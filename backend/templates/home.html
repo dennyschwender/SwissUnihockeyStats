@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t.home.title }} - {{ t.home.subtitle }}{% endblock %}
+
+{% block content %}
+<div class="hero fade-in">
+    <h1>{{ t.home.title }}</h1>
+    <p>{{ t.home.description }}</p>
+</div>
+
+<div class="cards-grid">
+    <!-- Clubs Card -->
+    <a href="/{{ locale }}/clubs" class="card">
+        <div class="card-icon">🏒</div>
+        <h3>{{ t.nav.clubs }}</h3>
+        <p>{{ t.clubs.subtitle }}</p>
+    </a>
+
+    <!-- Leagues Card -->
+    <a href="/{{ locale }}/leagues" class="card">
+        <div class="card-icon">🏆</div>
+        <h3>{{ t.nav.leagues }}</h3>
+        <p>{{ t.leagues.subtitle }}</p>
+    </a>
+
+    <!-- Teams Card -->
+    <a href="/{{ locale }}/teams" class="card">
+        <div class="card-icon">👥</div>
+        <h3>{{ t.nav.teams }}</h3>
+        <p>{{ t.teams.subtitle }}</p>
+    </a>
+
+    <!-- Games Card -->
+    <a href="/{{ locale }}/games" class="card">
+        <div class="card-icon">🎯</div>
+        <h3>{{ t.nav.games }}</h3>
+        <p>{{ t.games.subtitle }}</p>
+    </a>
+
+    <!-- Rankings Card -->
+    <a href="/{{ locale }}/rankings" class="card">
+        <div class="card-icon">📊</div>
+        <h3>{{ t.nav.rankings }}</h3>
+        <p>{{ t.rankings.subtitle }}</p>
+    </a>
+
+    <!-- Players Card -->
+    <a href="/{{ locale }}/players" class="card">
+        <div class="card-icon">⭐</div>
+        <h3>{{ t.nav.players }}</h3>
+        <p>{{ t.players.subtitle }}</p>
+    </a>
+</div>
+{% endblock %}

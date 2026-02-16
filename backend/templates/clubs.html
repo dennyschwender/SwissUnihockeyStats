@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t.clubs.title }} - {{ t.common.app_name }}{% endblock %}
+
+{% block content %}
+<div class="hero fade-in">
+    <h1>{{ t.clubs.title }}</h1>
+    <p>{{ t.clubs.subtitle }}</p>
+</div>
+
+<!-- Search Bar with htmx -->
+<div style="max-width: 600px; margin: 2rem auto;" x-data="{ search: '' }">
+    <input 
+        type="text" 
+        x-model="search"
+        hx-get="/{{ locale }}/clubs/search" 
+        hx-trigger="keyup changed delay:500ms" 
+        hx-target="#clubs-list"
+        hx-include="[name='q']"
+        name="q"
+        :value="search"
+        placeholder="{{ t.clubs.search_placeholder }}"
+        style="width: 100%; padding: 1rem; border: 2px solid var(--gray-300); border-radius: 0.5rem; font-size: 1rem;"
+    >
+    <span class="htmx-indicator loading" style="margin-left: 1rem;"></span>
+</div>
+
+<!-- Clubs List -->
+<div id="clubs-list" style="margin-top: 2rem;">
+    <div class="cards-grid">
+        {% for club in clubs %}
+        <div class="card" style="cursor: pointer;">
+            <h3>{{ club.text }}</h3>
+            <p>ID: {{ club.set_in_context.club_id }}</p>
+        </div>
+        {% endfor%}
+    </div>
+    
+    {% if not clubs %}
+    <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
+        <p>{{ t.common.loading }}</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+{
+  "common": {
+    "app_name": "SwissUnihockey",
+    "welcome": "Welcome",
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "search": "Search",
+    "filter": "Filter",
+    "back": "Back",
+    "close": "Close"
+  },
+  "nav": {
+    "home": "Home",
+    "clubs": "Clubs",
+    "leagues": "Leagues",
+    "teams": "Teams",
+    "games": "Games",
+    "rankings": "Rankings",
+    "players": "Players",
+    "statistics": "Statistics"
+  },
+  "home": {
+    "title": "SwissUnihockey",
+    "subtitle": "Swiss Unihockey Statistics",
+    "description": "Explore leagues, teams, games and statistics of Swiss Unihockey"
+  },
+  "clubs": {
+    "title": "Clubs",
+    "subtitle": "All Swiss Unihockey Clubs",
+    "search_placeholder": "Search club..."
+  },
+  "leagues": {
+    "title": "Leagues",
+    "subtitle": "All Swiss Unihockey Leagues"
+  },
+  "teams": {
+    "title": "Teams",
+    "subtitle": "All Teams of Swiss Unihockey Leagues"
+  },
+  "games": {
+    "title": "Games",
+    "subtitle": "Schedule and Results",
+    "live": "Live",
+    "upcoming": "Upcoming Games",
+    "results": "Results"
+  },
+  "rankings": {
+    "title": "Rankings",
+    "subtitle": "Current Rankings and Top Scorers",
+    "standings": "Standings",
+    "topscorers": "Top Scorers"
+  },
+  "players": {
+    "title": "Players",
+    "subtitle": "Player Search and Statistics"
+  },
+  "footer": {
+    "copyright": "© 2026 SwissUnihockey",
+    "about": "About Us",
+    "contact": "Contact",
+    "privacy": "Privacy"
+  }
+}
