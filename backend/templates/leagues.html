@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t.leagues.title }} - {{ t.common.app_name }}{% endblock %}
+
+{% block content %}
+<div class="hero fade-in">
+    <h1>{{ t.leagues.title }}</h1>
+    <p>{{ t.leagues.subtitle }}</p>
+</div>
+
+<!-- Leagues List -->
+<div style="margin-top: 2rem;">
+    <div class="cards-grid">
+        {% for league in leagues %}
+        <div class="card">
+            <div class="card-icon">🏆</div>
+            <h3>{{ league.text }}</h3>
+            {% if league.set_in_context %}
+            <p style="color: var(--gray-600); font-size: 0.875rem;">
+                Mode: {{ league.set_in_context.get('mode', 'N/A') }}<br>
+                Type: {{ league.set_in_context.get('type', 'N/A') }}
+            </p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% if not leagues %}
+    <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
+        <div class="loading"></div>
+        <p style="margin-top: 1rem;">{{ t.common.loading }}</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

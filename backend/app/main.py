@@ -126,6 +126,146 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
     return HTMLResponse(content=html)
 
 
+@app.get("/{locale}/leagues", response_class=HTMLResponse)
+async def leagues_page(request: Request, locale: str):
+    """Leagues listing page"""
+    client = get_swissunihockey_client()
+    leagues_data = client.get_leagues()
+    
+    return templates.TemplateResponse(
+        "leagues.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale),
+            "leagues": leagues_data.get("entries", [])
+        }
+    )
+
+
+@app.get("/{locale}/teams", response_class=HTMLResponse)
+async def teams_page(request: Request, locale: str):
+    """Teams listing page"""
+    client = get_swissunihockey_client()
+    teams_data = client.get_teams()
+    
+    return templates.TemplateResponse(
+        "teams.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale),
+            "teams": teams_data.get("entries", [])[:50]
+        }
+    )
+
+
+@app.get("/{locale}/teams/search", response_class=HTMLResponse)
+async def teams_search(request: Request, locale: str, q: str = "", mode: str = "all"):
+    """HTMX endpoint for team search"""
+    client = get_swissunihockey_client()
+    teams_data = client.get_teams()
+    all_teams = teams_data.get("entries", [])
+    
+    # Filter teams by search query and mode
+    filtered_teams = all_teams
+    if q:
+        filtered_teams = [
+            team for team in filtered_teams
+            if q.lower() in team.get("text", "").lower()
+        ]
+    
+    if mode != "all":
+        filtered_teams = [
+            team for team in filtered_teams
+            if str(team.get("set_in_context", {}).get("mode", "")) == mode
+        ]
+    
+    filtered_teams = filtered_teams[:50]
+    
+    # Return partial HTML for htmx
+    html = '<div class="cards-grid">'
+    for team in filtered_teams:
+        club_name = team.get("set_in_context", {}).get("club_name", "N/A")
+        league_name = team.get("set_in_context", {}).get("league_name", "N/A")
+        html += f'''
+        <div class="card">
+            <div class="card-icon">👥</div>
+            <h3>{team.get("text", "")}</h3>
+            <p style="color: var(--gray-600); font-size: 0.875rem;">
+                Club: {club_name}<br>
+                League: {league_name}
+            </p>
+        </div>
+        '''
+    html += '</div>'
+    
+    if not filtered_teams:
+        html = '<div style="text-align: center; padding: 3rem; color: var(--gray-600);"><p>No teams found</p></div>'
+    
+    return HTMLResponse(content=html)
+
+
+@app.get("/{locale}/games", response_class=HTMLResponse)
+async def games_page(request: Request, locale: str):
+    """Games schedule page"""
+    client = get_swissunihockey_client()
+    
+    try:
+        games_data = client.get_games()
+        games = games_data.get("entries", [])[:50] if isinstance(games_data, dict) else []
+    except Exception as e:
+        # Handle API errors gracefully
+        games = []
+    
+    return templates.TemplateResponse(
+        "games.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale),
+            "games": games
+        }
+    )
+
+
+@app.get("/{locale}/rankings", response_class=HTMLResponse)
+async def rankings_page(request: Request, locale: str):
+    """Rankings and top scorers page"""
+    client = get_swissunihockey_client()
+    
+    # Note: These methods might need league_id parameters in production
+    # For now, using mock data structure
+    standings = []
+    topscorers = []
+    
+    # Try to get rankings if available
+    try:
+        standings_data = client.get_table()
+        if isinstance(standings_data, dict) and "entries" in standings_data:
+            standings = standings_data["entries"][:20]
+    except:
+        pass
+    
+    try:
+        topscorers_data = client.get_top_scorers()
+        if isinstance(topscorers_data, dict) and "entries" in topscorers_data:
+            topscorers = topscorers_data["entries"][:20]
+    except:
+        pass
+    
+    return templates.TemplateResponse(
+        "rankings.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale),
+            "standings": standings,
+            "topscorers": topscorers
+        }
+    )
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""

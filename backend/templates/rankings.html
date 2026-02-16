@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t.rankings.title }} - {{ t.common.app_name }}{% endblock %}
+
+{% block content %}
+<div class="hero fade-in">
+    <h1>{{ t.rankings.title }}</h1>
+    <p>{{ t.rankings.subtitle }}</p>
+</div>
+
+<!-- Tab Navigation -->
+<div style="max-width: 900px; margin: 2rem auto;" x-data="{ tab: 'standings' }">
+    <div style="display: flex; gap: 1rem; border-bottom: 2px solid var(--gray-200); margin-bottom: 2rem;">
+        <button 
+            @click="tab = 'standings'"
+            :class="{ 'active': tab === 'standings' }"
+            class="tab-button"
+            style="padding: 1rem 2rem; background: none; border: none; cursor: pointer; font-weight: 600; border-bottom: 3px solid transparent; transition: all 0.3s;"
+            :style="tab === 'standings' ? 'border-bottom-color: var(--swiss-red); color: var(--swiss-red);' : ''"
+        >
+            {{ t.rankings.standings }}
+        </button>
+        <button 
+            @click="tab = 'topscorers'"
+            :class="{ 'active': tab === 'topscorers' }"
+            class="tab-button"
+            style="padding: 1rem 2rem; background: none; border: none; cursor: pointer; font-weight: 600; border-bottom: 3px solid transparent; transition: all 0.3s;"
+            :style="tab === 'topscorers' ? 'border-bottom-color: var(--swiss-red); color: var(--swiss-red);' : ''"
+        >
+            {{ t.rankings.topscorers }}
+        </button>
+    </div>
+    
+    <!-- Standings Tab -->
+    <div x-show="tab === 'standings'" style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; background: var(--swiss-white); border-radius: 0.5rem; overflow: hidden;">
+            <thead style="background: var(--swiss-red); color: white;">
+                <tr>
+                    <th style="padding: 1rem; text-align: left;">#</th>
+                    <th style="padding: 1rem; text-align: left;">Team</th>
+                    <th style="padding: 1rem; text-align: center;">GP</th>
+                    <th style="padding: 1rem; text-align: center;">W</th>
+                    <th style="padding: 1rem; text-align: center;">D</th>
+                    <th style="padding: 1rem; text-align: center;">L</th>
+                    <th style="padding: 1rem; text-align: center;">GF</th>
+                    <th style="padding: 1rem; text-align: center;">GA</th>
+                    <th style="padding: 1rem; text-align: center;">Pts</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for standing in standings %}
+                <tr style="border-bottom: 1px solid var(--gray-200);">
+                    <td style="padding: 1rem; font-weight: 600;">{{ standing.rank }}</td>
+                    <td style="padding: 1rem; font-weight: 600;">{{ standing.team_name }}</td>
+                    <td style="padding: 1rem; text-align: center;">{{ standing.games_played }}</td>
+                    <td style="padding: 1rem; text-align: center;">{{ standing.wins }}</td>
+                    <td style="padding: 1rem; text-align: center;">{{ standing.draws }}</td>
+                    <td style="padding: 1rem; text-align: center;">{{ standing.losses }}</td>
+                    <td style="padding: 1rem; text-align: center;">{{ standing.goals_for }}</td>
+                    <td style="padding: 1rem; text-align: center;">{{ standing.goals_against }}</td>
+                    <td style="padding: 1rem; text-align: center; font-weight: 700; color: var(--swiss-red);">{{ standing.points }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if not standings %}
+        <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
+            <p>No standings available</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Top Scorers Tab -->
+    <div x-show="tab === 'topscorers'" style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; background: var(--swiss-white); border-radius: 0.5rem; overflow: hidden;">
+            <thead style="background: var(--swiss-red); color: white;">
+                <tr>
+                    <th style="padding: 1rem; text-align: left;">#</th>
+                    <th style="padding: 1rem; text-align: left;">Player</th>
+                    <th style="padding: 1rem; text-align: left;">Team</th>
+                    <th style="padding: 1rem; text-align: center;">GP</th>
+                    <th style="padding: 1rem; text-align: center;">G</th>
+                    <th style="padding: 1rem; text-align: center;">A</th>
+                    <th style="padding: 1rem; text-align: center;">Pts</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for scorer in topscorers %}
+                <tr style="border-bottom: 1px solid var(--gray-200);">
+                    <td style="padding: 1rem; font-weight: 600;">{{ scorer.rank }}</td>
+                    <td style="padding: 1rem; font-weight: 600;">{{ scorer.player_name }}</td>
+                    <td style="padding: 1rem;">{{ scorer.team_name }}</td>
+                    <td style="padding: 1rem; text-align: center;">{{ scorer.games_played }}</td>
+                    <td style="padding: 1rem; text-align: center;">{{ scorer.goals }}</td>
+                    <td style="padding: 1rem; text-align: center;">{{ scorer.assists }}</td>
+                    <td style="padding: 1rem; text-align: center; font-weight: 700; color: var(--swiss-red);">{{ scorer.points }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if not topscorers %}
+        <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
+            <p>No top scorers available</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

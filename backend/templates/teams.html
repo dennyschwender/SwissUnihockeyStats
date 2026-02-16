@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t.teams.title }} - {{ t.common.app_name }}{% endblock %}
+
+{% block content %}
+<div class="hero fade-in">
+    <h1>{{ t.teams.title }}</h1>
+    <p>{{ t.teams.subtitle }}</p>
+</div>
+
+<!-- Search and Filters -->
+<div style="max-width: 800px; margin: 2rem auto;" x-data="{ search: '', mode: 'all' }">
+    <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+        <input 
+            type="text" 
+            x-model="search"
+            hx-get="/{{ locale }}/teams/search" 
+            hx-trigger="keyup changed delay:500ms" 
+            hx-target="#teams-list"
+            hx-include="[name='q'], [name='mode']"
+            name="q"
+            :value="search"
+            placeholder="{{ t.common.search }}..."
+            style="flex: 1; padding: 0.75rem; border: 2px solid var(--gray-300); border-radius: 0.5rem; font-size: 1rem;"
+        >
+        
+        <select 
+            x-model="mode"
+            hx-get="/{{ locale }}/teams/search" 
+            hx-trigger="change" 
+            hx-target="#teams-list"
+            hx-include="[name='q'], [name='mode']"
+            name="mode"
+            style="padding: 0.75rem; border: 2px solid var(--gray-300); border-radius: 0.5rem; font-size: 1rem;"
+        >
+            <option value="all">All Modes</option>
+            <option value="1">Men</option>
+            <option value="2">Women</option>
+            <option value="3">Mixed</option>
+        </select>
+    </div>
+    <span class="htmx-indicator loading" style="margin-left: 1rem;"></span>
+</div>
+
+<!-- Teams List -->
+<div id="teams-list" style="margin-top: 2rem;">
+    <div class="cards-grid">
+        {% for team in teams %}
+        <div class="card">
+            <div class="card-icon">👥</div>
+            <h3>{{ team.text }}</h3>
+            {% if team.set_in_context %}
+            <p style="color: var(--gray-600); font-size: 0.875rem;">
+                Club: {{ team.set_in_context.get('club_name', 'N/A') }}<br>
+                League: {{ team.set_in_context.get('league_name', 'N/A') }}
+            </p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% if not teams %}
+    <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
+        <div class="loading"></div>
+        <p style="margin-top: 1rem;">{{ t.common.loading }}</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
