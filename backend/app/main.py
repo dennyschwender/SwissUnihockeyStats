@@ -2,11 +2,15 @@
 Main FastAPI application entry point
 """
 from pathlib import Path
-from fastapi import FastAPI, Request
+from datetime import datetime
+import uuid
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.api.v1.router import api_router
 from app.lib.i18n import get_translations, get_locale_from_path, DEFAULT_LOCALE
@@ -270,6 +274,53 @@ async def rankings_page(request: Request, locale: str):
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
+
+
+# ============================================================================
+# Error Handlers
+# ============================================================================
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Handle HTTP exceptions (404, etc.)"""
+    locale = get_locale_from_path(request.url.path)
+    
+    if exc.status_code == 404:
+        return templates.TemplateResponse(
+            "error_404.html",
+            {
+                "request": request,
+                "locale": locale,
+                "t": get_translations(locale)
+            },
+            status_code=404
+        )
+    
+    # For other HTTP errors, return JSON
+    return {"detail": exc.detail}, exc.status_code
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Handle general exceptions (500)"""
+    locale = get_locale_from_path(request.url.path)
+    error_id = str(uuid.uuid4())[:8]
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Log error (in production, send to logging service)
+    print(f"[ERROR {error_id}] {exc}")
+    
+    return templates.TemplateResponse(
+        "error_500.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale),
+            "error_id": error_id,
+            "timestamp": timestamp
+        },
+        status_code=500
+    )
 
 
 if __name__ == "__main__":

@@ -251,11 +251,11 @@ backend/
 |------|-------|--------|----------------|
 | Home | `/{locale}` | ✅ Complete | Navigation cards |
 | Clubs | `/{locale}/clubs` | ✅ Complete | htmx search |
-| Leagues | `/{locale}/leagues` | ❌ Pending | Week 2 |
-| Teams | `/{locale}/teams` | ❌ Pending | Week 2 |
-| Games | `/{locale}/games` | ❌ Pending | Week 2 |
-| Rankings | `/{locale}/rankings` | ❌ Pending | Week 2 |
-| Players | `/{locale}/players` | ❌ Pending | Week 2 |
+| Leagues | `/{locale}/leagues` | ✅ Complete | Week 2 - Card grid |
+| Teams | `/{locale}/teams` | ✅ Complete | Week 2 - htmx search + filters |
+| Games | `/{locale}/games` | ✅ Complete | Week 2 - Schedule display |
+| Rankings | `/{locale}/rankings` | ✅ Complete | Week 2 - Alpine.js tabs |
+| Players | `/{locale}/players` | ❌ Pending | Week 4 |
 
 **Documentation:** See [PYTHON_FULL_STACK.md](PYTHON_FULL_STACK.md) for detailed architecture guide
 

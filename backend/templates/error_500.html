@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t.common.error }} 500 - {{ t.common.app_name }}{% endblock %}
+
+{% block content %}
+<div style="min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem;">
+    <div style="font-size: 8rem; font-weight: 700; color: var(--swiss-red); line-height: 1;">
+        500
+    </div>
+    
+    <h1 style="margin-top: 1rem; font-size: 2rem; font-weight: 700; color: var(--gray-900);">
+        Interner Serverfehler
+    </h1>
+    
+    <p style="margin-top: 1rem; font-size: 1.125rem; color: var(--gray-600); max-width: 500px;">
+        Entschuldigung! Etwas ist schiefgelaufen. Unser Team wurde automatisch benachrichtigt und arbeitet an einer Lösung.
+    </p>
+    
+    <div style="margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
+        <a href="/{{ locale }}" class="button-primary" style="text-decoration: none; padding: 0.75rem 2rem; background: var(--swiss-red); color: white; border-radius: 0.5rem; font-weight: 600; display: inline-block;">
+            Zur Startseite
+        </a>
+        
+        <button onclick="location.reload()" class="button-secondary" style="padding: 0.75rem 2rem; background: var(--gray-200); color: var(--gray-900); border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">
+            Seite neu laden
+        </button>
+    </div>
+    
+    <!-- Support info -->
+    <div style="margin-top: 3rem; padding: 1.5rem; background: var(--gray-50); border-radius: 0.5rem; max-width: 500px;">
+        <p style="font-size: 0.875rem; color: var(--gray-600); margin-bottom: 0.5rem;">
+            <strong>Fehler-ID:</strong> <code style="background: var(--gray-200); padding: 0.125rem 0.5rem; border-radius: 0.25rem;">{{ error_id }}</code>
+        </p>
+        <p style="font-size: 0.875rem; color: var(--gray-600);">
+            Falls das Problem weiterhin besteht, bitte kontaktieren Sie uns mit dieser Fehler-ID.
+        </p>
+    </div>
+    
+    <div style="margin-top: 2rem; font-size: 0.875rem; color: var(--gray-500);">
+        Zeitpunkt: {{ timestamp }}
+    </div>
+</div>
+{% endblock %}
