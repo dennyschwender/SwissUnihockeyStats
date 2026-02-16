@@ -1,0 +1,13 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include requirements.txt
+include config.ini
+include .env.example
+recursive-include api *.py
+recursive-include tests *.py
+recursive-include scripts *.py
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude data *
+recursive-exclude .venv *
