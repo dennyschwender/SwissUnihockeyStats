@@ -33,7 +33,8 @@ def load_translations(locale: str) -> Dict[str, Any]:
         return _translations_cache[locale]
     
     # Load from file
-    locales_dir = Path(__file__).parent.parent / "locales"
+    # Go from app/lib/i18n.py -> app/lib -> app -> backend -> locales
+    locales_dir = Path(__file__).parent.parent.parent / "locales"
     locale_file = locales_dir / locale / "messages.json"
     
     try:
