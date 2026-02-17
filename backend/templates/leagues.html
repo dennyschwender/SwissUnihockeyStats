@@ -13,7 +13,87 @@
 
 <!-- Leagues List -->
 <div id="leagues-list" style="margin-top: 2rem;">
-    {% if leagues %}
+    {% if grouped_leagues %}
+    <!-- Map game classes to readable names -->
+    {% set game_class_names = {
+        11: 'Men',
+        12: 'Men U21', 
+        21: 'Women',
+        22: 'Women U21',
+        31: 'Mixed'
+    } %}
+    
+    <!-- Group by league level -->
+    {% set current_league = None %}
+    {% for (league_num, game_class), league_group in grouped_leagues %}
+        {% if league_num != current_league %}
+            {% if current_league is not none %}
+                </div> <!-- Close previous league section -->
+            {% endif %}
+            {% set current_league = league_num %}
+            
+            <h2 style="margin: 2rem 0 1rem 0; color: var(--swiss-red); border-bottom: 2px solid var(--gray-200); padding-bottom: 0.5rem;">
+                {% if league_num == 1 %}
+                    🥇 NLA (National League A)
+                {% elif league_num == 2 %}
+                    🥈 NLB (National League B)
+                {% elif league_num == 3 %}
+                    🥉 1. Liga
+                {% elif league_num == 4 %}
+                    🎖️ 2. Liga
+                {% elif league_num == 5 %}
+                    🏅 3. Liga
+                {% elif league_num == 6 %}
+                    📋 4. Liga
+                {% elif league_num == 24 %}
+                    🌟 L-UPL (Unihockey Prime League)
+                {% else %}
+                    🏆 League {{ league_num }}
+                {% endif %}
+            </h2>
+            <div>
+        {% endif %}
+        
+        <!-- Display each game class group -->
+        {% set first_league = league_group[0] %}
+        <div class="card" style="margin-bottom: 1.5rem; cursor: pointer; border-left: 4px solid var(--swiss-red);"
+             onclick="window.location='/{{ locale }}/league/{{ first_league._index }}'">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="card-icon" style="font-size: 2.5rem;">
+                    {% if game_class in [11, 12] %}👨
+                    {% elif game_class in [21, 22] %}👩
+                    {% elif game_class == 31 %}👥
+                    {% else %}🏆
+                    {% endif %}
+                </div>
+                <div style="flex: 1;">
+                    <h3 style="margin: 0 0 0.5rem 0;">
+                        {{ game_class_names.get(game_class, 'Class ' ~ game_class) }}
+                    </h3>
+                    <p style="color: var(--gray-600); font-size: 0.875rem; margin: 0;">
+                        {{ first_league.text }}
+                        {% if league_group|length > 1 %}
+                        <br><span style="color: var(--gray-500); font-size: 0.813rem;">
+                            + {{ league_group|length - 1 }} more group(s)
+                        </span>
+                        {% endif %}
+                    </p>
+                </div>
+                <button 
+                    @click.stop="toggleFavorite('leagues', {{ first_league._index }}, '{{ first_league.text }}', {})"
+                    :class="isFavorite('leagues', {{ first_league._index }}) ? 'active' : 'inactive'"
+                    class="favorite-btn favorite-indicator"
+                    title="Add to favorites"
+                    onclick="event.stopPropagation();"
+                    style="position: static; margin-left: auto;"
+                >⭐</button>
+            </div>
+        </div>
+    {% endfor %}
+    </div> <!-- Close last league section -->
+    
+    {% elif leagues %}
+    <!-- Fallback to ungrouped display -->
     <div class="cards-grid">
         {% for league in leagues %}
         <div class="card" style="position: relative; cursor: pointer;"

@@ -220,13 +220,39 @@ async def leagues_page(request: Request, locale: str):
     # Use cached data instead of API call (loads on-demand if needed)
     leagues_list = await get_cached_leagues()
     
+    # Group leagues by league level and game class
+    from collections import defaultdict
+    grouped_leagues = defaultdict(list)
+    league_metadata = {}  # Store first occurrence of each league for metadata
+    
+    for idx, league in enumerate(leagues_list, 1):
+        league_num = league.get("set_in_context", {}).get("league")
+        game_class = league.get("set_in_context", {}).get("game_class")
+        
+        if league_num:
+            key = (league_num, game_class)
+            league_with_index = {**league, "_index": idx}  # Add index for URL routing
+            grouped_leagues[key].append(league_with_index)
+            
+            # Store metadata for the league level
+            if league_num not in league_metadata:
+                league_metadata[league_num] = {
+                    "name": league.get("text", "").split()[0] if league.get("text") else f"League {league_num}",
+                    "level": league_num
+                }
+    
+    # Sort groups by league level then game class
+    sorted_groups = sorted(grouped_leagues.items(), key=lambda x: (x[0][0], x[0][1] or 0))
+    
     return templates.TemplateResponse(
         "leagues.html",
         {
             "request": request,
             "locale": locale,
             "t": get_translations(locale),
-            "leagues": leagues_list
+            "leagues": leagues_list,  # Keep original for backwards compatibility
+            "grouped_leagues": sorted_groups,
+            "league_metadata": league_metadata
         }
     )
 
