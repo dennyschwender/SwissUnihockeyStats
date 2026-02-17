@@ -8,7 +8,7 @@
 {% block og_description %}Search for Swiss unihockey players{% endblock %}
 
 {% block content %}
-<div class="content-wrapper">
+<div class="content-wrapper" x-data="playerSearch()">
     <h1>Players</h1>
     <p style="color: var(--gray-600); margin-bottom: 2rem;">Search for Swiss unihockey players</p>
 
@@ -16,15 +16,16 @@
     <div style="max-width: 600px; margin-bottom: 2rem;">
         <input 
             type="text" 
-            id="player-search" 
+            x-ref="searchInput"
             placeholder="Search players by name..." 
             style="width: 100%; padding: 0.75rem 1rem; border: 2px solid var(--gray-300); border-radius: 8px; font-size: 1rem;"
-            @input="searchPlayers"
+            @input.debounce.300ms="searchPlayers($event.target.value)"
+            x-init="$nextTick(() => $refs.searchInput.focus())"
         >
     </div>
 
     <!-- Search Results -->
-    <div id="players-list">
+    <div id="players-list" x-html="resultsHtml">
         <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
             <p>Enter a player name to search</p>
         </div>
@@ -32,27 +33,20 @@
 </div>
 
 <script>
-const { createApp } = Vue;
-
-createApp({
-    data() {
-        return {
-            searchTimeout: null,
-            loading: false
-        }
-    },
-    methods: {
-        async searchPlayers(event) {
-            const query = event.target.value.trim();
-            
-            // Clear existing timeout
-            if (this.searchTimeout) {
-                clearTimeout(this.searchTimeout);
-            }
+function playerSearch() {
+    return {
+        resultsHtml: `
+            <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
+                <p>Enter a player name to search</p>
+            </div>
+        `,
+        
+        async searchPlayers(query) {
+            query = query.trim();
             
             // Don't search if query is too short
             if (query.length < 2) {
-                document.getElementById('players-list').innerHTML = `
+                this.resultsHtml = `
                     <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
                         <p>Enter at least 2 characters to search</p>
                     </div>
@@ -60,36 +54,27 @@ createApp({
                 return;
             }
             
-            // Debounce search
-            this.searchTimeout = setTimeout(async () => {
-                this.loading = true;
-                document.getElementById('players-list').innerHTML = `
-                    <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
-                        <p>Searching...</p>
+            // Show loading state
+            this.resultsHtml = `
+                <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
+                    <p>Searching...</p>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`/{{ locale }}/players/search?q=${encodeURIComponent(query)}`);
+                const html = await response.text();
+                this.resultsHtml = html;
+            } catch (error) {
+                console.error('Search error:', error);
+                this.resultsHtml = `
+                    <div style="text-align: center; padding: 3rem; color: #d32f2f;">
+                        <p>Error searching players. Please try again.</p>
                     </div>
                 `;
-                
-                try {
-                    const response = await fetch(`/{{ locale }}/players/search?q=${encodeURIComponent(query)}`);
-                    const html = await response.text();
-                    document.getElementById('players-list').innerHTML = html;
-                } catch (error) {
-                    console.error('Search error:', error);
-                    document.getElementById('players-list').innerHTML = `
-                        <div style="text-align: center; padding: 3rem; color: #d32f2f;">
-                            <p>Error searching players. Please try again.</p>
-                        </div>
-                    `;
-                } finally {
-                    this.loading = false;
-                }
-            }, 300);
+            }
         }
-    },
-    mounted() {
-        // Focus search box on load
-        document.getElementById('player-search').focus();
     }
-}).mount('#app');
+}
 </script>
 {% endblock %}
