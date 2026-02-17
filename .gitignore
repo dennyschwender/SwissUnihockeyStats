@@ -71,3 +71,6 @@ docker-compose.override.yml
 data/cache/*.json
 data/cache/**/*.json
 !data/cache/.gitkeep
+
+# Backend data directory (use root /data instead)
+backend/data/
