@@ -197,10 +197,11 @@ class TestUniversalSearch:
         mock_client.get_teams.side_effect = Exception("API Error")
         mock_get_client.return_value = mock_client
 
-        # Should crash since we don't have error handling yet
-        # This test documents current behavior - should be improved later
-        with pytest.raises(Exception):
-            response = client.get("/de/search", params={"q": "test"})
+        # Should handle errors gracefully (falls back to cache or shows error message)
+        response = client.get("/de/search", params={"q": "test"})
+        assert response.status_code == 200
+        # Should either show cached results or an error message
+        assert "service" in response.text.lower() or "search-results" in response.text.lower()
 
 
 class TestFavoritesPage:

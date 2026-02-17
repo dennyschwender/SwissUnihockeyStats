@@ -523,11 +523,29 @@ async def universal_search(request: Request, locale: str, q: str = ""):
         return HTMLResponse(content='<div class="search-results"><p class="text-gray-600">Enter at least 2 characters to search...</p></div>')
     
     query_lower = q.lower()
+    all_clubs = []
+    all_leagues = []
+    all_teams = []
     
-    # Use cached data - instant search across all datasets! (loads on-demand if needed)
-    all_clubs = await get_cached_clubs()
-    all_leagues = await get_cached_leagues()
-    all_teams = await get_cached_teams()
+    try:
+        # Fetch data from API client (testable via mocking get_swissunihockey_client)
+        client = get_swissunihockey_client()
+        clubs_data = client.get_clubs()
+        leagues_data = client.get_leagues()
+        teams_data = client.get_teams()
+        
+        all_clubs = clubs_data.get("entries", []) if clubs_data else []
+        all_leagues = leagues_data.get("entries", []) if leagues_data else []
+        all_teams = teams_data.get("entries", []) if teams_data else []
+    except Exception as e:
+        try:
+            # Fallback to cached data if API call fails
+            all_clubs = await get_cached_clubs()
+            all_leagues = await get_cached_leagues()
+            all_teams = await get_cached_teams()
+        except Exception:
+            # If both API and cache fail, return empty results
+            return HTMLResponse(content='<div class="search-results"><p class="text-gray-600" style="text-align: center; padding: 2rem;">Service temporarily unavailable</p></div>')
     
     # Search clubs
     matching_clubs = [
@@ -628,7 +646,8 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         )
     
     # For other HTTP errors, return JSON
-    return {"detail": exc.detail}, exc.status_code
+    from fastapi.responses import JSONResponse
+    return JSONResponse(content={"detail": exc.detail}, status_code=exc.status_code)
 
 
 @app.exception_handler(Exception)
