@@ -308,6 +308,10 @@ async def league_detail(request: Request, locale: str, league_id: int):
             game_class = league_data.get("set_in_context", {}).get("game_class")
             league_mode = league_data.get("set_in_context", {}).get("mode", "1")
             
+            # Store these for template use
+            league_data["_league_param"] = actual_league
+            league_data["_game_class_param"] = game_class
+            
             logger.info(f"Found league: {league_data.get('text')} (league={actual_league}, game_class={game_class}, mode={league_mode})")
             logger.info(f"API parameters: league={actual_league}, game_class={game_class}, mode={league_mode}")
             
@@ -468,7 +472,7 @@ async def teams_search(request: Request, locale: str, q: str = "", mode: str = "
 # ==================== Detail Pages ====================
 
 @app.get("/{locale}/team/{team_id}", response_class=HTMLResponse)
-async def team_detail(request: Request, locale: str, team_id: int):
+async def team_detail(request: Request, locale: str, team_id: int, league: int = None, game_class: int = None):
     """Team detail page"""
     client = get_swissunihockey_client()
     error_message = None
@@ -477,16 +481,35 @@ async def team_detail(request: Request, locale: str, team_id: int):
     games = []
     
     try:
-        # Try to fetch team data directly from API using team parameter
-        # This is more reliable than searching in cache
+        # If we have league and game_class, fetch team info from teams API
+        if league is not None and game_class is not None:
+            try:
+                teams_data = client.get_teams(league=league, game_class=game_class)
+                regions = teams_data.get("data", {}).get("regions", [])
+                if regions:
+                    all_teams = regions[0].get("rows", [])
+                    # Find our team in the list
+                    matching_teams = [t for t in all_teams if t.get("id") == team_id]
+                    if matching_teams:
+                        team_raw = matching_teams[0]
+                        # Extract team name from cells[0].text[0]
+                        team_name = team_raw.get("cells", [{}])[0].get("text", [f"Team {team_id}"])[0]
+                        team_data = {
+                            "id": team_id,
+                            "text": team_name,
+                            "club_name": team_raw.get("cells", [{}])[0].get("text", [""])[0] if len(team_raw.get("cells", [])) > 0 else ""
+                        }
+                        logger.info(f"Found team: {team_name}")
+            except Exception as team_error:
+                logger.warning(f"Could not load team from teams API: {team_error}")
+        
+        # Try to fetch players for this team
         try:
-            # Fetch players for this team - the response includes team info
             players_data = client.get_players(team=team_id)
             logger.info(f"Players response type: {type(players_data)}, keys: {players_data.keys() if isinstance(players_data, dict) else 'N/A'}")
             
-            # Extract team info from the response if available
-            if isinstance(players_data, dict):
-                # Check if team data is in the response
+            # If we don't have team_data yet, try to extract from players response
+            if not team_data and isinstance(players_data, dict):
                 team_context = players_data.get("data", {}).get("context", {})
                 if team_context:
                     team_data = {
@@ -494,12 +517,10 @@ async def team_detail(request: Request, locale: str, team_id: int):
                         "text": team_context.get("team_name", f"Team {team_id}"),
                         "club_name": team_context.get("club_name", ""),
                     }
-                    logger.info(f"Found team info in context: {team_data}")
-                else:
-                    # Fallback: create basic team data
-                    team_data = {"id": team_id, "text": f"Team {team_id}"}
-                
-                # Extract players from response
+                    logger.info(f"Found team info in players context: {team_data}")
+            
+            # Extract players from response
+            if isinstance(players_data, dict):
                 regions = players_data.get("data", {}).get("regions", [])
                 if regions:
                     players = regions[0].get("rows", [])
@@ -509,7 +530,9 @@ async def team_detail(request: Request, locale: str, team_id: int):
         except Exception as player_error:
             logger.warning(f"Could not load players for team {team_id}: {player_error}")
             players = []
-            # Still try to get basic team data from cache
+        
+        # If still no team_data, try cache
+        if not team_data:
             all_teams = await get_cached_teams()
             matching_teams = [t for t in all_teams if t.get("id") == team_id]
             if matching_teams:

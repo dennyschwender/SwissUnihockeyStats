@@ -72,7 +72,7 @@
                         </td>
                         <td style="padding: 0.75rem; font-weight: 600;">
                             {% if team_id %}
-                            <a href="/{{ locale }}/team/{{ team_id }}" style="color: inherit; text-decoration: none; border-bottom: 1px dashed var(--gray-400);" 
+                            <a href="/{{ locale }}/team/{{ team_id }}?league={{ league._league_param }}&game_class={{ league._game_class_param }}" style="color: inherit; text-decoration: none; border-bottom: 1px dashed var(--gray-400);" 
                                onmouseover="this.style.color='var(--swiss-red)'; this.style.borderBottomStyle='solid'" 
                                onmouseout="this.style.color='inherit'; this.style.borderBottomStyle='dashed'">
                                 {{ standing.data.team.name if standing.data and standing.data.team else (standing.team_name if standing.team_name else standing.team) }}
