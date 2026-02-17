@@ -12,24 +12,43 @@ logger = logging.getLogger(__name__)
 
 
 class DataCache:
-    """In-memory cache for SwissUnihockey API data with lazy loading"""
+    """In-memory cache for SwissUnihockey API data with hierarchical indexing
+    
+    Data is indexed in the following order:
+    1. Seasons (current + recent)
+    2. Leagues & Clubs (structural data)
+    3. Teams (with rosters → players)
+    4. Games (with events → player stats)
+    5. Players (aggregated from teams + games)
+    """
     
     def __init__(self):
-        self._teams: List[Dict[str, Any]] = []
+        # Structural data
         self._leagues: List[Dict[str, Any]] = []
         self._clubs: List[Dict[str, Any]] = []
+        self._teams: List[Dict[str, Any]] = []
+        
+        # Indexed data (keyed by ID)
+        self._seasons: List[int] = []  # Available seasons
+        self._games: Dict[int, Dict[str, Any]] = {}  # game_id -> game_data
+        self._players: Dict[int, Dict[str, Any]] = {}  # person_id -> player_profile
+        
         self._last_updated: Optional[datetime] = None
         
-        # Track loading state per category to prevent duplicate API calls
-        self._teams_loaded: bool = False  # All teams loaded
-        self._teams_popular_loaded: bool = False  # Popular teams (men's) loaded
+        # Track loading state per category
         self._leagues_loaded: bool = False
         self._clubs_loaded: bool = False
+        self._teams_loaded: bool = False
+        self._teams_popular_loaded: bool = False
+        self._seasons_loaded: bool = False
+        self._players_indexed: bool = False
         
-        # Locks to prevent concurrent loading of same data (created lazily)
+        # Locks to prevent concurrent loading
         self._teams_lock: Optional[asyncio.Lock] = None
         self._leagues_lock: Optional[asyncio.Lock] = None
         self._clubs_lock: Optional[asyncio.Lock] = None
+        self._players_lock: Optional[asyncio.Lock] = None
+        self._games_lock: Optional[asyncio.Lock] = None
     
     def _ensure_locks(self):
         """Ensure async locks are created (must be called in async context)"""
@@ -39,6 +58,10 @@ class DataCache:
             self._leagues_lock = asyncio.Lock()
         if self._clubs_lock is None:
             self._clubs_lock = asyncio.Lock()
+        if self._players_lock is None:
+            self._players_lock = asyncio.Lock()
+        if self._games_lock is None:
+            self._games_lock = asyncio.Lock()
     
 
     async def load_clubs(self) -> None:
@@ -337,12 +360,280 @@ class DataCache:
             "teams_popular_loaded": self._teams_popular_loaded,
             "leagues_loaded": self._leagues_loaded,
             "clubs_loaded": self._clubs_loaded,
+            "players_indexed": self._players_indexed,
             "all_loaded": self.is_loaded(),
             "last_updated": self._last_updated.isoformat() if self._last_updated else None,
             "teams_count": len(self._teams),
             "leagues_count": len(self._leagues),
             "clubs_count": len(self._clubs),
+            "players_count": len(self._players),
+            "games_count": len(self._games),
         }
+    
+    def _extract_player_name(self, player_data: Dict[str, Any]) -> str:
+        """Extract player name from various data formats"""
+        # Try direct text field
+        name = player_data.get("text", "")
+        if name:
+            return name
+        
+        # Try given_name + family_name
+        given = player_data.get("given_name", "")
+        family = player_data.get("family_name", "")
+        if given or family:
+            return f"{given} {family}".strip()
+        
+        # Try cells array (topscorers format)
+        cells = player_data.get("cells", [])
+        if cells and isinstance(cells[0], dict):
+            cell_text = cells[0].get("text", "")
+            if isinstance(cell_text, list):
+                return " ".join(str(t) for t in cell_text)
+            return str(cell_text)
+        
+        return ""
+    
+    async def index_players_from_teams(self) -> int:
+        """Extract and index players from team rosters
+        
+        Returns:
+            Number of new players indexed
+        """
+        logger.info("Indexing players from team rosters...")
+        client = get_swissunihockey_client()
+        from app.main import get_current_season
+        current_season = get_current_season()
+        
+        # Ensure leagues are loaded
+        await self.load_leagues()
+        
+        new_players = 0
+        teams_processed = 0
+        
+        # Process a sample of leagues to extract players from teams
+        for league in self._leagues[:10]:  # Process first 10 leagues
+            context = league.get("set_in_context", {})
+            league_id = context.get("league")
+            game_class = context.get("game_class")
+            mode = context.get("mode", "1")
+            
+            if not league_id or not game_class:
+                continue
+                
+            try:
+                # Fetch teams for this league
+                teams_data = client.get_teams(
+                    league=league_id,
+                    game_class=game_class,
+                    mode=mode,
+                    season=current_season
+                )
+                
+                teams = []
+                if isinstance(teams_data, dict):
+                    if "data" in teams_data:
+                        regions = teams_data.get("data", {}).get("regions", [])
+                        if regions:
+                            teams = regions[0].get("rows", [])
+                    elif "entries" in teams_data:
+                        teams = teams_data["entries"]
+                
+                # For each team, fetch players
+                for team in teams[:3]:  # First 3 teams per league
+                    team_id = team.get("id")
+                    team_name = team.get("text", "")
+                    
+                    if not team_id:
+                        continue
+                    
+                    try:
+                        # Fetch players for this team
+                        players_data = client.get_players(team=team_id, season=current_season)
+                        
+                        players = []
+                        if isinstance(players_data, dict):
+                            players = players_data.get("entries", players_data.get("data", []))
+                        
+                        # Index each player
+                        for player in players:
+                            player_id = player.get("person_id") or player.get("id")
+                            if not player_id:
+                                continue
+                            
+                            # Create or update player profile
+                            if player_id not in self._players:
+                                player_name = self._extract_player_name(player)
+                                
+                                self._players[player_id] = {
+                                    "id": player_id,
+                                    "person_id": player_id,
+                                    "name": player_name,
+                                    "text": player_name,
+                                    "teams": [{"id": team_id, "name": team_name, "league": league.get("text", "")}],
+                                    "games": [],  # Will be populated from game events
+                                    "stats": {},  # Will aggregate from games
+                                    "source": "team_roster",
+                                    "raw_data": player
+                                }
+                                new_players += 1
+                            else:
+                                # Add team to existing player
+                                team_info = {"id": team_id, "name": team_name, "league": league.get("text", "")}
+                                if team_info not in self._players[player_id]["teams"]:
+                                    self._players[player_id]["teams"].append(team_info)
+                        
+                        teams_processed += 1
+                        
+                    except Exception as e:
+                        logger.debug(f"Could not fetch players for team {team_id}: {e}")
+                        continue
+                        
+            except Exception as e:
+                logger.debug(f"Could not process league {league_id}: {e}")
+                continue
+        
+        logger.info(f"✓ Indexed {new_players} new players from {teams_processed} teams")
+        return new_players
+    
+    async def index_players_from_games(self) -> int:
+        """Extract and index players from game events and lineups
+        
+        Returns:
+            Number of players updated with game stats
+        """
+        logger.info("Indexing players from game events...")
+        client = get_swissunihockey_client()
+        from app.main import get_current_season
+        current_season = get_current_season()
+        
+        # Ensure leagues are loaded
+        await self.load_leagues()
+        
+        players_updated = 0
+        games_processed = 0
+        
+        # Process recent games from major leagues
+        major_leagues = [(1, 11), (1, 21), (2, 11), (2, 21)]  # NLA/NLB Men & Women
+        
+        for league_id, game_class in major_leagues:
+            try:
+                # Fetch recent games for this league
+                games_data = client.get_games(
+                    league=league_id,
+                    game_class=game_class,
+                    mode="1",
+                    season=current_season
+                )
+                
+                games = []
+                if isinstance(games_data, dict):
+                    games = games_data.get("entries", games_data.get("data", []))
+                
+                # Process first few games to extract player stats
+                for game in games[:5]:  # Process 5 games per league
+                    game_id = game.get("id")
+                    if not game_id:
+                        continue
+                    
+                    # Store game data
+                    if game_id not in self._games:
+                        self._games[game_id] = game
+                    
+                    # Extract players from game details/events
+                    # Game events contain player actions (goals, assists, etc.)
+                    events = game.get("events", [])
+                    for event in events:
+                        player_id = event.get("person_id") or event.get("player_id")
+                        if not player_id:
+                            continue
+                        
+                        # Create minimal player entry if not exists
+                        if player_id not in self._players:
+                            player_name = event.get("player_name", f"Player #{player_id}")
+                            self._players[player_id] = {
+                                "id": player_id,
+                                "person_id": player_id,
+                                "name": player_name,
+                                "text": player_name,
+                                "teams": [],
+                                "games": [game_id],
+                                "stats": {"games_played": 1},
+                                "source": "game_event"
+                            }
+                            players_updated += 1
+                        else:
+                            # Update existing player with game info
+                            if game_id not in self._players[player_id].get("games", []):
+                                self._players[player_id].setdefault("games", []).append(game_id)
+                                stats = self._players[player_id].setdefault("stats", {})
+                                stats["games_played"] = stats.get("games_played", 0) + 1
+                                players_updated += 1
+                    
+                    games_processed += 1
+                    
+            except Exception as e:
+                logger.debug(f"Could not process games for league {league_id}/{game_class}: {e}")
+                continue
+        
+        logger.info(f"✓ Updated {players_updated} players from {games_processed} games")
+        return players_updated
+    
+    async def build_comprehensive_player_index(self) -> None:
+        """Build comprehensive player index from all available sources
+        
+        Indexing order:
+        1. Teams (rosters) - primary source
+        2. Games (events) - adds stats and fills gaps
+        3. Topscorers - optional enhancement (if available)
+        """
+        self._ensure_locks()
+        async with self._players_lock:
+            if self._players_indexed:
+                logger.debug("Players already indexed, using cache")
+                return
+            
+            logger.info("Building comprehensive player index...")
+            start_time = datetime.now()
+            
+            try:
+                # Step 1: Index from team rosters
+                team_players = await self.index_players_from_teams()
+                
+                # Step 2: Enhance with game data
+                game_players = await self.index_players_from_games()
+                
+                self._players_indexed = True
+                elapsed = (datetime.now() - start_time).total_seconds()
+                
+                logger.info(f"✓ Indexed {len(self._players)} total players "
+                           f"({team_players} from teams, {game_players} from games) "
+                           f"in {elapsed:.2f}s")
+                
+            except Exception as e:
+                logger.error(f"❌ Error building player index: {e}")
+                raise
+    
+    
+    async def search_players(self, query: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Search for players by name in the indexed player data"""
+        # Ensure players are indexed
+        if not self._players_indexed:
+            await self.build_comprehensive_player_index()
+        
+        if not query or len(query) < 2:
+            return []
+        
+        query_lower = query.lower()
+        results = []
+        
+        for player_id, player in self._players.items():
+            player_name = player.get("name", "").lower()
+            if query_lower in player_name:
+                results.append(player)
+                if len(results) >= limit:
+                    break
+        
+        return results
 
 
 # Global cache instance

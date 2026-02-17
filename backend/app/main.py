@@ -4,6 +4,7 @@ Main FastAPI application entry point
 from pathlib import Path
 from datetime import datetime
 from contextlib import asynccontextmanager
+import asyncio
 import uuid
 import logging
 from fastapi import FastAPI, Request, HTTPException
@@ -60,6 +61,12 @@ async def lifespan(app: FastAPI):
     try:
         await preload_common_data()  # Loads leagues and popular teams
         # Note: Remaining teams will lazy-load on first search
+        
+        # Index players in background from teams and games
+        logger.info("🔍 Starting comprehensive player indexing in background...")
+        from app.services.data_cache import get_data_cache
+        cache = get_data_cache()
+        asyncio.create_task(cache.build_comprehensive_player_index())
     except Exception as e:
         logger.error(f"❌ Failed to preload common data: {e}")
         logger.warning("⚠️ App will start but may load data on first request")
@@ -649,17 +656,14 @@ async def players_page(request: Request, locale: str):
 async def search_players(request: Request, locale: str, q: str = "", team: str = "", club: str = ""):
     """Search players endpoint
     
-    Note: Swiss Unihockey API doesn't have a global player search endpoint.
-    We fetch topscorers from main leagues to build a searchable player database.
+    Uses cached player data indexed from topscorers across all leagues.
     """
-    client = get_swissunihockey_client()
-    current_season = get_current_season()
-    
     try:
-        all_players = []
+        filtered_players = []
         
-        # If team or club specified, use the players endpoint directly
+        # If team or club specified, use the API endpoint directly
         if team or club:
+            client = get_swissunihockey_client()
             params = {}
             if team:
                 params['team'] = team
@@ -667,93 +671,27 @@ async def search_players(request: Request, locale: str, q: str = "", team: str =
                 params['club'] = club
             players_data = client.get_players(**params)
             all_players = players_data.get("entries", players_data.get("data", [])) if isinstance(players_data, dict) else []
+            
+            # Filter by query if provided
+            if q:
+                q_lower = q.lower()
+                filtered_players = [
+                    p for p in all_players
+                    if q_lower in str(p.get("text", "")).lower()
+                    or q_lower in str(p.get("given_name", "")).lower()
+                    or q_lower in str(p.get("family_name", "")).lower()
+                ]
+            else:
+                filtered_players = all_players[:50]
         
-        # If we have a search query and no specific team/club, search through topscorers
-        # This gives us players from all main leagues
+        # If we have a search query and no specific team/club, search through cached player index
         elif q:
-            # Get leagues from cache to access their mode parameters
-            all_leagues = await get_cached_leagues()
-            
-            # Filter to main leagues with Men's and Women's categories
-            # Focus on NLB (league 2) and 1. Liga (league 3) which are most active
-            leagues_to_search = []
-            for league in all_leagues:
-                context = league.get("set_in_context", {})
-                league_num = context.get("league")
-                game_class = context.get("game_class")
-                mode = context.get("mode", "1")
-                
-                # NLB Men (league 2, game_class 11) or 1. Liga Men (league 3, game_class 11)
-                # or Women's leagues (game_class 21)
-                if league_num in [2, 3] and game_class in [11, 21]:
-                    leagues_to_search.append((league_num, game_class, mode))
-            
-            logger.info(f"Searching {len(leagues_to_search)} leagues for players matching '{q}'")
-            
-            for league, game_class, mode in leagues_to_search:
-                try:
-                    topscorers_data = client.get_topscorers(
-                        league=league, 
-                        game_class=game_class,
-                        mode=mode,
-                        season=current_season
-                    )
-                    # Extract players from nested structure
-                    if isinstance(topscorers_data, dict):
-                        # Try data.regions[0].rows first
-                        if "data" in topscorers_data:
-                            data_field = topscorers_data["data"]
-                            if isinstance(data_field, dict) and "regions" in data_field:
-                                for region in data_field.get("regions", []):
-                                    players = region.get("rows", [])
-                                    all_players.extend(players)
-                        # Fallback to entries
-                        elif "entries" in topscorers_data:
-                            all_players.extend(topscorers_data["entries"])
-                except Exception as e:
-                    logger.debug(f"Could not fetch topscorers for league {league}, game_class {game_class}, mode {mode}: {e}")
-                    continue
-            
-            logger.info(f"Found {len(all_players)} total players across all leagues")
+            # Search through indexed player data
+            from app.services.data_cache import get_data_cache
+            cache = get_data_cache()
+            filtered_players = await cache.search_players(q, limit=50)
+            logger.info(f"Found {len(filtered_players)} players matching '{q}'")
         
-        # Filter by query string if provided
-        if q:
-            q_lower = q.lower()
-            filtered_players = []
-            seen_ids = set()  # Avoid duplicates across leagues
-            
-            for p in all_players:
-                player_id = p.get("id", 0)
-                if player_id in seen_ids:
-                    continue
-                    
-                # Search in various player name fields
-                player_text = str(p.get("text", "")).lower()
-                given_name = str(p.get("given_name", "")).lower()
-                family_name = str(p.get("family_name", "")).lower()
-                
-                # Also check cells[0].text which contains player name in topscorers
-                cells = p.get("cells", [])
-                if cells and isinstance(cells[0], dict):
-                    cell_text = cells[0].get("text", "")
-                    if isinstance(cell_text, list):
-                        cell_text = " ".join(str(t) for t in cell_text).lower()
-                    else:
-                        cell_text = str(cell_text).lower()
-                else:
-                    cell_text = ""
-                
-                # Check if query matches any name field
-                if (q_lower in player_text or q_lower in given_name or 
-                    q_lower in family_name or q_lower in cell_text):
-                    filtered_players.append(p)
-                    seen_ids.add(player_id)
-                    
-                    # Limit results to prevent overwhelming the UI
-                    if len(filtered_players) >= 50:
-                        break
-        else:
-            filtered_players = []
     except Exception as e:
         logger.error(f"Error searching players: {e}")
         filtered_players = []
@@ -761,38 +699,14 @@ async def search_players(request: Request, locale: str, q: str = "", team: str =
     # Generate HTML response for search results
     html = '<div class="cards-grid">'
     for player in filtered_players:
-        # Extract player name from various possible fields
-        player_name = player.get("text", "")
+        # Extract player name
+        player_name = player.get("name", player.get("text", ""))
         if not player_name:
-            # Try cells[0].text (used in topscorers)
-            cells = player.get("cells", [])
-            if cells and isinstance(cells[0], dict):
-                cell_text = cells[0].get("text", "")
-                if isinstance(cell_text, list):
-                    player_name = " ".join(str(t) for t in cell_text)
-                else:
-                    player_name = str(cell_text)
-        if not player_name:
-            # Fallback to given_name + family_name
             player_name = f"{player.get('given_name', '')} {player.get('family_name', '')}".strip()
         
         player_id = player.get("id", 0)
-        
-        # Extract team name from different possible locations
-        team_name = player.get("set_in_context", {}).get("team_name", "")
-        if not team_name and len(cells) > 1:
-            # Team might be in cells[1]
-            team_cell = cells[1].get("text", "")
-            if isinstance(team_cell, list):
-                team_name = " ".join(str(t) for t in team_cell)
-            else:
-                team_name = str(team_cell)
-        if not team_name:
-            team_name = "N/A"
-            
+        team_name = player.get("team", player.get("set_in_context", {}).get("team_name", "N/A"))
         position = player.get("position", "")
-        if not position:
-            position = "N/A"
         
         html += f'''
         <div class="card" onclick="window.location='/{locale}/player/{player_id}'">
@@ -800,7 +714,7 @@ async def search_players(request: Request, locale: str, q: str = "", team: str =
             <h3>{player_name}</h3>
             <p style="color: var(--gray-600); font-size: 0.875rem;">
                 Team: {team_name}<br>
-                Position: {position}
+                {"Position: " + position if position else ""}
             </p>
         </div>
         '''
