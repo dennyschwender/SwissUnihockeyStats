@@ -66,15 +66,33 @@
                 <tbody>
                     {% for standing in standings[:20] %}
                     <tr style="border-bottom: 1px solid var(--gray-200);">
-                        <td style="padding: 0.75rem; font-weight: 600;">{{ standing.rank if standing.rank else loop.index }}</td>
-                        <td style="padding: 0.75rem; font-weight: 600;">{{ standing.team_name if standing.team_name else standing.team }}</td>
-                        <td style="padding: 0.75rem; text-align: center;">{{ standing.games_played if standing.games_played else standing.gp }}</td>
-                        <td style="padding: 0.75rem; text-align: center;">{{ standing.wins if standing.wins else standing.w }}</td>
-                        <td style="padding: 0.75rem; text-align: center;">{{ standing.draws if standing.draws else standing.d }}</td>
-                        <td style="padding: 0.75rem; text-align: center;">{{ standing.losses if standing.losses else standing.l }}</td>
-                        <td style="padding: 0.75rem; text-align: center;">{{ standing.goals_for if standing.goals_for else standing.gf }}</td>
-                        <td style="padding: 0.75rem; text-align: center;">{{ standing.goals_against if standing.goals_against else standing.ga }}</td>
-                        <td style="padding: 0.75rem; text-align: center; font-weight: 700; color: var(--swiss-red);">{{ standing.points if standing.points else standing.pts }}</td>
+                        <td style="padding: 0.75rem; font-weight: 600;">
+                            {{ standing.data.rank if standing.data and standing.data.rank else (standing.rank if standing.rank else loop.index) }}
+                        </td>
+                        <td style="padding: 0.75rem; font-weight: 600;">
+                            {{ standing.data.team.name if standing.data and standing.data.team else (standing.team_name if standing.team_name else standing.team) }}
+                        </td>
+                        <td style="padding: 0.75rem; text-align: center;">
+                            {{ standing.cells[3].text[0] if standing.cells and standing.cells|length > 3 else (standing.games_played if standing.games_played else standing.gp) }}
+                        </td>
+                        <td style="padding: 0.75rem; text-align: center;">
+                            {{ standing.cells[5].text[0] if standing.cells and standing.cells|length > 5 else (standing.wins if standing.wins else standing.w) }}
+                        </td>
+                        <td style="padding: 0.75rem; text-align: center;">
+                            {{ (standing.cells[6].text[0]|int + standing.cells[7].text[0]|int) if standing.cells and standing.cells|length > 7 else (standing.draws if standing.draws else standing.d) }}
+                        </td>
+                        <td style="padding: 0.75rem; text-align: center;">
+                            {{ standing.cells[8].text[0] if standing.cells and standing.cells|length > 8 else (standing.losses if standing.losses else standing.l) }}
+                        </td>
+                        <td style="padding: 0.75rem; text-align: center;">
+                            {{ standing.cells[9].text[0] if standing.cells and standing.cells|length > 9 else (standing.goals_for if standing.goals_for else standing.gf) }}
+                        </td>
+                        <td style="padding: 0.75rem; text-align: center;">
+                            {{ standing.cells[9].text[0].split(':')[1] if standing.cells and standing.cells|length > 9 and ':' in standing.cells[9].text[0] else (standing.goals_against if standing.goals_against else standing.ga) }}
+                        </td>
+                        <td style="padding: 0.75rem; text-align: center; font-weight: 700; color: var(--swiss-red);">
+                            {{ standing.cells[12].text[0] if standing.cells and standing.cells|length > 12 else (standing.points if standing.points else standing.pts) }}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -88,10 +106,14 @@
     <h2 style="margin: 2rem 0 1rem 0;">{{ t.teams.title if t.teams and t.teams.title else 'Teams' }}</h2>
     <div class="cards-grid">
         {% for team in teams[:30] %}
-        <div class="card" onclick="window.location='/{{ locale }}/team/{{ team.id if team.id else team.set_in_context.team_id }}'">
+        <div class="card" onclick="window.location='/{{ locale }}/team/{{ team.data.team.id if team.data and team.data.team else (team.id if team.id else team.set_in_context.team_id if team.set_in_context else '') }}'">
             <div class="card-icon">👥</div>
-            <h3>{{ team.text if team.text else 'Team' }}</h3>
-            {% if team.set_in_context and team.set_in_context.club_name %}
+            <h3>{{ team.data.team.name if team.data and team.data.team else (team.text if team.text else 'Team') }}</h3>
+            {% if team.data and team.data.club_name %}
+            <p style="color: var(--gray-600); font-size: 0.875rem;">
+                🏢 {{ team.data.club_name }}
+            </p>
+            {% elif team.set_in_context and team.set_in_context.club_name %}
             <p style="color: var(--gray-600); font-size: 0.875rem;">
                 🏢 {{ team.set_in_context.club_name }}
             </p>
@@ -126,13 +148,27 @@
                 <tbody>
                     {% for scorer in topscorers[:20] %}
                     <tr style="border-bottom: 1px solid var(--gray-200);">
-                        <td style="padding: 0.75rem; font-weight: 600;">{{ scorer.rank if scorer.rank else loop.index }}</td>
-                        <td style="padding: 0.75rem; font-weight: 600;">{{ scorer.player_name if scorer.player_name else scorer.player }}</td>
-                        <td style="padding: 0.75rem;">{{ scorer.team_name if scorer.team_name else scorer.team }}</td>
-                        <td style="padding: 0.75rem; text-align: center;">{{ scorer.games_played if scorer.games_played else scorer.gp }}</td>
-                        <td style="padding: 0.75rem; text-align: center;">{{ scorer.goals if scorer.goals else scorer.g }}</td>
-                        <td style="padding: 0.75rem; text-align: center;">{{ scorer.assists if scorer.assists else scorer.a }}</td>
-                        <td style="padding: 0.75rem; text-align: center; font-weight: 700; color: var(--swiss-red);">{{ scorer.points if scorer.points else scorer.pts }}</td>
+                        <td style="padding: 0.75rem; font-weight: 600;">
+                            {{ scorer.data.rank if scorer.data and scorer.data.rank else (scorer.rank if scorer.rank else loop.index) }}
+                        </td>
+                        <td style="padding: 0.75rem; font-weight: 600;">
+                            {{ scorer.data.player.name if scorer.data and scorer.data.player else (scorer.player_name if scorer.player_name else scorer.player) }}
+                        </td>
+                        <td style="padding: 0.75rem;">
+                            {{ scorer.data.team.name if scorer.data and scorer.data.team else (scorer.team_name if scorer.team_name else scorer.team) }}
+                        </td>
+                        <td style="padding: 0.75rem; text-align: center;">
+                            {{ scorer.cells[3].text[0] if scorer.cells and scorer.cells|length > 3 else (scorer.games_played if scorer.games_played else scorer.gp) }}
+                        </td>
+                        <td style="padding: 0.75rem; text-align: center;">
+                            {{ scorer.cells[4].text[0] if scorer.cells and scorer.cells|length > 4 else (scorer.goals if scorer.goals else scorer.g) }}
+                        </td>
+                        <td style="padding: 0.75rem; text-align: center;">
+                            {{ scorer.cells[5].text[0] if scorer.cells and scorer.cells|length > 5 else (scorer.assists if scorer.assists else scorer.a) }}
+                        </td>
+                        <td style="padding: 0.75rem; text-align: center; font-weight: 700; color: var(--swiss-red);">
+                            {{ scorer.cells[6].text[0] if scorer.cells and scorer.cells|length > 6 else (scorer.points if scorer.points else scorer.pts) }}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

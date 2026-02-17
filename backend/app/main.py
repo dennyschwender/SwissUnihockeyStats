@@ -272,32 +272,65 @@ async def league_detail(request: Request, locale: str, league_id: int):
             league_mode = league_data.get("set_in_context", {}).get("mode", "1")
             
             logger.info(f"Found league: {league_data.get('text')} (league={actual_league}, game_class={game_class}, mode={league_mode})")
+            logger.info(f"API parameters: league={actual_league}, game_class={game_class}, mode={league_mode}")
             
             # Fetch teams for this league
             try:
+                logger.info(f"Fetching teams for league {actual_league}, game_class {game_class}")
                 teams_data = client.get_teams(league=actual_league, game_class=game_class, mode=league_mode)
-                teams = teams_data.get("entries", [])[:50] if isinstance(teams_data, dict) else []
+                logger.info(f"Teams response type: {type(teams_data)}, keys: {teams_data.keys() if isinstance(teams_data, dict) else 'N/A'}")
+                # API v2 returns data.regions[0].rows structure
+                teams = teams_data.get("entries", [])
+                if not teams and isinstance(teams_data, dict):
+                    regions = teams_data.get("data", {}).get("regions", [])
+                    teams = regions[0].get("rows", []) if regions else []
+                teams = teams[:50]
+                logger.info(f"Loaded {len(teams)} teams")
             except Exception as team_error:
                 logger.warning(f"Could not load teams for league {actual_league}: {team_error}")
             
             # Fetch standings
             try:
+                logger.info(f"Fetching standings for league {actual_league}, game_class {game_class}")
                 standings_data = client.get_rankings(league=actual_league, game_class=game_class, mode=league_mode)
-                standings = standings_data.get("entries", [])[:30] if isinstance(standings_data, dict) else []
+                logger.info(f"Standings response type: {type(standings_data)}, keys: {standings_data.keys() if isinstance(standings_data, dict) else 'N/A'}")
+                # API v2 returns data.regions[0].rows structure
+                standings = standings_data.get("entries", [])
+                if not standings and isinstance(standings_data, dict):
+                    regions = standings_data.get("data", {}).get("regions", [])
+                    standings = regions[0].get("rows", []) if regions else []
+                standings = standings[:30]
+                logger.info(f"Loaded {len(standings)} standings entries")
             except Exception as standings_error:
                 logger.warning(f"Could not load standings for league {actual_league}: {standings_error}")
             
             # Fetch top scorers
             try:
+                logger.info(f"Fetching top scorers for league {actual_league}, game_class {game_class}")
                 topscorers_data = client.get_topscorers(league=actual_league, game_class=game_class, mode=league_mode)
-                topscorers = topscorers_data.get("entries", [])[:30] if isinstance(topscorers_data, dict) else []
+                logger.info(f"Top scorers response type: {type(topscorers_data)}, keys: {topscorers_data.keys() if isinstance(topscorers_data, dict) else 'N/A'}")
+                # API v2 returns data.regions[0].rows structure
+                topscorers = topscorers_data.get("entries", [])
+                if not topscorers and isinstance(topscorers_data, dict):
+                    regions = topscorers_data.get("data", {}).get("regions", [])
+                    topscorers = regions[0].get("rows", []) if regions else []
+                topscorers = topscorers[:30]
+                logger.info(f"Loaded {len(topscorers)} top scorers")
             except Exception as scorers_error:
                 logger.warning(f"Could not load top scorers for league {actual_league}: {scorers_error}")
             
             # Fetch recent games
             try:
+                logger.info(f"Fetching games for league {actual_league}, game_class {game_class}")
                 games_data = client.get_games(league=actual_league, game_class=game_class, mode=league_mode)
-                games = games_data.get("entries", [])[:20] if isinstance(games_data, dict) else []
+                logger.info(f"Games response type: {type(games_data)}, keys: {games_data.keys() if isinstance(games_data, dict) else 'N/A'}")
+                # API v2 returns data.regions[0].rows structure
+                games = games_data.get("entries", [])
+                if not games and isinstance(games_data, dict):
+                    regions = games_data.get("data", {}).get("regions", [])
+                    games = regions[0].get("rows", []) if regions else []
+                games = games[:20]
+                logger.info(f"Loaded {len(games)} games")
             except Exception as games_error:
                 logger.warning(f"Could not load games for league {actual_league}: {games_error}")
         else:
