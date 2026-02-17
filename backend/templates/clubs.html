@@ -27,6 +27,7 @@
 
 <!-- Clubs List -->
 <div id="clubs-list" style="margin-top: 2rem;">
+    {% if clubs %}
     <div class="cards-grid">
         {% for club in clubs %}
         <div class="card" style="cursor: pointer;">
@@ -35,10 +36,15 @@
         </div>
         {% endfor%}
     </div>
-    
-    {% if not clubs %}
-    <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
-        <p>{{ t.common.loading }}</p>
+    {% else %}
+    <!-- Loading skeleton -->
+    <div class="cards-grid">
+        {% for i in range(8) %}
+        <div class="skeleton-card">
+            <div class="skeleton skeleton-title" style="margin-bottom: 1rem;"></div>
+            <div class="skeleton skeleton-text" style="width: 40%;"></div>
+        </div>
+        {% endfor %}
     </div>
     {% endif %}
 </div>

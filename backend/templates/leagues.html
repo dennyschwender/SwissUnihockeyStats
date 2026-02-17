@@ -9,7 +9,8 @@
 </div>
 
 <!-- Leagues List -->
-<div style="margin-top: 2rem;">
+<div id="leagues-list" style="margin-top: 2rem;">
+    {% if leagues %}
     <div class="cards-grid">
         {% for league in leagues %}
         <div class="card">
@@ -24,11 +25,17 @@
         </div>
         {% endfor %}
     </div>
-    
-    {% if not leagues %}
-    <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
-        <div class="loading"></div>
-        <p style="margin-top: 1rem;">{{ t.common.loading }}</p>
+    {% else %}
+    <!-- Loading skeleton -->
+    <div class="cards-grid">
+        {% for i in range(6) %}
+        <div class="skeleton-card">
+            <div class="skeleton skeleton-avatar" style="margin: 0 auto 1rem; width: 64px; height: 64px;"></div>
+            <div class="skeleton skeleton-title" style="margin: 0 auto 1rem;"></div>
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-text" style="width: 70%;"></div>
+        </div>
+        {% endfor %}
     </div>
     {% endif %}
 </div>
