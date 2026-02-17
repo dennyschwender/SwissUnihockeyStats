@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}{{ league.text if league.text else 'League Details' }} - {{ t.common.app_name }}{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    <!-- Back Button -->
+    <div style="margin-bottom: 1.5rem;">
+        <a href="/{{ locale }}/leagues" style="color: var(--swiss-red); text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
+            ← {{ t.common.back if t.common.back else 'Back to Leagues' }}
+        </a>
+    </div>
+
+    {% if error_message %}
+    <div style="padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 8px; margin-bottom: 1.5rem;">
+        <strong>Error:</strong> {{ error_message }}
+    </div>
+    {% endif %}
+
+    <!-- League Header -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+            <div class="card-icon" style="font-size: 4rem;">🏆</div>
+            <div>
+                <h1 style="margin: 0;">{{ league.text if league.text else 'League Details' }}</h1>
+                {% if league.set_in_context %}
+                    {% if league.set_in_context.league_id %}
+                    <p style="margin: 0.5rem 0 0 0; color: var(--gray-600);">
+                        League ID: {{ league.set_in_context.league_id }}
+                    </p>
+                    {% endif %}
+                    {% if league.set_in_context.type %}
+                    <p style="margin: 0.25rem 0 0 0; color: var(--gray-600);">
+                        📋 Type: {{ league.set_in_context.type|title }}
+                    </p>
+                    {% endif %}
+                    {% if league.set_in_context.mode %}
+                    <p style="margin: 0.25rem 0 0 0; color: var(--gray-600);">
+                        ⚙️ Mode: {{ league.set_in_context.mode }}
+                    </p>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Standings Section -->
+    {% if standings %}
+    <h2 style="margin: 2rem 0 1rem 0;">{{ t.rankings.standings if t.rankings and t.rankings.standings else 'Standings' }}</h2>
+    <div class="card">
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead style="background: var(--gray-100); border-bottom: 2px solid var(--gray-300);">
+                    <tr>
+                        <th style="padding: 0.75rem; text-align: left;">Rank</th>
+                        <th style="padding: 0.75rem; text-align: left;">Team</th>
+                        <th style="padding: 0.75rem; text-align: center;">GP</th>
+                        <th style="padding: 0.75rem; text-align: center;">W</th>
+                        <th style="padding: 0.75rem; text-align: center;">D</th>
+                        <th style="padding: 0.75rem; text-align: center;">L</th>
+                        <th style="padding: 0.75rem; text-align: center;">GF</th>
+                        <th style="padding: 0.75rem; text-align: center;">GA</th>
+                        <th style="padding: 0.75rem; text-align: center; font-weight: bold;">Pts</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for standing in standings[:20] %}
+                    <tr style="border-bottom: 1px solid var(--gray-200);">
+                        <td style="padding: 0.75rem; font-weight: 600;">{{ standing.rank if standing.rank else loop.index }}</td>
+                        <td style="padding: 0.75rem; font-weight: 600;">{{ standing.team_name if standing.team_name else standing.team }}</td>
+                        <td style="padding: 0.75rem; text-align: center;">{{ standing.games_played if standing.games_played else standing.gp }}</td>
+                        <td style="padding: 0.75rem; text-align: center;">{{ standing.wins if standing.wins else standing.w }}</td>
+                        <td style="padding: 0.75rem; text-align: center;">{{ standing.draws if standing.draws else standing.d }}</td>
+                        <td style="padding: 0.75rem; text-align: center;">{{ standing.losses if standing.losses else standing.l }}</td>
+                        <td style="padding: 0.75rem; text-align: center;">{{ standing.goals_for if standing.goals_for else standing.gf }}</td>
+                        <td style="padding: 0.75rem; text-align: center;">{{ standing.goals_against if standing.goals_against else standing.ga }}</td>
+                        <td style="padding: 0.75rem; text-align: center; font-weight: 700; color: var(--swiss-red);">{{ standing.points if standing.points else standing.pts }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Teams Section -->
+    {% if teams %}
+    <h2 style="margin: 2rem 0 1rem 0;">{{ t.teams.title if t.teams and t.teams.title else 'Teams' }}</h2>
+    <div class="cards-grid">
+        {% for team in teams[:30] %}
+        <div class="card" onclick="window.location='/{{ locale }}/team/{{ team.id if team.id else team.set_in_context.team_id }}'">
+            <div class="card-icon">👥</div>
+            <h3>{{ team.text if team.text else 'Team' }}</h3>
+            {% if team.set_in_context and team.set_in_context.club_name %}
+            <p style="color: var(--gray-600); font-size: 0.875rem;">
+                🏢 {{ team.set_in_context.club_name }}
+            </p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% if teams|length > 30 %}
+    <p style="text-align: center; color: var(--gray-600); margin-top: 1rem;">
+        Showing 30 of {{ teams|length }} teams
+    </p>
+    {% endif %}
+    {% endif %}
+
+    <!-- Top Scorers Section -->
+    {% if topscorers %}
+    <h2 style="margin: 2rem 0 1rem 0;">{{ t.rankings.topscorers if t.rankings and t.rankings.topscorers else 'Top Scorers' }}</h2>
+    <div class="card">
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead style="background: var(--gray-100); border-bottom: 2px solid var(--gray-300);">
+                    <tr>
+                        <th style="padding: 0.75rem; text-align: left;">Rank</th>
+                        <th style="padding: 0.75rem; text-align: left;">Player</th>
+                        <th style="padding: 0.75rem; text-align: left;">Team</th>
+                        <th style="padding: 0.75rem; text-align: center;">GP</th>
+                        <th style="padding: 0.75rem; text-align: center;">G</th>
+                        <th style="padding: 0.75rem; text-align: center;">A</th>
+                        <th style="padding: 0.75rem; text-align: center; font-weight: bold;">Pts</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for scorer in topscorers[:20] %}
+                    <tr style="border-bottom: 1px solid var(--gray-200);">
+                        <td style="padding: 0.75rem; font-weight: 600;">{{ scorer.rank if scorer.rank else loop.index }}</td>
+                        <td style="padding: 0.75rem; font-weight: 600;">{{ scorer.player_name if scorer.player_name else scorer.player }}</td>
+                        <td style="padding: 0.75rem;">{{ scorer.team_name if scorer.team_name else scorer.team }}</td>
+                        <td style="padding: 0.75rem; text-align: center;">{{ scorer.games_played if scorer.games_played else scorer.gp }}</td>
+                        <td style="padding: 0.75rem; text-align: center;">{{ scorer.goals if scorer.goals else scorer.g }}</td>
+                        <td style="padding: 0.75rem; text-align: center;">{{ scorer.assists if scorer.assists else scorer.a }}</td>
+                        <td style="padding: 0.75rem; text-align: center; font-weight: 700; color: var(--swiss-red);">{{ scorer.points if scorer.points else scorer.pts }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Games -->
+    {% if games %}
+    <h2 style="margin: 2rem 0 1rem 0;">{{ t.games.title if t.games and t.games.title else 'Recent Games' }}</h2>
+    <div class="card">
+        {% for game in games[:15] %}
+        <div style="padding: 1rem; border-bottom: 1px solid var(--gray-200); {% if loop.last %}border-bottom: none;{% endif %}">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>{{ game.home_team if game.home_team else 'Home' }} vs {{ game.away_team if game.away_team else 'Away' }}</strong>
+                    {% if game.score %}
+                    <p style="margin: 0.25rem 0 0 0; color: var(--gray-600);">
+                        Score: {{ game.score }}
+                    </p>
+                    {% endif %}
+                </div>
+                <div style="text-align: right; color: var(--gray-600); font-size: 0.875rem;">
+                    {% if game.date %}{{ game.date }}{% endif %}
+                    {% if game.time %}<br>{{ game.time }}{% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

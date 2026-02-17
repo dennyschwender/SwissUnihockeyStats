@@ -28,7 +28,9 @@
 <div id="clubs-list" style="max-width: 1200px; margin: 2rem auto;">
     <div class="cards-grid">
         {% for club in clubs %}
-        <div class="card" data-club-id="{{ club.id }}">
+        <div class="card" data-club-id="{{ club.id }}" 
+             onclick="window.location='/{{ locale }}/club/{{ club.set_in_context.club_id if club.set_in_context and club.set_in_context.club_id else club.id }}'"
+             style="cursor: pointer;">
             <div style="display: flex; justify-content: space-between; align-items: start;">
                 <h3 style="margin: 0;">{{ club.text }}</h3>
                 <button 
@@ -38,12 +40,18 @@
                     data-name="{{ club.text }}"
                     style="background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0.25rem;"
                     title="Add to favorites"
+                    onclick="event.stopPropagation();"
                 >
                     ⭐
                 </button>
             </div>
             {% if club.region %}
             <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">📍 {{ club.region }}</p>
+            {% elif club.set_in_context and club.set_in_context.region %}
+            <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">📍 {{ club.set_in_context.region }}</p>
+            {% endif %}
+            {% if club.set_in_context and club.set_in_context.club_id %}
+            <p style="color: var(--gray-500); margin: 0.25rem 0 0 0; font-size: 0.75rem;">ID: {{ club.set_in_context.club_id }}</p>
             {% endif %}
         </div>
         {% endfor %}

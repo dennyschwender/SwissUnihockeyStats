@@ -16,21 +16,30 @@
     {% if leagues %}
     <div class="cards-grid">
         {% for league in leagues %}
-        <div class="card" style="position: relative;">
+        <div class="card" style="position: relative; cursor: pointer;"
+             onclick="window.location='/{{ locale }}/league/{{ league.set_in_context.league_id if league.set_in_context and league.set_in_context.league_id else loop.index }}'">
             <!-- Favorite Button -->
             <button 
                 @click.stop="toggleFavorite('leagues', {{ loop.index }}, '{{ league.text }}', {})"
                 :class="isFavorite('leagues', {{ loop.index }}) ? 'active' : 'inactive'"
                 class="favorite-btn favorite-indicator"
                 title="Add to favorites"
+                onclick="event.stopPropagation();"
             >⭐</button>
             
             <div class="card-icon">🏆</div>
             <h3>{{ league.text }}</h3>
             {% if league.set_in_context %}
             <p style="color: var(--gray-600); font-size: 0.875rem;">
+                {% if league.set_in_context.get('mode') %}
                 Mode: {{ league.set_in_context.get('mode', 'N/A') }}<br>
-                Type: {{ league.set_in_context.get('type', 'N/A') }}
+                {% endif %}
+                {% if league.set_in_context.get('type') %}
+                Type: {{ league.set_in_context.get('type', 'N/A')|title }}<br>
+                {% endif %}
+                {% if league.set_in_context.get('league_id') %}
+                ID: {{ league.set_in_context.get('league_id') }}
+                {% endif %}
             </p>
             {% endif %}
         </div>

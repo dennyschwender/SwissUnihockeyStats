@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Game {{ game.game_id if game and game.game_id else 'Details' }} - {{ t.common.app_name }}{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    <!-- Back Button -->
+    <div style="margin-bottom: 1.5rem;">
+        <a href="/{{ locale }}/games" style="color: var(--swiss-red); text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
+            ← {{ t.common.back if t.common.back else 'Back to Games' }}
+        </a>
+    </div>
+
+    {% if error_message %}
+    <div style="padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 8px; margin-bottom: 1.5rem;">
+        <strong>Error:</strong> {{ error_message }}
+    </div>
+    {% endif %}
+
+    <!-- Game Header -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div style="text-align: center;">
+            <h1 style="margin: 0 0 1rem 0;">
+                {% if game.home_team and game.away_team %}
+                {{ game.home_team }} vs {{ game.away_team }}
+                {% else %}
+                Game Details
+                {% endif %}
+            </h1>
+            
+            {% if game.score %}
+            <div style="font-size: 3rem; font-weight: bold; color: var(--swiss-red); margin: 1rem 0;">
+                {{ game.score }}
+            </div>
+            {% endif %}
+            
+            <div style="display: flex; justify-content: center; gap: 2rem; margin-top: 1rem; color: var(--gray-600);">
+                {% if game.date %}
+                <div>
+                    <strong>📅 Date:</strong> {{ game.date }}
+                </div>
+                {% endif %}
+                {% if game.time %}
+                <div>
+                    <strong>⏰ Time:</strong> {{ game.time }}
+                </div>
+                {% endif %}
+                {% if game.venue %}
+                <div>
+                    <strong>🏟️ Venue:</strong> {{ game.venue }}
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if game.league_name %}
+            <p style="margin: 1rem 0 0 0; color: var(--gray-600);">
+                🏆 {{ game.league_name }}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Game Information -->
+    {% if game.get('details') or game.get('status') or game.get('period') %}
+    <div class="card" style="margin-bottom: 2rem;">
+        <h2 style="margin: 0 0 1rem 0;">Game Information</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            {% if game.status %}
+            <div>
+                <strong style="color: var(--gray-600); font-size: 0.875rem;">Status</strong>
+                <p style="margin: 0.25rem 0 0 0;">{{ game.status|title }}</p>
+            </div>
+            {% endif %}
+            {% if game.period %}
+            <div>
+                <strong style="color: var(--gray-600); font-size: 0.875rem;">Period</strong>
+                <p style="margin: 0.25rem 0 0 0;">{{ game.period }}</p>
+            </div>
+            {% endif %}
+            {% if game.game_id %}
+            <div>
+                <strong style="color: var(--gray-600); font-size: 0.875rem;">Game ID</strong>
+                <p style="margin: 0.25rem 0 0 0;">{{ game.game_id }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Period Scores -->
+    {% if game.get('period_scores') %}
+    <div class="card" style="margin-bottom: 2rem;">
+        <h2 style="margin: 0 0 1rem 0;">Period Breakdown</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead style="background: var(--gray-100);">
+                <tr>
+                    <th style="padding: 0.75rem; text-align: left;">Team</th>
+                    {% for period in game.period_scores[0].periods if game.period_scores and game.period_scores[0].get('periods') %}
+                    <th style="padding: 0.75rem; text-align: center;">P{{ loop.index }}</th>
+                    {% endfor %}
+                    <th style="padding: 0.75rem; text-align: center; font-weight: bold;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for team_score in game.period_scores %}
+                <tr style="border-bottom: 1px solid var(--gray-200);">
+                    <td style="padding: 0.75rem; font-weight: 600;">{{ team_score.team }}</td>
+                    {% for score in team_score.periods %}
+                    <td style="padding: 0.75rem; text-align: center;">{{ score }}</td>
+                    {% endfor %}
+                    <td style="padding: 0.75rem; text-align: center; font-weight: bold;">{{ team_score.total }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- Game Events -->
+    {% if events %}
+    <div class="card">
+        <h2 style="margin: 0 0 1rem 0;">Game Events</h2>
+        <div style="position: relative;">
+            {% for event in events %}
+            <div style="padding: 1rem; border-left: 3px solid {% if event.type == 'goal' %}var(--swiss-red){% else %}var(--gray-300){% endif %}; margin-bottom: 1rem; background: var(--gray-50); border-radius: 0 8px 8px 0;">
+                <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <div>
+                        <div style="font-weight: bold; color: var(--swiss-red);">
+                            {% if event.type == 'goal' %}⚽ GOAL{% elif event.type == 'penalty' %}⚠️ PENALTY{% else %}📋 {{ event.type|upper }}{% endif %}
+                        </div>
+                        {% if event.player %}
+                        <div style="margin-top: 0.25rem;">{{ event.player }}</div>
+                        {% endif %}
+                        {% if event.team %}
+                        <div style="font-size: 0.875rem; color: var(--gray-600); margin-top: 0.25rem;">
+                            {{ event.team }}
+                        </div>
+                        {% endif %}
+                        {% if event.description %}
+                        <div style="font-size: 0.875rem; color: var(--gray-600); margin-top: 0.5rem;">
+                            {{ event.description }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div style="text-align: right; color: var(--gray-600); font-size: 0.875rem; white-space: nowrap;">
+                        {% if event.time %}{{ event.time }}{% endif %}
+                        {% if event.period %}<br>Period {{ event.period }}{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 3rem; color: var(--gray-600); background: var(--gray-50); border-radius: 8px;">
+        <p>No game events available</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

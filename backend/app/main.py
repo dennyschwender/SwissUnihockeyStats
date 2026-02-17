@@ -157,6 +157,63 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
     return HTMLResponse(content=html)
 
 
+@app.get("/{locale}/club/{club_id}", response_class=HTMLResponse)
+async def club_detail(request: Request, locale: str, club_id: int):
+    """Club detail page with teams and players"""
+    client = get_swissunihockey_client()
+    error_message = None
+    club_data = {}
+    teams = []
+    players = []
+    
+    try:
+        # Get club from cache
+        all_clubs = await get_cached_clubs()
+        
+        # Find the club with matching ID
+        matching_clubs = [
+            c for c in all_clubs 
+            if c.get("set_in_context", {}).get("club_id") == club_id
+        ]
+        
+        if matching_clubs:
+            club_data = matching_clubs[0]
+            
+            # Fetch teams for this club
+            try:
+                teams_data = client.get_teams(club=club_id)
+                teams = teams_data.get("entries", [])[:30] if isinstance(teams_data, dict) else []
+            except Exception as team_error:
+                logger.warning(f"Could not load teams for club {club_id}: {team_error}")
+            
+            # Fetch players for this club
+            try:
+                players_data = client.get_players(club=club_id)
+                players = players_data.get("entries", [])[:50] if isinstance(players_data, dict) else []
+            except Exception as player_error:
+                logger.warning(f"Could not load players for club {club_id}: {player_error}")
+        else:
+            error_message = f"Club with ID {club_id} not found"
+            logger.warning(error_message)
+    
+    except Exception as e:
+        logger.error(f"Error fetching club {club_id}: {e}")
+        error_message = f"Could not load club details: {str(e)}"
+    
+    return templates.TemplateResponse(
+        "club_detail.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale),
+            "club": club_data,
+            "teams": teams,
+            "players": players,
+            "error_message": error_message
+        }
+    )
+
+
 @app.get("/{locale}/leagues", response_class=HTMLResponse)
 async def leagues_page(request: Request, locale: str):
     """Leagues listing page"""
@@ -170,6 +227,82 @@ async def leagues_page(request: Request, locale: str):
             "locale": locale,
             "t": get_translations(locale),
             "leagues": leagues_list
+        }
+    )
+
+
+@app.get("/{locale}/league/{league_id}", response_class=HTMLResponse)
+async def league_detail(request: Request, locale: str, league_id: int):
+    """League detail page with standings, teams, and top scorers"""
+    client = get_swissunihockey_client()
+    error_message = None
+    league_data = {}
+    teams = []
+    standings = []
+    topscorers = []
+    games = []
+    
+    try:
+        # Get league from cache
+        all_leagues = await get_cached_leagues()
+        
+        # Find the league with matching ID
+        matching_leagues = [
+            l for l in all_leagues
+            if l.get("set_in_context", {}).get("league_id") == league_id
+        ]
+        
+        if matching_leagues:
+            league_data = matching_leagues[0]
+            league_mode = league_data.get("set_in_context", {}).get("mode", "1")
+            
+            # Fetch teams for this league
+            try:
+                teams_data = client.get_teams(league=league_id, mode=league_mode)
+                teams = teams_data.get("entries", [])[:50] if isinstance(teams_data, dict) else []
+            except Exception as team_error:
+                logger.warning(f"Could not load teams for league {league_id}: {team_error}")
+            
+            # Fetch standings
+            try:
+                standings_data = client.get_rankings(league=league_id, mode=league_mode)
+                standings = standings_data.get("entries", [])[:30] if isinstance(standings_data, dict) else []
+            except Exception as standings_error:
+                logger.warning(f"Could not load standings for league {league_id}: {standings_error}")
+            
+            # Fetch top scorers
+            try:
+                topscorers_data = client.get_topscorers(league=league_id, mode=league_mode)
+                topscorers = topscorers_data.get("entries", [])[:30] if isinstance(topscorers_data, dict) else []
+            except Exception as scorers_error:
+                logger.warning(f"Could not load top scorers for league {league_id}: {scorers_error}")
+            
+            # Fetch recent games
+            try:
+                games_data = client.get_games(league=league_id, mode=league_mode)
+                games = games_data.get("entries", [])[:20] if isinstance(games_data, dict) else []
+            except Exception as games_error:
+                logger.warning(f"Could not load games for league {league_id}: {games_error}")
+        else:
+            error_message = f"League with ID {league_id} not found"
+            logger.warning(error_message)
+    
+    except Exception as e:
+        logger.error(f"Error fetching league {league_id}: {e}")
+        error_message = f"Could not load league details: {str(e)}"
+    
+    return templates.TemplateResponse(
+        "league_detail.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale),
+            "league": league_data,
+            "teams": teams,
+            "standings": standings,
+            "topscorers": topscorers,
+            "games": games,
+            "error_message": error_message
         }
     )
 
@@ -436,6 +569,47 @@ async def games_page(request: Request, locale: str):
             "locale": locale,
             "t": get_translations(locale),
             "games": games
+        }
+    )
+
+
+@app.get("/{locale}/game/{game_id}", response_class=HTMLResponse)
+async def game_detail(request: Request, locale: str, game_id: int):
+    """Game detail page with events and statistics"""
+    client = get_swissunihockey_client()
+    error_message = None
+    game_data = {}
+    events = []
+    
+    try:
+        # Fetch game events which includes game details
+        game_events_data = client.get_game_events(game_id=game_id)
+        
+        if game_events_data:
+            # Extract game info and events
+            game_data = game_events_data.get("game", {})
+            events = game_events_data.get("events", [])
+            
+            # If game_id not in data, add it
+            if not game_data.get("game_id"):
+                game_data["game_id"] = game_id
+        else:
+            error_message = f"Game with ID {game_id} not found"
+            logger.warning(error_message)
+    
+    except Exception as e:
+        logger.error(f"Error fetching game {game_id}: {e}")
+        error_message = f"Could not load game details: {str(e)}"
+    
+    return templates.TemplateResponse(
+        "game_detail.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale),
+            "game": game_data,
+            "events": events,
+            "error_message": error_message
         }
     )
 

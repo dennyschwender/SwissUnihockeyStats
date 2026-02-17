@@ -12,18 +12,43 @@
 <div style="margin-top: 2rem; max-width: 900px; margin-left: auto; margin-right: auto;">
     {% if games %}
     {% for game in games %}
-    <div class="card" style="margin-bottom: 1rem; padding: 1.5rem;">
-        <div style="font-size: 1.125rem; font-weight: 600;">
-            Game {{ loop.index }}
-        </div>
-        <div style="margin-top: 0.5rem; color: var(--gray-600); font-size: 0.875rem;">
-            {{ game.get('text', 'Game details') }}
+    <div class="card" style="margin-bottom: 1rem; padding: 1.5rem; cursor: pointer;"
+         onclick="window.location='/{{ locale }}/game/{{ game.game_id if game.game_id else game.id }}'">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-size: 1.125rem; font-weight: 600;">
+                    {% if game.home_team and game.away_team %}
+                    {{ game.home_team }} vs {{ game.away_team }}
+                    {% else %}
+                    {{ game.get('text', 'Game ' ~ loop.index) }}
+                    {% endif %}
+                </div>
+                {% if game.score %}
+                <div style="margin-top: 0.5rem; color: var(--swiss-red); font-weight: bold; font-size: 1.25rem;">
+                    {{ game.score }}
+                </div>
+                {% endif %}
+                <div style="margin-top: 0.5rem; color: var(--gray-600); font-size: 0.875rem;">
+                    {% if game.date %}📅 {{ game.date }}{% endif %}
+                    {% if game.time %} ⏰ {{ game.time }}{% endif %}
+                    {% if game.league_name %}<br>🏆 {{ game.league_name }}{% endif %}
+                </div>
+            </div>
+            <div style="font-size: 1.5rem; color: var(--gray-400);">
+                →
+            </div>
         </div>
     </div>
     {% endfor %}
+    
+    {% if games|length >= 50 %}
+    <div style="text-align: center; padding: 1rem; color: var(--gray-600); font-size: 0.875rem;">
+        Showing 50 most recent games
+    </div>
+    {% endif %}
     {% else %}
     <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
-        <p>{{ t.common.loading }}</p>
+        <p>{{ t.common.no_results if t.common.no_results else 'No games found' }}</p>
     </div>
     {% endif %}
 </div>

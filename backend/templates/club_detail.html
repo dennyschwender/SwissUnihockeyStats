@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}{{ club.text if club.text else 'Club Details' }} - {{ t.common.app_name }}{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    <!-- Back Button -->
+    <div style="margin-bottom: 1.5rem;">
+        <a href="/{{ locale }}/clubs" style="color: var(--swiss-red); text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
+            ← {{ t.common.back if t.common.back else 'Back to Clubs' }}
+        </a>
+    </div>
+
+    {% if error_message %}
+    <div style="padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 8px; margin-bottom: 1.5rem;">
+        <strong>Error:</strong> {{ error_message }}
+    </div>
+    {% endif %}
+
+    <!-- Club Header -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+            {% if club.logo %}
+            <img src="{{ club.logo }}" alt="{{ club.text if club.text else 'Club' }} logo" style="width: 100px; height: 100px; object-fit: contain; border-radius: 8px;">
+            {% else %}
+            <div class="card-icon" style="font-size: 4rem;">🏢</div>
+            {% endif %}
+            <div>
+                <h1 style="margin: 0;">{{ club.text if club.text else 'Club Details' }}</h1>
+                {% if club.set_in_context and club.set_in_context.club_id %}
+                <p style="margin: 0.5rem 0 0 0; color: var(--gray-600);">
+                    Club ID: {{ club.set_in_context.club_id }}
+                </p>
+                {% endif %}
+                {% if club.set_in_context and club.set_in_context.region %}
+                <p style="margin: 0.25rem 0 0 0; color: var(--gray-600);">
+                    📍 {{ club.set_in_context.region }}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Teams Section -->
+    <h2 style="margin: 2rem 0 1rem 0;">{{ t.teams.title if t.teams and t.teams.title else 'Teams' }}</h2>
+    
+    {% if teams %}
+    <div class="cards-grid">
+        {% for team in teams %}
+        <div class="card" onclick="window.location='/{{ locale }}/team/{{ team.id if team.id else team.set_in_context.team_id }}'">
+            <div class="card-icon">👥</div>
+            <h3>{{ team.text if team.text else 'Team' }}</h3>
+            {% if team.set_in_context and team.set_in_context.league_name %}
+            <p style="color: var(--gray-600); font-size: 0.875rem;">
+                🏆 {{ team.set_in_context.league_name }}
+            </p>
+            {% endif %}
+            {% if team.set_in_context and team.set_in_context.mode %}
+            <p style="color: var(--gray-600); font-size: 0.75rem;">
+                Mode: {{ team.set_in_context.mode }}
+            </p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 3rem; color: var(--gray-600); background: var(--gray-50); border-radius: 8px;">
+        <p>{{ t.common.no_results if t.common.no_results else 'No teams found for this club' }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Players Section -->
+    {% if players %}
+    <h2 style="margin: 2rem 0 1rem 0;">{{ t.players.title if t.players and t.players.title else 'Players' }}</h2>
+    <div class="cards-grid">
+        {% for player in players[:20] %}
+        <div class="card" onclick="window.location='/{{ locale }}/player/{{ player.id if player.id else player.set_in_context.person_id }}'">
+            <div class="card-icon">👤</div>
+            <h3>{{ player.text if player.text else 'Player' }}</h3>
+            {% if player.jersey_number %}
+            <p style="color: var(--gray-600); font-size: 0.875rem;">
+                #{{ player.jersey_number }}
+            </p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% if players|length > 20 %}
+    <p style="text-align: center; color: var(--gray-600); margin-top: 1rem;">
+        Showing 20 of {{ players|length }} players
+    </p>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}
