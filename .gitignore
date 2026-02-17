@@ -40,6 +40,10 @@ data/raw/*.csv
 data/processed/*.json
 data/processed/*.csv
 data/processed/*.parquet
+data/cache/clubs/*.json
+data/cache/general/*.json
+data/cache/leagues/*.json
+data/cache/teams/*.json
 
 # Logs
 *.log
