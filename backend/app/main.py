@@ -275,33 +275,12 @@ async def club_detail(request: Request, locale: str, club_id: int):
             club_data = matching_clubs[0]
             logger.info(f"Club found: {club_data.get('text')}")
             
-            # Fetch teams for this club using API filter
-            try:
-                logger.info(f"Fetching teams for club {club_id}...")
-                teams_data = client.get_teams(club=club_id)
-                logger.info(f"Teams API returned: {type(teams_data)}")
-                
-                # Extract teams from nested structure
-                if isinstance(teams_data, dict):
-                    # Try multiple extraction paths
-                    data_field = teams_data.get("data", {})
-                    if isinstance(data_field, dict) and "regions" in data_field and len(data_field["regions"]) > 0:
-                        # Teams are in regions[0].rows
-                        teams = data_field["regions"][0].get("rows", [])
-                    elif isinstance(data_field, list):
-                        teams = data_field
-                    else:
-                        teams = teams_data.get("entries", [])
-                else:
-                    teams = []
-                    
-                logger.info(f"Extracted {len(teams)} teams")
-                if teams:
-                    logger.info(f"Sample team structure: {list(teams[0].keys()) if isinstance(teams[0], dict) else type(teams[0])}")
-                    logger.info(f"First team: {teams[0] if isinstance(teams[0], dict) else str(teams[0])[:200]}")
-            except Exception as team_error:
-                logger.warning(f"Could not load teams for club {club_id}: {team_error}")
-                teams = []
+            # Get teams from club data (if available)
+            # Note: SwissUnihockey API v2 doesn't support filtering teams by club ID via API
+            # The club=xxx parameter doesn't filter correctly - returns random teams
+            # Teams are stored in the club's 'entries' field from the cached data
+            teams = club_data.get('entries', [])
+            logger.info(f"Found {len(teams)} teams in club data")
         else:
             error_message = f"Club with ID {club_id} not found"
             logger.warning(error_message)
