@@ -5,10 +5,12 @@
 ## Executive Summary
 
 ### Current Architecture
+
 - **Backend:** Python/FastAPI/Uvicorn ✅ (implemented)
 - **Frontend:** Next.js 14/React (ready, needs Node.js)
 
 ### Key Finding
+
 **For this specific project, a hybrid approach (Python backend + Next.js frontend) offers the best performance**, but a **full Python stack is viable** with trade-offs.
 
 ---
@@ -65,6 +67,7 @@ Hydration Time: 150 ms
 ```
 
 **Features:**
+
 - ✅ Server-Side Rendering (SSR)
 - ✅ Static Site Generation (SSG)
 - ✅ Incremental Static Regeneration (ISR)
@@ -101,6 +104,7 @@ Hydration Time: 0 ms (no hydration needed)
 ```
 
 **Features:**
+
 - ✅ Server-Side Rendering (fast!)
 - ✅ Minimal JavaScript
 - ✅ HTMX for interactivity
@@ -138,6 +142,7 @@ Server Round-Trip: 30 ms
 ```
 
 **Features:**
+
 - ✅ Extremely fast SSR
 - ✅ Minimal JavaScript (14 KB htmx + 15 KB Alpine)
 - ✅ Reactive UI without React
@@ -228,6 +233,7 @@ Server Round-Trip: 30 ms
 **Stack:** Python/FastAPI backend + Next.js frontend
 
 **Pros:**
+
 - ✅ Already implemented (Week 1 complete)
 - ✅ Best developer experience
 - ✅ Rich React ecosystem (charts, tables, UI components)
@@ -238,6 +244,7 @@ Server Round-Trip: 30 ms
 - ✅ Best choice for scaling team
 
 **Cons:**
+
 - ❌ Requires Node.js installation
 - ❌ Larger bundle size (200 KB vs 35 KB)
 - ❌ Slower initial page load (800 ms vs 350 ms)
@@ -245,6 +252,7 @@ Server Round-Trip: 30 ms
 - ❌ Higher hosting costs
 
 **Best For:**
+
 - Teams with React experience
 - Complex, interactive UIs
 - Long-term product development
@@ -255,6 +263,7 @@ Server Round-Trip: 30 ms
 **Stack:** Python/FastAPI + Jinja2 + htmx + Alpine.js
 
 **Pros:**
+
 - ✅ **2-3x faster page loads** (350 ms FCP)
 - ✅ **82% smaller bundle** (35 KB vs 200 KB)
 - ✅ **50% cost savings** (single server)
@@ -264,6 +273,7 @@ Server Round-Trip: 30 ms
 - ✅ Lower battery consumption
 
 **Cons:**
+
 - ❌ Less mature ecosystem
 - ❌ Manual setup for many features
 - ❌ Learning curve for htmx patterns
@@ -272,6 +282,7 @@ Server Round-Trip: 30 ms
 - ❌ TypeScript only on backend
 
 **Best For:**
+
 - Performance-critical applications
 - Mobile-first projects
 - Small teams (1-3 developers)
@@ -283,6 +294,7 @@ Server Round-Trip: 30 ms
 **Stack:** Python/FastAPI + Jinja2 templates + minimal JS
 
 **Pros:**
+
 - ✅ Simplest to understand
 - ✅ Blazing fast SSR (400 ms FCP)
 - ✅ Minimal JavaScript (5 KB)
@@ -291,6 +303,7 @@ Server Round-Trip: 30 ms
 - ✅ Low resource usage
 
 **Cons:**
+
 - ❌ Limited interactivity
 - ❌ Full page reloads
 - ❌ Poor UX for dynamic features
@@ -298,6 +311,7 @@ Server Round-Trip: 30 ms
 - ❌ Feels outdated
 
 **Best For:**
+
 - Simple content sites
 - Admin dashboards
 - Internal tools
@@ -354,6 +368,7 @@ Total data: 50 KB (per page)
 ```
 
 **Winner:** Depends on use case
+
 - Next.js better for frequent filtering
 - Python better for large datasets
 
@@ -438,6 +453,7 @@ Week 9-12: Hybrid architecture (Python SSR + React islands)
 ### Current Situation
 
 You have:
+
 - ✅ FastAPI backend (implemented, running)
 - ✅ Next.js frontend (code ready, needs Node.js)
 - ❌ Node.js not installed (blocker)
@@ -490,15 +506,17 @@ Interactive features: Next.js (30% of site)
 **For SwissUnihockey MVP: Continue with Next.js (Path 1)**
 
 **Why?**
+
 1. You already have 20 files written and ready
 2. Only 5 minutes to install Node.js
 3. Better DX = faster development (Week 2-4)
 4. Rich ecosystem for sports stats (charts, tables)
 5. Can always optimize later
 
-**Performance isn't the bottleneck for MVP** - it's getting to market fast. 
+**Performance isn't the bottleneck for MVP** - it's getting to market fast.
 
 Once you have users, you can:
+
 - Profile real usage patterns
 - Optimize hot paths with Python SSR
 - Use islands architecture for best of both worlds

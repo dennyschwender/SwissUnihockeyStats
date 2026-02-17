@@ -11,8 +11,28 @@
     <p>{{ t.teams.subtitle }}</p>
 </div>
 
+<!-- Error Message (if teams data failed to load) -->
+{% if error_message %}
+<div style="max-width: 800px; margin: 2rem auto;">
+    <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 0.5rem;">
+        <p style="color: #92400e; margin: 0; font-weight: 600;">⚠️ Unable to load teams data</p>
+        <p style="color: #78350f; margin: 0.5rem 0 0 0; font-size: 0.875rem;">
+            {{ error_message }}
+            Try searching on the <a href="/{{ locale }}/clubs" style="color: var(--swiss-red); text-decoration: underline;">Clubs page</a> instead.
+        </p>
+    </div>
+</div>
+{% endif %}
+
 <!-- Search and Filters -->
-<div style="max-width: 800px; margin: 2rem auto;" x-data="{ search: '', mode: 'all' }">
+<div style="max-width: 1000px; margin: 2rem auto;" 
+     x-data="{ 
+         search: '', 
+         mode: 'all',
+         sortBy: 'name',
+         showFilters: false
+     }">
+    <!-- Main Search Bar -->
     <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
         <input 
             type="text" 
@@ -20,28 +40,115 @@
             hx-get="/{{ locale }}/teams/search" 
             hx-trigger="keyup changed delay:500ms" 
             hx-target="#teams-list"
-            hx-include="[name='q'], [name='mode']"
+            hx-include="[name='q'], [name='mode'], [name='sort']"
             name="q"
             :value="search"
-            placeholder="{{ t.common.search }}..."
-            style="flex: 1; padding: 0.75rem; border: 2px solid var(--gray-300); border-radius: 0.5rem; font-size: 1rem;"
+            placeholder="{{ t.common.search }}... (team name, club, league)"
+            style="flex: 1; padding: 0.75rem 1rem; border: 2px solid var(--gray-300); border-radius: 0.5rem; font-size: 1rem; background: var(--bg-primary); color: var(--text-primary);"
         >
         
-        <select 
-            x-model="mode"
-            hx-get="/{{ locale }}/teams/search" 
-            hx-trigger="change" 
-            hx-target="#teams-list"
-            hx-include="[name='q'], [name='mode']"
-            name="mode"
-            style="padding: 0.75rem; border: 2px solid var(--gray-300); border-radius: 0.5rem; font-size: 1rem;"
+        <!-- Advanced Filters Toggle -->
+        <button 
+            @click="showFilters = !showFilters"
+            style="padding: 0.75rem 1.5rem; background: var(--bg-secondary); border: 2px solid var(--gray-300); border-radius: 0.5rem; cursor: pointer; font-weight: 600; transition: all 0.2s;"
+            :style="showFilters ? 'background: var(--swiss-red); color: white; border-color: var(--swiss-red);' : ''"
         >
-            <option value="all">All Modes</option>
-            <option value="1">Men</option>
-            <option value="2">Women</option>
-            <option value="3">Mixed</option>
-        </select>
+            <span x-show="!showFilters">🔽 Filters</span>
+            <span x-show="showFilters">🔼 Hide</span>
+        </button>
     </div>
+    
+    <!-- Advanced Filters Panel -->
+    <div x-show="showFilters" 
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 transform scale-95"
+         x-transition:enter-end="opacity-100 transform scale-100"
+         style="background: var(--bg-secondary); border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 2px 4px var(--shadow-color);">
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <!-- Competition Mode Filter -->
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.875rem; color: var(--text-secondary);">Competition Mode</label>
+                <select 
+                    x-model="mode"
+                    hx-get="/{{ locale }}/teams/search" 
+                    hx-trigger="change" 
+                    hx-target="#teams-list"
+                    hx-include="[name='q'], [name='mode'], [name='sort']"
+                    name="mode"
+                    style="width: 100%; padding: 0.625rem; border: 2px solid var(--gray-300); border-radius: 0.375rem; font-size: 0.875rem; background: var(--bg-primary); color: var(--text-primary);"
+                >
+                    <option value="all">All Modes</option>
+                    <option value="1">Men</option>
+                    <option value="2">Women</option>
+                    <option value="3">Mixed</option>
+                </select>
+            </div>
+            
+            <!-- Sort By -->
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.875rem; color: var(--text-secondary);">Sort By</label>
+                <select 
+                    x-model="sortBy"
+                    hx-get="/{{ locale }}/teams/search" 
+                    hx-trigger="change" 
+                    hx-target="#teams-list"
+                    hx-include="[name='q'], [name='mode'], [name='sort']"
+                    name="sort"
+                    style="width: 100%; padding: 0.625rem; border: 2px solid var(--gray-300); border-radius: 0.375rem; font-size: 0.875rem; background: var(--bg-primary); color: var(--text-primary);"
+                >
+                    <option value="name">Name (A-Z)</option>
+                    <option value="club">Club</option>
+                    <option value="league">League</option>
+                </select>
+            </div>
+            
+            <!-- Clear Filters Button -->
+            <div style="display: flex; align-items: flex-end;">
+                <button 
+                    @click="search = ''; mode = 'all'; sortBy = 'name'; 
+                           $dispatch('htmx:trigger', { target: 'teams-list' })"
+                    style="width: 100%; padding: 0.625rem; background: var(--gray-100); border: 2px solid var(--gray-300); border-radius: 0.375rem; cursor: pointer; font-weight: 600; font-size: 0.875rem; color: var(--text-secondary); transition: all 0.2s;"
+                    onmouseover="this.style.background='var(--gray-200)'"
+                    onmouseout="this.style.background='var(--gray-100)'"
+                >
+                    ✖ Clear All
+                </button>
+            </div>
+        </div>
+        
+        <!-- Quick Filter Chips -->
+        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-300);">
+            <p style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary);">Quick Filters:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                <button 
+                    @click="mode = '1'; sortBy = 'league'"
+                    style="padding: 0.375rem 0.75rem; background: var(--bg-primary); border: 1px solid var(--swiss-red); border-radius: 1rem; cursor: pointer; font-size: 0.75rem; color: var(--swiss-red); font-weight: 600; transition: all 0.2s;"
+                    onmouseover="this.style.background='var(--swiss-red)'; this.style.color='white'"
+                    onmouseout="this.style.background='var(--bg-primary)'; this.style.color='var(--swiss-red)'"
+                >
+                    🚹 Men's Teams
+                </button>
+                <button 
+                    @click="mode = '2'; sortBy = 'league'"
+                    style="padding: 0.375rem 0.75rem; background: var(--bg-primary); border: 1px solid var(--swiss-red); border-radius: 1rem; cursor: pointer; font-size: 0.75rem; color: var(--swiss-red); font-weight: 600; transition: all 0.2s;"
+                    onmouseover="this.style.background='var(--swiss-red)'; this.style.color='white'"
+                    onmouseout="this.style.background='var(--bg-primary)'; this.style.color='var(--swiss-red)'"
+                >
+                    🚺 Women's Teams
+                </button>
+                <button 
+                    @click="mode = '3'"
+                    style="padding: 0.375rem 0.75rem; background: var(--bg-primary); border: 1px solid var(--swiss-red); border-radius: 1rem; cursor: pointer; font-size: 0.75rem; color: var(--swiss-red); font-weight: 600; transition: all 0.2s;"
+                    onmouseover="this.style.background='var(--swiss-red)'; this.style.color='white'"
+                    onmouseout="this.style.background='var(--bg-primary)'; this.style.color='var(--swiss-red)'"
+                >
+                    ⚧ Mixed Teams
+                </button>
+            </div>
+        </div>
+    </div>
+    
     <span class="htmx-indicator loading" style="margin-left: 1rem;"></span>
 </div>
 
@@ -49,10 +156,10 @@
 <div id="teams-list" style="margin-top: 2rem;">
     <div class="cards-grid">
         {% for team in teams %}
-        <div class="card" style="position: relative;">
+        <div class="card" style="position: relative; cursor: pointer;" onclick="window.location='/{{ locale }}/team/{{ team.id }}'">
             <!-- Favorite Button -->
             <button 
-                @click.stop="toggleFavorite('teams', {{ loop.index }}, '{{ team.text }}', {})"
+                @click.stop="toggleFavorite('teams', {{ loop.index }}, `{{ team.text | replace('`', '\\`') }}`, {})"
                 :class="isFavorite('teams', {{ loop.index }}) ? 'active' : 'inactive'"
                 class="favorite-btn favorite-indicator"
                 title="Add to favorites"

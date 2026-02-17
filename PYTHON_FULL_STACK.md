@@ -10,18 +10,21 @@ Switched from Next.js + FastAPI to **Python Full-Stack** (Jinja2 + htmx + FastAP
 ## Stack Components
 
 ### Backend (Python 3.13.8)
+
 - **FastAPI 0.109.2**: Web framework
 - **Uvicorn 0.27.1**: ASGI server
 - **Jinja2**: Template engine (included with FastAPI)
 - **SwissUnihockeyClient**: Existing API client with caching
 
 ### Frontend (Python Templates)
+
 - **Jinja2 Templates**: Server-side rendering
 - **htmx 1.9.10**: Dynamic interactions (14 KB)
 - **Alpine.js 3.13.5**: Client-side state (15 KB)
 - **Custom CSS**: Swiss theme (red/white colors)
 
 ### Multi-Language Support (i18n)
+
 - **Languages**: German (DE), English (EN), French (FR), Italian (IT)
 - **Default**: German (DE)
 - **Implementation**: Custom Python i18n module with JSON translation files
@@ -56,6 +59,7 @@ backend/
 ## Routing Strategy
 
 ### HTML Routes (Human Users)
+
 - `GET /` → Redirect to `/de` (homepage in German)
 - `GET /{locale}` → Homepage with language selection
 - `GET /{locale}/clubs` → Clubs listing page
@@ -66,6 +70,7 @@ backend/
 - `GET /{locale}/rankings` → Rankings/standings (TODO)
 
 ### JSON API Routes (AJAX/Programmatic)
+
 - `GET /api/v1/clubs` → JSON list of clubs
 - `GET /api/v1/leagues` → JSON list of leagues
 - `GET /api/v1/teams` → JSON list of teams
@@ -85,15 +90,18 @@ backend/
 ## Technology Comparison
 
 ### Dependencies
+
 - **Python Full-Stack**: ~30 packages (FastAPI, Jinja2, Pydantic, etc.)
 - **Next.js Stack**: 250+ npm packages + 30 Python packages
 
 ### Runtime Requirements
+
 - **Python Full-Stack**: Python 3.13 only
 - **Next.js Stack**: Python 3.13 + Node.js 20
 
 ### Bundle Sizes
-- **Python + htmx**: 
+
+- **Python + htmx**:
   - htmx: 14 KB
   - Alpine.js: 15 KB
   - Custom CSS: 6 KB
@@ -111,6 +119,7 @@ backend/
 ### Multi-Language Translation System
 
 **Translation File Format** (`locales/{locale}/messages.json`):
+
 ```json
 {
   "common": {
@@ -125,12 +134,14 @@ backend/
 ```
 
 **Usage in Templates**:
+
 ```jinja2
 <h1>{{ t.common.app_name }}</h1>
 <a href="/{{ locale }}/clubs">{{ t.nav.clubs }}</a>
 ```
 
 **Python i18n Module** (`app/lib/i18n.py`):
+
 - `get_translations(locale)` → Returns TranslationDict with dot notation
 - `load_translations(locale)` → Loads JSON from file system
 - `get_locale_from_path(path)` → Extracts locale from URL
@@ -139,6 +150,7 @@ backend/
 ### htmx Dynamic Search Example
 
 **Template** (`templates/clubs.html`):
+
 ```html
 <input 
     type="text" 
@@ -154,6 +166,7 @@ backend/
 ```
 
 **FastAPI Route** (`app/main.py`):
+
 ```python
 @app.get("/{locale}/clubs/search", response_class=HTMLResponse)
 async def clubs_search(request: Request, locale: str, q: str = ""):
@@ -181,6 +194,7 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
 ## Benefits of Python Full-Stack
 
 ### Development
+
 ✅ **Single Language**: Python only, no context switching  
 ✅ **Fewer Dependencies**: 30 packages vs 250+  
 ✅ **Simpler Build**: No transpilation, bundling, or compilation  
@@ -188,12 +202,14 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
 ✅ **Easier Debugging**: Server-side rendering, clear error messages  
 
 ### Performance
+
 ✅ **2-3x Faster Page Loads**: 350ms vs 800ms FCP  
 ✅ **82% Smaller Bundles**: 35 KB vs 200 KB  
 ✅ **Better Mobile Experience**: 1.5s vs 4.0s TTI on 3G  
 ✅ **Lower Server Load**: No JavaScript hydration overhead  
 
 ### Maintenance
+
 ✅ **Single Runtime**: Python only, no Node.js needed  
 ✅ **Unified Deployment**: One process, one container  
 ✅ **Simplified Security**: Fewer attack surfaces  
@@ -202,6 +218,7 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
 ## Migration Status
 
 ### ✅ Completed
+
 - [x] Jinja2 template structure
 - [x] Multi-language i18n system (DE, EN, FR, IT)
 - [x] Base template with navigation
@@ -212,6 +229,7 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
 - [x] FastAPI routes for templates
 
 ### 🚧 Pending
+
 - [ ] Leagues page template
 - [ ] Teams page template
 - [ ] Games/schedule page template
@@ -222,6 +240,7 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
 - [ ] Remove/archive web/ directory (Next.js)
 
 ### 📝 Deferred (Future Enhancement)
+
 - [ ] User authentication
 - [ ] Favorites/bookmarks
 - [ ] Live game updates (WebSocket)
@@ -232,20 +251,23 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
 ## Running the Application
 
 ### Development Server
+
 ```bash
 cd backend
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Access Points
-- **Homepage**: http://localhost:8000/de
-- **English**: http://localhost:8000/en
-- **French**: http://localhost:8000/fr
-- **Italian**: http://localhost:8000/it
-- **API Docs**: http://localhost:8000/docs
-- **JSON API**: http://localhost:8000/api/v1/clubs
+
+- **Homepage**: <http://localhost:8000/de>
+- **English**: <http://localhost:8000/en>
+- **French**: <http://localhost:8000/fr>
+- **Italian**: <http://localhost:8000/it>
+- **API Docs**: <http://localhost:8000/docs>
+- **JSON API**: <http://localhost:8000/api/v1/clubs>
 
 ### Testing Different Languages
+
 ```bash
 # German (default)
 curl http://localhost:8000/de

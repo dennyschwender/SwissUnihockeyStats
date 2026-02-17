@@ -132,7 +132,7 @@ class SwissUnihockeyClient:
         Fetch teams.
 
         Args:
-            **params: Query parameters (e.g., club_id, league, season)
+            **params: Query parameters (e.g., club, league, season, mode)
 
         Returns:
             Teams data
@@ -194,7 +194,7 @@ class SwissUnihockeyClient:
         Fetch players.
 
         Args:
-            **params: Query parameters (e.g., team_id, club_id)
+            **params: Query parameters (e.g., team, club, person_id)
 
         Returns:
             Players data

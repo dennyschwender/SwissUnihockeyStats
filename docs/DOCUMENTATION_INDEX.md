@@ -6,12 +6,14 @@ Complete documentation for the SwissUnihockey Statistics Project.
 
 ## 🚀 Getting Started
 
-### New Users Start Here:
+### New Users Start Here
+
 1. **[README.md](../README.md)** - Project overview and quick start
 2. **[GETTING_STARTED.md](GETTING_STARTED.md)** - Detailed tutorials and examples
 3. **[test_api.py](test_api.py)** - Test your setup
 
-### Try the Examples:
+### Try the Examples
+
 - **[scripts/example_fetch_data.py](scripts/example_fetch_data.py)** - Fetch sample data
 - **[API_USAGE_EXAMPLES.py](../API_USAGE_EXAMPLES.py)** - Code snippets
 
@@ -20,6 +22,7 @@ Complete documentation for the SwissUnihockey Statistics Project.
 ## 📖 Core Documentation
 
 ### User Documentation
+
 | Document | Description | Audience |
 |----------|-------------|----------|
 | [README.md](../README.md) | Project overview, installation, quick start | Everyone |
@@ -28,6 +31,7 @@ Complete documentation for the SwissUnihockey Statistics Project.
 | [FEATURE_IDEAS.md](FEATURE_IDEAS.md) | 20+ features you can build | Builders |
 
 ### Developer Documentation
+
 | Document | Description | Audience |
 |----------|-------------|----------|
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute to the project | Contributors |
@@ -35,6 +39,7 @@ Complete documentation for the SwissUnihockey Statistics Project.
 | [check_github_ready.py](check_github_ready.py) | Pre-publish verification | Maintainers |
 
 ### Project Management
+
 | Document | Description | Audience |
 |----------|-------------|----------|
 | [CHANGELOG.md](CHANGELOG.md) | Version history and changes | Everyone |
@@ -46,7 +51,7 @@ Complete documentation for the SwissUnihockey Statistics Project.
 
 ## 🎯 Quick Links by Task
 
-### I want to...
+### I want to
 
 **Use the API Client**
 → Start with [README.md](../README.md) → [GETTING_STARTED.md](GETTING_STARTED.md) → [API_USAGE_EXAMPLES.py](../API_USAGE_EXAMPLES.py)
@@ -71,18 +76,22 @@ Complete documentation for the SwissUnihockey Statistics Project.
 ## 📂 Code Documentation
 
 ### API Client (`api/`)
+
 - **[api/client.py](api/client.py)** - Main SwissUnihockeyClient class (400+ lines)
 - **[api/endpoints.py](api/endpoints.py)** - Convenience functions
-- **[api/__init__.py](api/__init__.py)** - Package initialization
+- **[api/**init**.py](api/__init__.py)** - Package initialization
 
 ### Scripts (`scripts/`)
+
 - **[scripts/example_fetch_data.py](scripts/example_fetch_data.py)** - Comprehensive example
 
 ### Tests (`tests/`)
+
 - **[tests/test_client.py](tests/test_client.py)** - Unit tests for API client
-- **[tests/__init__.py](tests/__init__.py)** - Test package
+- **[tests/**init**.py](tests/__init__.py)** - Test package
 
 ### Utilities
+
 - **[test_api.py](test_api.py)** - Quick API connection test
 - **[check_github_ready.py](check_github_ready.py)** - Pre-publish checks
 
@@ -105,13 +114,16 @@ Complete documentation for the SwissUnihockey Statistics Project.
 ## 🐙 GitHub Configuration
 
 ### Workflows (`.github/workflows/`)
+
 - **[tests.yml](.github/workflows/tests.yml)** - Automated testing CI/CD
 
 ### Issue Templates (`.github/ISSUE_TEMPLATE/`)
+
 - **[bug_report.md](.github/ISSUE_TEMPLATE/bug_report.md)** - Bug report template
 - **[feature_request.md](.github/ISSUE_TEMPLATE/feature_request.md)** - Feature request template
 
 ### Pull Requests (`.github/`)
+
 - **[pull_request_template.md](.github/pull_request_template.md)** - PR template
 
 ---
@@ -154,6 +166,7 @@ We follow these principles:
 ## 🙏 Contributing to Documentation
 
 Documentation improvements are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+
 - Writing style guidelines
 - How to submit documentation PRs
 - Testing documentation locally

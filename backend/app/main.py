@@ -3,7 +3,9 @@ Main FastAPI application entry point
 """
 from pathlib import Path
 from datetime import datetime
+from contextlib import asynccontextmanager
 import uuid
+import logging
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -15,19 +17,50 @@ from app.config import settings
 from app.api.v1.router import api_router
 from app.lib.i18n import get_translations, get_locale_from_path, DEFAULT_LOCALE
 from app.services.swissunihockey import get_swissunihockey_client
+from app.services.data_cache import preload_common_data, preload_data, get_cached_teams, get_cached_clubs, get_cached_leagues
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Setup paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 
-# Create FastAPI app
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan events: startup and shutdown"""
+    # Startup: Preload common data (clubs, leagues, popular teams)
+    logger.info("🚀 Starting SwissUnihockey application...")
+    try:
+        await preload_common_data()  # Loads clubs, leagues, and popular teams
+        # Note: Remaining teams will lazy-load on first search
+    except Exception as e:
+        logger.error(f"❌ Failed to preload common data: {e}")
+        logger.warning("⚠️ App will start but may load data on first request")
+    
+    # Optionally preload ALL data including all teams (uncomment for full preload):
+    # await preload_data()
+    
+    yield
+    
+    # Shutdown
+    logger.info("👋 Shutting down SwissUnihockey application")
+
+
+# Create FastAPI app with lifespan
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # Mount static files
@@ -82,9 +115,8 @@ async def home(request: Request, locale: str):
 @app.get("/{locale}/clubs", response_class=HTMLResponse)
 async def clubs_page(request: Request, locale: str):
     """Clubs listing page"""
-    # Get clubs from API
-    client = get_swissunihockey_client()
-    clubs_data = client.get_clubs()
+    # Use cached data instead of API call (loads on-demand if needed)
+    clubs_list = await get_cached_clubs()
     
     return templates.TemplateResponse(
         "clubs.html",
@@ -92,7 +124,7 @@ async def clubs_page(request: Request, locale: str):
             "request": request,
             "locale": locale,
             "t": get_translations(locale),
-            "clubs": clubs_data.get("entries", [])[:50]  # Limit to 50 for initial load
+            "clubs": clubs_list
         }
     )
 
@@ -100,9 +132,8 @@ async def clubs_page(request: Request, locale: str):
 @app.get("/{locale}/clubs/search", response_class=HTMLResponse)
 async def clubs_search(request: Request, locale: str, q: str = ""):
     """HTMX endpoint for club search"""
-    client = get_swissunihockey_client()
-    clubs_data = client.get_clubs()
-    all_clubs = clubs_data.get("entries", [])
+    # Use cached data instead of API call (loads on-demand if needed)
+    all_clubs = await get_cached_clubs()
     
     # Filter clubs by search query
     if q:
@@ -116,10 +147,11 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
     # Return partial HTML for htmx
     html = '<div class="cards-grid">'
     for club in filtered_clubs:
+        club_id = club.get("set_in_context", {}).get("club_id", "")
         html += f'''
-        <div class="card" style="cursor: pointer;">
+        <div class="card" style="cursor: pointer;" onclick="window.location='/{locale}/club/{club_id}'">
             <h3>{club.get("text", "")}</h3>
-            <p>ID: {club.get("set_in_context", {}).get("club_id", "N/A")}</p>
+            <p>ID: {club_id}</p>
         </div>
         '''
     html += '</div>'
@@ -133,8 +165,8 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
 @app.get("/{locale}/leagues", response_class=HTMLResponse)
 async def leagues_page(request: Request, locale: str):
     """Leagues listing page"""
-    client = get_swissunihockey_client()
-    leagues_data = client.get_leagues()
+    # Use cached data instead of API call (loads on-demand if needed)
+    leagues_list = await get_cached_leagues()
     
     return templates.TemplateResponse(
         "leagues.html",
@@ -142,7 +174,7 @@ async def leagues_page(request: Request, locale: str):
             "request": request,
             "locale": locale,
             "t": get_translations(locale),
-            "leagues": leagues_data.get("entries", [])
+            "leagues": leagues_list
         }
     )
 
@@ -150,26 +182,33 @@ async def leagues_page(request: Request, locale: str):
 @app.get("/{locale}/teams", response_class=HTMLResponse)
 async def teams_page(request: Request, locale: str):
     """Teams listing page"""
-    client = get_swissunihockey_client()
-    teams_data = client.get_teams()
-    
-    return templates.TemplateResponse(
-        "teams.html",
-        {
-            "request": request,
-            "locale": locale,
-            "t": get_translations(locale),
-            "teams": teams_data.get("entries", [])[:50]
-        }
-    )
+    try:
+        teams_list = await get_cached_teams()
+        error_message = None
+        
+        # Limit to first 50 teams for initial display
+        display_teams = teams_list[:50] if isinstance(teams_list, list) else []
+        
+        return templates.TemplateResponse(
+            "teams.html",
+            {
+                "request": request,
+                "locale": locale,
+                "t": get_translations(locale),
+                "teams": display_teams,
+                "error_message": error_message
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error in teams_page: {type(e).__name__}: {e}", exc_info=True)
+        raise
 
 
 @app.get("/{locale}/teams/search", response_class=HTMLResponse)
 async def teams_search(request: Request, locale: str, q: str = "", mode: str = "all"):
     """HTMX endpoint for team search"""
-    client = get_swissunihockey_client()
-    teams_data = client.get_teams()
-    all_teams = teams_data.get("entries", [])
+    # Use cached data instead of API call - instant results! (loads on-demand if needed)
+    all_teams = await get_cached_teams()
     
     # Filter teams by search query and mode
     filtered_teams = all_teams
@@ -192,8 +231,9 @@ async def teams_search(request: Request, locale: str, q: str = "", mode: str = "
     for team in filtered_teams:
         club_name = team.get("set_in_context", {}).get("club_name", "N/A")
         league_name = team.get("set_in_context", {}).get("league_name", "N/A")
+        team_id = team.get("id", "")
         html += f'''
-        <div class="card">
+        <div class="card" style="cursor: pointer;" onclick="window.location='/{locale}/team/{team_id}'">
             <div class="card-icon">👥</div>
             <h3>{team.get("text", "")}</h3>
             <p style="color: var(--gray-600); font-size: 0.875rem;">
@@ -209,6 +249,253 @@ async def teams_search(request: Request, locale: str, q: str = "", mode: str = "
     
     return HTMLResponse(content=html)
 
+
+# ==================== Detail Pages ====================
+
+@app.get("/{locale}/club/{club_id}", response_class=HTMLResponse)
+async def club_detail(request: Request, locale: str, club_id: int):
+    """Club detail page"""
+    logger.info(f"=== Club detail requested for ID {club_id} ===")
+    client = get_swissunihockey_client()
+    error_message = None
+    club_data = {}
+    teams = []
+    
+    try:
+        logger.info("Getting cached clubs...")
+        # Get club from cache (clubs are loaded on demand)
+        all_clubs = await get_cached_clubs()
+        logger.info(f"Got {len(all_clubs)} clubs from cache")
+        
+        # Find the club with matching ID
+        matching_clubs = [c for c in all_clubs if c.get("set_in_context", {}).get("club_id") == club_id]
+        logger.info(f"Found {len(matching_clubs)} matching clubs")
+        
+        if matching_clubs:
+            club_data = matching_clubs[0]
+            logger.info(f"Club found: {club_data.get('text')}")
+            
+            # Fetch teams for this club using API filter
+            try:
+                logger.info(f"Fetching teams for club {club_id}...")
+                teams_data = client.get_teams(club=club_id)
+                logger.info(f"Teams API returned: {type(teams_data)}")
+                
+                # Extract teams from nested structure
+                if isinstance(teams_data, dict):
+                    # Try multiple extraction paths
+                    data_field = teams_data.get("data", {})
+                    if isinstance(data_field, dict) and "regions" in data_field and len(data_field["regions"]) > 0:
+                        # Teams are in regions[0].rows
+                        teams = data_field["regions"][0].get("rows", [])
+                    elif isinstance(data_field, list):
+                        teams = data_field
+                    else:
+                        teams = teams_data.get("entries", [])
+                else:
+                    teams = []
+                    
+                logger.info(f"Extracted {len(teams)} teams")
+                if teams:
+                    logger.info(f"Sample team structure: {list(teams[0].keys()) if isinstance(teams[0], dict) else type(teams[0])}")
+                    logger.info(f"First team: {teams[0] if isinstance(teams[0], dict) else str(teams[0])[:200]}")
+            except Exception as team_error:
+                logger.warning(f"Could not load teams for club {club_id}: {team_error}")
+                teams = []
+        else:
+            error_message = f"Club with ID {club_id} not found"
+            logger.warning(error_message)
+        
+        logger.info(f"Rendering template with club_data keys: {list(club_data.keys()) if club_data else 'empty'}")
+            
+    except Exception as e:
+        logger.error(f"Error fetching club {club_id}: {e}", exc_info=True)
+        error_message = f"Could not load club details: {str(e)}"
+        club_data = {}
+        teams = []
+    
+    return templates.TemplateResponse(
+        "club_detail.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale),
+            "club": club_data,
+            "teams": teams,
+            "error_message": error_message
+        }
+    )
+
+
+@app.get("/{locale}/team/{team_id}", response_class=HTMLResponse)
+async def team_detail(request: Request, locale: str, team_id: int):
+    """Team detail page"""
+    client = get_swissunihockey_client()
+    error_message = None
+    team_data = {}
+    players = []
+    games = []
+    
+    try:
+        # Get team from cache (teams are loaded on demand)
+        all_teams = await get_cached_teams()
+        
+        # Find the team with matching ID
+        matching_teams = [t for t in all_teams if t.get("id") == team_id]
+        
+        if matching_teams:
+            team_data = matching_teams[0]
+            
+            # Try fetching players for this team
+            try:
+                players_data = client.get_players(team=team_id)
+                players = players_data.get("entries", players_data.get("data", [])) if isinstance(players_data, dict) else []
+            except Exception as player_error:
+                logger.warning(f"Could not load players for team {team_id}: {player_error}")
+                players = []
+            
+            # Try fetching games for this team
+            try:
+                games_data = client.get_games(team=team_id)
+                games = games_data.get("entries", games_data.get("data", []))[:10] if isinstance(games_data, dict) else []
+            except Exception as game_error:
+                logger.warning(f"Could not load games for team {team_id}: {game_error}")
+                games = []
+        else:
+            error_message = f"Team with ID {team_id} not found"
+            logger.warning(error_message)
+            
+    except Exception as e:
+        logger.error(f"Error fetching team {team_id}: {e}")
+        error_message = f"Could not load team details: {str(e)}"
+        team_data = {}
+        players = []
+        games = []
+    
+    return templates.TemplateResponse(
+        "team_detail.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale),
+            "team": team_data,
+            "players": players,
+            "games": games,
+            "error_message": error_message
+        }
+    )
+
+
+@app.get("/{locale}/players", response_class=HTMLResponse)
+async def players_page(request: Request, locale: str):
+    """Players search page"""
+    return templates.TemplateResponse(
+        "players.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale),
+            "players": []  # Start with no players, use search to load
+        }
+    )
+
+
+@app.get("/{locale}/players/search", response_class=HTMLResponse)
+async def search_players(request: Request, locale: str, q: str = "", team: str = "", club: str = ""):
+    """Search players endpoint"""
+    client = get_swissunihockey_client()
+    
+    try:
+        params = {}
+        if team:
+            params['team'] = team
+        if club:
+            params['club'] = club
+            
+        players_data = client.get_players(**params)
+        all_players = players_data.get("entries", players_data.get("data", [])) if isinstance(players_data, dict) else []
+        
+        # Filter by query string if provided
+        if q:
+            q_lower = q.lower()
+            filtered_players = [
+                p for p in all_players
+                if q_lower in str(p.get("given_name", "")).lower() 
+                or q_lower in str(p.get("family_name", "")).lower()
+                or q_lower in str(p.get("text", "")).lower()
+            ]
+        else:
+            filtered_players = all_players[:50]  # Limit to 50 if no search query
+    except Exception as e:
+        logger.error(f"Error searching players: {e}")
+        filtered_players = []
+    
+    # Generate HTML response for search results
+    html = '<div class="cards-grid">'
+    for player in filtered_players:
+        player_name = player.get("text", f"{player.get('given_name', '')} {player.get('family_name', '')}").strip()
+        player_id = player.get("id", 0)
+        team_name = player.get("set_in_context", {}).get("team_name", "N/A")
+        position = player.get("position", "N/A")
+        
+        html += f'''
+        <div class="card" onclick="window.location='/de/player/{player_id}'">
+            <div class="card-icon">👤</div>
+            <h3>{player_name}</h3>
+            <p style="color: var(--gray-600); font-size: 0.875rem;">
+                Team: {team_name}<br>
+                Position: {position}
+            </p>
+        </div>
+        '''
+    html += '</div>'
+    
+    if not filtered_players:
+        html = '<div style="text-align: center; padding: 3rem; color: var(--gray-600);"><p>No players found</p></div>'
+    
+    return HTMLResponse(content=html)
+
+
+@app.get("/{locale}/player/{player_id}", response_class=HTMLResponse)
+async def player_detail(request: Request, locale: str, player_id: int):
+    """Player detail page"""
+    client = get_swissunihockey_client()
+    error_message = None
+    player_data = {}
+    
+    try:
+        # Fetch all players and find the one with matching ID
+        # Note: This could be optimized with player caching in the future
+        players_data = client.get_players()
+        all_players = players_data.get("entries", players_data.get("data", [])) if isinstance(players_data, dict) else []
+        
+        # Find the player with matching ID
+        matching_players = [p for p in all_players if p.get("id") == player_id]
+        
+        if matching_players:
+            player_data = matching_players[0]
+        else:
+            error_message = f"Player with ID {player_id} not found"
+            logger.warning(error_message)
+            
+    except Exception as e:
+        logger.error(f"Error fetching player {player_id}: {e}")
+        error_message = f"Could not load player details: {str(e)}"
+        player_data = {}
+    
+    return templates.TemplateResponse(
+        "player_detail.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale),
+            "player": player_data,
+            "error_message": error_message
+        }
+    )
+
+
+# ==================== Other Pages ====================
 
 @app.get("/{locale}/games", response_class=HTMLResponse)
 async def games_page(request: Request, locale: str):
@@ -276,6 +563,35 @@ async def health_check():
     return {"status": "healthy"}
 
 
+@app.get("/cache/status")
+async def cache_status():
+    """Cache status endpoint - shows hybrid cache statistics"""
+    from app.services.data_cache import get_data_cache
+    cache = get_data_cache()
+    stats = cache.get_stats()
+    
+    # Determine status message
+    if stats["all_loaded"]:
+        status = "fully_loaded"
+    elif stats["teams_popular_loaded"]:
+        status = "popular_teams_loaded"
+    else:
+        status = "partially_loaded"
+    
+    return {
+        "status": status,
+        "teams_loaded_all": stats["teams_loaded"],
+        "teams_loaded_popular": stats["teams_popular_loaded"],
+        "clubs_loaded": stats["clubs_loaded"], 
+        "leagues_loaded": stats["leagues_loaded"],
+        "teams_count": stats["teams_count"],
+        "clubs_count": stats["clubs_count"],
+        "leagues_count": stats["leagues_count"],
+        "last_updated": stats["last_updated"],
+        "total_records": stats["teams_count"] + stats["clubs_count"] + stats["leagues_count"]
+    }
+
+
 # ============================================================================
 # Universal Search
 # ============================================================================
@@ -286,27 +602,28 @@ async def universal_search(request: Request, locale: str, q: str = ""):
     if not q or len(q) < 2:
         return HTMLResponse(content='<div class="search-results"><p class="text-gray-600">Enter at least 2 characters to search...</p></div>')
     
-    client = get_swissunihockey_client()
     query_lower = q.lower()
     
+    # Use cached data - instant search across all datasets! (loads on-demand if needed)
+    all_clubs = await get_cached_clubs()
+    all_leagues = await get_cached_leagues()
+    all_teams = await get_cached_teams()
+    
     # Search clubs
-    clubs_data = client.get_clubs()
     matching_clubs = [
-        club for club in clubs_data.get("entries", [])
+        club for club in all_clubs
         if query_lower in club.get("text", "").lower()
     ][:5]  # Limit to 5 results per category
     
     # Search leagues
-    leagues_data = client.get_leagues()
     matching_leagues = [
-        league for league in leagues_data.get("entries", [])
+        league for league in all_leagues
         if query_lower in league.get("text", "").lower()
     ][:5]
     
-    # Search teams
-    teams_data = client.get_teams()
+    # Search teams (now works instantly with 30,000+ records via cache!)
     matching_teams = [
-        team for team in teams_data.get("entries", [])
+        team for team in all_teams
         if query_lower in team.get("text", "").lower()
     ][:5]
     
@@ -317,7 +634,7 @@ async def universal_search(request: Request, locale: str, q: str = ""):
     
     if total_results == 0:
         html += '<p class="text-gray-600" style="text-align: center; padding: 2rem;">No results found</p>'
-    else:
+    elif total_results > 0:
         # Clubs section
         if matching_clubs:
             html += '<div class="search-category"><h3>🏢 Clubs</h3><div class="search-items">'

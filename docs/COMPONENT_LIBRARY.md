@@ -65,6 +65,7 @@ export function LiveScoreCard({ game }: LiveScoreCardProps) {
 ```
 
 **Usage:**
+
 ```tsx
 <LiveScoreCard
   game={{
@@ -551,6 +552,7 @@ export function BottomNav() {
 ```
 
 **Add to layout:**
+
 ```tsx
 // app/layout.tsx
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -598,11 +600,13 @@ export function ThemeToggle() {
 ```
 
 **Install next-themes:**
+
 ```bash
 npm install next-themes
 ```
 
 **Add provider to layout:**
+
 ```tsx
 // app/layout.tsx
 import { ThemeProvider } from "next-themes";
@@ -743,6 +747,7 @@ export function usePullToRefresh(onRefresh: () => Promise<void>) {
 ```
 
 **Usage:**
+
 ```tsx
 const { isRefreshing } = usePullToRefresh(async () => {
   await refetch();

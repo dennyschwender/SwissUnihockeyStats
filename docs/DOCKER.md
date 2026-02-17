@@ -62,8 +62,9 @@ make logs
 - 1GB disk space for cache
 
 **Installation**:
-- Docker Desktop: https://www.docker.com/products/docker-desktop
-- Docker Engine (Linux): https://docs.docker.com/engine/install/
+
+- Docker Desktop: <https://www.docker.com/products/docker-desktop>
+- Docker Engine (Linux): <https://docs.docker.com/engine/install/>
 
 ---
 
@@ -190,12 +191,14 @@ TZ=Europe/Zurich
 ### Volume Mounts
 
 **Cache persistence**:
+
 ```yaml
 volumes:
   - ./data/cache:/app/data/cache  # Cache persists on host
 ```
 
 **Script access** (read-only):
+
 ```yaml
 volumes:
   - ./scripts:/app/scripts:ro
@@ -204,6 +207,7 @@ volumes:
 ### Resource Limits
 
 Configured in `docker-compose.yml`:
+
 ```yaml
 deploy:
   resources:
@@ -232,6 +236,7 @@ make dev
 ```
 
 **Features**:
+
 - ✅ Source code mounted (live reload)
 - ✅ Debug port exposed (5678)
 - ✅ Increased resource limits
@@ -320,6 +325,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 ```
 
 Check status:
+
 ```bash
 docker inspect swissunihockey-client | grep -A 5 Health
 ```
@@ -554,10 +560,10 @@ docker-build:
 
 ## 📚 Additional Resources
 
-- **Docker Documentation**: https://docs.docker.com
-- **Docker Compose**: https://docs.docker.com/compose/
-- **Best Practices**: https://docs.docker.com/develop/dev-best-practices/
-- **Security**: https://docs.docker.com/engine/security/
+- **Docker Documentation**: <https://docs.docker.com>
+- **Docker Compose**: <https://docs.docker.com/compose/>
+- **Best Practices**: <https://docs.docker.com/develop/dev-best-practices/>
+- **Security**: <https://docs.docker.com/engine/security/>
 
 ---
 
@@ -571,6 +577,7 @@ docker-build:
 ✅ **Secured**: Non-root user and best practices  
 
 **Start using Docker now**:
+
 ```bash
 make build && make up && make preload
 ```

@@ -28,6 +28,7 @@ npx shadcn@latest init
 ```
 
 **Configure shadcn/ui when prompted:**
+
 ```
 ✔ Would you like to use TypeScript? yes
 ✔ Which style would you like to use? › Default
@@ -699,6 +700,7 @@ module.exports = withPWA({
 ## 🎯 MVP Checklist (End of Week 4)
 
 ### Features
+
 - [x] Homepage with hero
 - [x] League standings table
 - [x] Top scorers leaderboard
@@ -711,6 +713,7 @@ module.exports = withPWA({
 - [x] Dark mode
 
 ### Technical
+
 - [x] Next.js 15 setup
 - [x] FastAPI backend
 - [x] API integration
@@ -721,6 +724,7 @@ module.exports = withPWA({
 - [x] Loading states
 
 ### Deploy
+
 - [x] Frontend to Vercel
 - [x] Backend to Railway
 - [x] Domain setup
@@ -732,17 +736,20 @@ module.exports = withPWA({
 ## 📝 Daily Workflow Tips
 
 **Morning (30 min)**
+
 1. Review yesterday's work
 2. Check GitHub issues
 3. Plan today's tasks
 
 **Development (6-8 hours)**
+
 1. Work in 2-hour sprints
 2. Commit frequently
 3. Test on real device
 4. Take breaks
 
 **Evening (30 min)**
+
 1. Push code to GitHub
 2. Update TODO list
 3. Test on mobile
@@ -753,6 +760,7 @@ module.exports = withPWA({
 ## 🆘 Troubleshooting
 
 ### CORS errors
+
 ```python
 # backend: app/main.py
 app.add_middleware(
@@ -765,6 +773,7 @@ app.add_middleware(
 ```
 
 ### Build errors
+
 ```bash
 # Clear Next.js cache
 rm -rf .next
@@ -772,6 +781,7 @@ npm run build
 ```
 
 ### API not responding
+
 ```bash
 # Check backend is running
 curl http://localhost:8000/health

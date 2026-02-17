@@ -3,10 +3,12 @@
 ## What Was Added
 
 ### 1. Cache Manager Module
+
 **File**: [api/cache.py](api/cache.py)  
 **Purpose**: Intelligent file-based caching with automatic TTL management
 
 **Features**:
+
 - ✅ Automatic cache key generation (MD5 hash of endpoint + params)
 - ✅ Smart TTL based on data type:
   - Static data (clubs, seasons): 30 days
@@ -19,16 +21,19 @@
 - ✅ Selective cache clearing by category
 
 ### 2. Enhanced API Client
+
 **File**: [api/client.py](api/client.py)  
 **Changes**: Added caching support to existing client
 
 **New Parameters**:
+
 - `use_cache` (bool): Enable/disable caching (default: True)
 - `cache_dir` (str): Cache directory (default: "data/cache")
 - `force_refresh` (bool): Bypass cache on individual calls
 
 **Updated Methods**:
 All endpoint methods now support:
+
 ```python
 client.get_clubs(force_refresh=False)
 client.get_rankings(force_refresh=False, **params)
@@ -36,8 +41,10 @@ client.get_topscorers(force_refresh=False, **params)
 ```
 
 ### 3. Documentation
+
 **File**: [CACHING_STRATEGY.md](CACHING_STRATEGY.md)  
 **Content**: Comprehensive 500+ line guide covering:
+
 - Data classification by update frequency
 - Two-tier caching architecture diagram
 - Complete implementation code
@@ -46,10 +53,12 @@ client.get_topscorers(force_refresh=False, **params)
 - Best practices
 
 ### 4. Test Scripts
+
 **File**: [scripts/test_caching.py](scripts/test_caching.py)  
 **Purpose**: Demonstrate caching performance improvements
 
 Tests:
+
 - ✅ Performance comparison (with vs without cache)
 - ✅ Multiple endpoints test
 - ✅ Force refresh test
@@ -59,6 +68,7 @@ Tests:
 **Purpose**: Preload cache with commonly used data
 
 Preloads:
+
 - ✅ All clubs (~346 entries)
 - ✅ All leagues (~50 entries)
 - ✅ All seasons (31 seasons)
@@ -66,8 +76,10 @@ Preloads:
 - ✅ Top scorers for each league
 
 ### 5. Updated README
+
 **File**: [README.md](../README.md)  
-**Changes**: 
+**Changes**:
+
 - ✅ Added caching examples to usage section
 - ✅ Added cache management section
 - ✅ Added link to CACHING_STRATEGY.md
@@ -124,6 +136,7 @@ python scripts/test_caching.py
 ```
 
 Expected output:
+
 ```
 WITHOUT CACHING:
   • Fetching clubs (1st time)... ✓ 0.287s
@@ -148,6 +161,7 @@ python scripts/preload_cache.py
 ```
 
 Expected output:
+
 ```
 📦 Static Data (30-day cache):
   • Clubs... ✓ (346 clubs)
@@ -182,26 +196,32 @@ client.cache.clear()
 ## Performance Benefits
 
 ### Single Request
+
 - **Without cache**: ~300ms per request
 - **With cache**: ~2ms per request
 - **Speedup**: 150x faster ⚡
 
 ### 100 Requests
+
 - **Without cache**: ~30 seconds
 - **With cache**: ~0.5 seconds
 - **Speedup**: 60x faster ⚡
 
 ### Real-World Scenario
+
 Building a web app that displays:
+
 - League standings (3 leagues)
 - Top scorers (3 leagues)
 - Club information
 
 **First load** (cache miss):
+
 - API calls: 7
 - Total time: ~2.1 seconds
 
 **Subsequent loads** (cache hit):
+
 - API calls: 0
 - Total time: ~0.014 seconds
 - **Improvement**: 150x faster ⚡
@@ -239,6 +259,7 @@ client.cache.set(
 ## API Changes
 
 ### Backward Compatible
+
 All existing code continues to work without modifications:
 
 ```python
@@ -248,6 +269,7 @@ clubs = client.get_clubs()  # Now automatically cached!
 ```
 
 ### New Features
+
 Optional parameters for advanced usage:
 
 ```python
@@ -266,9 +288,11 @@ clubs = client.get_clubs(force_refresh=True)
 ## Cache Storage
 
 ### Location
+
 `data/cache/` directory (automatically created)
 
 ### Structure
+
 ```
 data/cache/
 ├── metadata.json          # Cache metadata
@@ -284,7 +308,9 @@ data/cache/
 ```
 
 ### File Naming
+
 Files are named using MD5 hash of `endpoint + parameters`:
+
 ```
 MD5("api/rankings:league=2&season=2025") = "abc123def456..."
 → data/cache/rankings/abc123def456.json
@@ -295,11 +321,13 @@ MD5("api/rankings:league=2&season=2025") = "abc123def456..."
 ## Testing
 
 ### Run Cache Tests
+
 ```bash
 python scripts/test_caching.py
 ```
 
 ### Unit Tests (Coming Soon)
+
 ```bash
 pytest tests/test_cache.py
 ```
@@ -309,6 +337,7 @@ pytest tests/test_cache.py
 ## Troubleshooting
 
 ### Cache not working?
+
 ```python
 # Check if caching is enabled
 print(client.use_cache)  # Should be True
@@ -318,6 +347,7 @@ print(client.cache.get_stats())
 ```
 
 ### Cache too large?
+
 ```python
 # Check size
 stats = client.cache.get_stats()
@@ -328,6 +358,7 @@ client.cache.clear("rankings")  # Clear dynamic data
 ```
 
 ### Need fresh data?
+
 ```python
 # Force refresh
 data = client.get_clubs(force_refresh=True)

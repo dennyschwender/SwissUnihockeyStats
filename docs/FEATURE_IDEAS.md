@@ -9,7 +9,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ## 📊 Core Features (Must-Have)
 
 ### 1. **League Standings Dashboard**
+
 **Data Source**: `/api/rankings`
+
 - Real-time league tables for all divisions
 - Sortable columns (points, goals, wins)
 - Filtering by league/division
@@ -18,6 +20,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Form indicators (W/L/D last 5 games)
 
 **Visual Elements**:
+
 - Table with team logos
 - Sparkline charts for recent form
 - Color-coded positions (promotion/relegation zones)
@@ -25,7 +28,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 2. **Match Center**
+
 **Data Source**: `/api/games`, `/api/game_events`
+
 - Today's matches with live scores
 - Weekly/monthly calendar view
 - Match details (venue, time, officials)
@@ -34,6 +39,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Head-to-head history
 
 **Visual Elements**:
+
 - Live score ticker
 - Interactive timeline
 - Heatmaps for goal timing
@@ -41,7 +47,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 3. **Club Profiles**
+
 **Data Source**: `/api/clubs`, `/api/teams`
+
 - Club information and history
 - All teams within a club (Men/Women/Junior)
 - Season statistics
@@ -50,6 +58,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Upcoming fixtures
 
 **Visual Elements**:
+
 - Club logo and colors
 - Team photos
 - Performance charts
@@ -57,7 +66,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 4. **Player Statistics**
+
 **Data Source**: `/api/players`, `/api/topscorers`
+
 - Individual player profiles
 - Career statistics
 - Season-by-season breakdown
@@ -66,6 +77,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Team history
 
 **Visual Elements**:
+
 - Player photos
 - Stats cards
 - Performance graphs
@@ -75,7 +87,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ## 🎯 Enhanced Features (Nice-to-Have)
 
 ### 5. **Top Scorers Leaderboard**
+
 **Data Source**: `/api/topscorers`
+
 - League-wide top scorers
 - Filterable by league/season
 - Goals, assists, points
@@ -84,6 +98,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Hat-tricks tracker
 
 **Visual Elements**:
+
 - Animated leaderboard
 - Player comparison tool
 - Historical top scorer awards
@@ -91,7 +106,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 6. **Team Comparison Tool**
+
 **Data Source**: `/api/teams`, `/api/games`, `/api/rankings`
+
 - Head-to-head records
 - Side-by-side statistics
 - Recent form comparison
@@ -100,6 +117,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Historical matchups
 
 **Visual Elements**:
+
 - Radar charts
 - Bar charts for comparisons
 - Win/loss visualization
@@ -107,7 +125,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 7. **Season Archive**
+
 **Data Source**: `/api/seasons`
+
 - Historical data back to 1995/96
 - Season winners by league
 - Records and milestones
@@ -116,6 +136,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Year-over-year trends
 
 **Visual Elements**:
+
 - Timeline of champions
 - Record book
 - Historical charts
@@ -123,7 +144,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 8. **Game Schedule & Calendar**
+
 **Data Source**: `/api/games`, `/api/calendars`
+
 - Full season schedule
 - Filterable by team/league
 - Calendar view (day/week/month)
@@ -132,6 +155,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Stadium information
 
 **Visual Elements**:
+
 - Interactive calendar
 - Filter sidebar
 - Map view of venues
@@ -139,7 +163,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 9. **Live Match Tracker**
+
 **Data Source**: `/api/game_events`
+
 - Goal notifications
 - Real-time event feed
 - Penalty tracking
@@ -148,6 +174,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Lineup changes
 
 **Visual Elements**:
+
 - Live event stream
 - Score ticker
 - Push notifications
@@ -157,7 +184,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ## 🔬 Advanced Analytics Features
 
 ### 10. **Form Guide & Trends**
+
 **Calculated from**: `/api/games` historical data
+
 - Last 5/10 game results
 - Win/loss streaks
 - Goals scored trends
@@ -166,6 +195,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Form over time chart
 
 **Visual Elements**:
+
 - Form bars (WWLWD)
 - Trend lines
 - Momentum indicators
@@ -173,7 +203,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 11. **Goal Timing Analysis**
+
 **Calculated from**: `/api/game_events`
+
 - Goals by period
 - Goals by minute ranges (0-10, 11-20, etc.)
 - Late goal frequency
@@ -181,6 +213,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - First goal importance
 
 **Visual Elements**:
+
 - Heatmap by time
 - Histogram charts
 - Pattern recognition
@@ -188,13 +221,16 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 12. **Strength of Schedule**
+
 **Calculated from**: `/api/rankings`, `/api/games`
+
 - Opponent ranking average
 - Difficulty rating
 - Remaining fixtures analysis
 - Schedule fairness
 
 **Visual Elements**:
+
 - Difficulty meter
 - Comparison charts
 - Fixture list with ratings
@@ -202,13 +238,16 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 13. **Playoff Predictor**
+
 **Calculated from**: Current standings + remaining games
+
 - Playoff probability %
 - Magic number calculator
 - Scenarios simulator
 - Championship odds
 
 **Visual Elements**:
+
 - Probability charts
 - Scenario matrix
 - Interactive simulator
@@ -216,7 +255,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 14. **Performance Metrics**
+
 **Calculated from**: Multiple endpoints
+
 - Points per game
 - Goals per game (for/against)
 - Goal difference
@@ -225,6 +266,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Late-game performance
 
 **Visual Elements**:
+
 - Stat cards
 - Comparison bars
 - Rating system
@@ -234,7 +276,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ## 🌟 Unique & Creative Features
 
 ### 15. **Fantasy League Integration**
+
 **Data Source**: All endpoints
+
 - Player points system
 - Team builder
 - Weekly scoring
@@ -242,6 +286,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Trade suggestions
 
 **Visual Elements**:
+
 - Team management UI
 - Points breakdown
 - League standings
@@ -249,7 +294,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 16. **Match Predictions**
+
 **ML Model using**: Historical game data
+
 - Win probability %
 - Expected score
 - Key factors analysis
@@ -257,6 +304,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Accuracy tracking
 
 **Visual Elements**:
+
 - Prediction cards
 - Confidence meter
 - Historical accuracy
@@ -264,13 +312,16 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 17. **Player Development Tracker**
+
 **Data Source**: `/api/players` over multiple seasons
+
 - Junior to senior progression
 - Season-over-season improvement
 - Breakout player identification
 - Age curves
 
 **Visual Elements**:
+
 - Development curves
 - Milestone tracking
 - Comparison to peers
@@ -278,7 +329,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 18. **Derby & Rivalry Tracker**
+
 **Calculated from**: `/api/games`, geographic data
+
 - Local derby matches
 - Rivalry history
 - All-time records
@@ -286,6 +339,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Memorable moments
 
 **Visual Elements**:
+
 - Rivalry cards
 - Head-to-head timeline
 - Trophy case
@@ -293,7 +347,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 19. **Streak Tracker**
+
 **Calculated from**: Game results
+
 - Current winning/losing streaks
 - Longest streaks (season/all-time)
 - Unbeaten runs
@@ -301,6 +357,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Scoring streaks
 
 **Visual Elements**:
+
 - Streak indicators
 - Record boards
 - Progress bars
@@ -308,7 +365,9 @@ Based on the available public endpoints, here's a complete breakdown of features
 ---
 
 ### 20. **Club Geography Map**
+
 **Data Source**: `/api/clubs` + geocoding
+
 - Interactive map of all 346 clubs
 - Cluster by region
 - Nearest clubs finder
@@ -316,6 +375,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Travel distance calculator
 
 **Visual Elements**:
+
 - Interactive map
 - Club markers with logos
 - Heat map by region
@@ -325,6 +385,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 ## 🎨 Visualization Ideas
 
 ### Dashboard Layouts
+
 1. **Home Page**: League tables + today's matches + top scorers
 2. **League Page**: Full standings + recent results + statistics
 3. **Team Page**: Profile + roster + fixtures + form
@@ -332,6 +393,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 5. **Match Page**: Live score + timeline + statistics
 
 ### Chart Types
+
 - **Line charts**: Form over time, goal trends
 - **Bar charts**: Goals per team, assists leaders
 - **Radar charts**: Team comparisons (5+ metrics)
@@ -341,6 +403,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - **Treemaps**: Goals by team hierarchy
 
 ### UI Components
+
 - **Live Score Ticker**: Horizontal scrolling scores
 - **Form Strip**: WWLDW boxes with colors
 - **Mini Table**: Top 5 teams widget
@@ -353,6 +416,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 ## 📱 Platform-Specific Features
 
 ### Web App
+
 - Responsive design (mobile/tablet/desktop)
 - Dark/light theme toggle
 - Bookmark favorite teams
@@ -360,6 +424,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Embedded widgets for other sites
 
 ### Mobile App
+
 - Push notifications for goals/results
 - Location-based club finder
 - Offline mode for cached data
@@ -367,6 +432,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 - Quick team switcher
 
 ### Progressive Web App (PWA)
+
 - Installable on devices
 - Offline support
 - Background sync
@@ -389,28 +455,32 @@ Based on the available public endpoints, here's a complete breakdown of features
 ## 🏗️ Implementation Priority
 
 ### MVP (Minimum Viable Product) - Week 1-2
+
 1. League standings
 2. Match results list
 3. Basic club info
 4. Simple search
 
 ### Version 1.0 - Week 3-4
+
 5. Player statistics
-6. Top scorers
-7. Team profiles
-8. Match details
+2. Top scorers
+3. Team profiles
+4. Match details
 
 ### Version 2.0 - Month 2
+
 9. Live scores
-10. Historical data
-11. Comparison tools
-12. Advanced stats
+2. Historical data
+3. Comparison tools
+4. Advanced stats
 
 ### Version 3.0 - Month 3+
+
 13. Predictions
-14. Analytics
-15. Mobile app
-16. Social features
+2. Analytics
+3. Mobile app
+4. Social features
 
 ---
 
@@ -428,6 +498,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 ## 💾 Data Requirements
 
 ### Storage Needs
+
 - **Clubs**: ~346 records (1 KB each) = 350 KB
 - **Seasons**: ~31 records (small)
 - **Leagues**: ~50 records (small)
@@ -435,12 +506,14 @@ Based on the available public endpoints, here's a complete breakdown of features
 - **Players**: ~5,000 active (10 KB each) = 50 MB
 
 ### Update Frequency
+
 - **Live matches**: Every 30 seconds
 - **Standings**: After each game
 - **Player stats**: Daily
 - **Historical data**: One-time fetch + updates
 
 ### API Call Budget (Estimate)
+
 - Initial data load: ~100 requests
 - Daily updates: ~50-100 requests
 - Per user visit: 1-5 requests (with caching)
@@ -472,6 +545,7 @@ Based on the available public endpoints, here's a complete breakdown of features
 ## 📊 Success Metrics
 
 Track these to measure your success:
+
 - Daily active users
 - Page views per visit
 - Time on site

@@ -34,24 +34,24 @@ This document summarizes the Docker containerization added to the SwissUnihockey
 
 ### Automation & Utilities
 
-5. **`Makefile`** (120 lines)
+1. **`Makefile`** (120 lines)
    - 20+ convenient commands
    - `make build`, `make up`, `make preload`
    - `make dev`, `make test`, `make clean`
    - Cache management commands
    - Production deployment helpers
 
-6. **`docker-quickstart.sh`** (Bash, 45 lines)
+2. **`docker-quickstart.sh`** (Bash, 45 lines)
    - One-command setup for Linux/Mac
    - Checks prerequisites
    - Builds, starts, and preloads cache
 
-7. **`docker-quickstart.ps1`** (PowerShell, 50 lines)
+3. **`docker-quickstart.ps1`** (PowerShell, 50 lines)
    - Windows equivalent
    - Color-coded output
    - Error handling
 
-8. **`.env.docker.example`** (15 lines)
+4. **`.env.docker.example`** (15 lines)
    - Environment variable template
    - API configuration
    - Caching settings
@@ -59,21 +59,21 @@ This document summarizes the Docker containerization added to the SwissUnihockey
 
 ### CI/CD & Health
 
-9. **`.github/workflows/docker.yml`** (110 lines)
+1. **`.github/workflows/docker.yml`** (110 lines)
    - Automated Docker builds on push
    - Multi-platform testing
    - Security scanning with Trivy
    - GitHub Container Registry publishing
    - Docker Compose validation
 
-10. **`scripts/healthcheck.py`** (30 lines)
+2. **`scripts/healthcheck.py`** (30 lines)
     - Container health verification
     - Tests API client initialization
     - Used by Docker HEALTHCHECK
 
 ### Documentation
 
-11. **`DOCKER.md`** (550 lines)
+1. **`DOCKER.md`** (550 lines)
     - Complete deployment guide
     - Quick start instructions
     - Configuration reference
@@ -87,6 +87,7 @@ This document summarizes the Docker containerization added to the SwissUnihockey
 ## 🚀 Quick Start
 
 ### Traditional Install (Python)
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate
@@ -95,6 +96,7 @@ python scripts/preload_cache.py
 ```
 
 ### Docker (Recommended)
+
 ```bash
 # Using Makefile
 make build
@@ -116,6 +118,7 @@ docker-compose run --rm preload-cache
 ## 📊 Docker Services
 
 ### 1. Main Service (`swissunihockey`)
+
 **Purpose**: Interactive Python environment with API client  
 **Status**: Always running  
 **Resources**: 512MB RAM, 1 CPU
@@ -129,17 +132,20 @@ docker-compose exec swissunihockey python scripts/example_fetch_data.py
 ```
 
 ### 2. Preload Service (`preload-cache`)
+
 **Purpose**: One-time cache population  
 **Status**: Runs once and exits  
 **Usage**: `docker-compose run --rm preload-cache`
 
 **What it caches**:
+
 - 346 clubs
 - 50 leagues
 - 31 seasons
 - Current rankings for NLA, NLB, 1. Liga
 
 ### 3. Auto-Refresh Service (`cache-refresher`)
+
 **Purpose**: Hourly cache updates  
 **Status**: Optional background service  
 **Profile**: `auto-refresh`
@@ -154,6 +160,7 @@ docker-compose --profile auto-refresh up -d cache-refresher
 ## 🎯 Key Features
 
 ### Security
+
 ✅ **Non-root user** - Container runs as `appuser:1000`  
 ✅ **Multi-stage build** - Smaller attack surface  
 ✅ **Resource limits** - Prevents resource exhaustion  
@@ -161,12 +168,14 @@ docker-compose --profile auto-refresh up -d cache-refresher
 ✅ **Security scanning** - Trivy in CI/CD pipeline
 
 ### Performance
+
 ✅ **Optimized layers** - Cached dependency installation  
 ✅ **Small image size** - ~200MB (vs 1GB+ unoptimized)  
 ✅ **Persistent cache** - Volume mount for `/app/data/cache`  
 ✅ **BuildKit support** - Faster builds with caching
 
 ### Developer Experience
+
 ✅ **Live reload** - Mount source code in dev mode  
 ✅ **Jupyter Lab** - Data exploration container  
 ✅ **One-command setup** - Quick start scripts  
@@ -174,6 +183,7 @@ docker-compose --profile auto-refresh up -d cache-refresher
 ✅ **VS Code integration** - Dev Container ready
 
 ### Production Ready
+
 ✅ **Health checks** - Kubernetes/Swarm compatible  
 ✅ **Graceful shutdown** - SIGTERM handling  
 ✅ **Log output** - STDOUT/STDERR for orchestration  
@@ -185,6 +195,7 @@ docker-compose --profile auto-refresh up -d cache-refresher
 ## 🛠️ Development Workflow
 
 ### Start Development
+
 ```bash
 # Full dev environment with Jupyter
 make dev-jupyter
@@ -198,11 +209,13 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml --profile jupyter
 ```
 
 ### Make Changes
+
 - Edit code locally (mounted into container)
 - Changes reflected immediately
 - No rebuild needed
 
 ### Run Tests
+
 ```bash
 make test
 
@@ -211,6 +224,7 @@ docker-compose exec swissunihockey pytest tests/ -v
 ```
 
 ### View Logs
+
 ```bash
 make logs
 
@@ -223,6 +237,7 @@ docker-compose logs -f swissunihockey
 ## 🚀 Production Deployment
 
 ### Build Production Image
+
 ```bash
 docker build -t swissunihockey:prod .
 ```
@@ -230,17 +245,20 @@ docker build -t swissunihockey:prod .
 ### Deploy to Cloud
 
 **Docker Swarm**:
+
 ```bash
 docker stack deploy -c docker-compose.yml swissunihockey
 ```
 
 **Kubernetes**:
+
 ```bash
 kompose convert -f docker-compose.yml
 kubectl apply -f swissunihockey-deployment.yaml
 ```
 
 **Single Server**:
+
 ```bash
 docker run -d \
   --name swissunihockey \
@@ -254,12 +272,14 @@ docker run -d \
 ## 📈 Resource Usage
 
 **Container stats** (after preload):
+
 - **Image size**: ~200MB
 - **Runtime memory**: ~150MB
 - **Cache storage**: ~300KB (compressed JSON)
 - **CPU**: <5% idle, <30% during API calls
 
 **Recommended limits**:
+
 - Production: 512MB RAM, 1 CPU
 - Development: 1GB RAM, 2 CPU
 - Minimum: 256MB RAM, 0.5 CPU
@@ -291,12 +311,14 @@ TZ=Europe/Zurich
 ### Volume Mounts
 
 **Cache persistence** (recommended):
+
 ```yaml
 volumes:
   - ./data/cache:/app/data/cache
 ```
 
 **Source code** (development only):
+
 ```yaml
 volumes:
   - ./api:/app/api
@@ -308,6 +330,7 @@ volumes:
 ## 🎯 Makefile Commands
 
 ### Essential Commands
+
 ```bash
 make help          # Show all commands
 make build         # Build Docker images
@@ -320,6 +343,7 @@ make python        # Open Python REPL
 ```
 
 ### Development
+
 ```bash
 make dev           # Start dev environment
 make dev-jupyter   # Start with Jupyter
@@ -327,6 +351,7 @@ make test          # Run tests
 ```
 
 ### Utilities
+
 ```bash
 make cache-stats   # Show cache statistics
 make cache-clear   # Clear all cache
@@ -340,6 +365,7 @@ make clean-all     # Nuclear option - remove everything
 ## 🐛 Troubleshooting
 
 ### Container won't start
+
 ```bash
 # Check logs
 docker-compose logs swissunihockey
@@ -349,6 +375,7 @@ docker ps
 ```
 
 ### Cache not persisting
+
 ```bash
 # Check volume
 docker-compose config | grep volumes -A 5
@@ -358,6 +385,7 @@ docker-compose exec swissunihockey ls -la /app/data/cache
 ```
 
 ### Out of memory
+
 ```bash
 # Increase limit in docker-compose.yml
 deploy:
@@ -367,6 +395,7 @@ deploy:
 ```
 
 ### Permission errors
+
 ```bash
 # Fix ownership
 sudo chown -R $USER:$USER ./data/cache
@@ -377,20 +406,22 @@ sudo chown -R $USER:$USER ./data/cache
 ## 📚 Learn More
 
 - **DOCKER.md** - Complete Docker guide (550 lines)
-- **Docker Docs** - https://docs.docker.com
-- **Docker Compose** - https://docs.docker.com/compose/
-- **Best Practices** - https://docs.docker.com/develop/dev-best-practices/
+- **Docker Docs** - <https://docs.docker.com>
+- **Docker Compose** - <https://docs.docker.com/compose/>
+- **Best Practices** - <https://docs.docker.com/develop/dev-best-practices/>
 
 ---
 
 ## ✅ What Changed
 
 ### Updated Files
+
 - **README.md** - Added Docker quick start section
 - **PROJECT_STATUS.md** - Added Phase 4: Docker Ready
 - **.gitignore** - Added Docker-specific ignores
 
 ### New Files (11 total)
+
 1. Dockerfile
 2. docker-compose.yml
 3. docker-compose.dev.yml
@@ -404,6 +435,7 @@ sudo chown -R $USER:$USER ./data/cache
 11. DOCKER.md
 
 ### Lines of Code Added
+
 - **Docker configuration**: ~400 lines
 - **Documentation**: ~550 lines
 - **Automation scripts**: ~250 lines
@@ -425,6 +457,7 @@ Your SwissUnihockey project is now **fully containerized** with:
 ✅ Performance optimizations  
 
 **Start now**:
+
 ```bash
 make build && make up && make preload
 ```

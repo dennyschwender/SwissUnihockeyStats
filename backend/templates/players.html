@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Players - SwissUnihockey{% endblock %}
+
+{% block description %}Search and find Swiss unihockey players{% endblock %}
+
+{% block og_title %}Players | SwissUnihockey{% endblock %}
+{% block og_description %}Search for Swiss unihockey players{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    <h1>Players</h1>
+    <p style="color: var(--gray-600); margin-bottom: 2rem;">Search for Swiss unihockey players</p>
+
+    <!-- Search Box -->
+    <div style="max-width: 600px; margin-bottom: 2rem;">
+        <input 
+            type="text" 
+            id="player-search" 
+            placeholder="Search players by name..." 
+            style="width: 100%; padding: 0.75rem 1rem; border: 2px solid var(--gray-300); border-radius: 8px; font-size: 1rem;"
+            @input="searchPlayers"
+        >
+    </div>
+
+    <!-- Search Results -->
+    <div id="players-list">
+        <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
+            <p>Enter a player name to search</p>
+        </div>
+    </div>
+</div>
+
+<script>
+const { createApp } = Vue;
+
+createApp({
+    data() {
+        return {
+            searchTimeout: null,
+            loading: false
+        }
+    },
+    methods: {
+        async searchPlayers(event) {
+            const query = event.target.value.trim();
+            
+            // Clear existing timeout
+            if (this.searchTimeout) {
+                clearTimeout(this.searchTimeout);
+            }
+            
+            // Don't search if query is too short
+            if (query.length < 2) {
+                document.getElementById('players-list').innerHTML = `
+                    <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
+                        <p>Enter at least 2 characters to search</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Debounce search
+            this.searchTimeout = setTimeout(async () => {
+                this.loading = true;
+                document.getElementById('players-list').innerHTML = `
+                    <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
+                        <p>Searching...</p>
+                    </div>
+                `;
+                
+                try {
+                    const response = await fetch(`/{{ locale }}/players/search?q=${encodeURIComponent(query)}`);
+                    const html = await response.text();
+                    document.getElementById('players-list').innerHTML = html;
+                } catch (error) {
+                    console.error('Search error:', error);
+                    document.getElementById('players-list').innerHTML = `
+                        <div style="text-align: center; padding: 3rem; color: #d32f2f;">
+                            <p>Error searching players. Please try again.</p>
+                        </div>
+                    `;
+                } finally {
+                    this.loading = false;
+                }
+            }, 300);
+        }
+    },
+    mounted() {
+        // Focus search box on load
+        document.getElementById('player-search').focus();
+    }
+}).mount('#app');
+</script>
+{% endblock %}

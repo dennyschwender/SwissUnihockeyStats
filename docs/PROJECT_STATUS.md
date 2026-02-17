@@ -3,6 +3,7 @@
 ## 🎯 Project Vision
 
 Build a **modern, mobile-first** Swiss Unihockey statistics platform that surpasses the current unihockeystats.ch with 2026 features including:
+
 - Progressive Web App (PWA)
 - Real-time live scores
 - Dark mode
@@ -76,6 +77,7 @@ All documentation is now complete and ready to use:
 ## ✅ What's Already Done
 
 ### Phase 1: Python API Client ✓
+
 - [x] Complete SwissUnihockeyClient class
 - [x] 13 endpoint methods (clubs, leagues, teams, games, players, etc.)
 - [x] Retry logic with exponential backoff
@@ -85,6 +87,7 @@ All documentation is now complete and ready to use:
 - [x] Successfully tested (346 clubs, 50 leagues, 31 seasons fetched)
 
 ### Phase 2: Documentation ✓
+
 - [x] Comprehensive README
 - [x] Getting started guide
 - [x] Feature ideas document
@@ -95,6 +98,7 @@ All documentation is now complete and ready to use:
 - [x] Component library ⭐ NEW
 
 ### Phase 3: GitHub Ready ✓
+
 - [x] LICENSE (MIT)
 - [x] CONTRIBUTING.md
 - [x] SECURITY.md
@@ -104,6 +108,7 @@ All documentation is now complete and ready to use:
 - [x] .gitignore configured
 
 ### Phase 4: Docker Ready ✓ ⭐ NEW
+
 - [x] Multi-stage Dockerfile
 - [x] Docker Compose configuration
 - [x] Development docker-compose.dev.yml
@@ -115,6 +120,7 @@ All documentation is now complete and ready to use:
 - [x] Complete Docker documentation
 
 **Quick Docker Start**:
+
 ```bash
 make build && make up && make preload
 ```
@@ -123,30 +129,34 @@ make build && make up && make preload
 
 ---
 
-## 🚀 Next Steps - Start Building!
+## 🚀 Next Steps - Start Building
 
 ### Option 1: MVP in 4 Weeks (Recommended)
 
 Follow the **[QUICK_START.md](./QUICK_START.md)** guide:
 
 **Week 1**: Setup & Foundation
+
 - Create Next.js frontend
 - Setup FastAPI backend
 - Integrate existing API client
 - Deploy basic "Hello World"
 
 **Week 2**: Core Features
+
 - League standings page
 - Top scorers leaderboard
 - Player profile pages
 - Team pages
 
 **Week 3**: Live Features
+
 - Real-time scores (WebSocket)
 - Push notifications
 - Live game feed
 
 **Week 4**: Mobile Polish
+
 - PWA configuration
 - Dark mode
 - Offline support
@@ -159,13 +169,14 @@ Follow the **[QUICK_START.md](./QUICK_START.md)** guide:
 If you want to start even faster:
 
 1. Setup Next.js (10 minutes):
+
 ```bash
 npx create-next-app@latest swiss-unihockey-web --typescript --tailwind --app
 cd swiss-unihockey-web
 npx shadcn@latest init
 ```
 
-2. Copy components from **[COMPONENT_LIBRARY.md](./COMPONENT_LIBRARY.md)**:
+1. Copy components from **[COMPONENT_LIBRARY.md](./COMPONENT_LIBRARY.md)**:
    - LiveScoreCard
    - PlayerStatsCard
    - StandingsTable
@@ -173,14 +184,16 @@ npx shadcn@latest init
    - BottomNav
    - ThemeToggle
 
-3. Connect to API:
+2. Connect to API:
+
 ```typescript
 // Copy API client to frontend
 // Create React Query hooks
 // Build pages with components
 ```
 
-4. Deploy to Vercel (5 minutes):
+1. Deploy to Vercel (5 minutes):
+
 ```bash
 vercel deploy --prod
 ```
@@ -190,7 +203,9 @@ vercel deploy --prod
 ## 💡 Key Decisions Made
 
 ### Frontend: Next.js 15 + React
+
 **Why?**
+
 - Best mobile-first experience
 - Vercel deployment (zero config)
 - Largest component ecosystem (shadcn/ui)
@@ -198,7 +213,9 @@ vercel deploy --prod
 - Great real-time capabilities
 
 ### Backend: FastAPI + Python
+
 **Why?**
+
 - Already have Python API client (reuse existing code!)
 - Async/await for performance
 - Automatic API docs (Swagger)
@@ -206,13 +223,17 @@ vercel deploy --prod
 - Fast development
 
 ### Database: PostgreSQL + Redis
+
 **Why?**
+
 - PostgreSQL: Robust, handles complex queries
 - Redis: Fast caching for API responses
 - Supabase: Managed, free tier available
 
 ### Hosting: Vercel + Railway
+
 **Why?**
+
 - Vercel: Best for Next.js, free hobby plan
 - Railway: Simple FastAPI deployment, $5/month
 - Total cost: ~$5-75/month depending on usage
@@ -222,6 +243,7 @@ vercel deploy --prod
 ## 🎨 Design Philosophy
 
 ### Mobile-First
+
 - Bottom navigation bar
 - Touch-friendly targets (44px minimum)
 - Pull-to-refresh
@@ -229,6 +251,7 @@ vercel deploy --prod
 - Responsive grid layouts
 
 ### Performance
+
 - Code splitting (route-based)
 - Image optimization (WebP, lazy loading)
 - API caching (React Query)
@@ -236,6 +259,7 @@ vercel deploy --prod
 - Target: < 2s first load
 
 ### Accessibility
+
 - Semantic HTML
 - ARIA labels
 - Keyboard navigation
@@ -266,12 +290,14 @@ vercel deploy --prod
 ## 💰 Cost Breakdown
 
 ### Development Phase (MVP)
+
 - **Time**: 4 weeks (part-time) or 2 weeks (full-time)
 - **Cost**: Free (self-built)
 
 ### Monthly Operating Costs
 
 **Tier 1: MVP (0-1,000 users)**
+
 - Vercel: $0 (Hobby)
 - Railway: $5 (Hobby)
 - Supabase: $0 (Free)
@@ -279,6 +305,7 @@ vercel deploy --prod
 - **Total: $5/month**
 
 **Tier 2: Growth (1,000-10,000 users)**
+
 - Vercel: $20 (Pro)
 - Railway: $20 (Pro)
 - Supabase: $25 (Pro)
@@ -286,6 +313,7 @@ vercel deploy --prod
 - **Total: $75/month**
 
 **Tier 3: Scale (10,000+ users)**
+
 - Custom scaling
 - **Estimated: $200-500/month**
 
@@ -294,6 +322,7 @@ vercel deploy --prod
 ## 🎯 Success Metrics
 
 ### Technical KPIs
+
 - Lighthouse Score: 95+
 - First Load: < 2s
 - API Response: < 200ms
@@ -301,6 +330,7 @@ vercel deploy --prod
 - Core Web Vitals: All green
 
 ### User Metrics (6-month targets)
+
 - Daily Active Users: 5,000+
 - Session Duration: 5+ minutes
 - Bounce Rate: < 40%
@@ -308,6 +338,7 @@ vercel deploy --prod
 - Return User Rate: 60%+
 
 ### Business Goals (12-month targets)
+
 - #1 Swiss Unihockey stats platform
 - 10,000+ registered users
 - Overtake unihockeystats.ch traffic
@@ -318,12 +349,14 @@ vercel deploy --prod
 
 ## 🛠️ Immediate Action Plan
 
-### Today (2 hours):
+### Today (2 hours)
+
 1. ⭐ Read [QUICK_START.md](./QUICK_START.md)
 2. ⭐ Choose deployment platforms (Vercel + Railway accounts)
 3. ⭐ Set up development environment
 
-### This Week (20 hours):
+### This Week (20 hours)
+
 1. Create Next.js frontend repository
 2. Create FastAPI backend repository
 3. Copy API client to backend
@@ -331,12 +364,14 @@ vercel deploy --prod
 5. Build homepage with hero
 6. Deploy to production (MVP v0.1)
 
-### Next 3 Weeks (60 hours):
+### Next 3 Weeks (60 hours)
+
 1. **Week 2**: Standings, players, top scorers
 2. **Week 3**: Live scores, real-time updates
 3. **Week 4**: PWA, dark mode, mobile polish
 
-### Launch Day (MVP):
+### Launch Day (MVP)
+
 - Press release
 - Post on Reddit r/unihockey
 - Share on Swiss Unihockey forums
@@ -348,21 +383,25 @@ vercel deploy --prod
 ## 📖 Learning Resources
 
 ### Next.js
-- Official Tutorial: https://nextjs.org/learn
-- Vercel Templates: https://vercel.com/templates
-- shadcn/ui: https://ui.shadcn.com
+
+- Official Tutorial: <https://nextjs.org/learn>
+- Vercel Templates: <https://vercel.com/templates>
+- shadcn/ui: <https://ui.shadcn.com>
 
 ### FastAPI
-- Official Docs: https://fastapi.tiangolo.com
-- Real World Example: https://github.com/nsidnev/fastapi-realworld-example-app
+
+- Official Docs: <https://fastapi.tiangolo.com>
+- Real World Example: <https://github.com/nsidnev/fastapi-realworld-example-app>
 
 ### React Query
-- Docs: https://tanstack.com/query/latest
-- Essential Patterns: https://tkdodo.eu/blog/practical-react-query
+
+- Docs: <https://tanstack.com/query/latest>
+- Essential Patterns: <https://tkdodo.eu/blog/practical-react-query>
 
 ### TailwindCSS
-- Docs: https://tailwindcss.com/docs
-- Component Examples: https://tailwindui.com
+
+- Docs: <https://tailwindcss.com/docs>
+- Component Examples: <https://tailwindui.com>
 
 ---
 
@@ -419,9 +458,10 @@ swissunihockey/              # Current Python package (existing)
 
 ---
 
-## 💪 You Have Everything You Need!
+## 💪 You Have Everything You Need
 
 ### ✅ Complete Python API Client
+
 - Tested and working
 - 346 clubs accessible
 - 50+ leagues
@@ -429,18 +469,21 @@ swissunihockey/              # Current Python package (existing)
 - All endpoints covered
 
 ### ✅ Complete Architecture
+
 - Technology stack chosen
 - Database schema designed
 - Deployment plan ready
 - File structure defined
 
 ### ✅ Complete Development Guide
+
 - 4-week roadmap
 - Copy-paste commands
 - Code examples
 - Component library
 
 ### ✅ Complete Documentation
+
 - 3,800+ lines of guides
 - Architecture decisions explained
 - Best practices documented

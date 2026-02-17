@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}{{ team.text if team.text else 'Team Details' }} - SwissUnihockey{% endblock %}
+
+{% block description %}Details for {{ team.text if team.text else 'team' }} - roster, games, statistics{% endblock %}
+
+{% block og_title %}{{ team.text if team.text else 'Team' }} | SwissUnihockey{% endblock %}
+{% block og_description %}View roster and schedule for {{ team.text if team.text else 'this team' }}{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    <!-- Back Button -->
+    <div style="margin-bottom: 1.5rem;">
+        <a href="/{{ locale }}/teams" style="color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
+            ← Back to Teams
+        </a>
+    </div>
+
+    {% if error_message %}
+    <div style="padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 8px; margin-bottom: 1.5rem;">
+        <strong>Error:</strong> {{ error_message }}
+    </div>
+    {% endif %}
+
+    <!-- Team Header -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+            {% if team.logo %}
+            <img src="{{ team.logo }}" alt="{{ team.text if team.text else 'Team' }} logo" style="width: 80px; height: 80px; object-fit: contain;">
+            {% else %}
+            <div class="card-icon" style="font-size: 3rem;">👥</div>
+            {% endif %}
+            <div>
+                <h1 style="margin: 0;">{{ team.text if team.text else 'Team Details' }}</h1>
+                {% if team.set_in_context and team.set_in_context.club_name %}
+                <p style="margin: 0.5rem 0 0 0; color: var(--gray-600);">
+                    🏒 {{ team.set_in_context.club_name }}
+                </p>
+                {% endif %}
+                {% if team.set_in_context and team.set_in_context.league_name %}
+                <p style="margin: 0.25rem 0 0 0; color: var(--gray-600);">
+                    🏆 {{ team.set_in_context.league_name }}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Players Section -->
+    <h2 style="margin: 2rem 0 1rem 0;">Roster</h2>
+    
+    {% if players %}
+    <div class="cards-grid">
+        {% for player in players %}
+        <div class="card" onclick="window.location='/{{ locale }}/player/{{ player.id }}'">
+            <div class="card-icon">👤</div>
+            <h3>{{ player.text if player.text else ((player.given_name if player.given_name else '') ~ ' ' ~ (player.family_name if player.family_name else '')) }}</h3>
+            {% if player.jersey_number or player.position %}
+            <p style="color: var(--gray-600); font-size: 0.875rem;">
+                {% if player.jersey_number %}#{{ player.jersey_number }}{% endif %}
+                {% if player.position %}{{ (' - ' ~ player.position) if player.jersey_number else player.position }}{% endif %}
+            </p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 3rem; color: var(--gray-600); background: var(--gray-50); border-radius: 8px;">
+        <p>No roster information available</p>
+    </div>
+    {% endif %}
+
+    <!-- Recent Games Section -->
+    <h2 style="margin: 2rem 0 1rem 0;">Recent Games</h2>
+    
+    {% if games %}
+    <div class="card">
+        {% for game in games %}
+        <div style="padding: 1rem; border-bottom: 1px solid var(--gray-200); {% if loop.last %}border-bottom: none;{% endif %}">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>{{ game.home_team if game.home_team else 'Home' }} vs {{ game.away_team if game.away_team else 'Away' }}</strong>
+                    {% if game.score %}
+                    <p style="margin: 0.25rem 0 0 0; color: var(--gray-600);">
+                        Score: {{ game.score }}
+                    </p>
+                    {% endif %}
+                </div>
+                <div style="text-align: right; color: var(--gray-600); font-size: 0.875rem;">
+                    {% if game.get('date') %}{{ game.date }}{% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 3rem; color: var(--gray-600); background: var(--gray-50); border-radius: 8px;">
+        <p>No games found</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

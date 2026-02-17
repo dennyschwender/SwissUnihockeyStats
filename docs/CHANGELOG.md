@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Initial project setup
 - SwissUnihockeyClient API wrapper
 - Support for 13 public API endpoints
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for 4 locales (en, de-CH, fr-CH, it-CH)
 
 ### Features
+
 - Fetch all 346 Swiss Unihockey clubs
 - Access 50+ league/game class combinations
 - Historical data from 31 seasons (1995/96 - 2026/27)
@@ -33,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-02-16
 
 ### Added
+
 - Initial release
 - Basic API client functionality
 - Documentation and examples

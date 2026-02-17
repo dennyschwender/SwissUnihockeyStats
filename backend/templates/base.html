@@ -39,17 +39,48 @@
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#FF0000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="SwissUnihockey">
+    <link rel="apple-touch-icon" href="/static/images/icon-192x192.png">
+    
     <!-- CSS -->
     <link rel="stylesheet" href="/static/css/main.css">
     
     <!-- htmx for dynamic interactions -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     
+    <!-- Chart.js for data visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <!-- Theme Manager (load before favorites) -->
+    <script src="/static/js/theme.js"></script>
+    
+    <!-- Lazy Loading for images -->
+    <script src="/static/js/lazy-loading.js"></script>
+    
     <!-- Favorites system -->
     <script src="/static/js/favorites.js"></script>
     
+    <!-- Charts utilities -->
+    <script src="/static/js/charts.js"></script>
+    
     <!-- Alpine.js for local state management -->
     <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(reg => console.log('Service Worker registered:', reg.scope))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+    </script>
     
     {% block head %}{% endblock %}
 </head>
@@ -68,7 +99,18 @@
                         <li><a href="/{{ locale }}/clubs" {% if '/clubs' in request.url.path %}class="active"{% endif %}>{{ t.nav.clubs }}</a></li>
                         <li><a href="/{{ locale }}/leagues" {% if '/leagues' in request.url.path %}class="active"{% endif %}>{{ t.nav.leagues }}</a></li>
                         <li><a href="/{{ locale }}/teams" {% if '/teams' in request.url.path %}class="active"{% endif %}>{{ t.nav.teams }}</a></li>
+                        <li><a href="/{{ locale }}/players" {% if '/players' in request.url.path or '/player/' in request.url.path %}class="active"{% endif %}>{{ t.nav.players }}</a></li>
                         <li><a href="/{{ locale }}/games" {% if '/games' in request.url.path %}class="active"{% endif %}>{{ t.nav.games }}</a></li>
+                    
+                    <!-- Theme Toggle -->
+                    <button class="theme-toggle" 
+                            x-data="themeToggle()" 
+                            @click="toggle()"
+                            :title="theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+                            aria-label="Toggle theme">
+                        <span x-show="theme === 'light'">🌙</span>
+                        <span x-show="theme === 'dark'">☀️</span>
+                    </button>
                         <li><a href="/{{ locale }}/rankings" {% if '/rankings' in request.url.path %}class="active"{% endif %}>{{ t.nav.rankings }}</a></li>
                     </ul>
                 </nav>
@@ -100,6 +142,46 @@
         <div class="container">
             <div class="footer-content">
                 <div>{{ t.footer.copyright }}</div>
+    <!-- PWA Install Prompt -->
+    <div class="pwa-install" id="pwa-install-prompt">
+        <div>
+            <strong>📱 Install SwissUnihockey</strong>
+            <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem;">Access stats offline, faster loading</p>
+        </div>
+        <button id="pwa-install-btn">Install</button>
+        <button class="close" onclick="document.getElementById('pwa-install-prompt').classList.remove('show')">×</button>
+    </div>
+
+    <script>
+        // PWA Install Prompt
+        let deferredPrompt;
+        const installPrompt = document.getElementById('pwa-install-prompt');
+        const installBtn = document.getElementById('pwa-install-btn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // Show install prompt after 5 seconds
+            setTimeout(() => {
+                installPrompt.classList.add('show');
+            }, 5000);
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            
+            if (outcome === 'accepted') {
+                installPrompt.classList.remove('show');
+            }
+            
+            deferredPrompt = null;
+        });
+    </script>
+
                 <div class="footer-links">
                     <a href="/{{ locale }}/about">{{ t.footer.about }}</a>
                     <a href="/{{ locale }}/contact">{{ t.footer.contact }}</a>

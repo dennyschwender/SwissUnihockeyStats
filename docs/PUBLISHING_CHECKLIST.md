@@ -77,7 +77,7 @@ git commit -m "Initial commit: SwissUnihockey API client
 
 ### Step 3: Create GitHub Repository
 
-1. Go to: https://github.com/new
+1. Go to: <https://github.com/new>
 2. Repository settings:
    - **Name**: `swissunihockey`
    - **Description**: `Python client for SwissUnihockey API - Access Swiss floorball statistics`
@@ -110,6 +110,7 @@ Replace `YOUR_USERNAME` with your actual GitHub username.
 ### GitHub Repository Settings
 
 - [ ] **Add Description** (in "About" section):
+
   ```
   Python client for SwissUnihockey API - Access Swiss floorball league standings, player stats, and match data
   ```
@@ -163,6 +164,7 @@ Go to: Settings → Branches → Add rule
 **Release title**: `v0.1.0 - Initial Release`
 
 **Description**:
+
 ```markdown
 ## 🎉 Initial Release
 
@@ -201,19 +203,23 @@ with SwissUnihockeyClient() as client:
 See [README.md](../README.md) for full documentation.
 
 ### 📊 Data Available
+
 - 346 Swiss Unihockey clubs
 - 50+ league/game class combinations
 - 31 seasons of historical data (1995/96 - 2026/27)
 - League standings, player stats, game events
 
 ### 📚 Documentation
+
 - [Getting Started Guide](GETTING_STARTED.md)
 - [Feature Ideas](FEATURE_IDEAS.md) - 20+ features to build
 - [API Examples](../API_USAGE_EXAMPLES.py)
 - [Contributing Guide](CONTRIBUTING.md)
 
 ### 🙏 Acknowledgments
+
 Data provided by [Swiss Unihockey](https://swissunihockey.ch) API.
+
 ```
 
 3. Click **"Publish release"**
@@ -228,6 +234,7 @@ Data provided by [Swiss Unihockey](https://swissunihockey.ch) API.
 
 - [ ] **Twitter/X**:
   ```
+
   🏒 Just released SwissUnihockey API Client v0.1.0!
   
   Python library for accessing Swiss floorball statistics:
@@ -238,7 +245,8 @@ Data provided by [Swiss Unihockey](https://swissunihockey.ch) API.
   
   #Python #Floorball #SwissUnihockey #OpenSource
   
-  https://github.com/YOUR_USERNAME/swissunihockey
+  <https://github.com/YOUR_USERNAME/swissunihockey>
+
   ```
 
 - [ ] **LinkedIn**:

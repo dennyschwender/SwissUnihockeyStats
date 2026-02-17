@@ -1,6 +1,7 @@
 # 💾 Caching Strategy - Avoid Unnecessary API Calls
 
 ## 🎯 Goal
+
 Minimize API requests to SwissUnihockey API by implementing intelligent local caching with appropriate TTL (Time To Live) for different data types.
 
 ---
@@ -8,7 +9,9 @@ Minimize API requests to SwissUnihockey API by implementing intelligent local ca
 ## 📊 Data Classification by Update Frequency
 
 ### 1. Static Data (Cache: 30 days)
+
 Data that rarely changes:
+
 - **Clubs** - Club information changes infrequently
 - **Venues** - Hall/venue information is stable
 - **Seasons** - Historical seasons never change
@@ -16,7 +19,9 @@ Data that rarely changes:
 **Strategy**: Long-term file cache (30 days)
 
 ### 2. Semi-Static Data (Cache: 7 days)
+
 Data that changes occasionally:
+
 - **Teams** - Team rosters change between seasons
 - **Players** - Player profiles updated occasionally
 - **Leagues** - League structure mostly stable
@@ -24,7 +29,9 @@ Data that changes occasionally:
 **Strategy**: Medium-term file cache (7 days)
 
 ### 3. Dynamic Data (Cache: 1 hour)
+
 Data that updates daily:
+
 - **Rankings/Standings** - Updated after each game
 - **Top Scorers** - Changes with every match
 - **Game Schedules** - New games added regularly
@@ -32,7 +39,9 @@ Data that updates daily:
 **Strategy**: Short-term file cache (1 hour)
 
 ### 4. Real-Time Data (Cache: 5 minutes or no cache)
+
 Data that changes during games:
+
 - **Live Game Events** - Goals, penalties in real-time
 - **Live Scores** - Updates every few minutes
 
@@ -536,6 +545,7 @@ if __name__ == "__main__":
 ## 📊 Performance Comparison
 
 ### Without Caching
+
 ```
 First API call:  ~300ms
 Second API call: ~300ms
@@ -544,6 +554,7 @@ Total: 900ms
 ```
 
 ### With Caching
+
 ```
 First API call:  ~300ms (cache miss)
 Second call:     ~2ms   (cache hit!)
@@ -552,6 +563,7 @@ Total: 304ms (3x faster!)
 ```
 
 ### For 100 Requests
+
 ```
 Without cache: 30 seconds
 With cache:    0.5 seconds (60x faster!)
@@ -562,21 +574,27 @@ With cache:    0.5 seconds (60x faster!)
 ## 🎯 Best Practices
 
 ### 1. Use Categories
+
 Organize cache by data type for easier management:
+
 ```python
 client.get_clubs(category="clubs")
 client.get_rankings(category="rankings")
 ```
 
 ### 2. Periodic Cache Refresh
+
 Set up scheduled jobs to refresh cache:
+
 ```python
 # Refresh dynamic data every hour
 schedule.every(1).hour.do(lambda: client.get_rankings(force_refresh=True))
 ```
 
 ### 3. Cache Warming
+
 Preload cache on application startup:
+
 ```python
 def on_startup():
     client = SwissUnihockeyClient()
@@ -586,6 +604,7 @@ def on_startup():
 ```
 
 ### 4. Monitor Cache Size
+
 ```python
 # Check cache size regularly
 stats = client.cache.get_stats()
@@ -626,12 +645,14 @@ client.cache.set(
 **Storage Location**: `data/cache/` directory (automatically created)
 
 **Cache Strategy**:
+
 - Static data (clubs, seasons): 30 days
 - Semi-static (teams, players): 7 days  
 - Dynamic (rankings, scorers): 1 hour
 - Real-time (live games): 5 minutes
 
 **Benefits**:
+
 - ✅ 60x faster for repeated requests
 - ✅ Reduces API load
 - ✅ Works offline with cached data
@@ -639,6 +660,7 @@ client.cache.set(
 - ✅ Easy to manage and clear
 
 **Next Steps**:
+
 1. Copy `cache.py` to `api/` folder
 2. Update `client.py` with caching support
 3. Run preload script to warm cache

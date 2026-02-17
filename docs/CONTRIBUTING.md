@@ -5,6 +5,7 @@ Thank you for your interest in contributing! 🏒
 ## How to Contribute
 
 ### Reporting Bugs
+
 - Check if the bug has already been reported in [Issues](../../issues)
 - If not, create a new issue with:
   - Clear description of the problem
@@ -13,11 +14,13 @@ Thank you for your interest in contributing! 🏒
   - Your environment (Python version, OS)
 
 ### Suggesting Features
+
 - Open an issue with the `enhancement` label
 - Describe the feature and its use case
 - Check [FEATURE_IDEAS.md](FEATURE_IDEAS.md) for inspiration
 
 ### Pull Requests
+
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes

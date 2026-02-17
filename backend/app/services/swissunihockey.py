@@ -21,7 +21,7 @@ _client: SwissUnihockeyClient | None = None
 
 def get_swissunihockey_client() -> SwissUnihockeyClient:
     """
-    Get or create SwissUn ihockey API client instance
+    Get or create SwissUnihockey API client instance
     
     Returns:
         SwissUnihockeyClient: Configured API client
@@ -33,7 +33,9 @@ def get_swissunihockey_client() -> SwissUnihockeyClient:
             base_url=settings.SWISSUNIHOCKEY_API_URL,
             locale=settings.SWISSUNIHOCKEY_LOCALE,
             use_cache=settings.SWISSUNIHOCKEY_CACHE_ENABLED,
-            cache_dir=settings.SWISSUNIHOCKEY_CACHE_DIR
+            cache_dir=settings.SWISSUNIHOCKEY_CACHE_DIR,
+            timeout=10,  # Reduce timeout to 10 seconds (was 30)
+            retry_attempts=2  # Reduce retries to 2 (was 3)
         )
     
     return _client

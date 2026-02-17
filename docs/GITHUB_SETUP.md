@@ -29,7 +29,7 @@ git commit -m "Initial commit: SwissUnihockey API client"
 
 ### 3. Create GitHub Repository
 
-1. Go to https://github.com/new
+1. Go to <https://github.com/new>
 2. Name: `swissunihockey`
 3. Description: "Python client for SwissUnihockey API - Access Swiss floorball statistics"
 4. Visibility: Public (or Private)
@@ -50,13 +50,16 @@ git push -u origin main
 ### 5. Configure GitHub Repository Settings
 
 #### Enable Features
+
 - [ ] Issues
 - [ ] Projects (optional)
 - [ ] Wiki (optional)
 - [ ] Discussions (optional)
 
 #### Add Topics
+
 Go to "About" section and add topics:
+
 - `python`
 - `swissunihockey`
 - `floorball`
@@ -66,15 +69,19 @@ Go to "About" section and add topics:
 - `swiss-sports`
 
 #### Set Up GitHub Actions
+
 GitHub Actions workflow is already configured in `.github/workflows/tests.yml`
 
 After first push, go to: Repository → Actions → Enable workflows
 
 #### Add Repository Description
+
 "Python client for SwissUnihockey API - Access Swiss floorball league standings, player stats, and match data"
 
 #### Set Up Branch Protection (Optional)
+
 Settings → Branches → Add rule for `main`:
+
 - [ ] Require pull request reviews
 - [ ] Require status checks (tests)
 - [ ] Require branches to be up to date
@@ -87,6 +94,7 @@ After pushing code:
 2. Tag: `v0.1.0`
 3. Title: `v0.1.0 - Initial Release`
 4. Description:
+
    ```markdown
    ## 🎉 Initial Release
    
@@ -104,9 +112,11 @@ After pushing code:
    ```bash
    pip install -r requirements.txt
    ```
-   
+
    ### Quick Start
+
    See [README.md](../README.md) for installation and usage instructions.
+
    ```
 5. Click "Publish release"
 
@@ -122,6 +132,7 @@ Update README.md badges with actual URLs:
 ```
 
 Optional badges:
+
 ```markdown
 [![GitHub stars](https://img.shields.io/github/stars/YOUR_USERNAME/swissunihockey.svg)](https://github.com/YOUR_USERNAME/swissunihockey/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/YOUR_USERNAME/swissunihockey.svg)](https://github.com/YOUR_USERNAME/swissunihockey/network)
@@ -133,6 +144,7 @@ Optional badges:
 Projects → New project → Board
 
 Columns:
+
 - 📋 Backlog
 - 🚧 In Progress
 - ✅ Done
@@ -145,6 +157,7 @@ Add issues from [FEATURE_IDEAS.md](FEATURE_IDEAS.md)
 Create issues for key features:
 
 **Issue 1: Add Data Storage**
+
 ```markdown
 ## Description
 Implement data storage layer for caching API responses
@@ -160,6 +173,7 @@ enhancement, good first issue
 ```
 
 **Issue 2: Build Web Interface**
+
 ```markdown
 ## Description
 Create Flask web application to display statistics
@@ -197,10 +211,11 @@ updates:
 ### 12. Add CODE_OF_CONDUCT.md (Optional)
 
 GitHub provides templates:
+
 - Settings → Community → Code of conduct → Add
 
 Or use Contributor Covenant:
-https://www.contributor-covenant.org/
+<https://www.contributor-covenant.org/>
 
 ## 📢 Promote Your Project
 
@@ -224,16 +239,19 @@ After publishing:
 ## 🔄 Ongoing Maintenance
 
 ### Weekly Tasks
+
 - [ ] Review and respond to issues
 - [ ] Merge dependabot PRs
 - [ ] Update documentation
 
 ### Monthly Tasks
+
 - [ ] Review and update dependencies
 - [ ] Check for API changes
 - [ ] Update CHANGELOG.md
 
 ### Release Process
+
 1. Update version in `pyproject.toml`
 2. Update `CHANGELOG.md`
 3. Commit changes

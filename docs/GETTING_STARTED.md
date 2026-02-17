@@ -14,17 +14,21 @@ Your project successfully connects to the SwissUnihockey API and can access:
 ## 🚀 Getting Started
 
 ### 1. Test the Connection
+
 ```powershell
 ..\.venv\Scripts\python.exe test_api.py
 ```
 
 ### 2. Fetch Sample Data
+
 ```powershell
 ..\.venv\Scripts\python.exe scripts\example_fetch_data.py
 ```
 
 ### 3. Check the Data
+
 Look in `data/raw/` for JSON files with:
+
 - `clubs_*.json` - All 346 clubs
 - `leagues_*.json` - All 50 leagues
 - `seasons_*.json` - All 31 seasons
@@ -32,18 +36,21 @@ Look in `data/raw/` for JSON files with:
 ## 📊 What You Can Build
 
 ### **Phase 1: Data Collection** (NOW)
+
 ✅ Fetch clubs, leagues, seasons  
 ✅ Download league standings  
 ✅ Get game schedules  
 ⬜ Store data in database
 
 ### **Phase 2: Basic Statistics Website**
+
 - League tables (live standings)
 - Team profiles with logos
 - Match schedules/results
 - Historical season comparisons
 
 ### **Phase 3: Advanced Analytics**
+
 - Player statistics dashboard
 - Top scorers leaderboard
 - Form guides (last 5 games)
@@ -51,6 +58,7 @@ Look in `data/raw/` for JSON files with:
 - Predictive analytics
 
 ### **Phase 4: Real-Time Features**
+
 - Live score updates
 - Game event timelines
 - Push notifications
@@ -59,6 +67,7 @@ Look in `data/raw/` for JSON files with:
 ## 💻 Code Examples
 
 ### Fetch League Standings
+
 ```python
 from api import SwissUnihockeyClient
 
@@ -74,6 +83,7 @@ with SwissUnihockeyClient() as client:
 ```
 
 ### Fetch Top 10 Clubs by Name
+
 ```python
 from api import get_clubs
 
@@ -87,6 +97,7 @@ for club in clubs['entries'][:10]:
 ```
 
 ### Fetch Games for a League
+
 ```python
 from api import SwissUnihockeyClient
 
@@ -101,6 +112,7 @@ with SwissUnihockeyClient() as client:
 ## 🗂️ League & Game Class Codes
 
 ### League Codes
+
 - `2` = NLB (National League B)
 - `3` = 1. Liga
 - `4` = 2. Liga
@@ -111,6 +123,7 @@ with SwissUnihockeyClient() as client:
 - `13` = Interregional A
 
 ### Game Class Codes
+
 - `11` = Herren (Men)
 - `21` = Damen (Women)
 - `31-36` = Junioren (Juniors)
@@ -120,25 +133,33 @@ with SwissUnihockeyClient() as client:
 ## 📦 Next Development Steps
 
 ### 1. Add Data Storage
+
 Install pandas for data processing:
+
 ```powershell
 ..\.venv\Scripts\python.exe -m pip install pandas
 ```
 
 ### 2. Create Analysis Scripts
+
 Add to `analysis/` folder:
+
 - `league_analysis.py` - Analyze league trends
 - `player_stats.py` - Player performance metrics
 - `team_comparison.py` - Compare teams head-to-head
 
 ### 3. Build Web Interface
+
 Choose a framework:
+
 - **Flask** (simple, included in requirements.txt)
 - **FastAPI** (modern, async)
 - **Streamlit** (quick data dashboards)
 
 ### 4. Add Database
+
 For persistent storage:
+
 - SQLite (simple, file-based)
 - PostgreSQL (production-ready)
 - MongoDB (flexible, document-based)
@@ -146,12 +167,15 @@ For persistent storage:
 ## 🔍 API Exploration Tips
 
 ### Find Available Parameters
+
 Some endpoints accept additional parameters. To discover them:
+
 1. Try the API in your browser: `https://api-v2.swissunihockey.ch/api/clubs`
 2. Check the response structure for hints
 3. Experiment with different parameter combinations
 
 ### Common Parameters
+
 - `club_id` - Filter by club
 - `team_id` - Filter by team
 - `league` - League number
@@ -164,7 +188,9 @@ Some endpoints accept additional parameters. To discover them:
 ## 🐛 Troubleshooting
 
 ### 404 Errors
+
 Some endpoints (like `/api/topscorers`) may return 404 if:
+
 - Season hasn't started yet
 - No data available for that combination
 - Required parameters are missing
@@ -173,15 +199,17 @@ Some endpoints (like `/api/topscorers`) may return 404 if:
 **Solution**: Try different season/league combinations
 
 ### Timeout Errors
+
 If requests timeout:
+
 - Increase timeout in `config.ini`: `timeout = 60`
 - Check your internet connection
 - Try again during off-peak hours
 
 ## 📚 Resources
 
-- **API Documentation**: https://api-v2.swissunihockey.ch/api/doc/table/overview
-- **Swiss Unihockey Website**: https://swissunihockey.ch
+- **API Documentation**: <https://api-v2.swissunihockey.ch/api/doc/table/overview>
+- **Swiss Unihockey Website**: <https://swissunihockey.ch>
 - **API Usage Examples**: See `API_USAGE_EXAMPLES.py`
 - **Test Script**: `test_api.py`
 - **Example Fetcher**: `scripts/example_fetch_data.py`
@@ -189,20 +217,23 @@ If requests timeout:
 ## 🎯 Project Ideas
 
 ### Beginner
+
 1. **Club Directory** - Searchable list of all 346 clubs
 2. **League Tables** - Display current standings
 3. **Season Selector** - Compare different seasons
 
 ### Intermediate
+
 4. **Team Dashboard** - Stats, games, roster
-5. **Player Profiles** - Individual statistics
-6. **Match Center** - Today's games with live scores
+2. **Player Profiles** - Individual statistics
+3. **Match Center** - Today's games with live scores
 
 ### Advanced
+
 7. **Prediction Model** - ML-based match predictions
-8. **Performance Tracker** - Track team form over time
-9. **Fantasy League** - Points system based on real stats
-10. **Mobile App** - React Native or Flutter app
+2. **Performance Tracker** - Track team form over time
+3. **Fantasy League** - Points system based on real stats
+4. **Mobile App** - React Native or Flutter app
 
 ## 💡 Tips
 
@@ -215,6 +246,7 @@ If requests timeout:
 ## ✉️ Need Help?
 
 Check these files:
+
 - `README.md` - Project overview
 - `API_USAGE_EXAMPLES.py` - Code snippets
 - `config.ini` - Configuration options

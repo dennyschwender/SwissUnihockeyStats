@@ -1,12 +1,13 @@
 # SwissUnihockey - Quick Start Guide
 
-##  Production-Ready Python Full-Stack Web Application
+## Production-Ready Python Full-Stack Web Application
 
 Modern web application for Swiss floorball statistics with universal search and favorites system.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Python 3.13+
 - Virtual environment (`.venv/` in workspace root)
 
@@ -19,6 +20,7 @@ cd swissunihockey/backend
 ```
 
 Or use the simplified command:
+
 ```powershell
 cd swissunihockey/backend
 uvicorn app.main:app --reload
@@ -26,21 +28,23 @@ uvicorn app.main:app --reload
 
 ### Access the Application
 
-- **Homepage**: http://localhost:8000/de
-- **English**: http://localhost:8000/en
-- **French**: http://localhost:8000/fr  
-- **Italian**: http://localhost:8000/it
-- **API Docs**: http://localhost:8000/docs
-- **Favorites**: http://localhost:8000/de/favorites
+- **Homepage**: <http://localhost:8000/de>
+- **English**: <http://localhost:8000/en>
+- **French**: <http://localhost:8000/fr>  
+- **Italian**: <http://localhost:8000/it>
+- **API Docs**: <http://localhost:8000/docs>
+- **Favorites**: <http://localhost:8000/de/favorites>
 
 ## ✨ Key Features
 
 ### Week 4 (NEW!)
+
 - **Universal Search**: Big search bar on home page - search across all clubs, leagues, and teams simultaneously
 - **Favorites System**: Star your favorite items, persistent across sessions using localStorage
 - **Toast Notifications**: Get feedback when adding/removing favorites
 
 ### Weeks 1-3
+
 - **Multi-language**: German, English, French, Italian support
 - **6 Core Pages**: Home, Clubs, Leagues, Teams, Games, Rankings
 - **Dynamic Interactions**: htmx for instant search, Alpine.js for state management
@@ -59,20 +63,23 @@ uvicorn app.main:app --reload
 ## 🎯 Try the Features
 
 ### 1. Universal Search
-1. Visit http://localhost:8000/de
+
+1. Visit <http://localhost:8000/de>
 2. Type in the search bar (e.g., "Zürich")
 3. See live results across clubs, leagues, and teams
 4. Click any result to navigate
 
 ### 2. Favorites System
+
 1. Browse to any page (clubs, leagues, teams)
 2. Click the ⭐ star icon on any card
 3. See toast notification confirming addition
-4. Visit http://localhost:8000/de/favorites to see all saved items
+4. Visit <http://localhost:8000/de/favorites> to see all saved items
 5. Click star again to remove from favorites
 
 ### 3. htmx Dynamic Search
-1. Go to http://localhost:8000/de/clubs
+
+1. Go to <http://localhost:8000/de/clubs>
 2. Use the search box
 3. Results update instantly without page reload
 4. Filter teams by mode (Men/Women/Mixed)
@@ -127,6 +134,7 @@ pytest tests/ --cov=backend --cov-report=term-missing
 ## 🎨 Design
 
 **Swiss Theme**: Red & white color scheme inspired by Swiss flag
+
 - Primary color: #FF0000 (Swiss Red)
 - Background: Gradient from white to light red
 - Typography: Inter font stack
@@ -135,7 +143,9 @@ pytest tests/ --cov=backend --cov-report=term-missing
 ## 🔧 Development Tips
 
 ### Favorite Buttons
+
 Favorite buttons use Alpine.js reactive state:
+
 ```html
 <button 
     @click.stop="toggleFavorite('clubs', 123, 'Club Name', {})"
@@ -145,7 +155,9 @@ Favorite buttons use Alpine.js reactive state:
 ```
 
 ### Universal Search
+
 Search endpoint returns categorized HTML:
+
 ```html
 <!-- htmx triggers search -->
 <input 
@@ -156,6 +168,7 @@ Search endpoint returns categorized HTML:
 ```
 
 ### LocalStorage Structure
+
 ```json
 {
   "swissunihockey_favorites": {
@@ -169,6 +182,7 @@ Search endpoint returns categorized HTML:
 ## 🚢 Deployment
 
 Ready for production deployment:
+
 - No build step required (server-side rendering)
 - Single Python process
 - Environment variables via .env
@@ -184,6 +198,7 @@ Ready for production deployment:
 ## 🎉 Project Status
 
 **MVP Complete**: 100% of core features implemented
+
 - Week 1: Infrastructure + Backend ✅
 - Week 2: Core pages ✅
 - Week 3: Polish + SEO ✅

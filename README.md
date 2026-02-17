@@ -10,10 +10,13 @@ A complete Python API client for Swiss Unihockey (floorball) statistics **+ comp
 ## 🎯 Two Ways to Use This Project
 
 ### 1️⃣ Python API Client (Ready Now)
+
 Use the complete Python client to fetch data from Swiss Unihockey API for your own projects.
 
 ### 2️⃣ Build Modern Web Platform (Full Stack Guide)
+
 Follow our comprehensive roadmap to build a **React + FastAPI application** with:
+
 - 📱 Mobile-first PWA
 - 🔴 Real-time live scores  
 - 🌙 Dark mode
@@ -78,14 +81,16 @@ make preload
 See [FEATURE_IDEAS.md](docs/FEATURE_IDEAS.md) for 20+ concrete feature ideas!
 
 ## 📖 API Documentation
+
 - Base URL: `https://api-v2.swissunihockey.ch`
-- Documentation: https://api-v2.swissunihockey.ch/api/doc/table/overview
+- Documentation: <https://api-v2.swissunihockey.ch/api/doc/table/overview>
 - Format: JSON responses
 - Authentication: Public endpoints don't require authentication
 
 ## Available Data
 
 ### Public Endpoints
+
 - `/api/clubs` - All Swiss Unihockey clubs
 - `/api/leagues` - League/game class information
 - `/api/seasons` - Historical seasons (2017/18+)
@@ -101,6 +106,7 @@ See [FEATURE_IDEAS.md](docs/FEATURE_IDEAS.md) for 20+ concrete feature ideas!
 - `/api/national_players` - National team players
 
 ### Localization
+
 Supports: `en`, `de-CH`, `fr-CH`, `it-CH` (currently defaults to de-CH)
 
 ## Project Structure
@@ -189,6 +195,7 @@ live_data = client.get_game_events(game_id=12345)
 ```
 
 **💡 Caching Details:**
+
 - Static data (clubs, seasons): 30-day cache
 - Semi-static (teams, players): 7-day cache
 - Dynamic data (rankings, top scorers): 1-hour cache

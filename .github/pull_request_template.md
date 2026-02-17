@@ -26,9 +26,9 @@ Closes #(issue number)
 ## Changes Made
 <!-- List the key changes made in this PR -->
 
-- 
-- 
-- 
+-
+-
+-
 
 ## Testing
 <!-- Describe the tests you ran to verify your changes -->

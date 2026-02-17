@@ -5,10 +5,12 @@ This guide will help you set up the SwissUnihockey project, including both the P
 ## Prerequisites
 
 ### Required
+
 - **Python 3.11+** - [Download](https://www.python.org/downloads/)
 - **Git** - [Download](https://git-scm.com/)
 
 ### Optional (for full stack web app)
+
 - **Node.js 18.0.0+** - [Download](https://nodejs.org/) (LTS version recommended)
 - **npm 9.0.0+** - Included with Node.js
 - **Docker & Docker Compose** - [Download](https://www.docker.com/products/docker-desktop) (optional)
@@ -196,20 +198,23 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 **Verify backend:**
-- Health check: http://localhost:8000/
-- API docs: http://localhost:8000/docs
-- OpenAPI spec: http://localhost:8000/openapi.json
+
+- Health check: <http://localhost:8000/>
+- API docs: <http://localhost:8000/docs>
+- OpenAPI spec: <http://localhost:8000/openapi.json>
 
 ### 3. Frontend Setup
 
 #### Install Node.js
 
-**Download:** https://nodejs.org/
+**Download:** <https://nodejs.org/>
+
 - Choose LTS (Long Term Support) version
 - Includes npm package manager
 - Minimum: Node.js 18.0.0, npm 9.0.0
 
 **Verify installation:**
+
 ```bash
 node --version  # Should show v18.0.0 or higher
 npm --version   # Should show v9.0.0 or higher
@@ -258,14 +263,16 @@ npm start
 ```
 
 **Access frontend:**
-- Application: http://localhost:3000
-- Auto redirects to: http://localhost:3000/de (German default)
+
+- Application: <http://localhost:3000>
+- Auto redirects to: <http://localhost:3000/de> (German default)
 
 ## Troubleshooting
 
 ### Python Issues
 
 **Problem:** Python command not found
+
 ```bash
 # Windows: Add Python to PATH during installation
 # Or use full path:
@@ -273,12 +280,14 @@ C:\Python311\python.exe -m venv .venv
 ```
 
 **Problem:** pip install fails with SSL errors
+
 ```bash
 # Try with trusted host
 pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt
 ```
 
 **Problem:** Virtual environment activation fails (Windows)
+
 ```powershell
 # Enable script execution
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -287,6 +296,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ### Backend Issues
 
 **Problem:** Port 8000 already in use
+
 ```bash
 # Find and kill process on Windows
 netstat -ano | findstr :8000
@@ -297,6 +307,7 @@ uvicorn app.main:app --reload --port 8001
 ```
 
 **Problem:** Import errors when running backend
+
 ```bash
 # Ensure you're in the backend directory
 cd backend
@@ -309,6 +320,7 @@ python -m uvicorn backend.app.main:app --reload
 ### Frontend Issues
 
 **Problem:** Node.js not found
+
 ```bash
 # Download and install from https://nodejs.org/
 # Verify installation:
@@ -317,6 +329,7 @@ npm --version
 ```
 
 **Problem:** npm install fails
+
 ```bash
 # Clear npm cache
 npm cache clean --force
@@ -329,6 +342,7 @@ npm install
 ```
 
 **Problem:** Port 3000 already in use
+
 ```bash
 # Next.js will automatically try 3001, 3002, etc.
 # Or specify port:
@@ -336,6 +350,7 @@ npm run dev -- --port 3001
 ```
 
 **Problem:** Module not found errors
+
 ```bash
 # Ensure all dependencies are installed
 npm install
@@ -347,6 +362,7 @@ npm install --legacy-peer-deps
 ### Docker Issues
 
 **Problem:** Docker daemon not running
+
 ```bash
 # Start Docker Desktop
 # Or on Linux:
@@ -354,6 +370,7 @@ sudo systemctl start docker
 ```
 
 **Problem:** Port conflicts
+
 ```bash
 # Stop containers using the same ports
 docker ps
@@ -363,6 +380,7 @@ docker stop <container_id>
 ```
 
 **Problem:** Build fails
+
 ```bash
 # Rebuild without cache
 docker-compose build --no-cache
@@ -376,42 +394,47 @@ docker-compose logs <service_name>
 After installation, verify everything works:
 
 ### Python API Client
+
 - [ ] Virtual environment activated
 - [ ] Dependencies installed: `pip list | grep swissunihockey`
 - [ ] API connection works: `python test_api.py`
 - [ ] Cache directory created: `ls data/cache/`
 
 ### Backend
+
 - [ ] Dependencies installed: `pip list | grep fastapi`
 - [ ] Server starts: `uvicorn app.main:app --reload`
-- [ ] Health check works: http://localhost:8000/
-- [ ] API docs accessible: http://localhost:8000/docs
-- [ ] Sample endpoint works: http://localhost:8000/api/v1/clubs/
+- [ ] Health check works: <http://localhost:8000/>
+- [ ] API docs accessible: <http://localhost:8000/docs>
+- [ ] Sample endpoint works: <http://localhost:8000/api/v1/clubs/>
 
 ### Frontend
+
 - [ ] Node.js installed: `node --version`
 - [ ] Dependencies installed: `ls web/node_modules/`
 - [ ] Dev server starts: `npm run dev`
-- [ ] Homepage loads: http://localhost:3000/
-- [ ] Language switching works: http://localhost:3000/en, /fr, /it
+- [ ] Homepage loads: <http://localhost:3000/>
+- [ ] Language switching works: <http://localhost:3000/en>, /fr, /it
 - [ ] Backend connection works (check browser console)
 
 ## Next Steps
 
 ### For Python API Client
+
 - Explore examples: `python API_USAGE_EXAMPLES.py`
 - Read [GETTING_STARTED.md](docs/GETTING_STARTED.md)
 - Build your first feature using [FEATURE_IDEAS.md](docs/FEATURE_IDEAS.md)
 
 ### For Full Stack Application
+
 - Follow [QUICK_START.md](docs/QUICK_START.md) for Week 1-4 MVP
 - Read [MODERN_WEB_APP_ROADMAP.md](docs/MODERN_WEB_APP_ROADMAP.md) for complete roadmap
 - Explore [COMPONENT_LIBRARY.md](docs/COMPONENT_LIBRARY.md) for UI components
 
 ## Support
 
-- **Issues:** https://github.com/YOUR_USERNAME/swissunihockey/issues
-- **Discussions:** https://github.com/YOUR_USERNAME/swissunihockey/discussions
+- **Issues:** <https://github.com/YOUR_USERNAME/swissunihockey/issues>
+- **Discussions:** <https://github.com/YOUR_USERNAME/swissunihockey/discussions>
 - **Documentation:** [docs/](docs/)
 
 ## Development Workflow
