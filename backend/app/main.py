@@ -17,7 +17,7 @@ from app.config import settings
 from app.api.v1.router import api_router
 from app.lib.i18n import get_translations, get_locale_from_path, DEFAULT_LOCALE
 from app.services.swissunihockey import get_swissunihockey_client
-from app.services.data_cache import preload_common_data, preload_data, get_cached_teams, get_cached_leagues
+from app.services.data_cache import preload_common_data, preload_data, get_cached_teams, get_cached_leagues, get_cached_clubs
 
 # Configure logging
 logging.basicConfig(
@@ -112,7 +112,49 @@ async def home(request: Request, locale: str):
     )
 
 
+@app.get("/{locale}/clubs", response_class=HTMLResponse)
+async def clubs_page(request: Request, locale: str):
+    """Clubs listing page"""
+    # Use cached data instead of API call (loads on-demand if needed)
+    clubs_list = await get_cached_clubs()
+    
+    return templates.TemplateResponse(
+        "clubs.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale),
+            "clubs": clubs_list[:100] if isinstance(clubs_list, list) else []  # Limit to 100 for initial display
+        }
+    )
 
+
+@app.get("/{locale}/clubs/search", response_class=HTMLResponse)
+async def clubs_search(request: Request, locale: str, q: str = ""):
+    """HTMX endpoint for club search"""
+    # Use cached data instead of API call - instant results!
+    all_clubs = await get_cached_clubs()
+    
+    # Filter clubs by search query
+    filtered_clubs = all_clubs
+    if q:
+        filtered_clubs = [
+            club for club in filtered_clubs
+            if q.lower() in club.get("text", "").lower()
+        ]
+    
+    filtered_clubs = filtered_clubs[:50]  # Limit results
+    
+    # Return partial HTML for htmx
+    html = ""
+    for club in filtered_clubs:
+        club_name = club.get("text", "Unknown")
+        html += f'<div class="club-card"><h3>{club_name}</h3></div>'
+    
+    if not filtered_clubs:
+        html = f'<div style="text-align: center; padding: 3rem; color: var(--text-muted);">{get_translations(locale).common.get("no_results", "No results found")}</div>'
+    
+    return HTMLResponse(content=html)
 
 
 @app.get("/{locale}/leagues", response_class=HTMLResponse)

@@ -12,19 +12,24 @@
   },
   "nav": {
     "home": "Startseite",
+    "clubs": "Vereine",
     "leagues": "Ligen",
-    "teams": "Teams",
+    "teams": "Teams", 
     "games": "Spiele",
     "rankings": "Ranglisten",
     "players": "Spieler",
-    "statistics": "Statistiken"
+    "statistics": "Statistiken",
+    "favorites": "Favoriten"
   },
   "home": {
     "title": "SwissUnihockey",
     "subtitle": "Schweizer Unihockey Statistiken",
     "description": "Entdecken Sie Ligen, Teams, Spiele und Statistiken des Schweizer Unihockey"
   },
-
+  "clubs": {
+    "title": "Vereine",
+    "subtitle": "Alle Schweizer Unihockey-Vereine"
+  },
   "leagues": {
     "title": "Ligen",
     "subtitle": "Alle Schweizer Unihockey-Ligen"

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t.clubs.title }} - {{ t.common.app_name }}{% endblock %}
+{% block description %}Search and browse Swiss floorball clubs. Complete directory of all Swiss Unihockey clubs.{% endblock %}
+{% block og_title %}{{ t.clubs.title }} - SwissUnihockey{% endblock %}
+{% block og_description %}Complete directory of Swiss floorball clubs with search functionality.{% endblock %}
+
+{% block content %}
+<div class="hero fade-in">
+    <h1>{{ t.clubs.title }}</h1>
+    <p>{{ t.clubs.subtitle }}</p>
+</div>
+
+<!-- Search Bar -->
+<div style="max-width: 800px; margin: 2rem auto;">
+    <input 
+        type="text" 
+        hx-get="/{{ locale }}/clubs/search" 
+        hx-trigger="keyup changed delay:500ms" 
+        hx-target="#clubs-list"
+        name="q"
+        placeholder="{{ t.common.search }}... (club name, location)"
+        style="width: 100%; padding: 0.75rem 1rem; border: 2px solid var(--gray-300); border-radius: 0.5rem; font-size: 1rem; background: var(--bg-primary); color: var(--text-primary);"
+    >
+</div>
+
+<!-- Clubs List -->
+<div id="clubs-list" style="max-width: 1200px; margin: 2rem auto;">
+    <div class="cards-grid">
+        {% for club in clubs %}
+        <div class="card" data-club-id="{{ club.id }}">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <h3 style="margin: 0;">{{ club.text }}</h3>
+                <button 
+                    class="favorite-btn" 
+                    data-type="club" 
+                    data-id="{{ club.id }}" 
+                    data-name="{{ club.text }}"
+                    style="background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0.25rem;"
+                    title="Add to favorites"
+                >
+                    ⭐
+                </button>
+            </div>
+            {% if club.region %}
+            <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">📍 {{ club.region }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+        
+        {% if not clubs %}
+        <div style="text-align: center; padding: 3rem; color: var(--text-muted); grid-column: 1/-1;">
+            No clubs found.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Loading Skeleton (hidden by default, shown when htmx is loading) -->
+<div id="clubs-skeleton" class="htmx-indicator" style="max-width: 1200px; margin: 2rem auto;">
+    <div class="cards-grid">
+        {% for i in range(6) %}
+        <div class="skeleton-card">
+            <div class="skeleton skeleton-title"></div>
+            <div class="skeleton skeleton-text"></div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.card {
+    position: relative;
+}
+
+.favorite-btn {
+    opacity: 0.3;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.favorite-btn:hover,
+.favorite-btn.active {
+    opacity: 1;
+    transform: scale(1.2);
+}
+
+.favorite-btn.active {
+    filter: drop-shadow(0 0 3px gold);
+}
+
+/* HTMX Loading States */
+.htmx-swapping {
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+}
+
+.htmx-settling {
+    opacity: 1;
+    transition: opacity 0.3s ease-in;
+}
+</style>
+{% endblock %}

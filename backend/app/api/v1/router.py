@@ -2,12 +2,12 @@
 Main API v1 router - aggregates all endpoint routers
 """
 from fastapi import APIRouter
-from app.api.v1.endpoints import leagues, teams, games, players, rankings
+from app.api.v1.endpoints import clubs, leagues, teams, games, players, rankings
 
 api_router = APIRouter()
 
 # Include all endpoint routers
-api_router.include_router(leagues.router, prefix="/leagues", tags=["leagues"])
+api_router.include_router(clubs.router, prefix="/clubs", tags=["clubs"])
 api_router.include_router(leagues.router, prefix="/leagues", tags=["leagues"])
 api_router.include_router(teams.router, prefix="/teams", tags=["teams"])
 api_router.include_router(games.router, prefix="/games", tags=["games"])
