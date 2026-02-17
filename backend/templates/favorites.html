@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Favorites - {{ t.common.app_name }}{% endblock %}
+{% block description %}Your saved clubs, leagues, and teams - quick access to your favorite SwissUnihockey content{% endblock %}
+
+{% block content %}
+<div class="hero fade-in">
+    <h1>⭐ Your Favorites</h1>
+    <p>Quick access to your saved items</p>
+</div>
+
+<!-- Favorites Manager using Alpine.js + localStorage -->
+<div x-data="favoritesManager()" x-init="loadFavorites()" style="margin-top: 2rem;">
+    
+    <!-- Empty State -->
+    <div x-show="isEmpty()" class="empty-state" style="text-align: center; padding: 4rem 2rem;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">⭐</div>
+        <h2 style="color: var(--gray-600); margin-bottom: 1rem;">No favorites yet</h2>
+        <p style="color: var(--gray-600); margin-bottom: 2rem;">
+            Click the star icon on clubs, leagues, or teams to save them here
+        </p>
+        <a href="/{{ locale }}" class="button" style="display: inline-block; padding: 1rem 2rem; background: var(--swiss-red); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+            Browse Content
+        </a>
+    </div>
+    
+    <!-- Favorites Lists -->
+    <div x-show="!isEmpty()">
+        
+        <!-- Clubs Favorites -->
+        <div x-show="favorites.clubs.length > 0" style="margin-bottom: 3rem;">
+            <h2 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span>🏒</span> Favorite Clubs
+                <span x-text="'(' + favorites.clubs.length + ')'" style="color: var(--gray-600); font-size: 1rem;"></span>
+            </h2>
+            <div class="cards-grid">
+                <template x-for="club in favorites.clubs" :key="club.id">
+                    <div class="card" style="position: relative;">
+                        <button 
+                            @click="removeFavorite('clubs', club.id)" 
+                            class="favorite-btn active favorite-indicator"
+                            title="Remove from favorites"
+                        >⭐</button>
+                        <h3 x-text="club.name"></h3>
+                        <p style="color: var(--gray-600); font-size: 0.875rem;" x-text="'ID: ' + club.id"></p>
+                        <a :href="'/{{ locale }}/clubs'" class="button" style="margin-top: 1rem; display: inline-block; padding: 0.5rem 1rem; background: var(--primary-500); color: white; text-decoration: none; border-radius: 6px; font-size: 0.875rem;">
+                            View All Clubs
+                        </a>
+                    </div>
+                </template>
+            </div>
+        </div>
+        
+        <!-- Leagues Favorites -->
+        <div x-show="favorites.leagues.length > 0" style="margin-bottom: 3rem;">
+            <h2 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span>🏆</span> Favorite Leagues
+                <span x-text="'(' + favorites.leagues.length + ')'" style="color: var(--gray-600); font-size: 1rem;"></span>
+            </h2>
+            <div class="cards-grid">
+                <template x-for="league in favorites.leagues" :key="league.id">
+                    <div class="card" style="position: relative;">
+                        <button 
+                            @click="removeFavorite('leagues', league.id)" 
+                            class="favorite-btn active favorite-indicator"
+                            title="Remove from favorites"
+                        >⭐</button>
+                        <div class="card-icon">🏆</div>
+                        <h3 x-text="league.name"></h3>
+                        <a :href="'/{{ locale }}/leagues'" class="button" style="margin-top: 1rem; display: inline-block; padding: 0.5rem 1rem; background: var(--primary-500); color: white; text-decoration: none; border-radius: 6px; font-size: 0.875rem;">
+                            View All Leagues
+                        </a>
+                    </div>
+                </template>
+            </div>
+        </div>
+        
+        <!-- Teams Favorites -->
+        <div x-show="favorites.teams.length > 0" style="margin-bottom: 3rem;">
+            <h2 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span>👥</span> Favorite Teams
+                <span x-text="'(' + favorites.teams.length + ')'" style="color: var(--gray-600); font-size: 1rem;"></span>
+            </h2>
+            <div class="cards-grid">
+                <template x-for="team in favorites.teams" :key="team.id">
+                    <div class="card" style="position: relative;">
+                        <button 
+                            @click="removeFavorite('teams', team.id)" 
+                            class="favorite-btn active favorite-indicator"
+                            title="Remove from favorites"
+                        >⭐</button>
+                        <div class="card-icon">👥</div>
+                        <h3 x-text="team.name"></h3>
+                        <a :href="'/{{ locale }}/teams'" class="button" style="margin-top: 1rem; display: inline-block; padding: 0.5rem 1rem; background: var(--primary-500); color: white; text-decoration: none; border-radius: 6px; font-size: 0.875rem;">
+                            View All Teams
+                        </a>
+                    </div>
+                </template>
+            </div>
+        </div>
+        
+        <!-- Clear All -->
+        <div style="text-align: center; margin-top: 3rem;">
+            <button 
+                @click="clearAll()" 
+                class="button-outline"
+                style="padding: 0.75rem 1.5rem; border: 2px solid var(--gray-300); background: transparent; color: var(--gray-700); border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s;"
+            >
+                Clear All Favorites
+            </button>
+        </div>
+    </div>
+    
+</div>
+
+<script>
+function favoritesManager() {
+    return {
+        favorites: {
+            clubs: [],
+            leagues: [],
+            teams: []
+        },
+        
+        loadFavorites() {
+            const stored = localStorage.getItem('swissunihockey_favorites');
+            if (stored) {
+                this.favorites = JSON.parse(stored);
+            }
+        },
+        
+        removeFavorite(type, id) {
+            this.favorites[type] = this.favorites[type].filter(item => item.id !== id);
+            this.saveFavorites();
+        },
+        
+        clearAll() {
+            if (confirm('Are you sure you want to remove all favorites?')) {
+                this.favorites = { clubs: [], leagues: [], teams: [] };
+                this.saveFavorites();
+            }
+        },
+        
+        saveFavorites() {
+            localStorage.setItem('swissunihockey_favorites', JSON.stringify(this.favorites));
+        },
+        
+        isEmpty() {
+            return this.favorites.clubs.length === 0 && 
+                   this.favorites.leagues.length === 0 && 
+                   this.favorites.teams.length === 0;
+        }
+    }
+}
+</script>
+{% endblock %}

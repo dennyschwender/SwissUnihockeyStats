@@ -8,7 +8,31 @@
     <p>{{ t.home.description }}</p>
 </div>
 
-<div class="cards-grid">
+<!-- Universal Search Bar -->
+<div class="universal-search-container" x-data="{ searchQuery: '' }">
+    <div class="universal-search-bar">
+        <div class="search-icon">🔍</div>
+        <input 
+            type="text"
+            x-model="searchQuery"
+            hx-get="/{{ locale }}/search"
+            hx-trigger="keyup changed delay:300ms"
+            hx-target="#universal-search-results"
+            hx-include="[name='q']"
+            name="q"
+            :value="searchQuery"
+            placeholder="Search clubs, leagues, teams..."
+            class="universal-search-input"
+            autofocus
+        >
+        <span class="htmx-indicator loading" style="position: absolute; right: 1rem;"></span>
+    </div>
+    
+    <!-- Search Results Dropdown -->
+    <div id="universal-search-results" class="universal-search-results"></div>
+</div>
+
+<div class="cards-grid" style="margin-top: 3rem;">
     <!-- Clubs Card -->
     <a href="/{{ locale }}/clubs" class="card">
         <div class="card-icon">🏒</div>
@@ -44,11 +68,11 @@
         <p>{{ t.rankings.subtitle }}</p>
     </a>
 
-    <!-- Players Card -->
-    <a href="/{{ locale }}/players" class="card">
+    <!-- Favorites Card -->
+    <a href="/{{ locale }}/favorites" class="card" style="background: linear-gradient(135deg, var(--swiss-red) 0%, var(--primary-700) 100%); color: white;">
         <div class="card-icon">⭐</div>
-        <h3>{{ t.nav.players }}</h3>
-        <p>{{ t.players.subtitle }}</p>
+        <h3>Favorites</h3>
+        <p>Your saved items</p>
     </a>
 </div>
 {% endblock %}

@@ -277,6 +277,100 @@ async def health_check():
 
 
 # ============================================================================
+# Universal Search
+# ============================================================================
+
+@app.get("/{locale}/search", response_class=HTMLResponse)
+async def universal_search(request: Request, locale: str, q: str = ""):
+    """Universal search across clubs, leagues, and teams"""
+    if not q or len(q) < 2:
+        return HTMLResponse(content='<div class="search-results"><p class="text-gray-600">Enter at least 2 characters to search...</p></div>')
+    
+    client = get_swissunihockey_client()
+    query_lower = q.lower()
+    
+    # Search clubs
+    clubs_data = client.get_clubs()
+    matching_clubs = [
+        club for club in clubs_data.get("entries", [])
+        if query_lower in club.get("text", "").lower()
+    ][:5]  # Limit to 5 results per category
+    
+    # Search leagues
+    leagues_data = client.get_leagues()
+    matching_leagues = [
+        league for league in leagues_data.get("entries", [])
+        if query_lower in league.get("text", "").lower()
+    ][:5]
+    
+    # Search teams
+    teams_data = client.get_teams()
+    matching_teams = [
+        team for team in teams_data.get("entries", [])
+        if query_lower in team.get("text", "").lower()
+    ][:5]
+    
+    # Build HTML response
+    html = '<div class="search-results">'
+    
+    total_results = len(matching_clubs) + len(matching_leagues) + len(matching_teams)
+    
+    if total_results == 0:
+        html += '<p class="text-gray-600" style="text-align: center; padding: 2rem;">No results found</p>'
+    else:
+        # Clubs section
+        if matching_clubs:
+            html += '<div class="search-category"><h3>🏢 Clubs</h3><div class="search-items">'
+            for club in matching_clubs:
+                club_id = club.get("set_in_context", {}).get("club_id", "")
+                html += f'''
+                <div class="search-item" onclick="window.location.href='/{locale}/clubs'">
+                    <strong>{club.get("text", "")}</strong>
+                    <span class="text-gray-600">Club ID: {club_id}</span>
+                </div>
+                '''
+            html += '</div></div>'
+        
+        # Leagues section  
+        if matching_leagues:
+            html += '<div class="search-category"><h3>🏆 Leagues</h3><div class="search-items">'
+            for league in matching_leagues:
+                html += f'''
+                <div class="search-item" onclick="window.location.href='/{locale}/leagues'">
+                    <strong>{league.get("text", "")}</strong>
+                </div>
+                '''
+            html += '</div></div>'
+        
+        # Teams section
+        if matching_teams:
+            html += '<div class="search-category"><h3>👥 Teams</h3><div class="search-items">'
+            for team in matching_teams:
+                html += f'''
+                <div class="search-item" onclick="window.location.href='/{locale}/teams'">
+                    <strong>{team.get("text", "")}</strong>
+                </div>
+                '''
+            html += '</div></div>'
+    
+    html += '</div>'
+    return HTMLResponse(content=html)
+
+
+@app.get("/{locale}/favorites", response_class=HTMLResponse)
+async def favorites_page(request: Request, locale: str):
+    """Favorites page"""
+    return templates.TemplateResponse(
+        "favorites.html",
+        {
+            "request": request,
+            "locale": locale,
+            "t": get_translations(locale)
+        }
+    )
+
+
+# ============================================================================
 # Error Handlers
 # ============================================================================
 

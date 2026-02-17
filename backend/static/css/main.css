@@ -358,3 +358,138 @@ footer {
 .htmx-settling {
   opacity: 1;
 }
+
+/* Universal Search */
+.universal-search-container {
+  max-width: 800px;
+  margin: 3rem auto;
+  position: relative;
+}
+
+.universal-search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--swiss-white);
+  border-radius: 50px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.universal-search-bar:focus-within {
+  box-shadow: 0 6px 30px rgba(255, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+
+.search-icon {
+  font-size: 1.5rem;
+  padding: 0 1.5rem;
+  color: var(--gray-600);
+}
+
+.universal-search-input {
+  flex: 1;
+  border: none;
+  padding: 1.25rem 1rem;
+  font-size: 1.125rem;
+  border-radius: 50px;
+  outline: none;
+  background: transparent;
+}
+
+.universal-search-input::placeholder {
+  color: var(--gray-600);
+}
+
+.universal-search-results {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  right: 0;
+  background: var(--swiss-white);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  max-height: 600px;
+  overflow-y: auto;
+  z-index: 50;
+}
+
+.universal-search-results:empty {
+  display: none;
+}
+
+.search-category {
+  padding: 1rem;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.search-category:last-child {
+  border-bottom: none;
+}
+
+.search-category h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+  padding-left: 0.5rem;
+}
+
+.search-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.search-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.search-item:hover {
+  background: var(--primary-50);
+}
+
+.search-item strong {
+  color: var(--gray-900);
+}
+
+.search-item .text-gray-600 {
+  color: var(--gray-600);
+  font-size: 0.875rem;
+}
+
+/* Favorites Star Icon */
+.favorite-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.5rem;
+  padding: 0.5rem;
+  transition: transform 0.2s;
+}
+
+.favorite-btn:hover {
+  transform: scale(1.2);
+}
+
+.favorite-btn.active {
+  color: var(--swiss-red);
+}
+
+.favorite-btn.inactive {
+  color: var(--gray-400);
+}
+
+.favorite-indicator {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+}

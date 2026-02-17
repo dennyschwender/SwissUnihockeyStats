@@ -16,7 +16,15 @@
     {% if leagues %}
     <div class="cards-grid">
         {% for league in leagues %}
-        <div class="card">
+        <div class="card" style="position: relative;">
+            <!-- Favorite Button -->
+            <button 
+                @click.stop="toggleFavorite('leagues', {{ loop.index }}, '{{ league.text }}', {})"
+                :class="isFavorite('leagues', {{ loop.index }}) ? 'active' : 'inactive'"
+                class="favorite-btn favorite-indicator"
+                title="Add to favorites"
+            >⭐</button>
+            
             <div class="card-icon">🏆</div>
             <h3>{{ league.text }}</h3>
             {% if league.set_in_context %}

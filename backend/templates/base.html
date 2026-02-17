@@ -45,12 +45,15 @@
     <!-- htmx for dynamic interactions -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     
+    <!-- Favorites system -->
+    <script src="/static/js/favorites.js"></script>
+    
     <!-- Alpine.js for local state management -->
     <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
     
     {% block head %}{% endblock %}
 </head>
-<body>
+<body x-data="favoritesStore()" x-init="init()">
     <!-- Header -->
     <header>
         <div class="container">

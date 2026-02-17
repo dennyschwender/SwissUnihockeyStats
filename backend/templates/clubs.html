@@ -33,7 +33,15 @@
     {% if clubs %}
     <div class="cards-grid">
         {% for club in clubs %}
-        <div class="card" style="cursor: pointer;">
+        <div class="card" style="cursor: pointer; position: relative;">
+            <!-- Favorite Button -->
+            <button 
+                @click.stop="toggleFavorite('clubs', {{ club.set_in_context.club_id }}, '{{ club.text }}', {})"
+                :class="isFavorite('clubs', {{ club.set_in_context.club_id }}) ? 'active' : 'inactive'"
+                class="favorite-btn favorite-indicator"
+                title="Add to favorites"
+            >⭐</button>
+            
             <h3>{{ club.text }}</h3>
             <p>ID: {{ club.set_in_context.club_id }}</p>
         </div>
