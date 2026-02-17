@@ -73,8 +73,10 @@
         {% endfor %}
     </div>
     {% else %}
-    <div style="text-align: center; padding: 3rem; color: var(--gray-600); background: var(--gray-50); border-radius: 8px;">
-        <p>No roster information available</p>
+    <div style="text-align: center; padding: 2rem; color: var(--gray-600); background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-100) 100%); border-radius: 8px; border: 1px dashed var(--gray-300);">
+        <div style="font-size: 3rem; margin-bottom: 0.5rem;">📋</div>
+        <p style="font-weight: 600; margin-bottom: 0.5rem;">No Roster Information Available</p>
+        <p style="font-size: 0.875rem;">This team does not have roster data in the system</p>
     </div>
     {% endif %}
 
@@ -108,8 +110,10 @@
         {% endfor %}
     </div>
     {% else %}
-    <div style="text-align: center; padding: 3rem; color: var(--gray-600); background: var(--gray-50); border-radius: 8px;">
-        <p>No games found</p>
+    <div style="text-align: center; padding: 2rem; color: var(--gray-600); background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-100) 100%); border-radius: 8px; border: 1px dashed var(--gray-300);">
+        <div style="font-size: 3rem; margin-bottom: 0.5rem;">🏒</div>
+        <p style="font-weight: 600; margin-bottom: 0.5rem;">No Recent Games</p>
+        <p style="font-size: 0.875rem;">No games found for this team</p>
     </div>
     {% endif %}
 </div>

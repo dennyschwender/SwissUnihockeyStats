@@ -540,22 +540,10 @@ async def team_detail(request: Request, locale: str, team_id: int, league: int =
             else:
                 team_data = {"id": team_id, "text": f"Team {team_id}"}
         
-        # Try fetching games for this team
-        try:
-            games_data = client.get_games(team=team_id)
-            logger.info(f"Games response type: {type(games_data)}, keys: {games_data.keys() if isinstance(games_data, dict) else 'N/A'}")
-            
-            # Extract games from response
-            if isinstance(games_data, dict):
-                regions = games_data.get("data", {}).get("regions", [])
-                if regions:
-                    games = regions[0].get("rows", [])[:10]
-                else:
-                    games = games_data.get("entries", [])[:10]
-            logger.info(f"Loaded {len(games)} games")
-        except Exception as game_error:
-            logger.warning(f"Could not load games for team {team_id}: {game_error}")
-            games = []
+        # Note: Games API doesn't support filtering by team ID or by league/game_class
+        # Teams without roster data typically also don't have games data
+        # Leave games empty to show "No Recent Games" message
+        games = []
         
         # If we still don't have team_data, show error
         if not team_data or not team_data.get("text"):
