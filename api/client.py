@@ -119,6 +119,10 @@ class SwissUnihockeyClient:
         """Fetch all leagues (cached for 7 days)."""
         return self._make_request("/api/leagues", category="leagues", force_refresh=force_refresh)
 
+    def get_clubs(self, force_refresh: bool = False) -> Dict[str, Any]:
+        """Fetch all clubs (cached for 30 days)."""
+        return self._make_request("/api/clubs", category="clubs", force_refresh=force_refresh)
+
     def get_seasons(self, force_refresh: bool = False) -> Dict[str, Any]:
         """Fetch all seasons (cached for 30 days)."""
         return self._make_request("/api/seasons", category="seasons", force_refresh=force_refresh)
