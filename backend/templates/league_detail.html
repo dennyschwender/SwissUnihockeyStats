@@ -65,12 +65,21 @@
                 </thead>
                 <tbody>
                     {% for standing in standings[:20] %}
+                    {% set team_id = standing.data.team.id if standing.data and standing.data.team else '' %}
                     <tr style="border-bottom: 1px solid var(--gray-200);">
                         <td style="padding: 0.75rem; font-weight: 600;">
                             {{ standing.data.rank if standing.data and standing.data.rank else (standing.rank if standing.rank else loop.index) }}
                         </td>
                         <td style="padding: 0.75rem; font-weight: 600;">
+                            {% if team_id %}
+                            <a href="/{{ locale }}/team/{{ team_id }}" style="color: inherit; text-decoration: none; border-bottom: 1px dashed var(--gray-400);" 
+                               onmouseover="this.style.color='var(--swiss-red)'; this.style.borderBottomStyle='solid'" 
+                               onmouseout="this.style.color='inherit'; this.style.borderBottomStyle='dashed'">
+                                {{ standing.data.team.name if standing.data and standing.data.team else (standing.team_name if standing.team_name else standing.team) }}
+                            </a>
+                            {% else %}
                             {{ standing.data.team.name if standing.data and standing.data.team else (standing.team_name if standing.team_name else standing.team) }}
+                            {% endif %}
                         </td>
                         <td style="padding: 0.75rem; text-align: center;">
                             {{ standing.cells[3].text[0] if standing.cells and standing.cells|length > 3 else (standing.games_played if standing.games_played else standing.gp) }}
@@ -106,10 +115,16 @@
     <h2 style="margin: 2rem 0 1rem 0;">{{ t.teams.title if t.teams and t.teams.title else 'Teams' }}</h2>
     <div class="cards-grid">
         {% for team in teams[:30] %}
-        <div class="card" onclick="window.location='/{{ locale }}/team/{{ team.data.team.id if team.data and team.data.team else (team.id if team.id else team.set_in_context.team_id if team.set_in_context else '') }}'">
+        {% set team_id = team.id if team.id else (team.data.team.id if team.data and team.data.team else '') %}
+        {% set team_name = team.cells[0].text[0] if team.cells and team.cells|length > 0 else (team.data.team.name if team.data and team.data.team else (team.text if team.text else 'Team')) %}
+        <div class="card" onclick="window.location='/{{ locale }}/team/{{ team_id }}'" style="cursor: pointer;">
             <div class="card-icon">👥</div>
-            <h3>{{ team.data.team.name if team.data and team.data.team else (team.text if team.text else 'Team') }}</h3>
-            {% if team.data and team.data.club_name %}
+            <h3>{{ team_name }}</h3>
+            {% if team.cells and team.cells|length > 2 and team.cells[2].url and team.cells[2].url.text %}
+            <p style="color: var(--gray-600); font-size: 0.875rem;">
+                📍 {{ team.cells[2].url.text }}
+            </p>
+            {% elif team.data and team.data.club_name %}
             <p style="color: var(--gray-600); font-size: 0.875rem;">
                 🏢 {{ team.data.club_name }}
             </p>
