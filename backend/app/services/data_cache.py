@@ -16,54 +16,26 @@ class DataCache:
     
     def __init__(self):
         self._teams: List[Dict[str, Any]] = []
-        self._clubs: List[Dict[str, Any]] = []
         self._leagues: List[Dict[str, Any]] = []
         self._last_updated: Optional[datetime] = None
         
         # Track loading state per category to prevent duplicate API calls
         self._teams_loaded: bool = False  # All teams loaded
         self._teams_popular_loaded: bool = False  # Popular teams (men's) loaded
-        self._clubs_loaded: bool = False
         self._leagues_loaded: bool = False
         
         # Locks to prevent concurrent loading of same data (created lazily)
         self._teams_lock: Optional[asyncio.Lock] = None
-        self._clubs_lock: Optional[asyncio.Lock] = None
         self._leagues_lock: Optional[asyncio.Lock] = None
     
     def _ensure_locks(self):
         """Ensure async locks are created (must be called in async context)"""
         if self._teams_lock is None:
             self._teams_lock = asyncio.Lock()
-        if self._clubs_lock is None:
-            self._clubs_lock = asyncio.Lock()
         if self._leagues_lock is None:
             self._leagues_lock = asyncio.Lock()
     
-    async def load_clubs(self) -> None:
-        """Load clubs data from API (lazy loading)"""
-        self._ensure_locks()
-        async with self._clubs_lock:
-            if self._clubs_loaded:
-                logger.debug("Clubs already loaded, using cache")
-                return
-            
-            logger.info("Loading clubs...")
-            start_time = datetime.now()
-            
-            try:
-                client = get_swissunihockey_client()
-                clubs_data = client.get_clubs()
-                self._clubs = clubs_data.get("entries", [])
-                self._clubs_loaded = True
-                
-                elapsed = (datetime.now() - start_time).total_seconds()
-                logger.info(f"✓ Loaded {len(self._clubs)} clubs in {elapsed:.2f}s")
-                
-            except Exception as e:
-                logger.error(f"❌ Error loading clubs: {e}")
-                self._clubs = []
-                raise
+
     
     async def load_leagues(self) -> None:
         """Load leagues data from API (lazy loading)"""
@@ -246,14 +218,13 @@ class DataCache:
                 raise
     
     async def load_common_data(self) -> None:
-        """Load commonly-accessed data (clubs, leagues, popular teams) - fast startup preload"""
+        """Load commonly-accessed data (leagues, popular teams) - fast startup preload"""
         logger.info("Preloading commonly-accessed data...")
         start_time = datetime.now()
         
         try:
-            # Load clubs, leagues, and popular teams concurrently
+            # Load leagues and popular teams concurrently
             await asyncio.gather(
-                self.load_clubs(),
                 self.load_leagues(),
                 self.load_popular_teams(),
                 return_exceptions=True
@@ -276,7 +247,6 @@ class DataCache:
         try:
             # Load all categories concurrently
             await asyncio.gather(
-                self.load_clubs(),
                 self.load_leagues(),
                 self.load_teams(),
                 return_exceptions=True
@@ -297,11 +267,7 @@ class DataCache:
             await self.load_popular_teams()
         return self._teams
     
-    async def get_clubs(self) -> List[Dict[str, Any]]:
-        """Get cached clubs data, loading if necessary"""
-        if not self._clubs_loaded:
-            await self.load_clubs()
-        return self._clubs
+
     
     async def get_leagues(self) -> List[Dict[str, Any]]:
         """Get cached leagues data, loading if necessary"""
@@ -311,15 +277,11 @@ class DataCache:
     
     def is_loaded(self) -> bool:
         """Check if all data has been loaded"""
-        return self._teams_loaded and self._clubs_loaded and self._leagues_loaded
+        return self._teams_loaded and self._leagues_loaded
     
     def is_teams_loaded(self) -> bool:
         """Check if teams data has been loaded"""
         return self._teams_loaded
-    
-    def is_clubs_loaded(self) -> bool:
-        """Check if clubs data has been loaded"""
-        return self._clubs_loaded
     
     def is_leagues_loaded(self) -> bool:
         """Check if leagues data has been loaded"""
@@ -334,12 +296,10 @@ class DataCache:
         return {
             "teams_loaded": self._teams_loaded,
             "teams_popular_loaded": self._teams_popular_loaded,
-            "clubs_loaded": self._clubs_loaded,
             "leagues_loaded": self._leagues_loaded,
             "all_loaded": self.is_loaded(),
             "last_updated": self._last_updated.isoformat() if self._last_updated else None,
             "teams_count": len(self._teams),
-            "clubs_count": len(self._clubs),
             "leagues_count": len(self._leagues),
         }
 
@@ -373,9 +333,7 @@ async def get_cached_teams() -> List[Dict[str, Any]]:
     return await get_data_cache().get_teams()
 
 
-async def get_cached_clubs() -> List[Dict[str, Any]]:
-    """Get clubs from cache, loading on-demand if necessary"""
-    return await get_data_cache().get_clubs()
+
 
 
 async def get_cached_leagues() -> List[Dict[str, Any]]:

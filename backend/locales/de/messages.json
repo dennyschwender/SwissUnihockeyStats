@@ -12,7 +12,6 @@
   },
   "nav": {
     "home": "Startseite",
-    "clubs": "Vereine",
     "leagues": "Ligen",
     "teams": "Teams",
     "games": "Spiele",
@@ -25,11 +24,7 @@
     "subtitle": "Schweizer Unihockey Statistiken",
     "description": "Entdecken Sie Ligen, Teams, Spiele und Statistiken des Schweizer Unihockey"
   },
-  "clubs": {
-    "title": "Vereine",
-    "subtitle": "Alle Schweizer Unihockey-Vereine",
-    "search_placeholder": "Verein suchen..."
-  },
+
   "leagues": {
     "title": "Ligen",
     "subtitle": "Alle Schweizer Unihockey-Ligen"

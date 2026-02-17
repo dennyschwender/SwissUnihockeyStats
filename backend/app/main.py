@@ -17,7 +17,7 @@ from app.config import settings
 from app.api.v1.router import api_router
 from app.lib.i18n import get_translations, get_locale_from_path, DEFAULT_LOCALE
 from app.services.swissunihockey import get_swissunihockey_client
-from app.services.data_cache import preload_common_data, preload_data, get_cached_teams, get_cached_clubs, get_cached_leagues
+from app.services.data_cache import preload_common_data, preload_data, get_cached_teams, get_cached_leagues
 
 # Configure logging
 logging.basicConfig(
@@ -35,10 +35,10 @@ STATIC_DIR = BASE_DIR / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan events: startup and shutdown"""
-    # Startup: Preload common data (clubs, leagues, popular teams)
+    # Startup: Preload common data (leagues, popular teams)
     logger.info("🚀 Starting SwissUnihockey application...")
     try:
-        await preload_common_data()  # Loads clubs, leagues, and popular teams
+        await preload_common_data()  # Loads leagues and popular teams
         # Note: Remaining teams will lazy-load on first search
     except Exception as e:
         logger.error(f"❌ Failed to preload common data: {e}")
@@ -112,54 +112,7 @@ async def home(request: Request, locale: str):
     )
 
 
-@app.get("/{locale}/clubs", response_class=HTMLResponse)
-async def clubs_page(request: Request, locale: str):
-    """Clubs listing page"""
-    # Use cached data instead of API call (loads on-demand if needed)
-    clubs_list = await get_cached_clubs()
-    
-    return templates.TemplateResponse(
-        "clubs.html",
-        {
-            "request": request,
-            "locale": locale,
-            "t": get_translations(locale),
-            "clubs": clubs_list
-        }
-    )
 
-
-@app.get("/{locale}/clubs/search", response_class=HTMLResponse)
-async def clubs_search(request: Request, locale: str, q: str = ""):
-    """HTMX endpoint for club search"""
-    # Use cached data instead of API call (loads on-demand if needed)
-    all_clubs = await get_cached_clubs()
-    
-    # Filter clubs by search query
-    if q:
-        filtered_clubs = [
-            club for club in all_clubs 
-            if q.lower() in club.get("text", "").lower()
-        ]
-    else:
-        filtered_clubs = all_clubs[:50]
-    
-    # Return partial HTML for htmx
-    html = '<div class="cards-grid">'
-    for club in filtered_clubs:
-        club_id = club.get("set_in_context", {}).get("club_id", "")
-        html += f'''
-        <div class="card" style="cursor: pointer;" onclick="window.location='/{locale}/club/{club_id}'">
-            <h3>{club.get("text", "")}</h3>
-            <p>ID: {club_id}</p>
-        </div>
-        '''
-    html += '</div>'
-    
-    if not filtered_clubs:
-        html = '<div style="text-align: center; padding: 3rem; color: var(--gray-600);"><p>No clubs found</p></div>'
-    
-    return HTMLResponse(content=html)
 
 
 @app.get("/{locale}/leagues", response_class=HTMLResponse)
@@ -251,60 +204,6 @@ async def teams_search(request: Request, locale: str, q: str = "", mode: str = "
 
 
 # ==================== Detail Pages ====================
-
-@app.get("/{locale}/club/{club_id}", response_class=HTMLResponse)
-async def club_detail(request: Request, locale: str, club_id: int):
-    """Club detail page"""
-    logger.info(f"=== Club detail requested for ID {club_id} ===")
-    client = get_swissunihockey_client()
-    error_message = None
-    club_data = {}
-    teams = []
-    
-    try:
-        logger.info("Getting cached clubs...")
-        # Get club from cache (clubs are loaded on demand)
-        all_clubs = await get_cached_clubs()
-        logger.info(f"Got {len(all_clubs)} clubs from cache")
-        
-        # Find the club with matching ID
-        matching_clubs = [c for c in all_clubs if c.get("set_in_context", {}).get("club_id") == club_id]
-        logger.info(f"Found {len(matching_clubs)} matching clubs")
-        
-        if matching_clubs:
-            club_data = matching_clubs[0]
-            logger.info(f"Club found: {club_data.get('text')}")
-            
-            # Get teams from club data (if available)
-            # Note: SwissUnihockey API v2 doesn't support filtering teams by club ID via API
-            # The club=xxx parameter doesn't filter correctly - returns random teams
-            # Teams are stored in the club's 'entries' field from the cached data
-            teams = club_data.get('entries', [])
-            logger.info(f"Found {len(teams)} teams in club data")
-        else:
-            error_message = f"Club with ID {club_id} not found"
-            logger.warning(error_message)
-        
-        logger.info(f"Rendering template with club_data keys: {list(club_data.keys()) if club_data else 'empty'}")
-            
-    except Exception as e:
-        logger.error(f"Error fetching club {club_id}: {e}", exc_info=True)
-        error_message = f"Could not load club details: {str(e)}"
-        club_data = {}
-        teams = []
-    
-    return templates.TemplateResponse(
-        "club_detail.html",
-        {
-            "request": request,
-            "locale": locale,
-            "t": get_translations(locale),
-            "club": club_data,
-            "teams": teams,
-            "error_message": error_message
-        }
-    )
-
 
 @app.get("/{locale}/team/{team_id}", response_class=HTMLResponse)
 async def team_detail(request: Request, locale: str, team_id: int):

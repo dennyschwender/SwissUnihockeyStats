@@ -96,7 +96,6 @@
                 <nav>
                     <ul>
                         <li><a href="/{{ locale }}" {% if request.url.path == '/' + locale %}class="active"{% endif %}>{{ t.nav.home }}</a></li>
-                        <li><a href="/{{ locale }}/clubs" {% if '/clubs' in request.url.path %}class="active"{% endif %}>{{ t.nav.clubs }}</a></li>
                         <li><a href="/{{ locale }}/leagues" {% if '/leagues' in request.url.path %}class="active"{% endif %}>{{ t.nav.leagues }}</a></li>
                         <li><a href="/{{ locale }}/teams" {% if '/teams' in request.url.path %}class="active"{% endif %}>{{ t.nav.teams }}</a></li>
                         <li><a href="/{{ locale }}/players" {% if '/players' in request.url.path or '/player/' in request.url.path %}class="active"{% endif %}>{{ t.nav.players }}</a></li>
