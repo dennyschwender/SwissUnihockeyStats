@@ -275,28 +275,28 @@ async def league_detail(request: Request, locale: str, league_id: int):
             
             # Fetch teams for this league
             try:
-                teams_data = client.get_teams(league=actual_league, gameClass=game_class, mode=league_mode)
+                teams_data = client.get_teams(league=actual_league, game_class=game_class, mode=league_mode)
                 teams = teams_data.get("entries", [])[:50] if isinstance(teams_data, dict) else []
             except Exception as team_error:
                 logger.warning(f"Could not load teams for league {actual_league}: {team_error}")
             
             # Fetch standings
             try:
-                standings_data = client.get_rankings(league=actual_league, gameClass=game_class, mode=league_mode)
+                standings_data = client.get_rankings(league=actual_league, game_class=game_class, mode=league_mode)
                 standings = standings_data.get("entries", [])[:30] if isinstance(standings_data, dict) else []
             except Exception as standings_error:
                 logger.warning(f"Could not load standings for league {actual_league}: {standings_error}")
             
             # Fetch top scorers
             try:
-                topscorers_data = client.get_topscorers(league=actual_league, gameClass=game_class, mode=league_mode)
+                topscorers_data = client.get_topscorers(league=actual_league, game_class=game_class, mode=league_mode)
                 topscorers = topscorers_data.get("entries", [])[:30] if isinstance(topscorers_data, dict) else []
             except Exception as scorers_error:
                 logger.warning(f"Could not load top scorers for league {actual_league}: {scorers_error}")
             
             # Fetch recent games
             try:
-                games_data = client.get_games(league=actual_league, gameClass=game_class, mode=league_mode)
+                games_data = client.get_games(league=actual_league, game_class=game_class, mode=league_mode)
                 games = games_data.get("entries", [])[:20] if isinstance(games_data, dict) else []
             except Exception as games_error:
                 logger.warning(f"Could not load games for league {actual_league}: {games_error}")
