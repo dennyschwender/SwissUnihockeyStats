@@ -32,11 +32,31 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 
 
+def get_current_season() -> int:
+    """
+    Get the current Swiss Unihockey season year.
+    Season runs from September to May, so:
+    - Jan-Aug: Previous year (e.g., 2025 for 2025/26 season)
+    - Sep-Dec: Current year (e.g., 2025 for 2025/26 season)
+    
+    Returns:
+        int: Season year (e.g., 2025 for 2025/26 season)
+    """
+    now = datetime.now()
+    # If month is Jan-Aug (1-8), use previous year; if Sep-Dec (9-12), use current year
+    if now.month >= 9:
+        return now.year
+    else:
+        return now.year - 1
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan events: startup and shutdown"""
     # Startup: Preload common data (leagues, popular teams)
     logger.info("🚀 Starting SwissUnihockey application...")
+    current_season = get_current_season()
+    logger.info(f"📅 Current season: {current_season}/{current_season + 1}")
     try:
         await preload_common_data()  # Loads leagues and popular teams
         # Note: Remaining teams will lazy-load on first search
@@ -178,17 +198,18 @@ async def club_detail(request: Request, locale: str, club_id: int):
         
         if matching_clubs:
             club_data = matching_clubs[0]
+            current_season = get_current_season()
             
             # Fetch teams for this club
             try:
-                teams_data = client.get_teams(club=club_id)
+                teams_data = client.get_teams(club=club_id, season=current_season)
                 teams = teams_data.get("entries", [])[:30] if isinstance(teams_data, dict) else []
             except Exception as team_error:
                 logger.warning(f"Could not load teams for club {club_id}: {team_error}")
             
             # Fetch players for this club
             try:
-                players_data = client.get_players(club=club_id)
+                players_data = client.get_players(club=club_id, season=current_season)
                 players = players_data.get("entries", [])[:50] if isinstance(players_data, dict) else []
             except Exception as player_error:
                 logger.warning(f"Could not load players for club {club_id}: {player_error}")
@@ -313,12 +334,13 @@ async def league_detail(request: Request, locale: str, league_id: int):
             league_data["_game_class_param"] = game_class
             
             logger.info(f"Found league: {league_data.get('text')} (league={actual_league}, game_class={game_class}, mode={league_mode})")
-            logger.info(f"API parameters: league={actual_league}, game_class={game_class}, mode={league_mode}")
+            current_season = get_current_season()
+            logger.info(f"API parameters: league={actual_league}, game_class={game_class}, mode={league_mode}, season={current_season}")
             
             # Fetch teams for this league
             try:
                 logger.info(f"Fetching teams for league {actual_league}, game_class {game_class}")
-                teams_data = client.get_teams(league=actual_league, game_class=game_class, mode=league_mode)
+                teams_data = client.get_teams(league=actual_league, game_class=game_class, mode=league_mode, season=current_season)
                 logger.info(f"Teams response type: {type(teams_data)}, keys: {teams_data.keys() if isinstance(teams_data, dict) else 'N/A'}")
                 # API v2 returns data.regions[0].rows structure
                 teams = teams_data.get("entries", [])
@@ -333,7 +355,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             # Fetch standings
             try:
                 logger.info(f"Fetching standings for league {actual_league}, game_class {game_class}")
-                standings_data = client.get_rankings(league=actual_league, game_class=game_class, mode=league_mode)
+                standings_data = client.get_rankings(league=actual_league, game_class=game_class, mode=league_mode, season=current_season)
                 logger.info(f"Standings response type: {type(standings_data)}, keys: {standings_data.keys() if isinstance(standings_data, dict) else 'N/A'}")
                 # API v2 returns data.regions[0].rows structure
                 standings = standings_data.get("entries", [])
@@ -348,7 +370,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             # Fetch top scorers
             try:
                 logger.info(f"Fetching top scorers for league {actual_league}, game_class {game_class}")
-                topscorers_data = client.get_topscorers(league=actual_league, game_class=game_class, mode=league_mode)
+                topscorers_data = client.get_topscorers(league=actual_league, game_class=game_class, mode=league_mode, season=current_season)
                 logger.info(f"Top scorers response type: {type(topscorers_data)}, keys: {topscorers_data.keys() if isinstance(topscorers_data, dict) else 'N/A'}")
                 # API v2 returns data.regions[0].rows structure
                 topscorers = topscorers_data.get("entries", [])
@@ -363,7 +385,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             # Fetch recent games
             try:
                 logger.info(f"Fetching games for league {actual_league}, game_class {game_class}")
-                games_data = client.get_games(league=actual_league, game_class=game_class, mode=league_mode)
+                games_data = client.get_games(league=actual_league, game_class=game_class, mode=league_mode, season=current_season)
                 logger.info(f"Games response type: {type(games_data)}, keys: {games_data.keys() if isinstance(games_data, dict) else 'N/A'}")
                 # API v2 returns data.regions[0].rows structure
                 games = games_data.get("entries", [])
@@ -481,10 +503,11 @@ async def team_detail(request: Request, locale: str, team_id: int, league: int =
     games = []
     
     try:
+        current_season = get_current_season()
         # If we have league and game_class, fetch team info from teams API
         if league is not None and game_class is not None:
             try:
-                teams_data = client.get_teams(league=league, game_class=game_class)
+                teams_data = client.get_teams(league=league, game_class=game_class, season=current_season)
                 regions = teams_data.get("data", {}).get("regions", [])
                 if regions:
                     all_teams = regions[0].get("rows", [])
@@ -505,7 +528,7 @@ async def team_detail(request: Request, locale: str, team_id: int, league: int =
         
         # Try to fetch players for this team
         try:
-            players_data = client.get_players(team=team_id)
+            players_data = client.get_players(team=team_id, season=current_season)
             logger.info(f"Players response type: {type(players_data)}, keys: {players_data.keys() if isinstance(players_data, dict) else 'N/A'}")
             
             # If we don't have team_data yet, try to extract from players response
@@ -552,7 +575,7 @@ async def team_detail(request: Request, locale: str, team_id: int, league: int =
                     game_class_num = league_data.get("set_in_context", {}).get("game_class")
                     if league_num and game_class_num:
                         try:
-                            teams_data = client.get_teams(league=league_num, game_class=game_class_num)
+                            teams_data = client.get_teams(league=league_num, game_class=game_class_num, season=current_season)
                             regions = teams_data.get("data", {}).get("regions", [])
                             if regions:
                                 all_teams = regions[0].get("rows", [])
