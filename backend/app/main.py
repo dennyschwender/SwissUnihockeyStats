@@ -246,46 +246,63 @@ async def league_detail(request: Request, locale: str, league_id: int):
         # Get league from cache
         all_leagues = await get_cached_leagues()
         
-        # Find the league with matching ID
+        # Try multiple ways to find the league:
+        # 1. By league_id in set_in_context
         matching_leagues = [
             l for l in all_leagues
             if l.get("set_in_context", {}).get("league_id") == league_id
         ]
         
+        # 2. If not found, try by top-level id field
+        if not matching_leagues:
+            matching_leagues = [
+                l for l in all_leagues
+                if l.get("id") == league_id
+            ]
+        
+        # 3. If still not found and league_id is small (< 1000), try by index
+        if not matching_leagues and league_id < 1000 and league_id <= len(all_leagues):
+            matching_leagues = [all_leagues[league_id - 1]]  # Convert to 0-based index
+        
         if matching_leagues:
             league_data = matching_leagues[0]
+            # Extract the actual league parameters from the data for API calls
+            actual_league = league_data.get("set_in_context", {}).get("league")
+            game_class = league_data.get("set_in_context", {}).get("game_class")
             league_mode = league_data.get("set_in_context", {}).get("mode", "1")
+            
+            logger.info(f"Found league: {league_data.get('text')} (league={actual_league}, game_class={game_class}, mode={league_mode})")
             
             # Fetch teams for this league
             try:
-                teams_data = client.get_teams(league=league_id, mode=league_mode)
+                teams_data = client.get_teams(league=actual_league, gameClass=game_class, mode=league_mode)
                 teams = teams_data.get("entries", [])[:50] if isinstance(teams_data, dict) else []
             except Exception as team_error:
-                logger.warning(f"Could not load teams for league {league_id}: {team_error}")
+                logger.warning(f"Could not load teams for league {actual_league}: {team_error}")
             
             # Fetch standings
             try:
-                standings_data = client.get_rankings(league=league_id, mode=league_mode)
+                standings_data = client.get_rankings(league=actual_league, gameClass=game_class, mode=league_mode)
                 standings = standings_data.get("entries", [])[:30] if isinstance(standings_data, dict) else []
             except Exception as standings_error:
-                logger.warning(f"Could not load standings for league {league_id}: {standings_error}")
+                logger.warning(f"Could not load standings for league {actual_league}: {standings_error}")
             
             # Fetch top scorers
             try:
-                topscorers_data = client.get_topscorers(league=league_id, mode=league_mode)
+                topscorers_data = client.get_topscorers(league=actual_league, gameClass=game_class, mode=league_mode)
                 topscorers = topscorers_data.get("entries", [])[:30] if isinstance(topscorers_data, dict) else []
             except Exception as scorers_error:
-                logger.warning(f"Could not load top scorers for league {league_id}: {scorers_error}")
+                logger.warning(f"Could not load top scorers for league {actual_league}: {scorers_error}")
             
             # Fetch recent games
             try:
-                games_data = client.get_games(league=league_id, mode=league_mode)
+                games_data = client.get_games(league=actual_league, gameClass=game_class, mode=league_mode)
                 games = games_data.get("entries", [])[:20] if isinstance(games_data, dict) else []
             except Exception as games_error:
-                logger.warning(f"Could not load games for league {league_id}: {games_error}")
+                logger.warning(f"Could not load games for league {actual_league}: {games_error}")
         else:
-            error_message = f"League with ID {league_id} not found"
-            logger.warning(error_message)
+            error_message = f"League with ID {league_id} not found. Please try selecting from the leagues list."
+            logger.warning(f"League {league_id} not found. Total leagues available: {len(all_leagues)}")
     
     except Exception as e:
         logger.error(f"Error fetching league {league_id}: {e}")
