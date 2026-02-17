@@ -537,8 +537,45 @@ async def team_detail(request: Request, locale: str, team_id: int, league: int =
             matching_teams = [t for t in all_teams if t.get("id") == team_id]
             if matching_teams:
                 team_data = matching_teams[0]
-            else:
-                team_data = {"id": team_id, "text": f"Team {team_id}"}
+        
+        # If STILL no team_data, search through leagues to find the team
+        if not team_data or team_data.get("text", "").startswith("Team "):
+            logger.info(f"Searching through leagues to find team {team_id}")
+            try:
+                all_leagues = await get_cached_leagues()
+                found = False
+                # Try common league/game_class combinations
+                for league_data in all_leagues[:20]:  # Check first 20 leagues
+                    if found:
+                        break
+                    league_num = league_data.get("set_in_context", {}).get("league")
+                    game_class_num = league_data.get("set_in_context", {}).get("game_class")
+                    if league_num and game_class_num:
+                        try:
+                            teams_data = client.get_teams(league=league_num, game_class=game_class_num)
+                            regions = teams_data.get("data", {}).get("regions", [])
+                            if regions:
+                                all_teams = regions[0].get("rows", [])
+                                matching_teams = [t for t in all_teams if t.get("id") == team_id]
+                                if matching_teams:
+                                    team_raw = matching_teams[0]
+                                    team_name = team_raw.get("cells", [{}])[0].get("text", [f"Team {team_id}"])[0]
+                                    team_data = {
+                                        "id": team_id,
+                                        "text": team_name,
+                                        "club_name": team_raw.get("cells", [{}])[0].get("text", [""])[0] if len(team_raw.get("cells", [])) > 0 else ""
+                                    }
+                                    logger.info(f"Found team '{team_name}' in league {league_num}/{game_class_num}")
+                                    found = True
+                                    break
+                        except Exception as search_error:
+                            continue  # Try next league
+            except Exception as search_error:
+                logger.warning(f"Error searching for team in leagues: {search_error}")
+        
+        # Final fallback
+        if not team_data:
+            team_data = {"id": team_id, "text": f"Team {team_id}"}
         
         # Note: Games API doesn't support filtering by team ID or by league/game_class
         # Teams without roster data typically also don't have games data
