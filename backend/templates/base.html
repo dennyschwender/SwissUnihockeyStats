@@ -5,6 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{{ t.common.app_name }}{% endblock %}</title>
     
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="{% block description %}SwissUnihockey Statistics - Comprehensive statistics for Swiss floorball leagues, teams, games, and rankings{% endblock %}">
+    <meta name="keywords" content="{% block keywords %}unihockey, floorball, swiss, switzerland, sports, leagues, teams, statistics, rankings{% endblock %}">
+    <meta name="author" content="SwissUnihockey">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ request.url }}">
+    <meta property="og:title" content="{% block og_title %}{{ t.common.app_name }} - Swiss Floorball Statistics{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Comprehensive statistics for Swiss floorball leagues, teams, games, and rankings{% endblock %}">
+    <meta property="og:image" content="{% block og_image %}/static/images/og-image.png{% endblock %}">
+    <meta property="og:locale" content="{{ locale }}_CH">
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="{{ request.url }}">
+    <meta name="twitter:title" content="{% block twitter_title %}{{ t.common.app_name }} - Swiss Floorball Statistics{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}Comprehensive statistics for Swiss floorball leagues, teams, and rankings{% endblock %}">
+    <meta name="twitter:image" content="{% block twitter_image %}/static/images/og-image.png{% endblock %}">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="{{ request.url }}">
+    
+    <!-- Alternate Language Versions -->
+    <link rel="alternate" hreflang="de" href="{{ request.url.scheme }}://{{ request.url.netloc }}/de{{ request.url.path[3:] }}">
+    <link rel="alternate" hreflang="en" href="{{ request.url.scheme }}://{{ request.url.netloc }}/en{{ request.url.path[3:] }}">
+    <link rel="alternate" hreflang="fr" href="{{ request.url.scheme }}://{{ request.url.netloc }}/fr{{ request.url.path[3:] }}">
+    <link rel="alternate" hreflang="it" href="{{ request.url.scheme }}://{{ request.url.netloc }}/it{{ request.url.path[3:] }}">
+    <link rel="alternate" hreflang="x-default" href="{{ request.url.scheme }}://{{ request.url.netloc }}/de{{ request.url.path[3:] }}">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    
     <!-- CSS -->
     <link rel="stylesheet" href="/static/css/main.css">
     
@@ -13,10 +47,6 @@
     
     <!-- Alpine.js for local state management -->
     <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
-    
-    <!-- Meta Tags -->
-    <meta name="description" content="SwissUnihockey Statistics - Leagues, Teams, Games, Rankings">
-    <meta name="keywords" content="unihockey, floorball, swiss, switzerland, sports, leagues">
     
     {% block head %}{% endblock %}
 </head>
