@@ -61,8 +61,13 @@ async def get_game(game_id: int):
     """
     try:
         client = get_swissunihockey_client()
-        # Would need to filter games or have specific endpoint
-        raise HTTPException(status_code=501, detail="Game details endpoint not yet implemented")
+        # Get game events which includes game details
+        game_data = client.get_game_events(game_id=game_id)
+        
+        if not game_data:
+            raise HTTPException(status_code=404, detail=f"Game {game_id} not found")
+        
+        return game_data
     
     except HTTPException:
         raise

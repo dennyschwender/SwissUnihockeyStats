@@ -54,8 +54,28 @@ async def get_team(team_id: int):
     """
     try:
         client = get_swissunihockey_client()
-        # Would need specific team endpoint - this is a simplified version
-        raise HTTPException(status_code=501, detail="Team details endpoint not yet implemented")
+        # Filter all teams to find the specific one
+        teams_data = client.get_teams()
+        
+        if not teams_data or "entries" not in teams_data:
+            raise HTTPException(status_code=500, detail="Failed to fetch teams")
+        
+        # Find the team by ID
+        team = None
+        for t in teams_data["entries"]:
+            team_context = t.get("set_in_context", {})
+            if team_context.get("team_id") == team_id:
+                team = {
+                    "team_id": team_id,
+                    "name": t.get("text", ""),
+                    **team_context
+                }
+                break
+        
+        if not team:
+            raise HTTPException(status_code=404, detail=f"Team {team_id} not found")
+        
+        return team
     
     except HTTPException:
         raise
