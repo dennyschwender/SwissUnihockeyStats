@@ -477,38 +477,72 @@ async def team_detail(request: Request, locale: str, team_id: int):
     games = []
     
     try:
-        # Get team from cache (teams are loaded on demand)
-        all_teams = await get_cached_teams()
-        
-        # Find the team with matching ID
-        matching_teams = [t for t in all_teams if t.get("id") == team_id]
-        
-        if matching_teams:
-            team_data = matching_teams[0]
+        # Try to fetch team data directly from API using team parameter
+        # This is more reliable than searching in cache
+        try:
+            # Fetch players for this team - the response includes team info
+            players_data = client.get_players(team=team_id)
+            logger.info(f"Players response type: {type(players_data)}, keys: {players_data.keys() if isinstance(players_data, dict) else 'N/A'}")
             
-            # Try fetching players for this team
-            try:
-                players_data = client.get_players(team=team_id)
-                players = players_data.get("entries", players_data.get("data", [])) if isinstance(players_data, dict) else []
-            except Exception as player_error:
-                logger.warning(f"Could not load players for team {team_id}: {player_error}")
-                players = []
+            # Extract team info from the response if available
+            if isinstance(players_data, dict):
+                # Check if team data is in the response
+                team_context = players_data.get("data", {}).get("context", {})
+                if team_context:
+                    team_data = {
+                        "id": team_id,
+                        "text": team_context.get("team_name", f"Team {team_id}"),
+                        "club_name": team_context.get("club_name", ""),
+                    }
+                    logger.info(f"Found team info in context: {team_data}")
+                else:
+                    # Fallback: create basic team data
+                    team_data = {"id": team_id, "text": f"Team {team_id}"}
+                
+                # Extract players from response
+                regions = players_data.get("data", {}).get("regions", [])
+                if regions:
+                    players = regions[0].get("rows", [])
+                else:
+                    players = players_data.get("entries", [])
+                logger.info(f"Loaded {len(players)} players")
+        except Exception as player_error:
+            logger.warning(f"Could not load players for team {team_id}: {player_error}")
+            players = []
+            # Still try to get basic team data from cache
+            all_teams = await get_cached_teams()
+            matching_teams = [t for t in all_teams if t.get("id") == team_id]
+            if matching_teams:
+                team_data = matching_teams[0]
+            else:
+                team_data = {"id": team_id, "text": f"Team {team_id}"}
+        
+        # Try fetching games for this team
+        try:
+            games_data = client.get_games(team=team_id)
+            logger.info(f"Games response type: {type(games_data)}, keys: {games_data.keys() if isinstance(games_data, dict) else 'N/A'}")
             
-            # Try fetching games for this team
-            try:
-                games_data = client.get_games(team=team_id)
-                games = games_data.get("entries", games_data.get("data", []))[:10] if isinstance(games_data, dict) else []
-            except Exception as game_error:
-                logger.warning(f"Could not load games for team {team_id}: {game_error}")
-                games = []
-        else:
+            # Extract games from response
+            if isinstance(games_data, dict):
+                regions = games_data.get("data", {}).get("regions", [])
+                if regions:
+                    games = regions[0].get("rows", [])[:10]
+                else:
+                    games = games_data.get("entries", [])[:10]
+            logger.info(f"Loaded {len(games)} games")
+        except Exception as game_error:
+            logger.warning(f"Could not load games for team {team_id}: {game_error}")
+            games = []
+        
+        # If we still don't have team_data, show error
+        if not team_data or not team_data.get("text"):
             error_message = f"Team with ID {team_id} not found"
             logger.warning(error_message)
             
     except Exception as e:
         logger.error(f"Error fetching team {team_id}: {e}")
         error_message = f"Could not load team details: {str(e)}"
-        team_data = {}
+        team_data = {"id": team_id, "text": f"Team {team_id}"}
         players = []
         games = []
     
