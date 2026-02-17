@@ -13,84 +13,81 @@
 
 <!-- Leagues List -->
 <div id="leagues-list" style="margin-top: 2rem;">
-    {% if grouped_leagues %}
-    <!-- Map game classes to readable names -->
-    {% set game_class_names = {
-        11: 'Men',
-        12: 'Men U21', 
-        21: 'Women',
-        22: 'Women U21',
-        31: 'Mixed'
+    {% if gender_leagues %}
+    <!-- Gender names and icons -->
+    {% set gender_info = {
+        'men': {'name': 'Men', 'icon': '👨', 'color': '#0066cc'},
+        'women': {'name': 'Women', 'icon': '👩', 'color': '#cc0066'},
+        'mixed': {'name': 'Mixed', 'icon': '👥', 'color': '#6600cc'}
     } %}
     
-    <!-- Group by league level -->
-    {% set current_league = None %}
-    {% for (league_num, game_class), league_group in grouped_leagues %}
-        {% if league_num != current_league %}
-            {% if current_league is not none %}
-                </div> <!-- Close previous league section -->
-            {% endif %}
-            {% set current_league = league_num %}
-            
-            <h2 style="margin: 2rem 0 1rem 0; color: var(--swiss-red); border-bottom: 2px solid var(--gray-200); padding-bottom: 0.5rem;">
-                {% if league_num == 1 %}
-                    🥇 NLA (National League A)
-                {% elif league_num == 2 %}
-                    🥈 NLB (National League B)
-                {% elif league_num == 3 %}
-                    🥉 1. Liga
-                {% elif league_num == 4 %}
-                    🎖️ 2. Liga
-                {% elif league_num == 5 %}
-                    🏅 3. Liga
-                {% elif league_num == 6 %}
-                    📋 4. Liga
-                {% elif league_num == 24 %}
-                    🌟 L-UPL (Unihockey Prime League)
-                {% else %}
-                    🏆 League {{ league_num }}
-                {% endif %}
-            </h2>
-            <div>
-        {% endif %}
+    <!-- League level names -->
+    {% set league_names = {
+        1: 'NLA (National League A)',
+        2: 'NLB (National League B)',
+        3: '1. Liga',
+        4: '2. Liga',
+        5: '3. Liga',
+        6: '4. Liga',
+        24: 'L-UPL (Unihockey Prime League)'
+    } %}
+    
+    <!-- Iterate through each gender category -->
+    {% for gender, league_levels in gender_leagues.items() %}
+        {% set info = gender_info.get(gender, {'name': 'Other', 'icon': '🏆', 'color': '#666'}) %}
         
-        <!-- Display each game class group -->
-        {% set first_league = league_group[0] %}
-        <div class="card" style="margin-bottom: 1.5rem; cursor: pointer; border-left: 4px solid var(--swiss-red);"
-             onclick="window.location='/{{ locale }}/league/{{ first_league._index }}'">
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <div class="card-icon" style="font-size: 2.5rem;">
-                    {% if game_class in [11, 12] %}👨
-                    {% elif game_class in [21, 22] %}👩
-                    {% elif game_class == 31 %}👥
-                    {% else %}🏆
-                    {% endif %}
-                </div>
-                <div style="flex: 1;">
-                    <h3 style="margin: 0 0 0.5rem 0;">
-                        {{ game_class_names.get(game_class, 'Class ' ~ game_class) }}
-                    </h3>
-                    <p style="color: var(--gray-600); font-size: 0.875rem; margin: 0;">
-                        {{ first_league.text }}
-                        {% if league_group|length > 1 %}
-                        <br><span style="color: var(--gray-500); font-size: 0.813rem;">
-                            + {{ league_group|length - 1 }} more group(s)
-                        </span>
+        <!-- Gender Section Header -->
+        <div style="margin: 3rem 0 1.5rem 0; padding: 1rem; background: linear-gradient(135deg, {{ info.color }}15, {{ info.color }}05); border-left: 5px solid {{ info.color }}; border-radius: 8px;">
+            <h2 style="margin: 0; color: {{ info.color }}; display: flex; align-items: center; gap: 0.75rem;">
+                <span style="font-size: 2rem;">{{ info.icon }}</span>
+                <span>{{ info.name }}</span>
+            </h2>
+        </div>
+        
+        <!-- Iterate through league levels within this gender -->
+        {% for league_num, leagues in league_levels.items() %}
+            <!-- League Level Header -->
+            <h3 style="margin: 1.5rem 0 1rem 0; color: var(--gray-700); padding-left: 0.5rem; border-left: 3px solid {{ info.color }};">
+                {% if league_num == 1 %}🥇
+                {% elif league_num == 2 %}🥈
+                {% elif league_num == 3 %}🥉
+                {% elif league_num == 24 %}🌟
+                {% else %}🏅
+                {% endif %}
+                {{ league_names.get(league_num, 'League ' ~ league_num) }}
+            </h3>
+            
+            <!-- Display leagues/groups within this level -->
+            <div class="cards-grid" style="margin-bottom: 1rem;">
+                {% for league in leagues %}
+                <div class="card" style="position: relative; cursor: pointer; border-top: 3px solid {{ info.color }};"
+                     onclick="window.location='/{{ locale }}/league/{{ league._index }}'">
+                    <!-- Favorite Button -->
+                    <button 
+                        @click.stop="toggleFavorite('leagues', {{ league._index }}, '{{ league.text }}', {})"
+                        :class="isFavorite('leagues', {{ league._index }}) ? 'active' : 'inactive'"
+                        class="favorite-btn favorite-indicator"
+                        title="Add to favorites"
+                        onclick="event.stopPropagation();"
+                    >⭐</button>
+                    
+                    <div class="card-icon" style="color: {{ info.color }};">{{ info.icon }}</div>
+                    <h3 style="font-size: 1rem;">{{ league.text }}</h3>
+                    {% if league.set_in_context %}
+                    <p style="color: var(--gray-600); font-size: 0.813rem; margin-top: 0.5rem;">
+                        {% if league.set_in_context.get('group') %}
+                        📍 {{ league.set_in_context.get('group') }}
+                        {% endif %}
+                        {% if league._game_class in [12, 22] %}
+                        <br>🔰 U21
                         {% endif %}
                     </p>
+                    {% endif %}
                 </div>
-                <button 
-                    @click.stop="toggleFavorite('leagues', {{ first_league._index }}, '{{ first_league.text }}', {})"
-                    :class="isFavorite('leagues', {{ first_league._index }}) ? 'active' : 'inactive'"
-                    class="favorite-btn favorite-indicator"
-                    title="Add to favorites"
-                    onclick="event.stopPropagation();"
-                    style="position: static; margin-left: auto;"
-                >⭐</button>
+                {% endfor %}
             </div>
-        </div>
+        {% endfor %}
     {% endfor %}
-    </div> <!-- Close last league section -->
     
     {% elif leagues %}
     <!-- Fallback to ungrouped display -->

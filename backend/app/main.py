@@ -220,29 +220,41 @@ async def leagues_page(request: Request, locale: str):
     # Use cached data instead of API call (loads on-demand if needed)
     leagues_list = await get_cached_leagues()
     
-    # Group leagues by league level and game class
+    # Group leagues: First by gender/category, then by league level, then by groups
     from collections import defaultdict
-    grouped_leagues = defaultdict(list)
-    league_metadata = {}  # Store first occurrence of each league for metadata
+    
+    # Structure: {gender: {league_level: [league_entries]}}
+    gender_leagues = defaultdict(lambda: defaultdict(list))
     
     for idx, league in enumerate(leagues_list, 1):
         league_num = league.get("set_in_context", {}).get("league")
         game_class = league.get("set_in_context", {}).get("game_class")
         
-        if league_num:
-            key = (league_num, game_class)
-            league_with_index = {**league, "_index": idx}  # Add index for URL routing
-            grouped_leagues[key].append(league_with_index)
+        if league_num and game_class:
+            # Determine gender/category from game_class
+            if game_class in [11, 12]:  # Men and Men U21
+                gender = "men"
+            elif game_class in [21, 22]:  # Women and Women U21
+                gender = "women"
+            elif game_class == 31:  # Mixed
+                gender = "mixed"
+            else:
+                gender = "other"
             
-            # Store metadata for the league level
-            if league_num not in league_metadata:
-                league_metadata[league_num] = {
-                    "name": league.get("text", "").split()[0] if league.get("text") else f"League {league_num}",
-                    "level": league_num
-                }
+            league_with_index = {**league, "_index": idx, "_game_class": game_class}
+            gender_leagues[gender][league_num].append(league_with_index)
     
-    # Sort groups by league level then game class
-    sorted_groups = sorted(grouped_leagues.items(), key=lambda x: (x[0][0], x[0][1] or 0))
+    # Sort each gender's leagues by level, and sort leagues within each level
+    for gender in gender_leagues:
+        gender_leagues[gender] = dict(sorted(gender_leagues[gender].items()))
+    
+    # Order genders: Men, Women, Mixed, Other
+    gender_order = ["men", "women", "mixed", "other"]
+    ordered_gender_leagues = {
+        gender: gender_leagues[gender] 
+        for gender in gender_order 
+        if gender in gender_leagues
+    }
     
     return templates.TemplateResponse(
         "leagues.html",
@@ -251,8 +263,7 @@ async def leagues_page(request: Request, locale: str):
             "locale": locale,
             "t": get_translations(locale),
             "leagues": leagues_list,  # Keep original for backwards compatibility
-            "grouped_leagues": sorted_groups,
-            "league_metadata": league_metadata
+            "gender_leagues": ordered_gender_leagues
         }
     )
 
