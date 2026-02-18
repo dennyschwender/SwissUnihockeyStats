@@ -24,16 +24,20 @@
   --primary-600: #dc2626;
   --primary-700: #b91c1c;
   
-  /* Gray Scaletext-primary);
-  background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 50%, var(--bg-gradient-start) 100%);
-  min-height: 100vh;
-  transition: background 0.3s ease, color 0.3s easef6;
+  /* Gray Scale */
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
   --gray-200: #e5e7eb;
   --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
   --gray-600: #4b5563;
   --gray-700: #374151;
   --gray-800: #1f2937;
   --gray-900: #111827;
+
+  /* Card background */
+  --card-bg: #ffffff;
 }
 
 /* Dark Mode Variables */
@@ -53,6 +57,21 @@ html.dark-mode {
   --primary-50: #2d0f0f;
   --primary-100: #3d1a1a;
   --swiss-red: #ff3333;
+
+  /* Card background */
+  --card-bg: #2d2d2d;
+
+  /* Override gray scale for dark mode */
+  --gray-50: #2d2d2d;
+  --gray-100: #374151;
+  --gray-200: #374151;
+  --gray-300: #4b5563;
+  --gray-400: #9ca3af;
+  --gray-500: #d1d5db;
+  --gray-600: #d1d5db;
+  --gray-700: #e5e7eb;
+  --gray-800: #f3f4f6;
+  --gray-900: #f9fafb;
 }
 
 * {
@@ -61,12 +80,17 @@ html.dark-mode {
   box-sizing: border-box;
 }
 
+html {
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.6;
-  color: var(--gray-900);
-  background: linear-gradient(135deg, var(--primary-50) 0%, var(--swiss-white) 50%, var(--primary-50) 100%);
+  color: var(--text-primary);
+  background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-primary) 50%, var(--bg-gradient-start) 100%);
   min-height: 100vh;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 .container {
@@ -76,13 +100,13 @@ body {
 }
 
 /* Header */
-header {bg-primary);
+header {
+  background: var(--bg-primary);
   box-shadow: 0 2px 10px var(--shadow-color);
   position: sticky;
   top: 0;
   z-index: 100;
-  transition: background 0.3s ease, box-shadow 0.3s ease
-  z-index: 100;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
 .header-content {
@@ -113,8 +137,8 @@ nav ul {
   gap: 2rem;
 }
 
-nav a {text-primary
-  color: var(--gray-800);
+nav a {
+  color: var(--text-primary);
   text-decoration: none;
   font-weight: 500;
   transition: color 0.3s;
@@ -306,6 +330,35 @@ footer {
 /* Dark mode specific overrides */
 html.dark-mode {
   color-scheme: dark;
+}
+
+html.dark-mode body {
+  color: var(--text-primary);
+  background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-primary) 50%, var(--bg-gradient-start) 100%);
+}
+
+html.dark-mode header {
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+html.dark-mode nav a {
+  color: var(--text-secondary);
+}
+
+html.dark-mode nav a:hover,
+html.dark-mode nav a.active {
+  color: var(--swiss-red);
+}
+
+html.dark-mode .card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+html.dark-mode main {
+  background: transparent;
 }
 
 html.dark-mode .hero p {
