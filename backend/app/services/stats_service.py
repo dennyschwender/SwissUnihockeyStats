@@ -300,13 +300,16 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
         if not player_ids:
             return []
 
-        # Query PlayerStatistics + Player for season
+        # Query PlayerStatistics + Player — restrict to team_id in this league so
+        # players who also played in other leagues only show their stats for
+        # the teams that actually participated here (one stat row per team).
         stats = (
             session.query(PlayerStatistics, Player)
             .join(Player, PlayerStatistics.player_id == Player.person_id)
             .filter(
                 PlayerStatistics.player_id.in_(player_ids),
                 PlayerStatistics.season_id == league.season_id,
+                PlayerStatistics.team_id.in_(all_team_ids),
             )
             .order_by(
                 PlayerStatistics.points.desc(),
