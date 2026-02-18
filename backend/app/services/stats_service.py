@@ -263,13 +263,11 @@ def get_league_standings(db_league_id: int) -> list[dict]:
 
 def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
     """
-    Top scorers for a league – matched by team_name stored in player_statistics.
+    Top scorers for a league.
 
-    Strategy:
-    1. Collect the known team names for this league (from Team rows linked via games).
-    2. Query PlayerStatistics where team_name matches any of those team names AND
-       season matches. Then join Player for the player name.
-    3. Falls back to league_abbrev matching if team name list is empty.
+    Strategy: collect player IDs from TeamPlayer rows for teams that played in
+    this league, then join PlayerStatistics + Player by player_id — avoids any
+    fragile team-name string matching.
     """
     db = get_database_service()
     with db.session_scope() as session:
@@ -282,32 +280,32 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
         if not group_ids:
             return []
 
-        # Get team IDs that played in this league
+        # Get team IDs that played in this league (from games)
         home_ids = {r[0] for r in session.query(Game.home_team_id).filter(Game.group_id.in_(group_ids)).all()}
         away_ids = {r[0] for r in session.query(Game.away_team_id).filter(Game.group_id.in_(group_ids)).all()}
-        all_team_ids = home_ids | away_ids
+        all_team_ids = list((home_ids | away_ids) - {None})
 
-        # Resolve team names from DB
-        team_rows = (
-            session.query(Team.name)
-            .filter(
-                Team.id.in_(list(all_team_ids)),
-                Team.name.isnot(None),
-            )
-            .distinct()
-            .all()
-        )
-        team_names = {r[0] for r in team_rows if r[0]}
-
-        if not team_names:
+        if not all_team_ids:
             return []
 
-        # Query PlayerStatistics matching team_name
+        # Collect player IDs for those teams (from TeamPlayer roster entries)
+        player_ids = [
+            r[0] for r in
+            session.query(TeamPlayer.player_id)
+            .filter(TeamPlayer.team_id.in_(all_team_ids))
+            .distinct()
+            .all()
+        ]
+
+        if not player_ids:
+            return []
+
+        # Query PlayerStatistics + Player for season
         stats = (
             session.query(PlayerStatistics, Player)
             .join(Player, PlayerStatistics.player_id == Player.person_id)
             .filter(
-                PlayerStatistics.team_name.in_(list(team_names)),
+                PlayerStatistics.player_id.in_(player_ids),
                 PlayerStatistics.season_id == league.season_id,
             )
             .order_by(

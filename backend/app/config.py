@@ -1,9 +1,14 @@
 """
 Application configuration using Pydantic Settings
 """
+from pathlib import Path
 from typing import List
 from pydantic_settings import BaseSettings
 from pydantic import AnyHttpUrl, field_validator
+
+# Resolve the project-level data directory regardless of CWD.
+# config.py lives at  <project>/backend/app/config.py  → data is at <project>/data/
+_DATA_DIR = str(Path(__file__).resolve().parent.parent.parent / "data")
 
 
 class Settings(BaseSettings):
@@ -35,7 +40,7 @@ class Settings(BaseSettings):
     SWISSUNIHOCKEY_API_URL: str = "https://api-v2.swissunihockey.ch"
     SWISSUNIHOCKEY_LOCALE: str = "de-CH"
     SWISSUNIHOCKEY_CACHE_ENABLED: bool = True
-    SWISSUNIHOCKEY_CACHE_DIR: str = "../data/cache"
+    SWISSUNIHOCKEY_CACHE_DIR: str = str(Path(_DATA_DIR) / "cache")
     
     # Redis (Optional)
     REDIS_HOST: str = "localhost"
@@ -45,7 +50,7 @@ class Settings(BaseSettings):
     
     # Database (Optional)
     DATABASE_URL: str | None = None
-    DATABASE_PATH: str = "../data/swissunihockey.db"
+    DATABASE_PATH: str = str(Path(_DATA_DIR) / "swissunihockey.db")
     
     # Server
     HOST: str = "0.0.0.0"

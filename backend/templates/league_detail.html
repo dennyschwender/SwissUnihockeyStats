@@ -21,15 +21,29 @@
     {% endif %}
   </div>
 
-  <div x-data="{ tab: 'standings' }">
-    <div style="display:flex;gap:.25rem;border-bottom:2px solid var(--gray-200);margin-bottom:1.5rem;">
-      {% for tid, tlabel in [('standings','Standings'),('topscorers','Top Scorers'),('results','Results')] %}
-      <button @click="tab='{{ tid }}'"
-        :style="tab==='{{ tid }}' ? 'border-bottom:2px solid var(--swiss-red,#e11d48);color:var(--swiss-red,#e11d48);margin-bottom:-2px' : 'color:var(--gray-600)'"
-        style="padding:.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:.9rem;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-2px;">
-        {{ tlabel }}
+  <style>
+    .league-tabs{display:flex;gap:.375rem;margin-bottom:1.75rem;}
+    .league-tab{display:flex;align-items:center;gap:.375rem;padding:.5rem 1.1rem;border:1.5px solid var(--gray-200,#e5e7eb);border-radius:9999px;background:transparent;cursor:pointer;font-size:.875rem;font-weight:500;color:var(--gray-500,#6b7280);transition:all .15s;white-space:nowrap;}
+    .league-tab:hover{border-color:var(--swiss-red,#e11d48);color:var(--swiss-red,#e11d48);background:#fff1f2;}
+    .league-tab.active{background:var(--swiss-red,#e11d48);border-color:var(--swiss-red,#e11d48);color:#fff;}
+    .league-tab .tab-badge{font-size:.7rem;padding:.1rem .4rem;border-radius:9999px;background:rgba(0,0,0,.12);margin-left:.1rem;}
+    [x-cloak]{display:none!important;}
+  </style>
+
+  <div x-data="{ tab: 'standings' }" x-cloak>
+    <div class="league-tabs">
+      <button @click="tab='standings'" :class="tab==='standings' ? 'league-tab active' : 'league-tab'">
+        <span>📊</span> Standings
+        {% if standings %}<span class="tab-badge">{{ standings|length }}</span>{% endif %}
       </button>
-      {% endfor %}
+      <button @click="tab='topscorers'" :class="tab==='topscorers' ? 'league-tab active' : 'league-tab'">
+        <span>⭐</span> Top Scorers
+        {% if topscorers %}<span class="tab-badge">{{ topscorers|length }}</span>{% endif %}
+      </button>
+      <button @click="tab='results'" :class="tab==='results' ? 'league-tab active' : 'league-tab'">
+        <span>🏒</span> Results
+        {% if games %}<span class="tab-badge">{{ games|length }}</span>{% endif %}
+      </button>
     </div>
 
     <!-- STANDINGS -->
