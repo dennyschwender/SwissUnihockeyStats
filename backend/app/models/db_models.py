@@ -283,6 +283,8 @@ class PlayerStatistics(Base):
     player_id = Column(Integer, ForeignKey("players.person_id"), nullable=False)
     season_id = Column(Integer, ForeignKey("seasons.id"), nullable=False)
     team_id = Column(Integer, nullable=True)  # Part of composite FK
+    team_name = Column(String, nullable=True)     # Club/team name text from API
+    league_abbrev = Column(String, nullable=True)  # League abbreviation from API (e.g. "NLB", "NLA")
     games_played = Column(Integer, default=0)
     goals = Column(Integer, default=0)
     assists = Column(Integer, default=0)

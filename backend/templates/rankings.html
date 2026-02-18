@@ -1,179 +1,55 @@
 {% extends "base.html" %}
 
-{% block title %}{{ t.rankings.title }} - {{ t.common.app_name }}{% endblock %}
+{% block title %}Rankings – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
-<div class="hero fade-in">
-    <h1>{{ t.rankings.title }}</h1>
-    <p>{{ t.rankings.subtitle }}</p>
+<div class="container" style="padding-top:2rem;padding-bottom:3rem;">
+  <h1 style="margin:0 0 1.5rem;font-size:2rem;font-weight:700;">📊 Top Scorers</h1>
+
+  {% if topscorers %}
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+      <thead>
+        <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
+          <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
+          <th style="padding:.6rem .75rem;text-align:left;">Player</th>
+          <th style="padding:.6rem .75rem;text-align:left;">Team</th>
+          <th style="padding:.6rem .5rem;text-align:center;">GP</th>
+          <th style="padding:.6rem .5rem;text-align:center;">G</th>
+          <th style="padding:.6rem .5rem;text-align:center;">A</th>
+          <th style="padding:.6rem .75rem;text-align:center;font-weight:700;">PTS</th>
+          <th style="padding:.6rem .5rem;text-align:center;">PIM</th>
+          <th style="padding:.6rem .5rem;text-align:center;">+/-</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in topscorers %}
+        <tr onclick="window.location='/{{ locale }}/player/{{ row.player_id }}'"
+          style="cursor:pointer;border-bottom:1px solid var(--gray-100);"
+          onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+          <td style="padding:.6rem .5rem;text-align:center;font-weight:600;color:var(--gray-500);">
+            {% if row.rank == 1 %}🥇{% elif row.rank == 2 %}🥈{% elif row.rank == 3 %}🥉{% else %}{{ row.rank }}{% endif %}
+          </td>
+          <td style="padding:.6rem .75rem;font-weight:500;">{{ row.player_name }}</td>
+          <td style="padding:.6rem .75rem;color:var(--gray-600);">{{ row.team_name }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;">{{ row.gp }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;">{{ row.g }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;">{{ row.a }}</td>
+          <td style="padding:.6rem .75rem;text-align:center;font-weight:700;font-size:1rem;">{{ row.pts }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;">{{ row.pim }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;{% if row.plus_minus > 0 %}color:#16a34a{% elif row.plus_minus < 0 %}color:#dc2626{% endif %}">
+            {{ "+" if row.plus_minus > 0 else "" }}{{ row.plus_minus }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:3rem;color:var(--gray-500);">
+    <p style="font-size:2rem">📊</p>
+    <p>No player statistics available yet.</p>
+  </div>
+  {% endif %}
 </div>
-
-<!-- Tab Navigation -->
-<div style="max-width: 1200px; margin: 2rem auto;" x-data="{ tab: 'standings', showCharts: true }">
-    <div style="display: flex; gap: 1rem; border-bottom: 2px solid var(--gray-200); margin-bottom: 2rem; align-items: center;">
-        <button 
-            @click="tab = 'standings'"
-            :class="{ 'active': tab === 'standings' }"
-            class="tab-button"
-            style="padding: 1rem 2rem; background: none; border: none; cursor: pointer; font-weight: 600; border-bottom: 3px solid transparent; transition: all 0.3s;"
-            :style="tab === 'standings' ? 'border-bottom-color: var(--swiss-red); color: var(--swiss-red);' : ''"
-        >
-            {{ t.rankings.standings }}
-        </button>
-        <button 
-            @click="tab = 'topscorers'"
-            :class="{ 'active': tab === 'topscorers' }"
-            class="tab-button"
-            style="padding: 1rem 2rem; background: none; border: none; cursor: pointer; font-weight: 600; border-bottom: 3px solid transparent; transition: all 0.3s;"
-            :style="tab === 'topscorers' ? 'border-bottom-color: var(--swiss-red); color: var(--swiss-red);' : ''"
-        >
-            {{ t.rankings.topscorers }}
-        </button>
-        
-        <!-- Chart/Table Toggle -->
-        <div style="margin-left: auto; display: flex; gap: 0.5rem; align-items: center;">
-            <span style="font-size: 0.875rem; color: var(--text-secondary);">View:</span>
-            <button 
-                @click="showCharts = !showCharts"
-                style="padding: 0.5rem 1rem; background: var(--bg-secondary); border: 2px solid var(--gray-300); border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem; font-weight: 600; transition: all 0.2s;"
-                :style="showCharts ? 'background: var(--swiss-red); color: white; border-color: var(--swiss-red);' : ''"
-            >
-                <span x-show="showCharts">📊 Charts</span>
-                <span x-show="!showCharts">📋 Table</span>
-            </button>
-        </div>
-    </div>
-    
-    <!-- Standings Tab -->
-    <div x-show="tab === 'standings'">
-        <!-- Chart View -->
-        <div x-show="showCharts" style="background: var(--bg-primary); border-radius: 0.5rem; padding: 2rem; box-shadow: 0 1px 3px var(--shadow-color);">
-            <canvas id="standingsChart" style="max-height: 400px;"></canvas>
-        </div>
-        
-        <!-- Table View -->
-        <div x-show="!showCharts" style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; background: var(--swiss-white); border-radius: 0.5rem; overflow: hidden;">
-                <thead style="background: var(--swiss-red); color: white;">
-                    <tr>
-                        <th style="padding: 1rem; text-align: left;">#</th>
-                        <th style="padding: 1rem; text-align: left;">Team</th>
-                        <th style="padding: 1rem; text-align: center;">GP</th>
-                        <th style="padding: 1rem; text-align: center;">W</th>
-                        <th style="padding: 1rem; text-align: center;">D</th>
-                        <th style="padding: 1rem; text-align: center;">L</th>
-                        <th style="padding: 1rem; text-align: center;">GF</th>
-                        <th style="padding: 1rem; text-align: center;">GA</th>
-                        <th style="padding: 1rem; text-align: center;">Pts</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for standing in standings %}
-                    <tr style="border-bottom: 1px solid var(--gray-200);">
-                        <td style="padding: 1rem; font-weight: 600;">{{ standing.rank }}</td>
-                        <td style="padding: 1rem; font-weight: 600;">{{ standing.team_name }}</td>
-                        <td style="padding: 1rem; text-align: center;">{{ standing.games_played }}</td>
-                        <td style="padding: 1rem; text-align: center;">{{ standing.wins }}</td>
-                        <td style="padding: 1rem; text-align: center;">{{ standing.draws }}</td>
-                        <td style="padding: 1rem; text-align: center;">{{ standing.losses }}</td>
-                        <td style="padding: 1rem; text-align: center;">{{ standing.goals_for }}</td>
-                        <td style="padding: 1rem; text-align: center;">{{ standing.goals_against }}</td>
-                        <td style="padding: 1rem; text-align: center; font-weight: 700; color: var(--swiss-red);">{{ standing.points }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            
-            {% if not standings %}
-            <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
-                <p>No standings available</p>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    
-    <!-- Top Scorers Tab -->
-    <div x-show="tab === 'topscorers'">
-        <!-- Chart View -->
-        <div x-show="showCharts" style="background: var(--bg-primary); border-radius: 0.5rem; padding: 2rem; box-shadow: 0 1px 3px var(--shadow-color);">
-            <canvas id="topscorersChart" style="max-height: 450px;"></canvas>
-        </div>
-        
-        <!-- Table View -->
-        <div x-show="!showCharts" style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; background: var(--swiss-white); border-radius: 0.5rem; overflow: hidden;">
-                <thead style="background: var(--swiss-red); color: white;">
-                    <tr>
-                        <th style="padding: 1rem; text-align: left;">#</th>
-                        <th style="padding: 1rem; text-align: left;">Player</th>
-                        <th style="padding: 1rem; text-align: left;">Team</th>
-                        <th style="padding: 1rem; text-align: center;">GP</th>
-                        <th style="padding: 1rem; text-align: center;">G</th>
-                        <th style="padding: 1rem; text-align: center;">A</th>
-                        <th style="padding: 1rem; text-align: center;">Pts</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for scorer in topscorers %}
-                    <tr style="border-bottom: 1px solid var(--gray-200);">
-                        <td style="padding: 1rem; font-weight: 600;">{{ scorer.rank }}</td>
-                        <td style="padding: 1rem; font-weight: 600;">{{ scorer.player_name }}</td>
-                        <td style="padding: 1rem;">{{ scorer.team_name }}</td>
-                        <td style="padding: 1rem; text-align: center;">{{ scorer.games_played }}</td>
-                        <td style="padding: 1rem; text-align: center;">{{ scorer.goals }}</td>
-                        <td style="padding: 1rem; text-align: center;">{{ scorer.assists }}</td>
-                        <td style="padding: 1rem; text-align: center; font-weight: 700; color: var(--swiss-red);">{{ scorer.points }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            
-            {% if not topscorers %}
-            <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
-                <p>No top scorers available</p>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-{% endblock %}
-
-{% block scripts %}
-<script>
-    // Initialize charts when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        // Standings Chart Data
-        const standingsData = [
-            {% for standing in standings %}
-            {
-                team: "{{ standing.team_name }}",
-                points: {{ standing.points }},
-                games: {{ standing.games_played }}
-            }{% if not loop.last %},{% endif %}
-            {% endfor %}
-        ];
-        
-        // Top Scorers Chart Data
-        const topscorersData = [
-            {% for scorer in topscorers %}
-            {
-                name: "{{ scorer.player_name }}",
-                goals: {{ scorer.goals }},
-                assists: {{ scorer.assists }},
-                points: {{ scorer.points }}
-            }{% if not loop.last %},{% endif %}
-            {% endfor %}
-        ];
-        
-        // Create charts
-        if (standingsData.length > 0) {
-            window.createStandingsChart('standingsChart', standingsData);
-        }
-        
-        if (topscorersData.length > 0) {
-            window.createTopScorersChart('topscorersChart', topscorersData);
-        }
-    });
-</script>
 {% endblock %}

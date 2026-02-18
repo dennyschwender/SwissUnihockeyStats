@@ -92,7 +92,18 @@ def index_leagues_path(season: int, events: bool, force: bool):
         index_events=events,
         force=force,
     )
-    click.echo(f"Done: leagues={stats['leagues']}  groups={stats['groups']}  games={stats['games']}  events={stats['events']}")
+    click.echo(f"Done: leagues={stats['leagues']}  groups={stats['groups']}  games={stats['games']}  team_names={stats['team_names']}  events={stats['events']}")
+
+
+@cli.command()
+@click.option("--season", default=2025, help="Season ID")
+@click.option("--force", is_flag=True, default=False, help="Force even if recently synced")
+def backfill_team_names(season: int, force: bool):
+    """Backfill Team.name for stub rows using the rankings API"""
+    click.echo(f"Backfilling team names for season {season} (force={force})...")
+    indexer = get_data_indexer()
+    n = indexer.backfill_team_names(season_id=season, force=force)
+    click.echo(f"Done: {n} team rows updated")
 
 
 @cli.command()

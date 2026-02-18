@@ -1,120 +1,109 @@
 {% extends "base.html" %}
 
-{% block title %}{{ team.text if team.text else 'Team Details' }} - SwissUnihockey{% endblock %}
-
-{% block description %}Details for {{ team.text if team.text else 'team' }} - roster, games, statistics{% endblock %}
-
-{% block og_title %}{{ team.text if team.text else 'Team' }} | SwissUnihockey{% endblock %}
-{% block og_description %}View roster and schedule for {{ team.text if team.text else 'this team' }}{% endblock %}
+{% block title %}{{ team.name if team else "Team" }} – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
-<div class="content-wrapper">
-    <!-- Back Button -->
-    <div style="margin-bottom: 1.5rem;">
-        <a href="/{{ locale }}/teams" style="color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
-            ← Back to Teams
+<div class="container" style="padding-top:2rem;padding-bottom:3rem;">
+
+  {% if error_message %}
+  <div style="margin-bottom:1.5rem;padding:1rem 1.5rem;background:#fef2f2;border:1px solid #fecaca;border-radius:.5rem;color:#b91c1c;">
+    ⚠ {{ error_message }}
+  </div>
+  {% endif %}
+
+  <div style="margin-bottom:2rem;">
+    <a href="javascript:history.back()" style="color:var(--gray-500);font-size:.875rem;text-decoration:none;">← Back</a>
+    <h1 style="margin:.5rem 0 0;font-size:2rem;font-weight:700;">👥 {{ team.name if team else "Team" }}</h1>
+  </div>
+
+  {% if team %}
+  <div x-data="{ tab: 'roster' }">
+    <div style="display:flex;gap:.25rem;border-bottom:2px solid var(--gray-200);margin-bottom:1.5rem;">
+      {% for tid, tlabel in [('roster','Roster & Stats'),('results','Recent Results')] %}
+      <button @click="tab='{{ tid }}'"
+        :style="tab==='{{ tid }}' ? 'border-bottom:2px solid var(--swiss-red,#e11d48);color:var(--swiss-red,#e11d48);margin-bottom:-2px' : 'color:var(--gray-600)'"
+        style="padding:.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:.9rem;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-2px;">
+        {{ tlabel }}
+      </button>
+      {% endfor %}
+    </div>
+
+    <!-- ROSTER -->
+    <div x-show="tab==='roster'">
+      {% if team.roster %}
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+          <thead>
+            <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
+              <th style="padding:.6rem .5rem;text-align:center;">#</th>
+              <th style="padding:.6rem .75rem;text-align:left;">Player</th>
+              <th style="padding:.6rem .75rem;text-align:left;">Position</th>
+              <th style="padding:.6rem .5rem;text-align:center;">GP</th>
+              <th style="padding:.6rem .5rem;text-align:center;">G</th>
+              <th style="padding:.6rem .5rem;text-align:center;">A</th>
+              <th style="padding:.6rem .75rem;text-align:center;font-weight:700;">PTS</th>
+              <th style="padding:.6rem .5rem;text-align:center;">PIM</th>
+              <th style="padding:.6rem .5rem;text-align:center;">+/-</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in team.roster %}
+            <tr onclick="window.location='/{{ locale }}/player/{{ p.player_id }}'"
+              style="cursor:pointer;border-bottom:1px solid var(--gray-100);"
+              onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+              <td style="padding:.6rem .5rem;text-align:center;color:var(--gray-500);">{{ p.number or "—" }}</td>
+              <td style="padding:.6rem .75rem;font-weight:500;">{{ p.name }}</td>
+              <td style="padding:.6rem .75rem;color:var(--gray-600);">{{ p.position or "—" }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;">{{ p.gp }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;">{{ p.g }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;">{{ p.a }}</td>
+              <td style="padding:.6rem .75rem;text-align:center;font-weight:700;">{{ p.pts }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;">{{ p.pim }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;{% if p.plus_minus > 0 %}color:#16a34a{% elif p.plus_minus < 0 %}color:#dc2626{% endif %}">
+                {{ "+" if p.plus_minus > 0 else "" }}{{ p.plus_minus }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
+        <p style="font-size:2rem">👤</p>
+        <p>No roster data available for this team.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- RECENT RESULTS -->
+    <div x-show="tab==='results'">
+      {% if team.recent_games %}
+      <div style="display:flex;flex-direction:column;gap:.5rem;">
+        {% for g in team.recent_games %}
+        <a href="/{{ locale }}/game/{{ g.game_id }}" style="text-decoration:none;color:inherit;">
+          <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;"
+               onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
+            <span style="width:6rem;font-size:.8rem;color:var(--gray-500);">{{ g.date }}</span>
+            <span style="width:2rem;text-align:center;font-weight:700;border-radius:.25rem;padding:.15rem .4rem;
+              {% if g.result=='W' %}background:#dcfce7;color:#15803d{% elif g.result=='L' %}background:#fee2e2;color:#b91c1c{% else %}background:#f3f4f6;color:#374151{% endif %}">
+              {{ g.result }}
+            </span>
+            <span style="margin:0 .5rem;font-size:.8rem;color:var(--gray-500);">{{ g.home_away }}</span>
+            <span style="flex:1;font-weight:500;">{{ g.opponent_name }}</span>
+            <span style="font-weight:700;font-size:1.1rem;font-variant-numeric:tabular-nums;">{{ g.score }}</span>
+          </div>
         </a>
-    </div>
-
-    {% if error_message %}
-    <div style="padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 8px; margin-bottom: 1.5rem;">
-        <strong>Error:</strong> {{ error_message }}
-    </div>
-    {% endif %}
-
-    <!-- Team Header -->
-    <div class="card" style="margin-bottom: 2rem;">
-        <div style="display: flex; align-items: center; gap: 1.5rem;">
-            {% if team.logo %}
-            <img src="{{ team.logo }}" alt="{{ team.text if team.text else 'Team' }} logo" style="width: 80px; height: 80px; object-fit: contain;">
-            {% else %}
-            <div class="card-icon" style="font-size: 3rem;">👥</div>
-            {% endif %}
-            <div>
-                <h1 style="margin: 0;">{{ team.text if team.text else 'Team Details' }}</h1>
-                {% if team.club_name %}
-                <p style="margin: 0.5rem 0 0 0; color: var(--gray-600);">
-                    🏢 {{ team.club_name }}
-                </p>
-                {% elif team.set_in_context and team.set_in_context.club_name %}
-                <p style="margin: 0.5rem 0 0 0; color: var(--gray-600);">
-                    🏢 {{ team.set_in_context.club_name }}
-                </p>
-                {% endif %}
-                {% if team.set_in_context and team.set_in_context.league_name %}
-                <p style="margin: 0.25rem 0 0 0; color: var(--gray-600);">
-                    🏆 {{ team.set_in_context.league_name }}
-                </p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Players Section -->
-    <h2 style="margin: 2rem 0 1rem 0;">Roster</h2>
-    
-    {% if players %}
-    <div class="cards-grid">
-        {% for player in players %}
-        {% set player_id = player.id if player.id else (player.data.player.id if player.data and player.data.player else '') %}
-        {% set player_name = player.cells[0].text[0] if player.cells and player.cells|length > 0 else (player.text if player.text else ((player.given_name if player.given_name else '') ~ ' ' ~ (player.family_name if player.family_name else ''))) %}
-        {% set jersey = player.cells[1].text[0] if player.cells and player.cells|length > 1 else (player.jersey_number if player.jersey_number else '') %}
-        {% set position = player.cells[2].text[0] if player.cells and player.cells|length > 2 else (player.position if player.position else '') %}
-        <div class="card" onclick="window.location='/{{ locale }}/player/{{ player_id }}'" style="cursor: pointer;">
-            <div class="card-icon">👤</div>
-            <h3>{{ player_name }}</h3>
-            {% if jersey or position %}
-            <p style="color: var(--gray-600); font-size: 0.875rem;">
-                {% if jersey %}#{{ jersey }}{% endif %}
-                {% if position %}{{ (' - ' ~ position) if jersey else position }}{% endif %}
-            </p>
-            {% endif %}
-        </div>
         {% endfor %}
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
+        <p style="font-size:2rem">📅</p>
+        <p>No completed games for this team yet.</p>
+      </div>
+      {% endif %}
     </div>
-    {% else %}
-    <div style="text-align: center; padding: 2rem; color: var(--gray-600); background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-100) 100%); border-radius: 8px; border: 1px dashed var(--gray-300);">
-        <div style="font-size: 3rem; margin-bottom: 0.5rem;">📋</div>
-        <p style="font-weight: 600; margin-bottom: 0.5rem;">No Roster Information Available</p>
-        <p style="font-size: 0.875rem;">This team does not have roster data in the system</p>
-    </div>
-    {% endif %}
 
-    <!-- Recent Games Section -->
-    <h2 style="margin: 2rem 0 1rem 0;">Recent Games</h2>
-    
-    {% if games %}
-    <div class="card">
-        {% for game in games %}
-        {% set game_id = game.id if game.id else (game.data.game_id if game.data and game.data.game_id else '') %}
-        {% set home_team = game.cells[1].text[0] if game.cells and game.cells|length > 1 else (game.home_team if game.home_team else 'Home') %}
-        {% set away_team = game.cells[2].text[0] if game.cells and game.cells|length > 2 else (game.away_team if game.away_team else 'Away') %}
-        {% set score = game.cells[3].text[0] if game.cells and game.cells|length > 3 else (game.score if game.score else '') %}
-        {% set date = game.cells[0].text[0] if game.cells and game.cells|length > 0 else (game.date if game.get('date') else '') %}
-        <div style="padding: 1rem; border-bottom: 1px solid var(--gray-200); {% if loop.last %}border-bottom: none;{% endif %} cursor: pointer;"
-             onclick="window.location='/{{ locale }}/game/{{ game_id }}'">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <strong>{{ home_team }} vs {{ away_team }}</strong>
-                    {% if score %}
-                    <p style="margin: 0.25rem 0 0 0; color: var(--gray-600);">
-                        Score: {{ score }}
-                    </p>
-                    {% endif %}
-                </div>
-                <div style="text-align: right; color: var(--gray-600); font-size: 0.875rem;">
-                    {% if date %}{{ date }}{% endif %}
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <div style="text-align: center; padding: 2rem; color: var(--gray-600); background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-100) 100%); border-radius: 8px; border: 1px dashed var(--gray-300);">
-        <div style="font-size: 3rem; margin-bottom: 0.5rem;">🏒</div>
-        <p style="font-weight: 600; margin-bottom: 0.5rem;">No Recent Games</p>
-        <p style="font-size: 0.875rem;">No games found for this team</p>
-    </div>
-    {% endif %}
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -1,139 +1,78 @@
 {% extends "base.html" %}
 
-{% block title %}{{ t.leagues.title }} - {{ t.common.app_name }}{% endblock %}
-{% block description %}Explore Swiss floorball leagues across all categories - men's, women's, and mixed competitions. Complete league standings and statistics.{% endblock %}
-{% block og_title %}{{ t.leagues.title }} - SwissUnihockey{% endblock %}
-{% block og_description %}Complete overview of Swiss floorball leagues with standings, statistics, and competition details.{% endblock %}
+{% block title %}Leagues – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
-<div class="hero fade-in">
-    <h1>{{ t.leagues.title }}</h1>
-    <p>{{ t.leagues.subtitle }}</p>
-</div>
-
-<!-- Leagues List -->
-<div id="leagues-list" style="margin-top: 2rem;">
-    {% if gender_leagues %}
-    <!-- Gender names and icons -->
-    {% set gender_info = {
-        'men': {'name': 'Men', 'icon': '👨', 'color': '#0066cc'},
-        'women': {'name': 'Women', 'icon': '👩', 'color': '#cc0066'},
-        'mixed': {'name': 'Mixed', 'icon': '👥', 'color': '#6600cc'}
-    } %}
-    
-    <!-- League level names -->
-    {% set league_names = {
-        1: 'NLA (National League A)',
-        2: 'NLB (National League B)',
-        3: '1. Liga',
-        4: '2. Liga',
-        5: '3. Liga',
-        6: '4. Liga',
-        24: 'L-UPL (Unihockey Prime League)'
-    } %}
-    
-    <!-- Iterate through each gender category -->
-    {% for gender, league_levels in gender_leagues.items() %}
-        {% set info = gender_info.get(gender, {'name': 'Other', 'icon': '🏆', 'color': '#666'}) %}
-        
-        <!-- Gender Section Header -->
-        <div style="margin: 3rem 0 1.5rem 0; padding: 1rem; background: linear-gradient(135deg, {{ info.color }}15, {{ info.color }}05); border-left: 5px solid {{ info.color }}; border-radius: 8px;">
-            <h2 style="margin: 0; color: {{ info.color }}; display: flex; align-items: center; gap: 0.75rem;">
-                <span style="font-size: 2rem;">{{ info.icon }}</span>
-                <span>{{ info.name }}</span>
-            </h2>
-        </div>
-        
-        <!-- Iterate through league levels within this gender -->
-        {% for league_num, leagues in league_levels.items() %}
-            <!-- League Level Header -->
-            <h3 style="margin: 1.5rem 0 1rem 0; color: var(--gray-700); padding-left: 0.5rem; border-left: 3px solid {{ info.color }};">
-                {% if league_num == 1 %}🥇
-                {% elif league_num == 2 %}🥈
-                {% elif league_num == 3 %}🥉
-                {% elif league_num == 24 %}🌟
-                {% else %}🏅
-                {% endif %}
-                {{ league_names.get(league_num, 'League ' ~ league_num) }}
-            </h3>
-            
-            <!-- Display leagues/groups within this level -->
-            <div class="cards-grid" style="margin-bottom: 1rem;">
-                {% for league in leagues %}
-                <div class="card" style="position: relative; cursor: pointer; border-top: 3px solid {{ info.color }};"
-                     onclick="window.location='/{{ locale }}/league/{{ league._index }}'">
-                    <!-- Favorite Button -->
-                    <button 
-                        @click.stop="toggleFavorite('leagues', {{ league._index }}, '{{ league.text }}', {})"
-                        :class="isFavorite('leagues', {{ league._index }}) ? 'active' : 'inactive'"
-                        class="favorite-btn favorite-indicator"
-                        title="Add to favorites"
-                        onclick="event.stopPropagation();"
-                    >⭐</button>
-                    
-                    <div class="card-icon" style="color: {{ info.color }};">{{ info.icon }}</div>
-                    <h3 style="font-size: 1rem;">{{ league.text }}</h3>
-                    {% if league.set_in_context %}
-                    <p style="color: var(--gray-600); font-size: 0.813rem; margin-top: 0.5rem;">
-                        {% if league.set_in_context.get('group') %}
-                        📍 {{ league.set_in_context.get('group') }}
-                        {% endif %}
-                        {% if league._game_class in [12, 22] %}
-                        <br>🔰 U21
-                        {% endif %}
-                    </p>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
+<div class="container" style="padding-top:2rem;padding-bottom:3rem;">
+  <!-- Header row -->
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+    <h1 style="margin:0;font-size:2rem;font-weight:700;">🏆 Leagues</h1>
+    {% if seasons %}
+    <form method="get" style="display:flex;align-items:center;gap:.5rem;">
+      <label for="season-select" style="font-size:.85rem;font-weight:600;color:var(--gray-500,#6b7280);">
+        Season
+      </label>
+      <select id="season-select" name="season"
+              onchange="this.form.submit()"
+              style="padding:.35rem .75rem;border:1px solid var(--gray-300,#d1d5db);
+                     border-radius:.375rem;font-size:.9rem;background:var(--card-bg,white);
+                     color:inherit;cursor:pointer;">
+        {% for s in seasons %}
+        <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>
+          {{ s.name }}
+        </option>
         {% endfor %}
-    {% endfor %}
-    
-    {% elif leagues %}
-    <!-- Fallback to ungrouped display -->
-    <div class="cards-grid">
-        {% for league in leagues %}
-        <div class="card" style="position: relative; cursor: pointer;"
-             onclick="window.location='/{{ locale }}/league/{{ loop.index }}'">
-            <!-- Favorite Button -->
-            <button 
-                @click.stop="toggleFavorite('leagues', {{ loop.index }}, '{{ league.text }}', {})"
-                :class="isFavorite('leagues', {{ loop.index }}) ? 'active' : 'inactive'"
-                class="favorite-btn favorite-indicator"
-                title="Add to favorites"
-                onclick="event.stopPropagation();"
-            >⭐</button>
-            
-            <div class="card-icon">🏆</div>
-            <h3>{{ league.text }}</h3>
-            {% if league.set_in_context %}
-            <p style="color: var(--gray-600); font-size: 0.875rem;">
-                {% if league.set_in_context.get('league') %}
-                League: {{ league.set_in_context.get('league') }}<br>
-                {% endif %}
-                {% if league.set_in_context.get('game_class') %}
-                Class: {{ league.set_in_context.get('game_class') }}<br>
-                {% endif %}
-                {% if league.set_in_context.get('mode') %}
-                Mode: {{ league.set_in_context.get('mode', 'N/A') }}
-                {% endif %}
-            </p>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <!-- Loading skeleton -->
-    <div class="cards-grid">
-        {% for i in range(6) %}
-        <div class="skeleton-card">
-            <div class="skeleton skeleton-avatar" style="margin: 0 auto 1rem; width: 64px; height: 64px;"></div>
-            <div class="skeleton skeleton-title" style="margin: 0 auto 1rem;"></div>
-            <div class="skeleton skeleton-text"></div>
-            <div class="skeleton skeleton-text" style="width: 70%;"></div>
-        </div>
-        {% endfor %}
-    </div>
+      </select>
+    </form>
     {% endif %}
+  </div>
+
+  {% if gender_tiers %}
+    {% for gender, tier_groups in gender_tiers.items() %}
+    <div style="margin-bottom:3rem;">
+      <!-- Gender heading -->
+      <h2 style="font-size:1.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+                 color:var(--primary,#2563eb);border-bottom:2px solid var(--primary,#2563eb);
+                 padding-bottom:.4rem;margin-bottom:1.25rem;">
+        {% if gender == 'men' %}Men{% elif gender == 'women' %}Women{% elif gender == 'mixed' %}Mixed{% else %}Other{% endif %}
+      </h2>
+
+      {% for tier_group in tier_groups %}
+      <div style="margin-bottom:1.75rem;">
+        <!-- Tier sub-heading -->
+        <h3 style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;
+                   color:var(--gray-400,#9ca3af);margin-bottom:.6rem;display:flex;align-items:center;gap:.5rem;">
+          <span style="flex:1;height:1px;background:var(--gray-200,#e5e7eb);display:inline-block;"></span>
+          {{ tier_group.label }}
+          <span style="flex:1;height:1px;background:var(--gray-200,#e5e7eb);display:inline-block;"></span>
+        </h3>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.65rem;">
+          {% for league in tier_group.leagues %}
+          <a href="/{{ locale }}/league/{{ league.id }}" style="text-decoration:none;color:inherit;">
+            <div style="background:var(--card-bg,white);border:1px solid var(--gray-200,#e5e7eb);
+                        border-radius:.5rem;padding:.9rem 1.1rem;transition:box-shadow .15s,transform .15s;"
+                 onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.1)';this.style.transform='translateY(-1px)'"
+                 onmouseout="this.style.boxShadow='';this.style.transform=''">
+              <div style="font-weight:600;font-size:.95rem;margin-bottom:.2rem;">{{ league.name }}</div>
+              {% if league.group_count %}
+              <div style="font-size:.75rem;color:var(--gray-500,#6b7280);">
+                {{ league.group_count }} group{{ "s" if league.group_count != 1 else "" }}
+              </div>
+              {% endif %}
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  {% else %}
+  <div style="text-align:center;padding:3rem;color:var(--gray-500,#6b7280);">
+    <p style="font-size:2rem">🏆</p>
+    <p>No leagues available in the database.</p>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

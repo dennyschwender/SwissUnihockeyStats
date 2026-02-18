@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libc-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY requirements.txt .
+# Copy requirements from backend directory
+COPY backend/requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --user -r requirements.txt
@@ -44,11 +44,14 @@ WORKDIR /app
 # Copy Python dependencies from builder
 COPY --from=builder /root/.local /home/appuser/.local
 
-# Copy application code
-COPY --chown=appuser:appuser api/ ./api/
+# Copy application code from backend directory
+COPY --chown=appuser:appuser backend/app/ ./app/
+COPY --chown=appuser:appuser backend/manage.py ./
+COPY --chown=appuser:appuser backend/.env.example ./
+COPY --chown=appuser:appuser backend/locales/ ./locales/
+COPY --chown=appuser:appuser backend/static/ ./static/
+COPY --chown=appuser:appuser backend/templates/ ./templates/
 COPY --chown=appuser:appuser scripts/ ./scripts/
-COPY --chown=appuser:appuser config.ini ./
-COPY --chown=appuser:appuser .env.example ./
 
 # Create cache directory with proper permissions
 RUN mkdir -p /app/data/cache && \
@@ -62,7 +65,10 @@ ENV PATH=/home/appuser/.local/bin:$PATH
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "from api import SwissUnihockeyClient; client = SwissUnihockeyClient(); client.get_clubs()" || exit 1
+    CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5)" || exit 1
 
-# Default command: Python shell with API client available
-CMD ["python", "-i", "-c", "from api import SwissUnihockeyClient; client = SwissUnihockeyClient(); print('SwissUnihockey API Client ready! Use: client.get_clubs(), client.get_leagues(), etc.')"]
+# Expose port
+EXPOSE 8000
+
+# Default command: Run FastAPI server
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

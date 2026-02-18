@@ -10,6 +10,7 @@ import hmac
 import uuid
 import logging
 import traceback
+from typing import Optional
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -459,6 +460,7 @@ _TASK_META = {
     "games":        "Index Games",
     "events":       "Index Game Events (finished games)",
     "player_stats": "Index Player Statistics",
+    "team_names":   "Backfill Team Names (from rankings API)",
     "leagues_path": "Index Leagues Path (leagues + groups + games)",
     "full":         "Full Index (clubs path + leagues path)",
 }
@@ -834,6 +836,13 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             stats["games"] = games_n
             push("ok", f"Games: {games_n}")
 
+        # ── BACKFILL TEAM NAMES ────────────────────────────────────────────
+        if task in ("team_names", "games", "leagues_path", "full"):
+            push("info", "Backfilling team names from rankings API...")
+            n = indexer.backfill_team_names(season, force=force)
+            stats["team_names"] = n
+            push("ok", f"Team names backfilled: {n}")
+
         # ── GAME EVENTS ────────────────────────────────────────────────────
         if task in ("events", "full"):
             from datetime import datetime as _dt
@@ -1004,174 +1013,144 @@ async def club_detail(request: Request, locale: str, club_id: int):
 
 
 @app.get("/{locale}/leagues", response_class=HTMLResponse)
-async def leagues_page(request: Request, locale: str):
-    """Leagues listing page"""
-    # Use cached data instead of API call (loads on-demand if needed)
-    leagues_list = await get_cached_leagues()
-    
-    # Group leagues: First by gender/category, then by league level, then by groups
+async def leagues_page(request: Request, locale: str, season: Optional[int] = None):
+    """Leagues listing page — DB-backed, ordered by admin tier categorization"""
+    from app.services.stats_service import get_leagues_from_db, get_all_seasons
+    from app.services.data_indexer import LEAGUE_TIERS, _DEFAULT_TIER
     from collections import defaultdict
-    
-    # Structure: {gender: {league_level: [league_entries]}}
-    gender_leagues = defaultdict(lambda: defaultdict(list))
-    
-    for idx, league in enumerate(leagues_list, 1):
-        league_num = league.get("set_in_context", {}).get("league")
-        game_class = league.get("set_in_context", {}).get("game_class")
-        
-        if league_num and game_class:
-            # Determine gender/category from game_class
-            if game_class in [11, 12]:  # Men and Men U21
-                gender = "men"
-            elif game_class in [21, 22]:  # Women and Women U21
-                gender = "women"
-            elif game_class == 31:  # Mixed
-                gender = "mixed"
-            else:
-                gender = "other"
-            
-            league_with_index = {**league, "_index": idx, "_game_class": game_class}
-            gender_leagues[gender][league_num].append(league_with_index)
-    
-    # Sort each gender's leagues by level, and sort leagues within each level
-    for gender in gender_leagues:
-        gender_leagues[gender] = dict(sorted(gender_leagues[gender].items()))
-    
-    # Order genders: Men, Women, Mixed, Other
-    gender_order = ["men", "women", "mixed", "other"]
-    ordered_gender_leagues = {
-        gender: gender_leagues[gender] 
-        for gender in gender_order 
-        if gender in gender_leagues
+
+    all_seasons = get_all_seasons()
+    # Resolve selected season: use query param, else fall back to current
+    if season is None:
+        current = next((s for s in all_seasons if s["current"]), None)
+        season = current["id"] if current else (all_seasons[0]["id"] if all_seasons else 2025)
+
+    leagues_list = get_leagues_from_db(season_id=season)
+
+    # Tier → human-readable label (matches admin categorization)
+    TIER_DISPLAY: dict[int, str] = {
+        1: "NLA / L-UPL",
+        2: "NLB",
+        3: "1. Liga",
+        4: "2. Liga",
+        5: "3. Liga",
+        6: "4. / 5. Liga & Cups",
+        7: "Youth & Regional",
     }
-    
+
+    # Gender from game_class
+    gender_map = {11: "men", 12: "men", 21: "women", 22: "women", 31: "mixed"}
+
+    # Build: gender → tier → [leagues]
+    by_gender_tier: dict[str, dict[int, list]] = defaultdict(lambda: defaultdict(list))
+    for lg in leagues_list:
+        gender = gender_map.get(lg["game_class"], "other")
+        tier = LEAGUE_TIERS.get(lg["league_id"], _DEFAULT_TIER)
+        by_gender_tier[gender][tier].append(lg)
+
+    # Sort leagues within each tier by name
+    gender_order = ["men", "women", "mixed", "other"]
+    ordered = {}
+    for g in gender_order:
+        if g not in by_gender_tier:
+            continue
+        tier_dict = by_gender_tier[g]
+        ordered[g] = [
+            {"tier": t, "label": TIER_DISPLAY.get(t, f"Tier {t}"), "leagues": sorted(tier_dict[t], key=lambda x: x["name"])}
+            for t in sorted(tier_dict.keys())
+        ]
+
+    # Resolve display name for selected season
+    selected_season_name = next((s["name"] for s in all_seasons if s["id"] == season), str(season))
+
     return templates.TemplateResponse(
         "leagues.html",
         {
             "request": request,
             "locale": locale,
             "t": get_translations(locale),
-            "leagues": leagues_list,  # Keep original for backwards compatibility
-            "gender_leagues": ordered_gender_leagues
-        }
+            "gender_tiers": ordered,
+            "seasons": all_seasons,
+            "selected_season": season,
+            "selected_season_name": selected_season_name,
+        },
     )
 
 
 @app.get("/{locale}/league/{league_id}", response_class=HTMLResponse)
 async def league_detail(request: Request, locale: str, league_id: int):
-    """League detail page with standings, teams, and top scorers"""
-    client = get_swissunihockey_client()
+    """League detail page — standings + top scorers from DB"""
+    from app.services.stats_service import (
+        get_league_by_id,
+        get_league_standings,
+        get_league_top_scorers,
+        get_recent_games,
+    )
+    from app.services.database import get_database_service
+    from app.models.db_models import Game, LeagueGroup
+
+    league_data = get_league_by_id(league_id)
     error_message = None
-    league_data = {}
-    teams = []
-    standings = []
-    topscorers = []
-    games = []
-    
-    try:
-        # Get league from cache
-        all_leagues = await get_cached_leagues()
-        
-        # Try multiple ways to find the league:
-        # 1. By league_id in set_in_context
-        matching_leagues = [
-            l for l in all_leagues
-            if l.get("set_in_context", {}).get("league_id") == league_id
-        ]
-        
-        # 2. If not found, try by top-level id field
-        if not matching_leagues:
-            matching_leagues = [
-                l for l in all_leagues
-                if l.get("id") == league_id
-            ]
-        
-        # 3. If still not found and league_id is small (< 1000), try by index
-        if not matching_leagues and league_id < 1000 and league_id <= len(all_leagues):
-            matching_leagues = [all_leagues[league_id - 1]]  # Convert to 0-based index
-        
-        if matching_leagues:
-            league_data = matching_leagues[0]
-            # Extract the actual league parameters from the data for API calls
-            actual_league = league_data.get("set_in_context", {}).get("league")
-            game_class = league_data.get("set_in_context", {}).get("game_class")
-            league_mode = league_data.get("set_in_context", {}).get("mode", "1")
-            
-            # Store these for template use
-            league_data["_league_param"] = actual_league
-            league_data["_game_class_param"] = game_class
-            
-            logger.info(f"Found league: {league_data.get('text')} (league={actual_league}, game_class={game_class}, mode={league_mode})")
-            current_season = get_current_season()
-            logger.info(f"API parameters: league={actual_league}, game_class={game_class}, mode={league_mode}, season={current_season}")
-            
-            # Fetch teams for this league
-            try:
-                logger.info(f"Fetching teams for league {actual_league}, game_class {game_class}")
-                teams_data = client.get_teams(league=actual_league, game_class=game_class, mode=league_mode, season=current_season)
-                logger.info(f"Teams response type: {type(teams_data)}, keys: {teams_data.keys() if isinstance(teams_data, dict) else 'N/A'}")
-                # API v2 returns data.regions[0].rows structure
-                teams = teams_data.get("entries", [])
-                if not teams and isinstance(teams_data, dict):
-                    regions = teams_data.get("data", {}).get("regions", [])
-                    teams = regions[0].get("rows", []) if regions else []
-                teams = teams[:50]
-                logger.info(f"Loaded {len(teams)} teams")
-            except Exception as team_error:
-                logger.warning(f"Could not load teams for league {actual_league}: {team_error}")
-            
-            # Fetch standings
-            try:
-                logger.info(f"Fetching standings for league {actual_league}, game_class {game_class}")
-                standings_data = client.get_rankings(league=actual_league, game_class=game_class, mode=league_mode, season=current_season)
-                logger.info(f"Standings response type: {type(standings_data)}, keys: {standings_data.keys() if isinstance(standings_data, dict) else 'N/A'}")
-                # API v2 returns data.regions[0].rows structure
-                standings = standings_data.get("entries", [])
-                if not standings and isinstance(standings_data, dict):
-                    regions = standings_data.get("data", {}).get("regions", [])
-                    standings = regions[0].get("rows", []) if regions else []
-                standings = standings[:30]
-                logger.info(f"Loaded {len(standings)} standings entries")
-            except Exception as standings_error:
-                logger.warning(f"Could not load standings for league {actual_league}: {standings_error}")
-            
-            # Fetch top scorers
-            try:
-                logger.info(f"Fetching top scorers for league {actual_league}, game_class {game_class}")
-                topscorers_data = client.get_topscorers(league=actual_league, game_class=game_class, mode=league_mode, season=current_season)
-                logger.info(f"Top scorers response type: {type(topscorers_data)}, keys: {topscorers_data.keys() if isinstance(topscorers_data, dict) else 'N/A'}")
-                # API v2 returns data.regions[0].rows structure
-                topscorers = topscorers_data.get("entries", [])
-                if not topscorers and isinstance(topscorers_data, dict):
-                    regions = topscorers_data.get("data", {}).get("regions", [])
-                    topscorers = regions[0].get("rows", []) if regions else []
-                topscorers = topscorers[:30]
-                logger.info(f"Loaded {len(topscorers)} top scorers")
-            except Exception as scorers_error:
-                logger.warning(f"Could not load top scorers for league {actual_league}: {scorers_error}")
-            
-            # Fetch recent games
-            try:
-                logger.info(f"Fetching games for league {actual_league}, game_class {game_class}")
-                games_data = client.get_games(league=actual_league, game_class=game_class, mode=league_mode, season=current_season)
-                logger.info(f"Games response type: {type(games_data)}, keys: {games_data.keys() if isinstance(games_data, dict) else 'N/A'}")
-                # API v2 returns data.regions[0].rows structure
-                games = games_data.get("entries", [])
-                if not games and isinstance(games_data, dict):
-                    regions = games_data.get("data", {}).get("regions", [])
-                    games = regions[0].get("rows", []) if regions else []
-                games = games[:20]
-                logger.info(f"Loaded {len(games)} games")
-            except Exception as games_error:
-                logger.warning(f"Could not load games for league {actual_league}: {games_error}")
-        else:
-            error_message = f"League with ID {league_id} not found. Please try selecting from the leagues list."
-            logger.warning(f"League {league_id} not found. Total leagues available: {len(all_leagues)}")
-    
-    except Exception as e:
-        logger.error(f"Error fetching league {league_id}: {e}")
-        error_message = f"Could not load league details: {str(e)}"
-    
+
+    if league_data is None:
+        error_message = f"League with ID {league_id} not found."
+        return templates.TemplateResponse(
+            "league_detail.html",
+            {
+                "request": request,
+                "locale": locale,
+                "t": get_translations(locale),
+                "league": {},
+                "standings": [],
+                "topscorers": [],
+                "games": [],
+                "error_message": error_message,
+            },
+        )
+
+    standings = get_league_standings(league_id)
+    topscorers = get_league_top_scorers(league_id, limit=25)
+
+    # Recent results for this league
+    db = get_database_service()
+    recent_games = []
+    with db.session_scope() as session:
+        from app.models.db_models import Team
+        group_ids = [g["id"] for g in league_data.get("groups", [])]
+        if group_ids:
+            games_raw = (
+                session.query(Game)
+                .filter(
+                    Game.group_id.in_(group_ids),
+                    Game.home_score.isnot(None),
+                )
+                .order_by(Game.game_date.desc())
+                .limit(20)
+                .all()
+            )
+            team_ids = set()
+            for g in games_raw:
+                team_ids.add(g.home_team_id)
+                team_ids.add(g.away_team_id)
+            team_names: dict = {}
+            for t in session.query(Team).filter(
+                Team.id.in_(team_ids),
+                Team.season_id == league_data["season_id"],
+            ).all():
+                team_names[t.id] = t.name or t.text or f"Team {t.id}"
+
+            for g in games_raw:
+                recent_games.append({
+                    "game_id": g.id,
+                    "date": g.game_date.strftime("%Y-%m-%d") if g.game_date else "",
+                    "home_team": team_names.get(g.home_team_id, f"Team {g.home_team_id}"),
+                    "away_team": team_names.get(g.away_team_id, f"Team {g.away_team_id}"),
+                    "home_team_id": g.home_team_id,
+                    "away_team_id": g.away_team_id,
+                    "home_score": g.home_score,
+                    "away_score": g.away_score,
+                })
+
     return templates.TemplateResponse(
         "league_detail.html",
         {
@@ -1179,12 +1158,11 @@ async def league_detail(request: Request, locale: str, league_id: int):
             "locale": locale,
             "t": get_translations(locale),
             "league": league_data,
-            "teams": teams,
             "standings": standings,
             "topscorers": topscorers,
-            "games": games,
-            "error_message": error_message
-        }
+            "games": recent_games,
+            "error_message": error_message,
+        },
     )
 
 
@@ -1262,404 +1240,165 @@ async def teams_search(request: Request, locale: str, q: str = "", mode: str = "
 # ==================== Detail Pages ====================
 
 @app.get("/{locale}/team/{team_id}", response_class=HTMLResponse)
-async def team_detail(request: Request, locale: str, team_id: int, league: int = None, game_class: int = None):
-    """Team detail page"""
-    client = get_swissunihockey_client()
+async def team_detail(request: Request, locale: str, team_id: int, season: int = None):
+    """Team detail page — roster + stats + recent results from DB"""
+    from app.services.stats_service import get_team_detail
+
+    team = get_team_detail(team_id, season_id=season)
     error_message = None
-    team_data = {}
-    players = []
-    games = []
-    
-    try:
-        current_season = get_current_season()
-        # If we have league and game_class, fetch team info from teams API
-        if league is not None and game_class is not None:
-            try:
-                teams_data = client.get_teams(league=league, game_class=game_class, season=current_season)
-                regions = teams_data.get("data", {}).get("regions", [])
-                if regions:
-                    all_teams = regions[0].get("rows", [])
-                    # Find our team in the list
-                    matching_teams = [t for t in all_teams if t.get("id") == team_id]
-                    if matching_teams:
-                        team_raw = matching_teams[0]
-                        # Extract team name from cells[0].text[0]
-                        team_name = team_raw.get("cells", [{}])[0].get("text", [f"Team {team_id}"])[0]
-                        team_data = {
-                            "id": team_id,
-                            "text": team_name,
-                            "club_name": team_raw.get("cells", [{}])[0].get("text", [""])[0] if len(team_raw.get("cells", [])) > 0 else ""
-                        }
-                        logger.info(f"Found team: {team_name}")
-            except Exception as team_error:
-                logger.warning(f"Could not load team from teams API: {team_error}")
-        
-        # Try to fetch players for this team
-        try:
-            players_data = client.get_players(team=team_id, season=current_season)
-            logger.info(f"Players response type: {type(players_data)}, keys: {players_data.keys() if isinstance(players_data, dict) else 'N/A'}")
-            
-            # If we don't have team_data yet, try to extract from players response
-            if not team_data and isinstance(players_data, dict):
-                team_context = players_data.get("data", {}).get("context", {})
-                if team_context:
-                    team_data = {
-                        "id": team_id,
-                        "text": team_context.get("team_name", f"Team {team_id}"),
-                        "club_name": team_context.get("club_name", ""),
-                    }
-                    logger.info(f"Found team info in players context: {team_data}")
-            
-            # Extract players from response
-            if isinstance(players_data, dict):
-                regions = players_data.get("data", {}).get("regions", [])
-                if regions:
-                    players = regions[0].get("rows", [])
-                else:
-                    players = players_data.get("entries", [])
-                logger.info(f"Loaded {len(players)} players")
-        except Exception as player_error:
-            logger.warning(f"Could not load players for team {team_id}: {player_error}")
-            players = []
-        
-        # If still no team_data, try cache
-        if not team_data:
-            all_teams = await get_cached_teams()
-            matching_teams = [t for t in all_teams if t.get("id") == team_id]
-            if matching_teams:
-                team_data = matching_teams[0]
-        
-        # If STILL no team_data, search through leagues to find the team
-        if not team_data or team_data.get("text", "").startswith("Team "):
-            logger.info(f"Searching through leagues to find team {team_id}")
-            try:
-                all_leagues = await get_cached_leagues()
-                found = False
-                # Try common league/game_class combinations
-                for league_data in all_leagues[:20]:  # Check first 20 leagues
-                    if found:
-                        break
-                    league_num = league_data.get("set_in_context", {}).get("league")
-                    game_class_num = league_data.get("set_in_context", {}).get("game_class")
-                    if league_num and game_class_num:
-                        try:
-                            teams_data = client.get_teams(league=league_num, game_class=game_class_num, season=current_season)
-                            regions = teams_data.get("data", {}).get("regions", [])
-                            if regions:
-                                all_teams = regions[0].get("rows", [])
-                                matching_teams = [t for t in all_teams if t.get("id") == team_id]
-                                if matching_teams:
-                                    team_raw = matching_teams[0]
-                                    team_name = team_raw.get("cells", [{}])[0].get("text", [f"Team {team_id}"])[0]
-                                    team_data = {
-                                        "id": team_id,
-                                        "text": team_name,
-                                        "club_name": team_raw.get("cells", [{}])[0].get("text", [""])[0] if len(team_raw.get("cells", [])) > 0 else ""
-                                    }
-                                    logger.info(f"Found team '{team_name}' in league {league_num}/{game_class_num}")
-                                    found = True
-                                    break
-                        except Exception as search_error:
-                            continue  # Try next league
-            except Exception as search_error:
-                logger.warning(f"Error searching for team in leagues: {search_error}")
-        
-        # Final fallback
-        if not team_data:
-            team_data = {"id": team_id, "text": f"Team {team_id}"}
-        
-        # Note: Games API doesn't support filtering by team ID or by league/game_class
-        # Teams without roster data typically also don't have games data
-        # Leave games empty to show "No Recent Games" message
-        games = []
-        
-        # If we still don't have team_data, show error
-        if not team_data or not team_data.get("text"):
-            error_message = f"Team with ID {team_id} not found"
-            logger.warning(error_message)
-            
-    except Exception as e:
-        logger.error(f"Error fetching team {team_id}: {e}")
-        error_message = f"Could not load team details: {str(e)}"
-        team_data = {"id": team_id, "text": f"Team {team_id}"}
-        players = []
-        games = []
-    
+    if not team:
+        error_message = f"Team {team_id} not found in database."
+
     return templates.TemplateResponse(
         "team_detail.html",
         {
             "request": request,
             "locale": locale,
             "t": get_translations(locale),
-            "team": team_data,
-            "players": players,
-            "games": games,
-            "error_message": error_message
-        }
+            "team": team,
+            "error_message": error_message,
+        },
     )
 
 
 @app.get("/{locale}/players", response_class=HTMLResponse)
-async def players_page(request: Request, locale: str):
-    """Players search page"""
+async def players_page(request: Request, locale: str, order_by: str = "points"):
+    """Players leaderboard page — DB-backed"""
+    from app.services.stats_service import get_player_leaderboard
+
+    valid_order = {"points", "goals", "assists", "pim"}
+    if order_by not in valid_order:
+        order_by = "points"
+
+    players = get_player_leaderboard(limit=50, order_by=order_by)
     return templates.TemplateResponse(
         "players.html",
         {
             "request": request,
             "locale": locale,
             "t": get_translations(locale),
-            "players": []  # Start with no players, use search to load
-        }
+            "players": players,
+            "order_by": order_by,
+        },
     )
 
 
 @app.get("/{locale}/players/search", response_class=HTMLResponse)
-async def search_players(request: Request, locale: str, q: str = "", team: str = "", club: str = ""):
-    """Search players endpoint
-    
-    Searches player database indexed from Swiss Unihockey API.
-    """
-    try:
-        filtered_players = []
-        
-        # If team or club specified, use the API endpoint directly
-        if team or club:
-            client = get_swissunihockey_client()
-            params = {}
-            if team:
-                params['team'] = team
-            if club:
-                params['club'] = club
-            players_data = client.get_players(**params)
-            all_players = players_data.get("entries", players_data.get("data", [])) if isinstance(players_data, dict) else []
-            
-            # Filter by query if provided
-            if q:
-                q_lower = q.lower()
-                filtered_players = [
-                    p for p in all_players
-                    if q_lower in str(p.get("text", "")).lower()
-                    or q_lower in str(p.get("given_name", "")).lower()
-                    or q_lower in str(p.get("family_name", "")).lower()
-                ]
-            else:
-                filtered_players = all_players[:50]
-        
-        # If we have a search query, search through database
-        elif q:
-            # Search through database
-            from app.services.database import get_database_service
-            from app.models.db_models import Player, TeamPlayer, Team
-            from sqlalchemy import or_
-            
-            q_lower = q.lower()
-            db_service = get_database_service()
-            
-            with db_service.session_scope() as session:
-                # Search players by name
-                db_players = session.query(Player).filter(
+async def search_players(request: Request, locale: str, q: str = ""):
+    """HTMX player name search — returns partial HTML rows."""
+    from app.services.database import get_database_service
+    from app.models.db_models import Player
+    from sqlalchemy import or_
+
+    filtered: list[dict] = []
+
+    if q and len(q) >= 2:
+        db = get_database_service()
+        with db.session_scope() as session:
+            rows = (
+                session.query(Player)
+                .filter(
                     or_(
                         Player.full_name.ilike(f"%{q}%"),
-                        Player.name_normalized.like(f"%{q_lower}%")
+                        Player.name_normalized.like(f"%{q.lower()}%"),
                     )
-                ).limit(50).all()
-                
-                # Convert database players to format expected by template
-                for player in db_players:
-                    # Get most recent team
-                    team_name = "N/A"
-                    if player.team_memberships:
-                        # Get the most recently updated team membership
-                        latest_membership = max(player.team_memberships, key=lambda x: x.last_updated)
-                        if latest_membership.team:
-                            team_name = latest_membership.team.name
-                    
-                    filtered_players.append({
-                        "id": player.person_id,
-                        "name": player.full_name,
-                        "text": player.full_name,
-                        "team": team_name,
-                        "position": ""
-                    })
-            
-            logger.info(f"Found {len(filtered_players)} players matching '{q}'")
-        
-    except Exception as e:
-        logger.error(f"Error searching players: {e}")
-        filtered_players = []
-    
-    # Generate HTML response for search results
-    html = '<div class="cards-grid">'
-    for player in filtered_players:
-        # Extract player name
-        player_name = player.get("name", player.get("text", ""))
-        if not player_name:
-            player_name = f"{player.get('given_name', '')} {player.get('family_name', '')}".strip()
-        
-        player_id = player.get("id", 0)
-        team_name = player.get("team", player.get("set_in_context", {}).get("team_name", "N/A"))
-        position = player.get("position", "")
-        
-        html += f'''
-        <div class="card" onclick="window.location='/{locale}/player/{player_id}'">
-            <div class="card-icon">👤</div>
-            <h3>{player_name}</h3>
-            <p style="color: var(--gray-600); font-size: 0.875rem;">
-                Team: {team_name}<br>
-                {"Position: " + position if position else ""}
-            </p>
-        </div>
-        '''
-    html += '</div>'
-    
-    if not filtered_players:
-        if q:
-            html = '<div style="text-align: center; padding: 3rem; color: var(--gray-600);"><p>No players found matching your search</p></div>'
-        else:
-            html = '<div style="text-align: center; padding: 3rem; color: var(--gray-600);"><p>Enter a player name to search</p></div>'
-    
-    return HTMLResponse(content=html)
+                )
+                .limit(50)
+                .all()
+            )
+            for pl in rows:
+                filtered.append({"id": pl.person_id, "name": pl.full_name or f"Player {pl.person_id}"})
+
+    if not filtered:
+        msg = "Enter at least 2 characters to search" if not q else "No players found"
+        return HTMLResponse(f'<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--gray-600)">{msg}</td></tr>')
+
+    rows_html = ""
+    for p in filtered:
+        rows_html += f'<tr onclick="window.location=\'/{locale}/player/{p["id"]}\'" style="cursor:pointer"><td colspan="8">{p["name"]}</td></tr>'
+    return HTMLResponse(rows_html)
 
 
 @app.get("/{locale}/player/{player_id}", response_class=HTMLResponse)
 async def player_detail(request: Request, locale: str, player_id: int):
-    """Player detail page"""
-    client = get_swissunihockey_client()
+    """Player detail page — career stats from DB"""
+    from app.services.stats_service import get_player_detail
+
+    player = get_player_detail(player_id)
     error_message = None
-    player_data = {}
-    
-    try:
-        # Fetch all players and find the one with matching ID
-        # Note: This could be optimized with player caching in the future
-        players_data = client.get_players()
-        all_players = players_data.get("entries", players_data.get("data", [])) if isinstance(players_data, dict) else []
-        
-        # Find the player with matching ID
-        matching_players = [p for p in all_players if p.get("id") == player_id]
-        
-        if matching_players:
-            player_data = matching_players[0]
-        else:
-            error_message = f"Player with ID {player_id} not found"
-            logger.warning(error_message)
-            
-    except Exception as e:
-        logger.error(f"Error fetching player {player_id}: {e}")
-        error_message = f"Could not load player details: {str(e)}"
-        player_data = {}
-    
+    if not player:
+        error_message = f"Player {player_id} not found in database."
+
     return templates.TemplateResponse(
         "player_detail.html",
         {
             "request": request,
             "locale": locale,
             "t": get_translations(locale),
-            "player": player_data,
-            "error_message": error_message
-        }
+            "player": player,
+            "error_message": error_message,
+        },
     )
 
 
 # ==================== Other Pages ====================
 
 @app.get("/{locale}/games", response_class=HTMLResponse)
-async def games_page(request: Request, locale: str):
-    """Games schedule page"""
-    client = get_swissunihockey_client()
-    
-    try:
-        games_data = client.get_games()
-        games = games_data.get("entries", [])[:50] if isinstance(games_data, dict) else []
-    except Exception as e:
-        # Handle API errors gracefully
-        games = []
-    
+async def games_page(request: Request, locale: str, scored_only: str = "1"):
+    """Games schedule page — DB-backed"""
+    from app.services.stats_service import get_recent_games
+
+    with_score = scored_only != "0"
+    games = get_recent_games(limit=100, with_score_only=with_score)
     return templates.TemplateResponse(
         "games.html",
         {
             "request": request,
             "locale": locale,
             "t": get_translations(locale),
-            "games": games
-        }
+            "games": games,
+            "scored_only": with_score,
+        },
     )
 
 
 @app.get("/{locale}/game/{game_id}", response_class=HTMLResponse)
 async def game_detail(request: Request, locale: str, game_id: int):
-    """Game detail page with events and statistics"""
-    client = get_swissunihockey_client()
+    """Game detail page — box score from DB"""
+    from app.services.stats_service import get_game_box_score
+
+    box = get_game_box_score(game_id)
     error_message = None
-    game_data = {}
-    events = []
-    
-    try:
-        # Fetch game events which includes game details
-        game_events_data = client.get_game_events(game_id=game_id)
-        
-        if game_events_data:
-            # Extract game info and events
-            game_data = game_events_data.get("game", {})
-            events = game_events_data.get("events", [])
-            
-            # If game_id not in data, add it
-            if not game_data.get("game_id"):
-                game_data["game_id"] = game_id
-        else:
-            error_message = f"Game with ID {game_id} not found"
-            logger.warning(error_message)
-    
-    except Exception as e:
-        logger.error(f"Error fetching game {game_id}: {e}")
-        error_message = f"Could not load game details: {str(e)}"
-    
+    if not box:
+        error_message = f"Game {game_id} not found in database."
+
     return templates.TemplateResponse(
         "game_detail.html",
         {
             "request": request,
             "locale": locale,
             "t": get_translations(locale),
-            "game": game_data,
-            "events": events,
-            "error_message": error_message
-        }
+            "game": box,
+            "error_message": error_message,
+        },
     )
 
 
 @app.get("/{locale}/rankings", response_class=HTMLResponse)
 async def rankings_page(request: Request, locale: str):
-    """Rankings and top scorers page"""
-    client = get_swissunihockey_client()
-    
-    # Note: These methods might need league_id parameters in production
-    # For now, using mock data structure
-    standings = []
-    topscorers = []
-    
-    # Try to get rankings if available
-    try:
-        standings_data = client.get_table()
-        if isinstance(standings_data, dict) and "entries" in standings_data:
-            standings = standings_data["entries"][:20]
-    except:
-        pass
-    
-    try:
-        topscorers_data = client.get_top_scorers()
-        if isinstance(topscorers_data, dict) and "entries" in topscorers_data:
-            topscorers = topscorers_data["entries"][:20]
-    except:
-        pass
-    
+    """Rankings page — global player leaderboard from DB"""
+    from app.services.stats_service import get_player_leaderboard
+
+    topscorers = get_player_leaderboard(limit=50, order_by="points")
     return templates.TemplateResponse(
         "rankings.html",
         {
             "request": request,
             "locale": locale,
             "t": get_translations(locale),
-            "standings": standings,
-            "topscorers": topscorers
-        }
+            "topscorers": topscorers,
+            "standings": [],
+        },
     )
 
 

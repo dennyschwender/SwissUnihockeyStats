@@ -1,125 +1,89 @@
 {% extends "base.html" %}
 
-{% block title %}{{ player.text if player.text else ((player.given_name if player.given_name else '') ~ ' ' ~ (player.family_name if player.family_name else '')) }} - SwissUnihockey{% endblock %}
-
-{% block description %}Player profile for {{ player.text if player.text else 'player' }}{% endblock %}
-
-{% block og_title %}{{ player.text if player.text else 'Player' }} | SwissUnihockey{% endblock %}
-{% block og_description %}View statistics and information for {{ player.text if player.text else 'this player' }}{% endblock %}
+{% block title %}{{ player.name if player else "Player" }} – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
-<div class="content-wrapper">
-    <!-- Back Button -->
-    <div style="margin-bottom: 1.5rem;">
-        <a href="/{{ locale }}/players" style="color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
-            ← Back to Players
-        </a>
-    </div>
+<div class="container" style="padding-top:2rem;padding-bottom:3rem;">
 
-    {% if error_message %}
-    <div style="padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 8px; margin-bottom: 1.5rem;">
-        <strong>Error:</strong> {{ error_message }}
-    </div>
+  {% if error_message %}
+  <div style="margin-bottom:1.5rem;padding:1rem 1.5rem;background:#fef2f2;border:1px solid #fecaca;border-radius:.5rem;color:#b91c1c;">
+    ⚠ {{ error_message }}
+  </div>
+  {% endif %}
+
+  <div style="margin-bottom:2rem;">
+    <a href="javascript:history.back()" style="color:var(--gray-500);font-size:.875rem;text-decoration:none;">← Back</a>
+    <h1 style="margin:.5rem 0 0;font-size:2rem;font-weight:700;">👤 {{ player.name if player else "Player" }}</h1>
+    {% if player and player.year_of_birth %}
+    <p style="color:var(--gray-500);margin:.25rem 0 0;">Born: {{ player.year_of_birth }}</p>
     {% endif %}
+  </div>
 
-    <!-- Player Header -->
-    <div class="card" style="margin-bottom: 2rem;">
-        <div style="display: flex; align-items: center; gap: 1.5rem;">
-            {% if player.photo %}
-            <img src="{{ player.photo }}" alt="{{ player.text if player.text else 'Player' }}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover;">
-            {% else %}
-            <div class="card-icon" style="font-size: 4rem;">👤</div>
-            {% endif %}
-            <div>
-                <h1 style="margin: 0;">{{ player.text if player.text else ((player.given_name if player.given_name else '') ~ ' ' ~ (player.family_name if player.family_name else '')) }}</h1>
-                {% if player.jersey_number %}
-                <p style="margin: 0.5rem 0 0 0; color: var(--gray-600); font-size: 1.5rem; font-weight: bold;">
-                    #{{ player.jersey_number }}
-                </p>
-                {% endif %}
-            </div>
-        </div>
+  {% if player %}
 
-        <!-- Player Information -->
-        <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-200); display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-            {% if player.position %}
-            <div>
-                <strong style="color: var(--gray-600); font-size: 0.875rem;">Position</strong>
-                <p style="margin: 0.25rem 0 0 0;">{{ player.position }}</p>
-            </div>
-            {% endif %}
-            
-            {% if player.set_in_context and player.set_in_context.team_name %}
-            <div>
-                <strong style="color: var(--gray-600); font-size: 0.875rem;">Team</strong>
-                <p style="margin: 0.25rem 0 0 0;">{{ player.set_in_context.team_name }}</p>
-            </div>
-            {% endif %}
-            
-            {% if player.set_in_context and player.set_in_context.club_name %}
-            <div>
-                <strong style="color: var(--gray-600); font-size: 0.875rem;">Club</strong>
-                <p style="margin: 0.25rem 0 0 0;">{{ player.set_in_context.club_name }}</p>
-            </div>
-            {% endif %}
-            
-            {% if player.date_of_birth %}
-            <div>
-                <strong style="color: var(--gray-600); font-size: 0.875rem;">Date of Birth</strong>
-                <p style="margin: 0.25rem 0 0 0;">{{ player.date_of_birth }}</p>
-            </div>
-            {% endif %}
-            
-            {% if player.nationality %}
-            <div>
-                <strong style="color: var(--gray-600); font-size: 0.875rem;">Nationality</strong>
-                <p style="margin: 0.25rem 0 0 0;">{{ player.nationality }}</p>
-            </div>
-            {% endif %}
-            
-            {% if player.license %}
-            <div>
-                <strong style="color: var(--gray-600); font-size: 0.875rem;">License</strong>
-                <p style="margin: 0.25rem 0 0 0;">{{ player.license }}</p>
-            </div>
-            {% endif %}
-        </div>
+  <!-- Career totals -->
+  {% if player.career %}
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:2rem;">
+    {% for label, val in [('GP', player.totals.gp), ('G', player.totals.g), ('A', player.totals.a), ('PTS', player.totals.pts), ('PIM', player.totals.pim)] %}
+    <div style="background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;padding:1rem 1.5rem;text-align:center;min-width:70px;">
+      <div style="font-size:1.5rem;font-weight:700;">{{ val }}</div>
+      <div style="font-size:.75rem;color:var(--gray-500);margin-top:.2rem;">{{ label }}</div>
     </div>
+    {% endfor %}
+  </div>
 
-    <!-- Statistics Section (if available) -->
-    {% if player.get('statistics') %}
-    <h2 style="margin: 2rem 0 1rem 0;">Statistics</h2>
-    <div class="card">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1.5rem;">
-            {% if player.statistics.get('games') is not none %}
-            <div style="text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold; color: var(--primary);">{{ player.statistics.games }}</div>
-                <div style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.25rem;">Games</div>
-            </div>
-            {% endif %}
-            
-            {% if player.statistics.get('goals') is not none %}
-            <div style="text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold; color: var(--primary);">{{ player.statistics.goals }}</div>
-                <div style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.25rem;">Goals</div>
-            </div>
-            {% endif %}
-            
-            {% if player.statistics.get('assists') is not none %}
-            <div style="text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold; color: var(--primary);">{{ player.statistics.assists }}</div>
-                <div style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.25rem;">Assists</div>
-            </div>
-            {% endif %}
-            
-            {% if player.statistics.get('points') is not none %}
-            <div style="text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold; color: var(--primary);">{{ player.statistics.points }}</div>
-                <div style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.25rem;">Points</div>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
+  <!-- Per-season table -->
+  <h2 style="font-size:1.25rem;font-weight:600;margin-bottom:.75rem;">Season History</h2>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+      <thead>
+        <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
+          <th style="padding:.6rem .75rem;text-align:left;">Season</th>
+          <th style="padding:.6rem .75rem;text-align:left;">Team</th>
+          <th style="padding:.6rem .5rem;text-align:center;">GP</th>
+          <th style="padding:.6rem .5rem;text-align:center;">G</th>
+          <th style="padding:.6rem .5rem;text-align:center;">A</th>
+          <th style="padding:.6rem .75rem;text-align:center;font-weight:700;">PTS</th>
+          <th style="padding:.6rem .5rem;text-align:center;">PIM</th>
+          <th style="padding:.6rem .5rem;text-align:center;">+/-</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in player.career %}
+        <tr style="border-bottom:1px solid var(--gray-100);"
+          onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+          <td style="padding:.6rem .75rem;font-weight:500;">{{ row.season_text }}</td>
+          <td style="padding:.6rem .75rem;color:var(--gray-600);">{{ row.team_name }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;">{{ row.gp }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;">{{ row.g }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;">{{ row.a }}</td>
+          <td style="padding:.6rem .75rem;text-align:center;font-weight:700;">{{ row.pts }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;">{{ row.pim }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;{% if row.plus_minus > 0 %}color:#16a34a{% elif row.plus_minus < 0 %}color:#dc2626{% endif %}">
+            {{ "+" if row.plus_minus > 0 else "" }}{{ row.plus_minus }}
+          </td>
+        </tr>
+        {% endfor %}
+        <!-- Totals row -->
+        <tr style="background:var(--gray-50);border-top:2px solid var(--gray-200);font-weight:700;">
+          <td style="padding:.6rem .75rem;" colspan="2">Career Totals</td>
+          <td style="padding:.6rem .5rem;text-align:center;">{{ player.totals.gp }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;">{{ player.totals.g }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;">{{ player.totals.a }}</td>
+          <td style="padding:.6rem .75rem;text-align:center;">{{ player.totals.pts }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;">{{ player.totals.pim }}</td>
+          <td style="padding:.6rem .5rem;text-align:center;">—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:3rem;color:var(--gray-500);">
+    <p style="font-size:2rem">📊</p>
+    <p>No statistics on record for this player.</p>
+  </div>
+  {% endif %}
+
+  {% endif %}
 </div>
 {% endblock %}

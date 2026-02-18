@@ -1,20 +1,31 @@
 version: '3.8'
 
 services:
-  # SwissUnihockey API Client
+  # SwissUnihockey FastAPI Backend
   swissunihockey:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: swissunihockey-client
+    container_name: swissunihockey-api
     image: swissunihockey:latest
     
-    # Environment variables
+    # Environment variables for FastAPI backend
     environment:
+      # API Configuration
+      - API_V1_PREFIX=/api/v1
+      - PROJECT_NAME=SwissUnihockey API
+      - VERSION=1.0.0
+      - DEBUG=false
+      # SwissUnihockey API Integration
       - SWISSUNIHOCKEY_API_URL=https://api-v2.swissunihockey.ch
       - SWISSUNIHOCKEY_LOCALE=de-CH
       - SWISSUNIHOCKEY_CACHE_ENABLED=true
       - SWISSUNIHOCKEY_CACHE_DIR=/app/data/cache
+      # Server
+      - HOST=0.0.0.0
+      - PORT=8000
+      - WORKERS=1
+      # Timezone
       - TZ=Europe/Zurich
     
     # Volume mounts for persistent cache
@@ -22,9 +33,9 @@ services:
       - ./data/cache:/app/data/cache
       - ./scripts:/app/scripts:ro
     
-    # Keep container running
-    stdin_open: true
-    tty: true
+    # Expose port for FastAPI
+    ports:
+      - "8000:8000"
     
     # Resource limits
     deploy:
@@ -44,67 +55,64 @@ services:
       - swissunihockey-net
 
   # Cache preloader (run once to populate cache)
-  preload-cache:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: swissunihockey-preload
-    image: swissunihockey:latest
-    
-    environment:
-      - SWISSUNIHOCKEY_API_URL=https://api-v2.swissunihockey.ch
-      - SWISSUNIHOCKEY_LOCALE=de-CH
-      - TZ=Europe/Zurich
-    
-    volumes:
-      - ./data/cache:/app/data/cache
-    
-    command: ["python", "scripts/preload_cache.py"]
-    
-    networks:
-      - swissunihockey-net
-    
-    # Run once and exit
-    restart: "no"
-    
-    # Only run when explicitly started
-    profiles:
-      - preload
+  # NOTE: This service uses the old API client structure and needs updating
+  # preload-cache:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: swissunihockey-preload
+  #   image: swissunihockey:latest
+  #   
+  #   environment:
+  #     - SWISSUNIHOCKEY_API_URL=https://api-v2.swissunihockey.ch
+  #     - SWISSUNIHOCKEY_LOCALE=de-CH
+  #     - TZ=Europe/Zurich
+  #   
+  #   volumes:
+  #     - ./data/cache:/app/data/cache
+  #   
+  #   command: ["python", "scripts/preload_cache.py"]
+  #   
+  #   networks:
+  #     - swissunihockey-net
+  #   
+  #   restart: "no"
+  #   profiles:
+  #     - preload
 
   # Example: Scheduled cache refresh with cron
-  cache-refresher:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: swissunihockey-refresher
-    image: swissunihockey:latest
-    
-    environment:
-      - SWISSUNIHOCKEY_API_URL=https://api-v2.swissunihockey.ch
-      - SWISSUNIHOCKEY_LOCALE=de-CH
-      - TZ=Europe/Zurich
-    
-    volumes:
-      - ./data/cache:/app/data/cache
-      - ./scripts:/app/scripts:ro
-    
-    # Run preload script every hour
-    entrypoint: /bin/sh -c
-    command: >
-      "while true; do
-        python scripts/preload_cache.py;
-        echo 'Cache refreshed at $(date)';
-        sleep 3600;
-      done"
-    
-    restart: unless-stopped
-    
-    networks:
-      - swissunihockey-net
-    
-    # Optional: only run when explicitly enabled
-    profiles:
-      - auto-refresh
+  # NOTE: This service uses the old API client structure and needs updating
+  # cache-refresher:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: swissunihockey-refresher
+  #   image: swissunihockey:latest
+  #   
+  #   environment:
+  #     - SWISSUNIHOCKEY_API_URL=https://api-v2.swissunihockey.ch
+  #     - SWISSUNIHOCKEY_LOCALE=de-CH
+  #     - TZ=Europe/Zurich
+  #   
+  #   volumes:
+  #     - ./data/cache:/app/data/cache
+  #     - ./scripts:/app/scripts:ro
+  #   
+  #   entrypoint: /bin/sh -c
+  #   command: >
+  #     "while true; do
+  #       python scripts/preload_cache.py;
+  #       echo 'Cache refreshed at $(date)';
+  #       sleep 3600;
+  #     done"
+  #   
+  #   restart: unless-stopped
+  #   
+  #   networks:
+  #     - swissunihockey-net
+  #   
+  #   profiles:
+  #     - auto-refresh
 
 networks:
   swissunihockey-net:

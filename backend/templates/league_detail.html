@@ -1,220 +1,157 @@
 {% extends "base.html" %}
 
-{% block title %}{{ league.text if league.text else 'League Details' }} - {{ t.common.app_name }}{% endblock %}
+{% block title %}{{ league.name if league else "League" }} – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
-<div class="content-wrapper">
-    <!-- Back Button -->
-    <div style="margin-bottom: 1.5rem;">
-        <a href="/{{ locale }}/leagues" style="color: var(--swiss-red); text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
-            ← {{ t.common.back if t.common.back else 'Back to Leagues' }}
+<div class="container" style="padding-top:2rem;padding-bottom:3rem;">
+
+  {% if error_message %}
+  <div style="margin-bottom:1.5rem;padding:1rem 1.5rem;background:#fef2f2;border:1px solid #fecaca;border-radius:.5rem;color:#b91c1c;">
+    ⚠ {{ error_message }}
+  </div>
+  {% endif %}
+
+  <div style="margin-bottom:2rem;">
+    <a href="/{{ locale }}/leagues" style="color:var(--gray-500);font-size:.875rem;text-decoration:none;">← Leagues</a>
+    <h1 style="margin:.5rem 0 0;font-size:2rem;font-weight:700;">🏆 {{ league.name if league else "League" }}</h1>
+    {% if league.game_class %}
+    <span style="font-size:.875rem;color:var(--gray-500);">
+      {% if league.game_class in [11,12] %}Men{% elif league.game_class in [21,22] %}Women{% elif league.game_class == 31 %}Mixed{% endif %}
+    </span>
+    {% endif %}
+  </div>
+
+  <div x-data="{ tab: 'standings' }">
+    <div style="display:flex;gap:.25rem;border-bottom:2px solid var(--gray-200);margin-bottom:1.5rem;">
+      {% for tid, tlabel in [('standings','Standings'),('topscorers','Top Scorers'),('results','Results')] %}
+      <button @click="tab='{{ tid }}'"
+        :style="tab==='{{ tid }}' ? 'border-bottom:2px solid var(--swiss-red,#e11d48);color:var(--swiss-red,#e11d48);margin-bottom:-2px' : 'color:var(--gray-600)'"
+        style="padding:.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:.9rem;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-2px;">
+        {{ tlabel }}
+      </button>
+      {% endfor %}
+    </div>
+
+    <!-- STANDINGS -->
+    <div x-show="tab==='standings'">
+      {% if standings %}
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+          <thead>
+            <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
+              <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
+              <th style="padding:.6rem .75rem;text-align:left;">Team</th>
+              <th style="padding:.6rem .5rem;text-align:center;" title="Games Played">GP</th>
+              <th style="padding:.6rem .5rem;text-align:center;" title="Wins">W</th>
+              <th style="padding:.6rem .5rem;text-align:center;" title="Losses">L</th>
+              <th style="padding:.6rem .5rem;text-align:center;" title="Goals For">GF</th>
+              <th style="padding:.6rem .5rem;text-align:center;" title="Goals Against">GA</th>
+              <th style="padding:.6rem .5rem;text-align:center;" title="Goal Difference">GD</th>
+              <th style="padding:.6rem .75rem;text-align:center;font-weight:700;" title="Points">PTS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in standings %}
+            <tr onclick="window.location='/{{ locale }}/team/{{ row.team_id }}'"
+              style="cursor:pointer;border-bottom:1px solid var(--gray-100);"
+              onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+              <td style="padding:.6rem .5rem;text-align:center;font-weight:600;color:var(--gray-500);">{{ row.rank }}</td>
+              <td style="padding:.6rem .75rem;font-weight:500;">{{ row.team_name }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;">{{ row.gp }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;color:#16a34a;">{{ row.w }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;color:#dc2626;">{{ row.l }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;">{{ row.gf }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;">{{ row.ga }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;{% if row.gd > 0 %}color:#16a34a{% elif row.gd < 0 %}color:#dc2626{% endif %}">
+                {{ "+" if row.gd > 0 else "" }}{{ row.gd }}
+              </td>
+              <td style="padding:.6rem .75rem;text-align:center;font-weight:700;font-size:1rem;">{{ row.pts }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
+        <p style="font-size:2rem">📊</p>
+        <p>No standings data available. Standings require finished games.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- TOP SCORERS -->
+    <div x-show="tab==='topscorers'">
+      {% if topscorers %}
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+          <thead>
+            <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
+              <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
+              <th style="padding:.6rem .75rem;text-align:left;">Player</th>
+              <th style="padding:.6rem .75rem;text-align:left;">Team</th>
+              <th style="padding:.6rem .5rem;text-align:center;">GP</th>
+              <th style="padding:.6rem .5rem;text-align:center;">G</th>
+              <th style="padding:.6rem .5rem;text-align:center;">A</th>
+              <th style="padding:.6rem .75rem;text-align:center;font-weight:700;">PTS</th>
+              <th style="padding:.6rem .5rem;text-align:center;">PIM</th>
+              <th style="padding:.6rem .5rem;text-align:center;">+/-</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in topscorers %}
+            <tr onclick="window.location='/{{ locale }}/player/{{ row.player_id }}'"
+              style="cursor:pointer;border-bottom:1px solid var(--gray-100);"
+              onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+              <td style="padding:.6rem .5rem;text-align:center;font-weight:600;color:var(--gray-500);">
+                {% if row.rank == 1 %}🥇{% elif row.rank == 2 %}🥈{% elif row.rank == 3 %}🥉{% else %}{{ row.rank }}{% endif %}
+              </td>
+              <td style="padding:.6rem .75rem;font-weight:500;">{{ row.player_name }}</td>
+              <td style="padding:.6rem .75rem;color:var(--gray-600);">{{ row.team_name }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;">{{ row.gp }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;">{{ row.g }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;">{{ row.a }}</td>
+              <td style="padding:.6rem .75rem;text-align:center;font-weight:700;">{{ row.pts }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;">{{ row.pim }}</td>
+              <td style="padding:.6rem .5rem;text-align:center;{% if row.plus_minus > 0 %}color:#16a34a{% elif row.plus_minus < 0 %}color:#dc2626{% endif %}">
+                {{ "+" if row.plus_minus > 0 else "" }}{{ row.plus_minus }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
+        <p style="font-size:2rem">🏒</p>
+        <p>No scorer statistics available yet.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- RESULTS -->
+    <div x-show="tab==='results'">
+      {% if games %}
+      <div style="display:flex;flex-direction:column;gap:.5rem;">
+        {% for g in games %}
+        <a href="/{{ locale }}/game/{{ g.game_id }}" style="text-decoration:none;color:inherit;">
+          <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;"
+               onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
+            <span style="width:90px;font-size:.8rem;color:var(--gray-500);">{{ g.date }}</span>
+            <span style="flex:1;font-weight:500;text-align:right;padding-right:.75rem;">{{ g.home_team }}</span>
+            <span style="width:70px;text-align:center;font-weight:700;font-size:1.1rem;">{{ g.home_score }} : {{ g.away_score }}</span>
+            <span style="flex:1;font-weight:500;padding-left:.75rem;">{{ g.away_team }}</span>
+          </div>
         </a>
-    </div>
-
-    {% if error_message %}
-    <div style="padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 8px; margin-bottom: 1.5rem;">
-        <strong>Error:</strong> {{ error_message }}
-    </div>
-    {% endif %}
-
-    <!-- League Header -->
-    <div class="card" style="margin-bottom: 2rem;">
-        <div style="display: flex; align-items: center; gap: 1.5rem;">
-            <div class="card-icon" style="font-size: 4rem;">🏆</div>
-            <div>
-                <h1 style="margin: 0;">{{ league.text if league.text else 'League Details' }}</h1>
-                {% if league.set_in_context %}
-                    {% if league.set_in_context.league_id %}
-                    <p style="margin: 0.5rem 0 0 0; color: var(--gray-600);">
-                        League ID: {{ league.set_in_context.league_id }}
-                    </p>
-                    {% endif %}
-                    {% if league.set_in_context.type %}
-                    <p style="margin: 0.25rem 0 0 0; color: var(--gray-600);">
-                        📋 Type: {{ league.set_in_context.type|title }}
-                    </p>
-                    {% endif %}
-                    {% if league.set_in_context.mode %}
-                    <p style="margin: 0.25rem 0 0 0; color: var(--gray-600);">
-                        ⚙️ Mode: {{ league.set_in_context.mode }}
-                    </p>
-                    {% endif %}
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Standings Section -->
-    {% if standings %}
-    <h2 style="margin: 2rem 0 1rem 0;">{{ t.rankings.standings if t.rankings and t.rankings.standings else 'Standings' }}</h2>
-    <div class="card">
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse;">
-                <thead style="background: var(--gray-100); border-bottom: 2px solid var(--gray-300);">
-                    <tr>
-                        <th style="padding: 0.75rem; text-align: left;">Rank</th>
-                        <th style="padding: 0.75rem; text-align: left;">Team</th>
-                        <th style="padding: 0.75rem; text-align: center;">GP</th>
-                        <th style="padding: 0.75rem; text-align: center;">W</th>
-                        <th style="padding: 0.75rem; text-align: center;">D</th>
-                        <th style="padding: 0.75rem; text-align: center;">L</th>
-                        <th style="padding: 0.75rem; text-align: center;">GF</th>
-                        <th style="padding: 0.75rem; text-align: center;">GA</th>
-                        <th style="padding: 0.75rem; text-align: center; font-weight: bold;">Pts</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for standing in standings[:20] %}
-                    {% set team_id = standing.data.team.id if standing.data and standing.data.team else '' %}
-                    <tr style="border-bottom: 1px solid var(--gray-200);">
-                        <td style="padding: 0.75rem; font-weight: 600;">
-                            {{ standing.data.rank if standing.data and standing.data.rank else (standing.rank if standing.rank else loop.index) }}
-                        </td>
-                        <td style="padding: 0.75rem; font-weight: 600;">
-                            {% if team_id %}
-                            <a href="/{{ locale }}/team/{{ team_id }}?league={{ league._league_param }}&game_class={{ league._game_class_param }}" style="color: inherit; text-decoration: none; border-bottom: 1px dashed var(--gray-400);" 
-                               onmouseover="this.style.color='var(--swiss-red)'; this.style.borderBottomStyle='solid'" 
-                               onmouseout="this.style.color='inherit'; this.style.borderBottomStyle='dashed'">
-                                {{ standing.data.team.name if standing.data and standing.data.team else (standing.team_name if standing.team_name else standing.team) }}
-                            </a>
-                            {% else %}
-                            {{ standing.data.team.name if standing.data and standing.data.team else (standing.team_name if standing.team_name else standing.team) }}
-                            {% endif %}
-                        </td>
-                        <td style="padding: 0.75rem; text-align: center;">
-                            {{ standing.cells[3].text[0] if standing.cells and standing.cells|length > 3 else (standing.games_played if standing.games_played else standing.gp) }}
-                        </td>
-                        <td style="padding: 0.75rem; text-align: center;">
-                            {{ standing.cells[5].text[0] if standing.cells and standing.cells|length > 5 else (standing.wins if standing.wins else standing.w) }}
-                        </td>
-                        <td style="padding: 0.75rem; text-align: center;">
-                            {{ (standing.cells[6].text[0]|int + standing.cells[7].text[0]|int) if standing.cells and standing.cells|length > 7 else (standing.draws if standing.draws else standing.d) }}
-                        </td>
-                        <td style="padding: 0.75rem; text-align: center;">
-                            {{ standing.cells[8].text[0] if standing.cells and standing.cells|length > 8 else (standing.losses if standing.losses else standing.l) }}
-                        </td>
-                        <td style="padding: 0.75rem; text-align: center;">
-                            {{ standing.cells[9].text[0] if standing.cells and standing.cells|length > 9 else (standing.goals_for if standing.goals_for else standing.gf) }}
-                        </td>
-                        <td style="padding: 0.75rem; text-align: center;">
-                            {{ standing.cells[9].text[0].split(':')[1] if standing.cells and standing.cells|length > 9 and ':' in standing.cells[9].text[0] else (standing.goals_against if standing.goals_against else standing.ga) }}
-                        </td>
-                        <td style="padding: 0.75rem; text-align: center; font-weight: 700; color: var(--swiss-red);">
-                            {{ standing.cells[12].text[0] if standing.cells and standing.cells|length > 12 else (standing.points if standing.points else standing.pts) }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Teams Section -->
-    {% if teams %}
-    <h2 style="margin: 2rem 0 1rem 0;">{{ t.teams.title if t.teams and t.teams.title else 'Teams' }}</h2>
-    <div class="cards-grid">
-        {% for team in teams[:30] %}
-        {% set team_id = team.id if team.id else (team.data.team.id if team.data and team.data.team else '') %}
-        {% set team_name = team.cells[0].text[0] if team.cells and team.cells|length > 0 else (team.data.team.name if team.data and team.data.team else (team.text if team.text else 'Team')) %}
-        <div class="card" onclick="window.location='/{{ locale }}/team/{{ team_id }}'" style="cursor: pointer;">
-            <div class="card-icon">👥</div>
-            <h3>{{ team_name }}</h3>
-            {% if team.cells and team.cells|length > 2 and team.cells[2].url and team.cells[2].url.text %}
-            <p style="color: var(--gray-600); font-size: 0.875rem;">
-                📍 {{ team.cells[2].url.text }}
-            </p>
-            {% elif team.data and team.data.club_name %}
-            <p style="color: var(--gray-600); font-size: 0.875rem;">
-                🏢 {{ team.data.club_name }}
-            </p>
-            {% elif team.set_in_context and team.set_in_context.club_name %}
-            <p style="color: var(--gray-600); font-size: 0.875rem;">
-                🏢 {{ team.set_in_context.club_name }}
-            </p>
-            {% endif %}
-        </div>
         {% endfor %}
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
+        <p style="font-size:2rem">📅</p>
+        <p>No completed games available yet.</p>
+      </div>
+      {% endif %}
     </div>
-    {% if teams|length > 30 %}
-    <p style="text-align: center; color: var(--gray-600); margin-top: 1rem;">
-        Showing 30 of {{ teams|length }} teams
-    </p>
-    {% endif %}
-    {% endif %}
 
-    <!-- Top Scorers Section -->
-    {% if topscorers %}
-    <h2 style="margin: 2rem 0 1rem 0;">{{ t.rankings.topscorers if t.rankings and t.rankings.topscorers else 'Top Scorers' }}</h2>
-    <div class="card">
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse;">
-                <thead style="background: var(--gray-100); border-bottom: 2px solid var(--gray-300);">
-                    <tr>
-                        <th style="padding: 0.75rem; text-align: left;">Rank</th>
-                        <th style="padding: 0.75rem; text-align: left;">Player</th>
-                        <th style="padding: 0.75rem; text-align: left;">Team</th>
-                        <th style="padding: 0.75rem; text-align: center;">GP</th>
-                        <th style="padding: 0.75rem; text-align: center;">G</th>
-                        <th style="padding: 0.75rem; text-align: center;">A</th>
-                        <th style="padding: 0.75rem; text-align: center; font-weight: bold;">Pts</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for scorer in topscorers[:20] %}
-                    <tr style="border-bottom: 1px solid var(--gray-200);">
-                        <td style="padding: 0.75rem; font-weight: 600;">
-                            {{ scorer.data.rank if scorer.data and scorer.data.rank else (scorer.rank if scorer.rank else loop.index) }}
-                        </td>
-                        <td style="padding: 0.75rem; font-weight: 600;">
-                            {{ scorer.data.player.name if scorer.data and scorer.data.player else (scorer.player_name if scorer.player_name else scorer.player) }}
-                        </td>
-                        <td style="padding: 0.75rem;">
-                            {{ scorer.data.team.name if scorer.data and scorer.data.team else (scorer.team_name if scorer.team_name else scorer.team) }}
-                        </td>
-                        <td style="padding: 0.75rem; text-align: center;">
-                            {{ scorer.cells[3].text[0] if scorer.cells and scorer.cells|length > 3 else (scorer.games_played if scorer.games_played else scorer.gp) }}
-                        </td>
-                        <td style="padding: 0.75rem; text-align: center;">
-                            {{ scorer.cells[4].text[0] if scorer.cells and scorer.cells|length > 4 else (scorer.goals if scorer.goals else scorer.g) }}
-                        </td>
-                        <td style="padding: 0.75rem; text-align: center;">
-                            {{ scorer.cells[5].text[0] if scorer.cells and scorer.cells|length > 5 else (scorer.assists if scorer.assists else scorer.a) }}
-                        </td>
-                        <td style="padding: 0.75rem; text-align: center; font-weight: 700; color: var(--swiss-red);">
-                            {{ scorer.cells[6].text[0] if scorer.cells and scorer.cells|length > 6 else (scorer.points if scorer.points else scorer.pts) }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Recent Games -->
-    {% if games %}
-    <h2 style="margin: 2rem 0 1rem 0;">{{ t.games.title if t.games and t.games.title else 'Recent Games' }}</h2>
-    <div class="card">
-        {% for game in games[:15] %}
-        <div style="padding: 1rem; border-bottom: 1px solid var(--gray-200); {% if loop.last %}border-bottom: none;{% endif %}">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <strong>{{ game.home_team if game.home_team else 'Home' }} vs {{ game.away_team if game.away_team else 'Away' }}</strong>
-                    {% if game.score %}
-                    <p style="margin: 0.25rem 0 0 0; color: var(--gray-600);">
-                        Score: {{ game.score }}
-                    </p>
-                    {% endif %}
-                </div>
-                <div style="text-align: right; color: var(--gray-600); font-size: 0.875rem;">
-                    {% if game.date %}{{ game.date }}{% endif %}
-                    {% if game.time %}<br>{{ game.time }}{% endif %}
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
+  </div>
 </div>
 {% endblock %}

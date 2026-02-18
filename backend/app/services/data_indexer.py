@@ -529,6 +529,8 @@ class DataIndexer:
                                 if season_label and row_season != season_label:
                                     continue
 
+                                league_abbrev    = _txt(1)  # e.g. "NLB", "NLA", "L-UPL"
+                                team_name_txt    = _txt(2)  # e.g. "Unihockey Basel Regio"
                                 games_played     = _int(3)
                                 goals            = _int(4)
                                 assists          = _int(5)
@@ -543,6 +545,8 @@ class DataIndexer:
                                     ).first()
                                 )
                                 if existing:
+                                    existing.league_abbrev   = league_abbrev
+                                    existing.team_name       = team_name_txt
                                     existing.games_played    = games_played
                                     existing.goals           = goals
                                     existing.assists         = assists
@@ -553,6 +557,8 @@ class DataIndexer:
                                     session.add(PlayerStatistics(
                                         player_id       = person_id,
                                         season_id       = season_id,
+                                        league_abbrev   = league_abbrev,
+                                        team_name       = team_name_txt,
                                         games_played    = games_played,
                                         goals           = goals,
                                         assists         = assists,
@@ -791,22 +797,30 @@ class DataIndexer:
 
                             # --- home team ---
                             home_team_id = None
+                            home_team_name = None
                             if len(cells) > 2:
                                 hl = cells[2].get("link", {})
                                 if hl.get("ids"):
                                     home_team_id = hl["ids"][0]
+                                t = cells[2].get("text", [])
+                                home_team_name = (t[0] if isinstance(t, list) else t) or None
 
                             # --- away team ---
                             away_team_id = None
+                            away_team_name = None
                             if len(cells) > 6:
                                 al = cells[6].get("link", {})
                                 if al.get("ids"):
                                     away_team_id = al["ids"][0]
+                                t = cells[6].get("text", [])
+                                away_team_name = (t[0] if isinstance(t, list) else t) or None
                             elif len(cells) > 5:
                                 # fallback: some rows have logo at 5, team at 6
                                 al = cells[5].get("link", {})
                                 if al.get("ids"):
                                     away_team_id = al["ids"][0]
+                                t = cells[5].get("text", [])
+                                away_team_name = (t[0] if isinstance(t, list) else t) or None
 
                             if not home_team_id or not away_team_id:
                                 continue
@@ -829,20 +843,33 @@ class DataIndexer:
                                             pass
 
                             # Ensure teams exist (create stubs if not in our DB)
+                            # and update names when available from the game row
+                            team_name_map = {
+                                home_team_id: home_team_name,
+                                away_team_id: away_team_name,
+                            }
                             for tid in (home_team_id, away_team_id):
                                 from app.models.db_models import Team
-                                if not session.get(Team, (tid, season_id)):
+                                tname = team_name_map.get(tid)
+                                existing = session.get(Team, (tid, season_id))
+                                if not existing:
                                     stub = Team(
                                         id=tid,
                                         season_id=season_id,
                                         league_id=league_id,
                                         game_class=game_class,
+                                        name=tname,
+                                        text=tname,
                                     )
                                     session.add(stub)
                                     try:
                                         session.flush()
                                     except Exception:
                                         session.rollback()
+                                elif tname and not existing.name:
+                                    # Backfill name on existing nameless stub
+                                    existing.name = tname
+                                    existing.text = tname
 
                             # Upsert game
                             game = session.get(Game, game_id)
@@ -980,6 +1007,60 @@ class DataIndexer:
                 logger.debug(f"Failed to index events for game {game_id}: {e}")
                 return 0
 
+    def backfill_team_names(self, season_id: int, force: bool = False) -> int:
+        """Backfill Team.name for stub rows that have no name.
+
+        Calls the rankings API for every league in the season and records
+        the (team_id → name) mapping returned by the API into the local DB.
+
+        Returns number of Team rows updated.
+        """
+        entity_id = f"backfill_team_names:{season_id}"
+        if not force and not self._should_update("team_names", entity_id, max_age_hours=24):
+            logger.debug(f"Team names for season {season_id} recently backfilled, skipping")
+            return 0
+
+        logger.info(f"Backfilling team names for season {season_id}...")
+        updated = 0
+
+        with self.db_service.session_scope() as session:
+            leagues = session.query(League).filter(League.season_id == season_id).all()
+            name_map: dict[int, str] = {}  # team_id → name (across all leagues)
+
+            for lg in leagues:
+                try:
+                    data = self.client.get_rankings(
+                        league=lg.league_id,
+                        game_class=lg.game_class,
+                        season=season_id,
+                    )
+                    regions = data.get("data", {}).get("regions", [])
+                    for region in regions:
+                        for row in region.get("rows", []):
+                            row_data = row.get("data", {})
+                            team_info = row_data.get("team", {})
+                            tid = team_info.get("id")
+                            tname = team_info.get("name")
+                            if tid and tname:
+                                name_map[tid] = tname
+                except Exception as e:
+                    logger.warning(f"Rankings fetch failed for league {lg.league_id}: {e}")
+
+            logger.info(f"Resolved {len(name_map)} team names from rankings API")
+
+            # Bulk-update all nameless Team stubs in this season
+            for team_id, name in name_map.items():
+                team = session.get(Team, (team_id, season_id))
+                if team and not team.name:
+                    team.name = name
+                    team.text = name
+                    updated += 1
+
+            session.commit()
+            self._mark_sync_complete(session, "team_names", entity_id, updated)
+            logger.info(f"✓ Backfilled names for {updated} teams in season {season_id}")
+            return updated
+
     def index_leagues_path(self, season_id: int = 2025,
                             index_games: bool = True,
                             index_events: bool = False,
@@ -995,7 +1076,7 @@ class DataIndexer:
         Returns:
             Dict with counts: leagues, groups, games, events.
         """
-        stats: Dict[str, int] = {"leagues": 0, "groups": 0, "games": 0, "events": 0}
+        stats: Dict[str, int] = {"leagues": 0, "groups": 0, "games": 0, "team_names": 0, "events": 0}
 
         logger.info(f"=== LEAGUES PATH starting for season {season_id} ===")
 
@@ -1040,7 +1121,11 @@ class DataIndexer:
                 )
                 stats["games"] += gm_count
 
-        # 5. Optionally index events for past games (game_date < now, regardless of stored status)
+        # 5. Backfill team names from rankings API (fills stubs created during game indexing)
+        if index_games:
+            stats["team_names"] = self.backfill_team_names(season_id, force=force)
+
+        # 6. Optionally index events for past games (game_date < now, regardless of stored status)
         if index_events:
             now = datetime.utcnow()
             with self.db_service.session_scope() as session:
