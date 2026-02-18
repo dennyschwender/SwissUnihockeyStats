@@ -33,6 +33,11 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+# Install gosu for step-down from root
+RUN apt-get update && apt-get install -y --no-install-recommends gosu && \
+    rm -rf /var/lib/apt/lists/* && \
+    gosu nobody true
+
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \
     mkdir -p /app/data/cache && \
@@ -53,14 +58,15 @@ COPY --chown=appuser:appuser backend/static/ ./static/
 COPY --chown=appuser:appuser backend/templates/ ./templates/
 COPY --chown=appuser:appuser scripts/ ./scripts/
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Create cache directory with proper permissions
 RUN mkdir -p /app/data/cache && \
     chown -R appuser:appuser /app/data
 
-# Switch to non-root user
-USER appuser
-
-# Update PATH
+# Update PATH for appuser
 ENV PATH=/home/appuser/.local/bin:$PATH
 
 # Health check
@@ -69,6 +75,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Expose port
 EXPOSE 8000
+
+# Entrypoint handles permission fixes and user switching
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 # Default command: Run FastAPI server
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
