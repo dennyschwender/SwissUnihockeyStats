@@ -21,6 +21,7 @@ aioredis==2.0.1
 
 # HTTP Client
 httpx==0.26.0
+requests==2.31.0
 
 # CORS
 python-jose[cryptography]==3.3.0
