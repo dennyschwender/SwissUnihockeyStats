@@ -44,6 +44,10 @@
         <span>🏒</span> Results
         {% if games %}<span class="tab-badge">{{ games|length }}</span>{% endif %}
       </button>
+      <button @click="tab='upcoming'" :class="tab==='upcoming' ? 'league-tab active' : 'league-tab'">
+        <span>📅</span> Upcoming
+        {% if upcoming_games %}<span class="tab-badge">{{ upcoming_games|length }}</span>{% endif %}
+      </button>
     </div>
 
     <!-- STANDINGS -->
@@ -67,7 +71,7 @@
           <tbody>
             {% for row in standings %}
             <tr onclick="window.location='/{{ locale }}/team/{{ row.team_id }}'"
-              style="cursor:pointer;border-bottom:1px solid var(--gray-100);"
+              style="cursor:pointer;border-bottom:1px solid var(--gray-100);{% if row.rank <= 4 %}border-left:3px solid #16a34a;{% elif row.rank > standings|length - 2 %}border-left:3px solid #dc2626;{% endif %}"
               onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
               <td style="padding:.6rem .5rem;text-align:center;font-weight:600;color:var(--gray-500);">{{ row.rank }}</td>
               <td style="padding:.6rem .75rem;font-weight:500;">{{ row.team_name }}</td>
@@ -162,6 +166,30 @@
       <div style="text-align:center;padding:3rem;color:var(--gray-500);">
         <p style="font-size:2rem">📅</p>
         <p>No completed games available yet.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- UPCOMING -->
+    <div x-show="tab==='upcoming'">
+      {% if upcoming_games %}
+      <div style="display:flex;flex-direction:column;gap:.5rem;">
+        {% for g in upcoming_games %}
+        <a href="/{{ locale }}/game/{{ g.game_id }}" style="text-decoration:none;color:inherit;">
+          <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;"
+               onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
+            <span style="width:110px;font-size:.8rem;color:var(--gray-500);">{{ g.weekday }} {{ g.date }}{% if g.time %} {{ g.time }}{% endif %}</span>
+            <span style="flex:1;font-weight:500;text-align:right;padding-right:.75rem;">{{ g.home_team }}</span>
+            <span style="width:50px;text-align:center;font-weight:400;font-size:.85rem;color:var(--gray-400);">vs</span>
+            <span style="flex:1;font-weight:500;padding-left:.75rem;">{{ g.away_team }}</span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
+        <p style="font-size:2rem">📅</p>
+        <p>No upcoming games scheduled.</p>
       </div>
       {% endif %}
     </div>

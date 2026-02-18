@@ -532,6 +532,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
 def get_player_detail(person_id: int) -> dict:
     """
     Return player profile + per-season stats across all seasons.
+    Uses team_name / league_abbrev text columns (populated since schema migration).
     """
     db = get_database_service()
     with db.session_scope() as session:
@@ -540,26 +541,21 @@ def get_player_detail(person_id: int) -> dict:
             return {}
 
         stats_rows = (
-            session.query(PlayerStatistics, Season, Team)
+            session.query(PlayerStatistics, Season)
             .join(Season, PlayerStatistics.season_id == Season.id)
-            .join(
-                Team,
-                (Team.id == PlayerStatistics.team_id)
-                & (Team.season_id == PlayerStatistics.season_id),
-                isouter=True,
-            )
             .filter(PlayerStatistics.player_id == person_id)
             .order_by(Season.id.desc())
             .all()
         )
 
         career: list[dict] = []
-        for ps, season, tm in stats_rows:
+        for ps, season in stats_rows:
             career.append(
                 {
                     "season_text": season.text or str(season.id),
                     "season_id": season.id,
-                    "team_name": (tm.name if tm else None) or f"Team {ps.team_id}",
+                    "team_name": ps.team_name or "—",
+                    "league": ps.league_abbrev or "",
                     "team_id": ps.team_id,
                     "gp": ps.games_played,
                     "g": ps.goals,
@@ -591,7 +587,76 @@ def get_player_detail(person_id: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 7. Game detail / box score
+# 7. Upcoming games
+# ---------------------------------------------------------------------------
+
+def get_upcoming_games(
+    limit: int = 10,
+    league_ids: Optional[list] = None,
+    season_id: Optional[int] = None,
+) -> list[dict]:
+    """Return next scheduled games (no score yet), ordered soonest first."""
+    from datetime import date as _date
+    db = get_database_service()
+    with db.session_scope() as session:
+        if season_id is None:
+            season_id = _get_current_season_id(session)
+
+        today = _date.today()
+        q = (
+            session.query(Game)
+            .filter(
+                Game.season_id == season_id,
+                Game.home_score.is_(None),
+                Game.game_date.isnot(None),
+                Game.game_date >= today,
+            )
+        )
+        if league_ids:
+            q = q.join(LeagueGroup, Game.group_id == LeagueGroup.id).filter(
+                LeagueGroup.league_id.in_(league_ids)
+            )
+        games_raw = q.order_by(Game.game_date.asc()).limit(limit).all()
+
+        if not games_raw:
+            return []
+
+        team_ids = {g.home_team_id for g in games_raw} | {g.away_team_id for g in games_raw}
+        t_names: dict = {}
+        for t in session.query(Team).filter(
+            Team.id.in_(team_ids), Team.season_id == season_id
+        ).all():
+            t_names[t.id] = t.name or t.text or f"Team {t.id}"
+        missing = team_ids - t_names.keys()
+        if missing:
+            for t in session.query(Team).filter(Team.id.in_(missing), Team.name.isnot(None)).all():
+                t_names.setdefault(t.id, t.name)
+
+        # league name per group
+        group_ids = {g.group_id for g in games_raw}
+        grp_league: dict = {}
+        for grp in session.query(LeagueGroup).filter(LeagueGroup.id.in_(group_ids)).all():
+            lg = session.query(League).filter(League.id == grp.league_id).first()
+            grp_league[grp.id] = lg.name if lg else ""
+
+        return [
+            {
+                "game_id": g.id,
+                "date": g.game_date.strftime("%d.%m") if g.game_date else "",
+                "weekday": g.game_date.strftime("%a") if g.game_date else "",
+                "time": g.game_time or "",
+                "home_team": t_names.get(g.home_team_id, f"Team {g.home_team_id}"),
+                "away_team": t_names.get(g.away_team_id, f"Team {g.away_team_id}"),
+                "home_team_id": g.home_team_id,
+                "away_team_id": g.away_team_id,
+                "league": grp_league.get(g.group_id, ""),
+            }
+            for g in games_raw
+        ]
+
+
+# ---------------------------------------------------------------------------
+# 8. Game detail / box score
 # ---------------------------------------------------------------------------
 
 _GOAL_RE = re.compile(r"^(Torschütze|Eigentor)\s+(\d+):(\d+)", re.IGNORECASE)

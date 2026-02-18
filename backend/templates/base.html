@@ -36,16 +36,16 @@
     <link rel="alternate" hreflang="it" href="{{ request.url.scheme }}://{{ request.url.netloc }}/it{{ request.url.path[3:] }}">
     <link rel="alternate" hreflang="x-default" href="{{ request.url.scheme }}://{{ request.url.netloc }}/de{{ request.url.path[3:] }}">
     
-    <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <!-- Favicon (inline SVG data URI - no file needed) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%92%3C/text%3E%3C/svg%3E">
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#FF0000">
+    <meta name="theme-color" content="#e11d48">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="SwissUnihockey">
-    <link rel="apple-touch-icon" href="/static/images/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/static/images/icon-192x192.svg">
     
     <!-- CSS -->
     <link rel="stylesheet" href="/static/css/main.css">

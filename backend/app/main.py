@@ -898,13 +898,18 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
 
 @app.get("/{locale}", response_class=HTMLResponse)
 async def home(request: Request, locale: str):
-    """Homepage with language selection"""
+    """Homepage with upcoming games + NLB top scorers"""
+    from app.services.stats_service import get_upcoming_games, get_league_top_scorers
+    upcoming = get_upcoming_games(limit=8, league_ids=[1, 2])
+    top_scorers = get_league_top_scorers(1, limit=5)
     return templates.TemplateResponse(
         "home.html",
         {
             "request": request,
             "locale": locale,
-            "t": get_translations(locale)
+            "t": get_translations(locale),
+            "upcoming_games": upcoming,
+            "top_scorers": top_scorers,
         }
     )
 
@@ -1104,12 +1109,54 @@ async def league_detail(request: Request, locale: str, league_id: int):
                 "standings": [],
                 "topscorers": [],
                 "games": [],
+                "upcoming_games": [],
                 "error_message": error_message,
             },
         )
 
     standings = get_league_standings(league_id)
     topscorers = get_league_top_scorers(league_id, limit=25)
+
+    # Upcoming (unscored) games for this league
+    from app.services.stats_service import get_upcoming_games
+    group_ids_for_league = [g["id"] for g in league_data.get("groups", [])]
+    upcoming_games: list[dict] = []
+    if group_ids_for_league:
+        with db.session_scope() as sess:
+            from app.models.db_models import LeagueGroup as LG
+            from datetime import date as _date
+            uq = (
+                sess.query(Game)
+                .filter(
+                    Game.group_id.in_(group_ids_for_league),
+                    Game.home_score.is_(None),
+                    Game.game_date.isnot(None),
+                    Game.game_date >= _date.today(),
+                )
+                .order_by(Game.game_date.asc())
+                .limit(15)
+                .all()
+            )
+            u_team_ids = {g.home_team_id for g in uq} | {g.away_team_id for g in uq}
+            u_names: dict = {}
+            from app.models.db_models import Team as TM
+            for t in sess.query(TM).filter(TM.id.in_(u_team_ids), TM.season_id == league_data["season_id"]).all():
+                u_names[t.id] = t.name or t.text or f"Team {t.id}"
+            missing = u_team_ids - u_names.keys()
+            if missing:
+                for t in sess.query(TM).filter(TM.id.in_(missing), TM.name.isnot(None)).all():
+                    u_names.setdefault(t.id, t.name)
+            for g in uq:
+                upcoming_games.append({
+                    "game_id": g.id,
+                    "date": g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
+                    "weekday": g.game_date.strftime("%a") if g.game_date else "",
+                    "time": g.game_time or "",
+                    "home_team": u_names.get(g.home_team_id, f"Team {g.home_team_id}"),
+                    "away_team": u_names.get(g.away_team_id, f"Team {g.away_team_id}"),
+                    "home_team_id": g.home_team_id,
+                    "away_team_id": g.away_team_id,
+                })
 
     # Recent results for this league
     db = get_database_service()
@@ -1161,6 +1208,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             "standings": standings,
             "topscorers": topscorers,
             "games": recent_games,
+            "upcoming_games": upcoming_games,
             "error_message": error_message,
         },
     )

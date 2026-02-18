@@ -39,6 +39,7 @@
       <thead>
         <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
           <th style="padding:.6rem .75rem;text-align:left;">Season</th>
+          <th style="padding:.6rem .75rem;text-align:left;">League</th>
           <th style="padding:.6rem .75rem;text-align:left;">Team</th>
           <th style="padding:.6rem .5rem;text-align:center;">GP</th>
           <th style="padding:.6rem .5rem;text-align:center;">G</th>
@@ -53,6 +54,7 @@
         <tr style="border-bottom:1px solid var(--gray-100);"
           onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
           <td style="padding:.6rem .75rem;font-weight:500;">{{ row.season_text }}</td>
+          <td style="padding:.6rem .75rem;color:var(--gray-500);font-size:.8rem;">{{ row.league }}</td>
           <td style="padding:.6rem .75rem;color:var(--gray-600);">{{ row.team_name }}</td>
           <td style="padding:.6rem .5rem;text-align:center;">{{ row.gp }}</td>
           <td style="padding:.6rem .5rem;text-align:center;">{{ row.g }}</td>
@@ -66,7 +68,7 @@
         {% endfor %}
         <!-- Totals row -->
         <tr style="background:var(--gray-50);border-top:2px solid var(--gray-200);font-weight:700;">
-          <td style="padding:.6rem .75rem;" colspan="2">Career Totals</td>
+          <td style="padding:.6rem .75rem;" colspan="3">Career Totals</td>
           <td style="padding:.6rem .5rem;text-align:center;">{{ player.totals.gp }}</td>
           <td style="padding:.6rem .5rem;text-align:center;">{{ player.totals.g }}</td>
           <td style="padding:.6rem .5rem;text-align:center;">{{ player.totals.a }}</td>
@@ -82,6 +84,35 @@
     <p style="font-size:2rem">📊</p>
     <p>No statistics on record for this player.</p>
   </div>
+  {% endif %}
+
+  {% if player.career | length > 1 %}
+  <h2 style="font-size:1.25rem;font-weight:600;margin:2rem 0 .75rem;">Goals &amp; Assists by Season</h2>
+  <div style="background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.75rem;padding:1.25rem;">
+    <canvas id="careerChart" height="90"></canvas>
+  </div>
+  <script>
+  (function(){
+    const labels = {{ player.career | reverse | map(attribute='season_text') | list | tojson }};
+    const goals   = {{ player.career | reverse | map(attribute='g')          | list | tojson }};
+    const assists = {{ player.career | reverse | map(attribute='a')          | list | tojson }};
+    new Chart(document.getElementById('careerChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Goals',   data: goals,   backgroundColor: '#e11d48', borderRadius: 4 },
+          { label: 'Assists', data: assists, backgroundColor: '#3b82f6', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'top' } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 5 } } }
+      }
+    });
+  })();
+  </script>
   {% endif %}
 
   {% endif %}
