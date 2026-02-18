@@ -48,6 +48,8 @@ data/cache/teams/*.json
 # Logs
 *.log
 logs/
+uvicorn_err.txt
+uvicorn_out.txt
 
 # Config files with credentials
 credentials.ini
