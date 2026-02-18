@@ -124,6 +124,11 @@ async def lifespan(app: FastAPI):
 
 
 # Create FastAPI app with lifespan
+class _AdminNotAuthenticated(Exception):
+    """Raised by require_admin dependency when session is not authenticated."""
+    pass
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
@@ -151,6 +156,11 @@ app.add_middleware(
 
 # Include API router (JSON endpoints)
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+
+@app.exception_handler(_AdminNotAuthenticated)
+async def _admin_not_auth_handler(request: Request, exc: _AdminNotAuthenticated):
+    return RedirectResponse(url="/admin/login", status_code=302)
 
 
 # DEBUG endpoint to check player index status
@@ -309,9 +319,9 @@ def _pin_hash(pin: str) -> str:
 _ADMIN_TOKEN_KEY = "admin_authed"
 
 def require_admin(request: Request):
-    """FastAPI dependency — raises 302 redirect if not logged in."""
+    """FastAPI dependency — raises exception caught by handler below if not logged in."""
     if request.session.get(_ADMIN_TOKEN_KEY) != _pin_hash(settings.ADMIN_PIN):
-        raise HTTPException(status_code=307, headers={"Location": "/admin/login"})
+        raise _AdminNotAuthenticated()
 
 
 # ============================================================================
