@@ -62,8 +62,13 @@ Thumbs.db
 
 # Database
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
+
+# SQLite database files in data directory
+data/swissunihockey.db*
 
 # Docker
 .env
