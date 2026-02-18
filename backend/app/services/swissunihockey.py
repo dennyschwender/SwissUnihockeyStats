@@ -1,17 +1,7 @@
 """
-SwissUnihockey API integration service
-Connects FastAPI backend to the existing Python API client
+SwissUnihockey API integration service — singleton wrapper around SwissUnihockeyClient.
 """
-import sys
-from pathlib import Path
-
-# Add parent directory to path to import from ../api
-backend_dir = Path(__file__).resolve().parent.parent.parent
-root_dir = backend_dir.parent
-sys.path.insert(0, str(root_dir))
-
-# Import the existing API client
-from api import SwissUnihockeyClient
+from app.services.api_client import SwissUnihockeyClient
 from app.config import settings
 
 
