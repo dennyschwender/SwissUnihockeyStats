@@ -18,6 +18,14 @@ class ThemeManager {
         const theme = savedTheme || (prefersDark ? 'dark' : 'light');
         this.setTheme(theme, false);
 
+        // Sync button icon once DOM is ready (script runs in <head>)
+        document.addEventListener('DOMContentLoaded', () => {
+            const btn = document.getElementById('theme-toggle-btn');
+            if (btn) {
+                btn.textContent = this.getCurrentTheme() === 'dark' ? '☀️' : '🌙';
+            }
+        });
+
         // Listen for system theme changes
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
             if (!localStorage.getItem(this.STORAGE_KEY)) {
@@ -35,6 +43,13 @@ class ThemeManager {
 
         if (save) {
             localStorage.setItem(this.STORAGE_KEY, theme);
+        }
+
+        // Update toggle button icon
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn) {
+            btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+            btn.title = theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
         }
 
         // Dispatch custom event for other components

@@ -100,19 +100,15 @@
                         <li><a href="/{{ locale }}/teams" {% if '/teams' in request.url.path %}class="active"{% endif %}>{{ t.nav.teams }}</a></li>
                         <li><a href="/{{ locale }}/players" {% if '/players' in request.url.path or '/player/' in request.url.path %}class="active"{% endif %}>{{ t.nav.players }}</a></li>
                         <li><a href="/{{ locale }}/games" {% if '/games' in request.url.path %}class="active"{% endif %}>{{ t.nav.games }}</a></li>
-                    
-                    <!-- Theme Toggle -->
-                    <button class="theme-toggle" 
-                            x-data="themeToggle()" 
-                            @click="toggle()"
-                            :title="theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
-                            aria-label="Toggle theme">
-                        <span x-show="theme === 'light'">🌙</span>
-                        <span x-show="theme === 'dark'">☀️</span>
-                    </button>
                         <li><a href="/{{ locale }}/rankings" {% if '/rankings' in request.url.path %}class="active"{% endif %}>{{ t.nav.rankings }}</a></li>
                     </ul>
                 </nav>
+
+                <!-- Theme Toggle -->
+                <button id="theme-toggle-btn" class="theme-toggle"
+                        onclick="themeManager.toggle()"
+                        aria-label="Toggle theme"
+                        title="Toggle dark/light mode">🌙</button>
                 
                 <!-- Language Switcher -->
                 <div class="language-switcher" x-data="{ locale: '{{ locale }}' }">
