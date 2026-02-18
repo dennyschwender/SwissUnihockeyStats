@@ -119,9 +119,17 @@ class SwissUnihockeyClient:
         """Fetch all leagues (cached for 7 days)."""
         return self._make_request("/api/leagues", category="leagues", force_refresh=force_refresh)
 
-    def get_clubs(self, force_refresh: bool = False) -> Dict[str, Any]:
-        """Fetch all clubs (cached for 30 days)."""
-        return self._make_request("/api/clubs", category="clubs", force_refresh=force_refresh)
+    def get_clubs(self, force_refresh: bool = False, **params) -> Dict[str, Any]:
+        """Fetch all clubs (cached for 30 days).
+        
+        Args:
+            force_refresh: Force refresh cache
+            **params: Query parameters (e.g., season)
+        
+        Returns:
+            Clubs data
+        """
+        return self._make_request("/api/clubs", params, category="clubs", force_refresh=force_refresh)
 
     def get_seasons(self, force_refresh: bool = False) -> Dict[str, Any]:
         """Fetch all seasons (cached for 30 days)."""
@@ -144,7 +152,8 @@ class SwissUnihockeyClient:
         Fetch games.
 
         Args:
-            **params: Query parameters (e.g., team_id, league, season, from_date, to_date)
+            **params: Query parameters (e.g., mode="list", season, league, game_class, team_id)
+                     Note: For league games, use mode="list" with season, league, and game_class
 
         Returns:
             Games data
@@ -162,6 +171,55 @@ class SwissUnihockeyClient:
             Game events data
         """
         return self._make_request("/api/game_events", params)
+    
+    def get_game_details(self, game_id: int) -> Dict[str, Any]:
+        """
+        Fetch detailed game information.
+        
+        Args:
+            game_id: Game ID
+            
+        Returns:
+            Game details
+        """
+        return self._make_request(f"/api/games/{game_id}", {})
+    
+    def get_game_summary(self, game_id: int) -> Dict[str, Any]:
+        """
+        Fetch game summary.
+        
+        Args:
+            game_id: Game ID
+            
+        Returns:
+            Game summary
+        """
+        return self._make_request(f"/api/games/{game_id}/summary", {})
+    
+    def get_game_lineup(self, game_id: int, is_home: int = 1) -> Dict[str, Any]:
+        """
+        Fetch game lineup (players for home or away team).
+        
+        Args:
+            game_id: Game ID
+            is_home: 1 for home team, 0 for away team
+            
+        Returns:
+            Game lineup data
+        """
+        return self._make_request(f"/api/games/{game_id}/teams/{is_home}/players", {})
+    
+    def get_game_events_by_id(self, game_id: int) -> Dict[str, Any]:
+        """
+        Fetch game events by game ID.
+        
+        Args:
+            game_id: Game ID
+            
+        Returns:
+            Game events data
+        """
+        return self._make_request(f"/api/game_events/{game_id}", {})
 
     def get_rankings(self, force_refresh: bool = False, **params) -> Dict[str, Any]:
         """
@@ -200,6 +258,56 @@ class SwissUnihockeyClient:
             Players data
         """
         return self._make_request("/api/players", params)
+    
+    def get_team_players(self, team_id: int) -> Dict[str, Any]:
+        """
+        Fetch players for a specific team (team roster).
+        
+        Args:
+            team_id: Team ID
+            
+        Returns:
+            Team players data
+        """
+        return self._make_request(f"/api/teams/{team_id}/players", {})
+    
+    def get_player_details(self, player_id: int) -> Dict[str, Any]:
+        """
+        Fetch detailed player information.
+        
+        Args:
+            player_id: Player/person ID
+            
+        Returns:
+            Player details
+        """
+        return self._make_request(f"/api/players/{player_id}", {})
+    
+    def get_player_stats(self, player_id: int, **params) -> Dict[str, Any]:
+        """
+        Fetch player statistics.
+        
+        Args:
+            player_id: Player/person ID
+            **params: Additional query parameters (e.g., season)
+            
+        Returns:
+            Player statistics
+        """
+        return self._make_request(f"/api/players/{player_id}/statistics", params)
+    
+    def get_player_overview(self, player_id: int, **params) -> Dict[str, Any]:
+        """
+        Fetch player games overview.
+        
+        Args:
+            player_id: Player/person ID
+            **params: Additional query parameters
+            
+        Returns:
+            Player games overview
+        """
+        return self._make_request(f"/api/players/{player_id}/overview", params)
 
     def get_national_players(self, **params) -> Dict[str, Any]:
         """

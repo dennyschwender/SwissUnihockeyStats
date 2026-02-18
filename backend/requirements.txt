@@ -37,3 +37,4 @@ mypy==1.8.0
 
 # Utilities
 python-dateutil==2.8.2
+click==8.1.7

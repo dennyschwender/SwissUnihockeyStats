@@ -45,11 +45,16 @@ class Settings(BaseSettings):
     
     # Database (Optional)
     DATABASE_URL: str | None = None
+    DATABASE_PATH: str = "../data/swissunihockey.db"
     
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     WORKERS: int = 1
+
+    # Admin protection
+    ADMIN_PIN: str = "1234"          # Override via env: ADMIN_PIN=yourpin
+    SESSION_SECRET: str = "change-me-in-production-use-random-32-chars"
     
     class Config:
         env_file = ".env"

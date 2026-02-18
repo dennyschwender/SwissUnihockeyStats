@@ -401,32 +401,34 @@ class DataCache:
         """
         logger.info("Indexing players from team rosters...")
         client = get_swissunihockey_client()
-        from app.main import get_current_season
-        current_season = get_current_season()
         
-        # Ensure leagues are loaded
-        await self.load_leagues()
+        # Use season 2025 (2024/25) - season 2026 doesn't have data yet
+        season = 2025
         
         new_players = 0
         teams_processed = 0
         
-        # Process a sample of leagues to extract players from teams
-        for league in self._leagues[:10]:  # Process first 10 leagues
-            context = league.get("set_in_context", {})
-            league_id = context.get("league")
-            game_class = context.get("game_class")
-            mode = context.get("mode", "1")
+        # Focus on major leagues that are known to have rankings
+        # NLB Men: league=2, game_class=11
+        # NLB Women: league=2, game_class=21  
+        major_leagues = [
+            {"league": 2, "game_class": 11, "name": "Herren NLB"},
+            {"league": 2, "game_class": 21, "name": "Damen NLB "},
+            {"league": 3, "game_class": 11, "name": "1. Liga"},
+            {"league": 3, "game_class": 21, "name": "Damen 1. Liga"},
+        ]
+        
+        for league_info in major_leagues:
+            league_id = league_info["league"]
+            game_class = league_info["game_class"]
+            league_name = league_info["name"]
             
-            if not league_id or not game_class:
-                continue
-                
             try:
-                # Fetch teams for this league
-                teams_data = client.get_teams(
+                # Fetch teams from rankings (more reliable than teams endpoint)
+                teams_data = client.get_rankings(
                     league=league_id,
                     game_class=game_class,
-                    mode=mode,
-                    season=current_season
+                    season=season
                 )
                 
                 teams = []
@@ -434,12 +436,28 @@ class DataCache:
                     if "data" in teams_data:
                         regions = teams_data.get("data", {}).get("regions", [])
                         if regions:
-                            teams = regions[0].get("rows", [])
+                            rows = regions[0].get("rows", [])
+                            # Extract team info from ranking rows
+                            # Each row has data.team.id and data.team.name
+                            for row in rows:
+                                row_data = row.get("data", {})
+                                team_info = row_data.get("team", {})
+                                if team_info.get("id"):
+                                    teams.append({
+                                        "id": team_info.get("id"),
+                                        "text": team_info.get("name", "Unknown Team")
+                                    })
                     elif "entries" in teams_data:
                         teams = teams_data["entries"]
                 
+                if not teams:
+                    logger.debug(f"No teams found for league {league_id}")
+                    continue
+                
+                logger.info(f"  → Found {len(teams)} teams in {league_name}")
+                
                 # For each team, fetch players
-                for team in teams[:3]:  # First 3 teams per league
+                for team in teams[:15]:  # Try up to 15 teams per league to find ones with rosters
                     team_id = team.get("id")
                     team_name = team.get("text", "")
                     
@@ -447,12 +465,26 @@ class DataCache:
                         continue
                     
                     try:
-                        # Fetch players for this team
-                        players_data = client.get_players(team=team_id, season=current_season)
+                        # Fetch players for this team using correct endpoint
+                        players_data = client.get_team_players(team_id)
                         
                         players = []
                         if isinstance(players_data, dict):
-                            players = players_data.get("entries", players_data.get("data", []))
+                            # Team players use table format: data.regions[0].rows
+                            data = players_data.get("data", {})
+                            if isinstance(data, dict) and "regions" in data:
+                                regions = data.get("regions", [])
+                                if regions and len(regions) > 0:
+                                    players = regions[0].get("rows", [])
+                            # Fallback to other formats
+                            elif "entries" in players_data:
+                                players = players_data["entries"]
+                        
+                        if not players:
+                            logger.debug(f"No players found for team {team_id}")
+                            continue
+                        
+                        logger.info(f"  → Found {len(players)} players in team {team_id} ({team_name})")
                         
                         # Index each player
                         for player in players:
@@ -469,7 +501,7 @@ class DataCache:
                                     "person_id": player_id,
                                     "name": player_name,
                                     "text": player_name,
-                                    "teams": [{"id": team_id, "name": team_name, "league": league.get("text", "")}],
+                                    "teams": [{"id": team_id, "name": team_name, "league": league_name}],
                                     "games": [],  # Will be populated from game events
                                     "stats": {},  # Will aggregate from games
                                     "source": "team_roster",
@@ -478,7 +510,7 @@ class DataCache:
                                 new_players += 1
                             else:
                                 # Add team to existing player
-                                team_info = {"id": team_id, "name": team_name, "league": league.get("text", "")}
+                                team_info = {"id": team_id, "name": team_name, "league": league_name}
                                 if team_info not in self._players[player_id]["teams"]:
                                     self._players[player_id]["teams"].append(team_info)
                         
@@ -496,12 +528,17 @@ class DataCache:
         return new_players
     
     async def index_players_from_games(self) -> int:
-        """Extract and index players from game events and lineups
+        """Extract and index players from game lineups
+        
+        Uses hierarchical API structure:
+        1. Get leagues from cache
+        2. For each league, fetch games with actual league/game_class parameters
+        3. For each game, fetch lineups for home and away teams
         
         Returns:
             Number of players updated with game stats
         """
-        logger.info("Indexing players from game events...")
+        logger.info("Indexing players from game lineups...")
         client = get_swissunihockey_client()
         from app.main import get_current_season
         current_season = get_current_season()
@@ -509,71 +546,138 @@ class DataCache:
         # Ensure leagues are loaded
         await self.load_leagues()
         
+        if not self._leagues:
+            logger.warning("No leagues loaded, cannot index from games")
+            return 0
+        
         players_updated = 0
         games_processed = 0
         
-        # Process recent games from major leagues
-        major_leagues = [(1, 11), (1, 21), (2, 11), (2, 21)]  # NLA/NLB Men & Women
-        
-        for league_id, game_class in major_leagues:
-            try:
-                # Fetch recent games for this league
-                games_data = client.get_games(
-                    league=league_id,
-                    game_class=game_class,
-                    mode="1",
-                    season=current_season
-                )
+        # Process games from actual loaded leagues (use first 5 leagues)
+        for league in self._leagues[:5]:
+            league_id = league.get("id")
+            league_name = league.get("text", "Unknown")
+            
+            # Get game classes for this league
+            game_classes = league.get("game_classes", [])
+            if not game_classes:
+                continue
+            
+            # Process first game class (typically the main competition)
+            for game_class_info in game_classes[:1]:
+                game_class = game_class_info.get("id")
                 
-                games = []
-                if isinstance(games_data, dict):
-                    games = games_data.get("entries", games_data.get("data", []))
+                if not game_class:
+                    continue
                 
-                # Process first few games to extract player stats
-                for game in games[:5]:  # Process 5 games per league
-                    game_id = game.get("id")
+                try:
+                    # Try current season first, fall back to previous season
+                    games_data = None
+                    season_to_use = current_season
+                    
+                    for season_attempt in [current_season, current_season - 1]:
+                        try:
+                            logger.info(f"Fetching games for {league_name} (league={league_id}, game_class={game_class}, season={season_attempt})...")
+                            games_data = client.get_games(
+                                mode="list",
+                                season=season_attempt,
+                                league=league_id,
+                                game_class=game_class
+                            )
+                            season_to_use = season_attempt
+                            break
+                        except Exception as e:
+                            if season_attempt == current_season:
+                                logger.debug(f"  Season {season_attempt} failed: {e}, trying previous season...")
+                            else:
+                                logger.debug(f"  Season {season_attempt} also failed: {e}")
+                                continue
+                    
+                    if not games_data:
+                        continue
+                    
+                    # Parse games list (table format with regions)
+                    games = []
+                    if isinstance(games_data, dict):
+                        # Games use table format with regions
+                        data = games_data.get("data", {})
+                        if isinstance(data, dict) and "regions" in data:
+                            regions = data.get("regions", [])
+                            if regions:
+                                games = regions[0].get("rows", [])
+                        # Fallback to entries
+                        elif "entries" in games_data:
+                            games = games_data["entries"]
+                    
+                    logger.info(f"  → Found {len(games)} games")
+                    
+                    # Process first few games to extract players from lineups
+                    for game in games[:5]:  # Process 5 games per league
+                        game_id = game.get("id")
                     if not game_id:
                         continue
                     
-                    # Store game data
-                    if game_id not in self._games:
-                        self._games[game_id] = game
-                    
-                    # Extract players from game details/events
-                    # Game events contain player actions (goals, assists, etc.)
-                    events = game.get("events", [])
-                    for event in events:
-                        player_id = event.get("person_id") or event.get("player_id")
-                        if not player_id:
-                            continue
+                    try:
+                        # Fetch game lineups for both home and away teams
+                        for is_home in [1, 0]:  # 1=home, 0=away
+                            team_type = "home" if is_home else "away"
+                            logger.info(f"  Fetching {team_type} lineup for game {game_id}...")
+                            
+                            lineup_data = client.get_game_lineup(game_id, is_home)
+                            
+                            if not lineup_data or not isinstance(lineup_data, dict):
+                                continue
+                            
+                            # Parse lineup data (table format)
+                            players = []
+                            data = lineup_data.get("data", {})
+                            if isinstance(data, dict) and "regions" in data:
+                                regions = data.get("regions", [])
+                                if regions:
+                                    players = regions[0].get("rows", [])
+                            
+                            logger.info(f"    → Found {len(players)} players in {team_type} lineup")
+                            
+                            # Index each player
+                            for player in players:
+                                player_id = player.get("person_id") or player.get("id")
+                                if not player_id:
+                                    continue
+                                
+                                # Extract player name
+                                player_name = self._extract_player_name(player)
+                                
+                                # Create or update player entry
+                                if player_id not in self._players:
+                                    self._players[player_id] = {
+                                        "id": player_id,
+                                        "person_id": player_id,
+                                        "name": player_name,
+                                        "text": player_name,
+                                        "teams": [],
+                                        "games": [game_id],
+                                        "stats": {"games_played": 1},
+                                        "source": "game_lineup",
+                                        "raw_data": player
+                                    }
+                                    players_updated += 1
+                                else:
+                                    # Update existing player with game info
+                                    if game_id not in self._players[player_id].get("games", []):
+                                        self._players[player_id].setdefault("games", []).append(game_id)
+                                        stats = self._players[player_id].setdefault("stats", {})
+                                        stats["games_played"] = stats.get("games_played", 0) + 1
+                                        players_updated += 1
                         
-                        # Create minimal player entry if not exists
-                        if player_id not in self._players:
-                            player_name = event.get("player_name", f"Player #{player_id}")
-                            self._players[player_id] = {
-                                "id": player_id,
-                                "person_id": player_id,
-                                "name": player_name,
-                                "text": player_name,
-                                "teams": [],
-                                "games": [game_id],
-                                "stats": {"games_played": 1},
-                                "source": "game_event"
-                            }
-                            players_updated += 1
-                        else:
-                            # Update existing player with game info
-                            if game_id not in self._players[player_id].get("games", []):
-                                self._players[player_id].setdefault("games", []).append(game_id)
-                                stats = self._players[player_id].setdefault("stats", {})
-                                stats["games_played"] = stats.get("games_played", 0) + 1
-                                players_updated += 1
+                        games_processed += 1
                     
-                    games_processed += 1
-                    
-            except Exception as e:
-                logger.debug(f"Could not process games for league {league_id}/{game_class}: {e}")
-                continue
+                    except Exception as e:
+                        logger.debug(f"Could not fetch game lineup for {game_id}: {e}")
+                        continue
+                
+                except Exception as e:
+                    logger.debug(f"Could not process games for league {league_id}/{game_class}: {e}")
+                    continue
         
         logger.info(f"✓ Updated {players_updated} players from {games_processed} games")
         return players_updated

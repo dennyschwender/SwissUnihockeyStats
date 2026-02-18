@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login — SwissUnihockey</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0d1117; color: #c9d1d9; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .card {
+      background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+      padding: 2rem 2.5rem; width: 100%; max-width: 360px;
+    }
+    h1 { font-size: 1.1rem; font-weight: 600; margin-bottom: 1.5rem; }
+    h1 span { font-size: .65rem; background: #b91c1c; color: #fff; padding: 2px 6px; border-radius: 8px; margin-left: .5rem; vertical-align: middle; }
+    label { display: block; font-size: .78rem; color: #8b949e; margin-bottom: .35rem; }
+    input[type="password"], input[type="text"] {
+      width: 100%; background: #21262d; border: 1px solid #30363d; color: #c9d1d9;
+      border-radius: 6px; padding: .55rem .75rem; font-size: .9rem;
+      outline: none; margin-bottom: 1rem;
+    }
+    input:focus { border-color: #58a6ff; }
+    .btn {
+      width: 100%; padding: .55rem; border-radius: 6px; border: none;
+      background: #238636; color: #fff; font-size: .9rem; font-weight: 600;
+      cursor: pointer;
+    }
+    .btn:hover { background: #2ea043; }
+    .error {
+      background: #2d1214; border: 1px solid #da3633; color: #f85149;
+      border-radius: 6px; padding: .5rem .75rem; font-size: .78rem; margin-bottom: 1rem;
+    }
+    .hint { font-size: .7rem; color: #6e7681; margin-top: 1rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>SwissUnihockey <span>Admin</span></h1>
+
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/admin/login">
+      <label for="pin">PIN / Password</label>
+      <input type="password" id="pin" name="pin" autofocus autocomplete="current-password" placeholder="Enter admin PIN">
+      <button type="submit" class="btn">Unlock</button>
+    </form>
+
+    <p class="hint">Set <code>ADMIN_PIN</code> in your <code>.env</code> file.</p>
+  </div>
+</body>
+</html>

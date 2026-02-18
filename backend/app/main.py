@@ -5,15 +5,19 @@ from pathlib import Path
 from datetime import datetime
 from contextlib import asynccontextmanager
 import asyncio
+import hashlib
+import hmac
 import uuid
 import logging
-from fastapi import FastAPI, Request, HTTPException
+import traceback
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.sessions import SessionMiddleware
 from app.config import settings
 from app.api.v1.router import api_router
 from app.lib.i18n import get_translations, get_locale_from_path, DEFAULT_LOCALE
@@ -36,47 +40,86 @@ STATIC_DIR = BASE_DIR / "static"
 def get_current_season() -> int:
     """
     Get the current Swiss Unihockey season year.
-    Season runs from September to May, so:
-    - Jan-Aug: Previous year (e.g., 2025 for 2025/26 season)
-    - Sep-Dec: Current year (e.g., 2025 for 2025/26 season)
-    
-    Returns:
-        int: Season year (e.g., 2025 for 2025/26 season)
+    Prefers the season flagged as highlighted in the DB.
+    Falls back to date-based detection if DB is unavailable or no season is flagged.
     """
+    try:
+        from app.services.database import get_database_service
+        from app.models.db_models import Season as _Season
+        db = get_database_service()
+        with db.session_scope() as session:
+            row = session.query(_Season.id).filter(_Season.highlighted == True).first()
+            if row:
+                return row[0]
+    except Exception:
+        pass
+    # Date-based fallback: Sep-Dec → current year, Jan-Aug → previous year
     now = datetime.now()
-    # If month is Jan-Aug (1-8), use previous year; if Sep-Dec (9-12), use current year
-    if now.month >= 9:
-        return now.year
-    else:
-        return now.year - 1
+    return now.year if now.month >= 9 else now.year - 1
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan events: startup and shutdown"""
-    # Startup: Preload common data (leagues, popular teams)
+    # Startup: Initialize database and preload common data
     logger.info("🚀 Starting SwissUnihockey application...")
     current_season = get_current_season()
     logger.info(f"📅 Current season: {current_season}/{current_season + 1}")
+
+    _sched_task = None  # initialise before try so shutdown block can always reference it
+
     try:
-        await preload_common_data()  # Loads leagues and popular teams
-        # Note: Remaining teams will lazy-load on first search
+        # Initialize database
+        logger.info("🗄️ Initializing database...")
+        from app.services.database import get_database_service
+        db_service = get_database_service()
+        db_service.initialize()
+        logger.info("✓ Database initialized")
+
+        # Reset any sync rows that were left in_progress by a prior server process
+        from app.services.data_indexer import DataIndexer as _DI
+        _stale = _DI().cleanup_stale_sync_status()
+        if _stale:
+            logger.warning(f"⚠️ Reset {_stale} stale in_progress sync row(s) to failed")
         
-        # Index players in background from teams and games
-        logger.info("🔍 Starting comprehensive player indexing in background...")
-        from app.services.data_cache import get_data_cache
-        cache = get_data_cache()
-        asyncio.create_task(cache.build_comprehensive_player_index())
+        # Preload common data (leagues, popular teams) into memory cache
+        await preload_common_data()  # Loads leagues and popular teams
+        logger.info("✓ Common data preloaded")
+        
+        # Note: Use manage.py to trigger database indexing:
+        # python manage.py index-clubs-path --season 2025
+
+        # Start background scheduler
+        from app.services.scheduler import init_scheduler
+        _sched_instance = init_scheduler(_admin_jobs, _submit_job)
+        _sched_task = asyncio.create_task(
+            _sched_instance.run(), name="scheduler"
+        )
+        logger.info("✓ Scheduler started")
+
     except Exception as e:
-        logger.error(f"❌ Failed to preload common data: {e}")
-        logger.warning("⚠️ App will start but may load data on first request")
-    
-    # Optionally preload ALL data including all teams (uncomment for full preload):
-    # await preload_data()
-    
+        logger.error(f"❌ Failed to initialize application: {e}")
+        logger.warning("⚠️ App will start but may have issues")
+
     yield
-    
+
     # Shutdown
+    logger.info("Shutting down application...")
+    try:
+        from app.services.scheduler import get_scheduler
+        sched = get_scheduler()
+        if sched:
+            sched.stop()
+        if _sched_task and not _sched_task.done():
+            _sched_task.cancel()
+    except Exception as e:
+        logger.error(f"Error stopping scheduler: {e}")
+    try:
+        from app.services.database import get_database_service
+        db_service = get_database_service()
+        db_service.close()
+    except Exception as e:
+        logger.error(f"Error closing database: {e}")
     logger.info("👋 Shutting down SwissUnihockey application")
 
 
@@ -97,6 +140,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 # Configure CORS
+app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET, session_cookie="admin_session")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
@@ -107,6 +151,129 @@ app.add_middleware(
 
 # Include API router (JSON endpoints)
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+
+# DEBUG endpoint to check player index status
+@app.get("/debug/player-index")
+async def debug_player_index():
+    """Debug endpoint to see player index status"""
+    from app.services.data_cache import get_data_cache
+    cache = get_data_cache()
+    
+    player_count = len(cache._players)
+    game_count = len(cache._games)
+    indexed = cache._players_indexed
+    
+    sample_players = list(cache._players.values())[:5] if cache._players else []
+    
+    return {
+        "players_indexed": indexed,
+        "player_count": player_count,
+        "game_count": game_count,
+        "sample_players": sample_players
+    }
+
+
+@app.get("/debug/force-reindex")
+async def debug_force_reindex():
+    """Force player reindexing and return detailed logs"""
+    from app.services.data_cache import get_data_cache
+    import logging
+    
+    cache = get_data_cache()
+    
+    # Try to index with detailed logging
+    try:
+        players_teams = await cache.index_players_from_teams()
+        players_games = await cache.index_players_from_games()
+        
+        return {
+            "success": True,
+            "players_from_teams": players_teams,
+            "players_from_games": players_games,
+            "total_players": len(cache._players),
+            "sample": list(cache._players.values())[:3]
+        }
+    except Exception as e:
+        logger.error(f"Reindex failed: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
+@app.get("/debug/test-games-fetch")
+async def debug_test_games_fetch():
+    """Debug endpoint to test various API endpoints"""
+    client = get_swissunihockey_client()
+    from app.services.data_cache import get_data_cache
+    cache = get_data_cache()
+    
+    results = {}
+    
+    # Test NEW endpoint: Team players
+    await cache.load_leagues()
+    if cache._leagues:
+        first_league = cache._leagues[0]
+        try:
+            teams_data = client.get_teams(
+                league=first_league.get("id"),
+                game_class=first_league.get("game_classes", [{}])[0].get("id", 11),
+                mode="1",
+                season=2025
+            )
+            
+            teams = []
+            if isinstance(teams_data, dict):
+                if "data" in teams_data:
+                    regions = teams_data.get("data", {}).get("regions", [])
+                    if regions:
+                        teams = regions[0].get("rows", [])
+                elif "entries" in teams_data:
+                    teams = teams_data["entries"]
+            
+            if teams:
+                team_id = teams[0].get("id")
+                team_name = teams[0].get("text", "")
+                
+                # Try NEW endpoint: /api/teams/:team_id/players
+                try:
+                    players_data = client.get_team_players(team_id)
+                    results["team_players"] = {
+                        "success": True,
+                        "team_id": team_id,
+                        "team_name": team_name,
+                        "data_type": str(type(players_data)),
+                        "has_data": bool(players_data),
+                        "raw_data": players_data  # Include full raw data
+                    }
+                except Exception as e:
+                    results["team_players"] = {"success": False, "team_id": team_id, "error": str(e)}
+        except Exception as e:
+            results["team_players"] = {"success": False, "error": str(e)}
+    
+    # Test NEW games endpoint with mode=list
+    try:
+        games_data = client.get_games(
+            mode="list",
+            season=2025,
+            league=1,
+            game_class=11
+        )
+        results["games_mode_list"] = {
+            "success": True,
+            "data_type": str(type(games_data)),
+            "has_data": bool(games_data)
+        }
+        if isinstance(games_data, dict):
+            results["games_mode_list"]["keys"] = list(games_data.keys())
+            if "entries" in games_data:
+                results["games_mode_list"]["game_count"] = len(games_data["entries"])
+    except Exception as e:
+        results["games_mode_list"] = {"success": False, "error": str(e)}
+    
+    return results
 
 
 # ============================================================================
@@ -124,6 +291,590 @@ async def root_redirect(request: Request):
             "t": get_translations(DEFAULT_LOCALE)
         }
     )
+
+
+# ============================================================================
+# AUTH HELPERS
+# ============================================================================
+
+def _pin_hash(pin: str) -> str:
+    """Stable hash of the PIN so we never store it plaintext in session."""
+    return hashlib.pbkdf2_hmac(
+        'sha256',
+        pin.encode(),
+        settings.SESSION_SECRET.encode(),
+        1,
+    ).hex()
+
+_ADMIN_TOKEN_KEY = "admin_authed"
+
+def require_admin(request: Request):
+    """FastAPI dependency — raises 302 redirect if not logged in."""
+    if request.session.get(_ADMIN_TOKEN_KEY) != _pin_hash(settings.ADMIN_PIN):
+        raise HTTPException(status_code=307, headers={"Location": "/admin/login"})
+
+
+# ============================================================================
+# ADMIN LOGIN / LOGOUT
+# ============================================================================
+
+@app.get("/admin/login", response_class=HTMLResponse)
+async def admin_login_page(request: Request):
+    if request.session.get(_ADMIN_TOKEN_KEY) == _pin_hash(settings.ADMIN_PIN):
+        return RedirectResponse("/admin", status_code=302)
+    return templates.TemplateResponse("admin_login.html", {"request": request, "error": None})
+
+
+@app.post("/admin/login")
+async def admin_login_submit(request: Request):
+    form = await request.form()
+    pin  = str(form.get("pin", "")).strip()
+    if hmac.compare_digest(_pin_hash(pin), _pin_hash(settings.ADMIN_PIN)):
+        request.session[_ADMIN_TOKEN_KEY] = _pin_hash(settings.ADMIN_PIN)
+        return RedirectResponse("/admin", status_code=302)
+    return templates.TemplateResponse(
+        "admin_login.html",
+        {"request": request, "error": "Incorrect PIN. Try again."},
+        status_code=401,
+    )
+
+
+@app.get("/admin/logout")
+async def admin_logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/admin/login", status_code=302)
+
+
+# ==================== ADMIN ROUTES ====================
+# Must be registered BEFORE the /{locale} catch-all route.
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page(request: Request, _: None = Depends(require_admin)):
+    """Admin dashboard — indexing status and controls"""
+    return templates.TemplateResponse("admin.html", {"request": request})
+
+
+@app.get("/admin/api/stats")
+async def admin_stats(_: None = Depends(require_admin)):
+    """Per-entity DB counts, per-season breakdown, and last 50 sync records."""
+    from app.services.database import get_database_service
+    from app.models.db_models import (
+        Season, Club, Team, Player, TeamPlayer,
+        League, LeagueGroup, Game, GameEvent, PlayerStatistics, SyncStatus
+    )
+    from sqlalchemy import func
+
+    db_service = get_database_service()
+    with db_service.session_scope() as session:
+        totals = {
+            "seasons":      session.query(func.count(Season.id)).scalar() or 0,
+            "clubs":        session.query(Club).count(),
+            "teams":        session.query(func.count(Team.id)).scalar() or 0,
+            "players":      session.query(func.count(Player.person_id)).scalar() or 0,
+            "team_players": session.query(func.count(TeamPlayer.id)).scalar() or 0,
+            "leagues":      session.query(func.count(League.id)).scalar() or 0,
+            "league_groups":session.query(func.count(LeagueGroup.id)).scalar() or 0,
+            "games":        session.query(func.count(Game.id)).scalar() or 0,
+            "game_events":    session.query(func.count(GameEvent.id)).scalar() or 0,
+            "player_stats":   session.query(func.count(PlayerStatistics.id)).scalar() or 0,
+        }
+
+        season_rows = session.query(Season.id, Season.text, Season.highlighted).order_by(Season.id.desc()).all()
+        by_season = []
+        for sid, stext, shighlighted in season_rows:
+            clubs_n   = session.query(Club).filter(Club.season_id == sid).count()
+            teams_n   = session.query(Team).filter(Team.season_id == sid).count()
+            tp_n      = session.query(TeamPlayer).filter(TeamPlayer.season_id == sid).count()
+            leagues_n = session.query(League).filter(League.season_id == sid).count()
+            groups_n  = (session.query(func.count(LeagueGroup.id))
+                         .join(League, LeagueGroup.league_id == League.id)
+                         .filter(League.season_id == sid).scalar() or 0)
+            games_n        = session.query(Game).filter(Game.season_id == sid).count()
+            events_n       = (session.query(func.count(GameEvent.id))
+                              .join(Game, GameEvent.game_id == Game.id)
+                              .filter(Game.season_id == sid).scalar() or 0)
+            player_stats_n = (session.query(func.count(PlayerStatistics.id))
+                              .filter(PlayerStatistics.season_id == sid).scalar() or 0)
+            by_season.append({
+                "season_id":     sid,
+                "season_text":   stext or str(sid),
+                "clubs":         clubs_n,
+                "teams":         teams_n,
+                "team_players":  tp_n,
+                "leagues":       leagues_n,
+                "league_groups": groups_n,
+                "games":         games_n,
+                "game_events":   events_n,
+                "player_stats":  player_stats_n,
+                "is_current":    bool(shighlighted),
+            })
+
+        syncs = (session.query(SyncStatus)
+                 .order_by(SyncStatus.last_sync.desc())
+                 .limit(100).all())
+        sync_status = [
+            {
+                "entity_type": s.entity_type,
+                "entity_id":   s.entity_id,
+                "status":      s.sync_status,
+                "last_sync":   s.last_sync.strftime("%Y-%m-%d %H:%M") if s.last_sync else None,
+                "records":     s.records_synced or 0,
+                "error":       s.error_message,
+            }
+            for s in syncs
+        ]
+
+    return {"totals": totals, "by_season": by_season, "sync_status": sync_status}
+
+
+# In-memory job registry for background indexing tasks
+_admin_jobs: dict  = {}
+_admin_tasks: dict = {}  # job_id → asyncio.Task (running only)
+
+
+async def _submit_job(job_id: str, season: int | None, task: str, force: bool = False, max_tier: int = 7):
+    """Bridge used by the scheduler to start an _run() coroutine for a pre-registered job."""
+    t = asyncio.create_task(_run(job_id, season, task, force, max_tier=max_tier), name=f"job-{job_id}")
+    _admin_tasks[job_id] = t
+
+# Task definitions: human label + which tasks it maps to internally
+_TASK_META = {
+    "seasons":      "Index Seasons",
+    "clubs":        "Index Clubs",
+    "teams":        "Index Teams (all clubs)",
+    "players":      "Index Players (all teams)",
+    "clubs_path":   "Index Clubs Path (clubs + teams + players)",
+    "leagues":      "Index Leagues",
+    "groups":       "Index League Groups",
+    "games":        "Index Games",
+    "events":       "Index Game Events (finished games)",
+    "player_stats": "Index Player Statistics",
+    "leagues_path": "Index Leagues Path (leagues + groups + games)",
+    "full":         "Full Index (clubs path + leagues path)",
+}
+
+
+@app.post("/admin/api/index")
+async def admin_start_indexing(payload: dict, _: None = Depends(require_admin)):
+    """Start a background indexing job.
+
+    payload: { season: int, task: str, force: bool, max_tier?: int }
+    task is one of: clubs | teams | players | clubs_path |
+                    leagues | groups | games | events | leagues_path | full
+    max_tier: 1–7 — only index events for leagues at or below this tier
+               (1=L-UPL only … 7=all incl. youth/regional, default 7)
+    """
+    season   = int(payload.get("season", get_current_season()))
+    task     = payload.get("task", "full")
+    force    = bool(payload.get("force", False))
+    max_tier = int(payload.get("max_tier", 7))
+
+    if task not in _TASK_META:
+        raise HTTPException(status_code=400, detail=f"Unknown task '{task}'. Valid: {list(_TASK_META)}")
+
+    job_id = str(uuid.uuid4())[:8]
+    _admin_jobs[job_id] = {
+        "job_id":    job_id,
+        "season":    season,
+        "task":      task,
+        "label":     _TASK_META[task],
+        "status":    "running",
+        "progress":  0,
+        "stats":     {},
+        "log_lines": [],
+        "error":     None,
+    }
+    t = asyncio.create_task(_run(job_id, season, task, force, max_tier=max_tier), name=f"job-{job_id}")
+    _admin_tasks[job_id] = t
+    return {"job_id": job_id, "season": season, "task": task, "label": _TASK_META[task]}
+
+
+@app.get("/admin/api/jobs/{job_id}")
+async def admin_job_status(job_id: str, _: None = Depends(require_admin)):
+    """Return current status and buffered log lines for a running job."""
+    job = _admin_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    log_lines = job.pop("log_lines", [])
+    job["log_lines"] = []
+    return {**job, "log_lines": log_lines}
+
+
+@app.delete("/admin/api/jobs/{job_id}")
+async def admin_stop_job(job_id: str, _: None = Depends(require_admin)):
+    """Cancel a running job."""
+    job = _admin_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.get("status") != "running":
+        return {"ok": False, "detail": f"Job is already {job.get('status')}"}
+    task = _admin_tasks.get(job_id)
+    if task and not task.done():
+        task.cancel()
+    job["status"] = "stopped"
+    job["error"]  = "Cancelled by user"
+    job["log_lines"].append({"level": "warn", "msg": "Job cancelled by user"})
+    _admin_tasks.pop(job_id, None)
+    logger.info("Admin job %s cancelled by user", job_id)
+    return {"ok": True, "job_id": job_id}
+
+
+_LAYER_DELETE_ORDER = [
+    # (model_class, filter_col) — ordered leaf-first so FK constraints aren't violated
+    ("GameEvent",         "season_id"),
+    ("GamePlayer",        "season_id"),
+    ("Game",              "season_id"),
+    ("LeagueGroup",       None),          # handled via League cascade
+    ("League",            "season_id"),
+    ("PlayerStatistics",  "season_id"),
+    ("TeamPlayer",        "season_id"),
+    ("Team",              "season_id"),
+    ("Club",              "season_id"),
+]
+
+_LAYER_SETS: dict[str, list[str]] = {
+    "events":       ["GameEvent"],
+    "games":        ["GameEvent", "GamePlayer", "Game"],
+    "groups":       ["GameEvent", "GamePlayer", "Game", "LeagueGroup"],
+    "leagues":      ["GameEvent", "GamePlayer", "Game", "LeagueGroup", "League"],
+    "player_stats": ["PlayerStatistics"],
+    "players":      ["PlayerStatistics", "TeamPlayer"],
+    "teams":        ["PlayerStatistics", "TeamPlayer", "Team"],
+    "clubs":        ["PlayerStatistics", "TeamPlayer", "Team", "Club"],
+    "all":          [m for m, _ in _LAYER_DELETE_ORDER],
+}
+
+
+@app.post("/admin/api/season/{season_id}/set-current")
+async def admin_set_current_season(season_id: int, _: None = Depends(require_admin)):
+    """Mark a season as the current active season (clears flag on all others)."""
+    from app.services.database import get_database_service
+    from app.models.db_models import Season
+    db = get_database_service()
+    with db.session_scope() as session:
+        if not session.query(Season).filter(Season.id == season_id).first():
+            raise HTTPException(status_code=404, detail=f"Season {season_id} not found")
+        session.query(Season).update({Season.highlighted: False})
+        session.query(Season).filter(Season.id == season_id).update({Season.highlighted: True})
+    return {"ok": True, "current_season": season_id}
+
+
+@app.delete("/admin/api/season/{season_id}")
+async def admin_delete_season_layer(season_id: int, layer: str = "all", _: None = Depends(require_admin)):
+    """Delete indexed data for a season layer.
+
+    layer values: all | clubs | teams | players | player_stats |
+                  leagues | groups | games | events
+    """
+    from app.models.db_models import (
+        Club, League, LeagueGroup, Team, TeamPlayer, PlayerStatistics,
+        Game, GamePlayer, GameEvent, SyncStatus
+    )
+    model_map = {
+        "Club": Club, "League": League, "LeagueGroup": LeagueGroup,
+        "Team": Team, "TeamPlayer": TeamPlayer,
+        "PlayerStatistics": PlayerStatistics,
+        "Game": Game, "GamePlayer": GamePlayer, "GameEvent": GameEvent,
+    }
+
+    layer = layer.lower()
+    if layer not in _LAYER_SETS:
+        raise HTTPException(status_code=400, detail=f"Unknown layer '{layer}'. Valid: {list(_LAYER_SETS)}")
+
+    targets = _LAYER_SETS[layer]
+
+    from app.services.database import get_database_service
+    db = get_database_service()
+    totals: dict[str, int] = {}
+
+    with db.session_scope() as session:
+        # Use the global ordered list so we always delete in safe (leaf-first) order
+        for model_name, filter_col in _LAYER_DELETE_ORDER:
+            if model_name not in targets:
+                continue
+            model_cls = model_map[model_name]
+            if model_name == "LeagueGroup":
+                # Delete via parent league IDs to respect FK
+                league_ids = [
+                    r[0] for r in session.query(League.id).filter(League.season_id == season_id).all()
+                ]
+                if league_ids:
+                    n = session.query(LeagueGroup).filter(LeagueGroup.league_id.in_(league_ids)).delete(synchronize_session=False)
+                else:
+                    n = 0
+            else:
+                n = session.query(model_cls).filter(
+                    getattr(model_cls, filter_col) == season_id
+                ).delete(synchronize_session=False)
+            totals[model_name] = n
+
+        # Also clean up SyncStatus rows for this season
+        if layer == "all":
+            session.query(SyncStatus).filter(
+                SyncStatus.entity_id == f"season:{season_id}"
+            ).delete(synchronize_session=False)
+
+        session.commit()
+
+    logger.info("Admin deleted season=%s layer=%s — %s", season_id, layer, totals)
+    return {"ok": True, "season_id": season_id, "layer": layer, "deleted": totals}
+
+
+@app.get("/admin/api/scheduler")
+async def admin_scheduler_status(_: None = Depends(require_admin)):
+    """Return the scheduler queue and recent history."""
+    from app.services.scheduler import get_scheduler
+    sched = get_scheduler()
+    if not sched:
+        return {"enabled": False, "queue": [], "history": []}
+    return {
+        "enabled": sched.enabled,
+        "queue":   sched.get_schedule(),
+        "history": sched.get_history(50),
+    }
+
+
+@app.post("/admin/api/scheduler")
+async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin)):
+    """Control the scheduler.
+
+    payload options:
+      { "action": "enable" }            – resume auto-scheduling
+      { "action": "disable" }           – pause auto-scheduling
+      { "action": "trigger", "policy": "clubs", "season": 2025 }  – run now
+    """
+    from app.services.scheduler import get_scheduler
+    sched = get_scheduler()
+    if not sched:
+        raise HTTPException(status_code=503, detail="Scheduler not running")
+
+    action = payload.get("action")
+    if action == "enable":
+        sched.enable(True)
+        return {"ok": True, "enabled": True}
+    if action == "disable":
+        sched.enable(False)
+        return {"ok": True, "enabled": False}
+    if action == "trigger":
+        policy = payload.get("policy")
+        season = payload.get("season")
+        job_id = await sched.trigger_now(policy, season)
+        if job_id is None:
+            raise HTTPException(status_code=400, detail=f"Unknown policy '{policy}'")
+        # Return enough info for the UI to register and poll the job
+        job_entry = _admin_jobs.get(job_id, {})
+        return {
+            "ok":     True,
+            "policy": policy,
+            "season": season,
+            "job_id": job_id,
+            "label":  job_entry.get("label", f"{policy} S{season}"),
+            "task":   job_entry.get("task", policy),
+        }
+    raise HTTPException(status_code=400, detail=f"Unknown action '{action}'")
+
+
+# ==================== END ADMIN ROUTES ====================
+
+
+async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier: int = 7):
+    """Module-level coroutine that drives a single indexing job.
+
+    Args:
+        max_tier: For events tasks, only process leagues with tier <= max_tier.
+                  1=L-UPL/NLA only, 2=+NLB, … 7=all (default).
+    """
+    job = _admin_jobs[job_id]
+
+    def push(level: str, msg: str):
+        job["log_lines"].append({"level": level, "msg": msg})
+        logger.info("[admin %s] %s", job_id, msg)
+
+    def set_progress(pct: int):
+        job["progress"] = min(pct, 99)
+
+    try:
+        from app.services.data_indexer import get_data_indexer
+        from app.services.database import get_database_service
+        from app.models.db_models import Club, Team, League, Game
+        indexer    = get_data_indexer()
+        db_service = get_database_service()
+
+        stats: dict = {}
+
+        # ── GUARD: skip future seasons ─────────────────────────────────────
+        if task != "seasons" and season is not None:
+            current = get_current_season()
+            if season > current:
+                push("warn", f"Season {season} is beyond the flagged current season ({current}). Skipping.")
+                job["status"]   = "done"
+                job["progress"] = 100
+                job["stats"]    = stats
+                return
+
+        # ── SEASONS ────────────────────────────────────────────────────────
+        if task == "seasons":
+            push("info", "Fetching seasons list from API...")
+            n = indexer.index_seasons(force=True)
+            stats["seasons"] = n
+            push("ok", f"Seasons: {n}")
+            set_progress(100)
+
+        # ── CLUBS ──────────────────────────────────────────────────────────
+        if task in ("clubs", "clubs_path", "full"):
+            push("info", f"Indexing clubs for season {season}...")
+            n = indexer.index_clubs(season, force=force)
+            stats["clubs"] = n
+            push("ok", f"Clubs: {n}")
+            set_progress(10)
+
+        # ── TEAMS ──────────────────────────────────────────────────────────
+        if task in ("teams", "clubs_path", "full"):
+            with db_service.session_scope() as s:
+                club_list = [(c.id, c.name) for c in
+                             s.query(Club).filter(Club.season_id == season).all()]
+            total = len(club_list)
+            push("info", f"Indexing teams for {total} clubs...")
+            teams_n = 0
+            team_id_list = []
+            for i, (cid, cname) in enumerate(club_list, 1):
+                cnt, tids = indexer.index_teams_for_club(cid, season, force=force)
+                teams_n += cnt
+                team_id_list.extend(tids)
+                set_progress(10 + int(i / total * 25))
+                await asyncio.sleep(0)
+            stats["teams"] = teams_n
+            push("ok", f"Teams: {teams_n}")
+
+        # ── PLAYERS ────────────────────────────────────────────────────────
+        if task in ("players", "clubs_path", "full"):
+            if "team_id_list" not in dir():
+                with db_service.session_scope() as s:
+                    team_id_list = [r[0] for r in
+                                    s.query(Team.id).filter(Team.season_id == season).distinct().all()]
+            total = len(team_id_list)
+            push("info", f"Indexing players for {total} teams...")
+            players_n = 0
+            for i, tid in enumerate(team_id_list, 1):
+                players_n += indexer.index_players_for_team(tid, season, force=force)
+                set_progress(35 + int(i / total * 25))
+                await asyncio.sleep(0)
+            stats["players"] = players_n
+            push("ok", f"Players: {players_n}")
+
+        # ── PLAYER STATS ───────────────────────────────────────────────────
+        if task in ("player_stats", "clubs_path", "full"):
+            push("info", f"Indexing player statistics for season {season}...")
+            stats_n = indexer.index_player_stats_for_season(season, force=force)
+            stats["player_stats"] = stats_n
+            push("ok", f"Player stats: {stats_n}")
+            set_progress(60)
+
+        # ── LEAGUES ────────────────────────────────────────────────────────
+        if task in ("leagues", "groups", "games", "leagues_path", "full"):
+            push("info", f"Indexing leagues for season {season}...")
+            n = indexer.index_leagues(season, force=force)
+            stats["leagues"] = n
+            push("ok", f"Leagues: {n}")
+            set_progress(62)
+
+        # ── GROUPS ─────────────────────────────────────────────────────────
+        if task in ("groups", "games", "leagues_path", "full"):
+            with db_service.session_scope() as s:
+                lg_list = [(lg.id, lg.league_id, lg.game_class) for lg in
+                           s.query(League).filter(League.season_id == season).all()]
+            total  = len(lg_list)
+            groups_n = 0
+            push("info", f"Indexing groups for {total} leagues...")
+            for i, (ldb, lid, gc) in enumerate(lg_list, 1):
+                groups_n += indexer.index_groups_for_league(ldb, season, lid, gc, force=force)
+                set_progress(62 + int(i / total * 13))
+                await asyncio.sleep(0)
+            stats["league_groups"] = groups_n
+            push("ok", f"Groups: {groups_n}")
+
+        # ── GAMES ──────────────────────────────────────────────────────────
+        if task in ("games", "leagues_path", "full"):
+            from app.models.db_models import LeagueGroup
+            if "lg_list" not in dir():
+                with db_service.session_scope() as s:
+                    lg_list = [(lg.id, lg.league_id, lg.game_class) for lg in
+                               s.query(League).filter(League.season_id == season).all()]
+            # Build per-group work list so each group gets its own API call
+            work: list[tuple] = []  # (league_db_id, league_id, game_class, group_db_id, group_name)
+            with db_service.session_scope() as s:
+                for ldb, lid, gc in lg_list:
+                    grps = s.query(LeagueGroup).filter(LeagueGroup.league_id == ldb).all()
+                    if grps:
+                        for grp in grps:
+                            work.append((ldb, lid, gc, grp.id, grp.name))
+                    else:
+                        work.append((ldb, lid, gc, None, None))
+            total  = len(work)
+            games_n = 0
+            push("info", f"Indexing games for {total} groups across {len(lg_list)} leagues...")
+            for i, (ldb, lid, gc, grp_db_id, grp_name) in enumerate(work, 1):
+                games_n += indexer.index_games_for_league(
+                    ldb, season, lid, gc,
+                    group_name=grp_name, group_db_id=grp_db_id,
+                    force=force,
+                )
+                set_progress(75 + int(i / total * 20))
+                await asyncio.sleep(0)
+            stats["games"] = games_n
+            push("ok", f"Games: {games_n}")
+
+        # ── GAME EVENTS ────────────────────────────────────────────────────
+        if task in ("events", "full"):
+            from datetime import datetime as _dt
+            from app.services.data_indexer import league_tier
+            _now = _dt.utcnow()
+            with db_service.session_scope() as s:
+                # Join Game → League to filter by tier
+                from app.models.db_models import LeagueGroup, League as _League
+                rows = (
+                    s.query(Game.id, Game.season_id, _League.league_id)
+                    .join(LeagueGroup, Game.group_id == LeagueGroup.id, isouter=True)
+                    .join(_League, LeagueGroup.league_id == _League.id, isouter=True)
+                    .filter(
+                        Game.season_id == season,
+                        Game.game_date < _now,
+                    )
+                    .all()
+                )
+                finished = [
+                    (r.id, r.season_id)
+                    for r in rows
+                    if league_tier(r.league_id or 0) <= max_tier
+                ]
+            total    = len(finished)
+            tier_lbl = f"tier ≤ {max_tier}" if max_tier < 7 else "all tiers"
+            push("info", f"Indexing events for {total} past games ({tier_lbl})...")
+            events_n = 0
+            for i, (gid, sid_) in enumerate(finished, 1):
+                events_n += indexer.index_game_events(gid, sid_, force=force)
+                set_progress(int(i / total * 95) if total else 99)
+                await asyncio.sleep(0)
+            stats["game_events"] = events_n
+            push("ok", f"Game events: {events_n}")
+
+        job["stats"]    = stats
+        job["progress"] = 100
+        job["status"]   = "done"
+        summary = "  ".join(f"{k}={v}" for k, v in stats.items())
+        push("ok", f"Done — {summary}")
+
+    except asyncio.CancelledError:
+        job["status"] = "stopped"
+        job["error"]  = "Cancelled"
+        logger.info("Admin indexing job %s was cancelled", job_id)
+        raise  # let asyncio clean up properly
+    except Exception as exc:
+        job["status"] = "error"
+        job["error"]  = str(exc)
+        logger.error("Admin indexing job %s failed: %s", job_id, exc, exc_info=True)
+    finally:
+        _admin_tasks.pop(job_id, None)
 
 
 @app.get("/{locale}", response_class=HTMLResponse)
@@ -656,7 +1407,7 @@ async def players_page(request: Request, locale: str):
 async def search_players(request: Request, locale: str, q: str = "", team: str = "", club: str = ""):
     """Search players endpoint
     
-    Uses cached player data indexed from topscorers across all leagues.
+    Searches player database indexed from Swiss Unihockey API.
     """
     try:
         filtered_players = []
@@ -684,12 +1435,43 @@ async def search_players(request: Request, locale: str, q: str = "", team: str =
             else:
                 filtered_players = all_players[:50]
         
-        # If we have a search query and no specific team/club, search through cached player index
+        # If we have a search query, search through database
         elif q:
-            # Search through indexed player data
-            from app.services.data_cache import get_data_cache
-            cache = get_data_cache()
-            filtered_players = await cache.search_players(q, limit=50)
+            # Search through database
+            from app.services.database import get_database_service
+            from app.models.db_models import Player, TeamPlayer, Team
+            from sqlalchemy import or_
+            
+            q_lower = q.lower()
+            db_service = get_database_service()
+            
+            with db_service.session_scope() as session:
+                # Search players by name
+                db_players = session.query(Player).filter(
+                    or_(
+                        Player.full_name.ilike(f"%{q}%"),
+                        Player.name_normalized.like(f"%{q_lower}%")
+                    )
+                ).limit(50).all()
+                
+                # Convert database players to format expected by template
+                for player in db_players:
+                    # Get most recent team
+                    team_name = "N/A"
+                    if player.team_memberships:
+                        # Get the most recently updated team membership
+                        latest_membership = max(player.team_memberships, key=lambda x: x.last_updated)
+                        if latest_membership.team:
+                            team_name = latest_membership.team.name
+                    
+                    filtered_players.append({
+                        "id": player.person_id,
+                        "name": player.full_name,
+                        "text": player.full_name,
+                        "team": team_name,
+                        "position": ""
+                    })
+            
             logger.info(f"Found {len(filtered_players)} players matching '{q}'")
         
     except Exception as e:

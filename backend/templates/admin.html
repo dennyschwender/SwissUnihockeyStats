@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — SwissUnihockey</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; color: #c9d1d9; min-height: 100vh; }
+
+    /* ── top bar ── */
+    .topbar {
+      background: #161b22; border-bottom: 1px solid #30363d;
+      padding: .75rem 1.5rem; display: flex; align-items: center; gap: 1rem;
+    }
+    .topbar h1 { font-size: 1.1rem; font-weight: 600; }
+    .topbar a  { color: #58a6ff; text-decoration: none; font-size: .8rem; }
+    .badge { background: #b91c1c; color: #fff; font-size: .6rem; padding: 2px 6px; border-radius: 10px; font-weight: 700; letter-spacing: .05em; }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
+    #refresh-ts { font-size: .75rem; color: #6e7681; }
+
+    /* ── layout ── */
+    .layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; padding: 1.25rem 1.5rem; max-width: 1400px; margin: 0 auto; }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+    /* ── totals bar ── */
+    .totals { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: 1.25rem; }
+    .chip {
+      background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+      padding: .4rem .8rem; font-size: .78rem; color: #8b949e;
+    }
+    .chip strong { color: #58a6ff; font-size: .95rem; margin-right: .2rem; }
+
+    /* ── section headers ── */
+    .section-title {
+      font-size: .7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #6e7681; margin-bottom: .6rem;
+    }
+
+    /* ── season accordion ── */
+    .season-card {
+      background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+      margin-bottom: .75rem; overflow: hidden;
+    }
+    .season-header {
+      display: flex; align-items: center; gap: .75rem;
+      padding: .75rem 1rem; cursor: pointer; user-select: none;
+    }
+    .season-header:hover { background: #1c2128; }
+    .season-year { font-weight: 700; font-size: .95rem; min-width: 60px; }
+    .season-chips { display: flex; flex-wrap: wrap; gap: .4rem; flex: 1; }
+    .s-chip {
+      font-size: .7rem; padding: 1px 7px; border-radius: 10px; border: 1px solid;
+    }
+    .s-chip.ok    { background: #0d2818; color: #3fb950; border-color: #238636; }
+    .s-chip.warn  { background: #271a00; color: #d29922; border-color: #9e6a03; }
+    .s-chip.empty { background: #161b22; color: #6e7681; border-color: #30363d; }
+    .chevron { color: #6e7681; font-size: .75rem; transition: transform .2s; margin-left: auto; }
+    .chevron.open { transform: rotate(90deg); }
+
+    .season-body { display: none; border-top: 1px solid #30363d; }
+    .season-body.open { display: block; }
+
+    /* ── task rows inside accordion ── */
+    .task-group-label {
+      font-size: .65rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; color: #6e7681;
+      padding: .55rem 1rem .2rem; background: #0d1117;
+    }
+    .task-row {
+      display: grid;
+      grid-template-columns: 200px 1fr auto auto;
+      align-items: center;
+      gap: .5rem;
+      padding: .45rem 1rem;
+      border-bottom: 1px solid #1c2128;
+    }
+    .task-row:hover { background: #1a2130; }
+    .task-name { font-size: .8rem; color: #c9d1d9; }
+    .task-counts { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+    .tier-select {
+      font-size: .7rem; background: #21262d; color: #8b949e;
+      border: 1px solid #30363d; border-radius: 6px;
+      padding: 2px 6px; cursor: pointer;
+    }
+    .tier-select:hover { border-color: #58a6ff; color: #c9d1d9; }
+    .current-season { border-left: 3px solid #f0883e; }
+    .current-badge {
+      font-size: .65rem; font-weight: 700; text-transform: uppercase;
+      color: #f0883e; letter-spacing: .05em; margin-left: .4rem;
+    }
+    .btn-yellow {
+      background: #4d3800; color: #f0883e; border-color: #f0883e44;
+    }
+    .btn-yellow:hover { background: #6b4f00; border-color: #f0883e; }
+    .count-pill {
+      font-size: .7rem; color: #8b949e; background: #21262d;
+      padding: 1px 7px; border-radius: 10px; white-space: nowrap;
+    }
+    .count-pill.has-data { color: #3fb950; background: #0d2818; }
+
+    /* quick-actions row at bottom of accordion */
+    .quick-row {
+      display: flex; gap: .5rem; flex-wrap: wrap; align-items: center;
+      padding: .6rem 1rem; background: #0d1117; border-top: 1px solid #30363d;
+    }
+    .quick-row label { font-size: .72rem; color: #6e7681; display: flex; align-items: center; gap: .3rem; margin-left: auto; }
+
+    /* ── buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: .3rem;
+      padding: .28rem .65rem; border-radius: 5px; border: 1px solid #30363d;
+      background: #21262d; color: #c9d1d9; font-size: .75rem;
+      cursor: pointer; white-space: nowrap; transition: background .12s;
+    }
+    .btn:hover:not(:disabled) { background: #30363d; border-color: #8b949e; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-green  { background: #196127; border-color: #2ea043; color: #c9d1d9; }
+    .btn-green:hover:not(:disabled)  { background: #238636; }
+    .btn-blue   { background: #1158a7; border-color: #388bfd; color: #e6edf3; }
+    .btn-blue:hover:not(:disabled)   { background: #1f6feb; }
+    .btn-orange { background: #5a2d0c; border-color: #d1780c; color: #e3b341; }
+    .btn-orange:hover:not(:disabled) { background: #7d3f0f; }
+    .btn-red    { background: #2d1214; border-color: #da3633; color: #f85149; }
+    .btn-red:hover:not(:disabled)    { background: #4a1d1e; }
+    .btn-sm { padding: .2rem .5rem; font-size: .7rem; }
+
+    /* ── right sidebar ── */
+    .sidebar { position: sticky; top: 1.25rem; }
+
+    /* ── job tracker ── */
+    .job-panel {
+      background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+      margin-bottom: 1rem; overflow: hidden;
+    }
+    .panel-header { padding: .6rem .9rem; font-size: .8rem; font-weight: 600; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; }
+    .no-jobs { padding: .8rem .9rem; font-size: .78rem; color: #6e7681; }
+    .job-item { padding: .55rem .9rem; border-bottom: 1px solid #1c2128; }
+    .job-item:last-child { border-bottom: none; }
+    .job-item-top { display: flex; align-items: center; gap: .5rem; margin-bottom: .3rem; }
+    .job-tag { font-size: .68rem; padding: 1px 6px; border-radius: 8px; border: 1px solid; }
+    .job-tag.running { color: #58a6ff; border-color: #388bfd; background: #0c2040; }
+    .job-tag.done    { color: #3fb950; border-color: #238636; background: #0d2818; }
+    .job-tag.error   { color: #f85149; border-color: #da3633; background: #2d1214; }
+    .job-tag.stopped { color: #d29922; border-color: #9e6a03; background: #271a00; }
+    .job-label  { font-size: .78rem; flex: 1; }
+    .job-season { font-size: .68rem; color: #6e7681; }
+    .progress-wrap { background: #21262d; border-radius: 3px; height: 4px; overflow: hidden; }
+    .progress-bar  { height: 100%; background: #238636; border-radius: 3px; transition: width .4s ease; }
+    .pulse { animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+
+    /* ── log box ── */
+    .log-panel { background: #161b22; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; }
+    .log-box {
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: .72rem; background: #010409;
+      max-height: 340px; overflow-y: auto; padding: .6rem .75rem;
+      color: #8b949e; white-space: pre-wrap;
+    }
+    .log-box .ok    { color: #3fb950; }
+    .log-box .warn  { color: #d29922; }
+    .log-box .error { color: #f85149; }
+    .log-box .info  { color: #58a6ff; }
+
+    /* ── sync table ── */
+    .sync-panel { background: #161b22; border: 1px solid #30363d; border-radius: 8px; margin-top: 1.25rem; overflow: hidden; }
+    .sync-panel > h2 { padding: .6rem 1rem; font-size: .8rem; font-weight: 600; border-bottom: 1px solid #30363d; }
+    .sync-table { width: 100%; border-collapse: collapse; font-size: .72rem; }
+    .sync-table th { padding: .4rem .7rem; color: #6e7681; text-transform: uppercase; font-size: .6rem; letter-spacing: .06em; border-bottom: 1px solid #30363d; text-align: left; }
+    .sync-table td { padding: .38rem .7rem; border-bottom: 1px solid #1c2128; vertical-align: top; }
+    .sync-table tbody tr:hover td { background: #1a2130; }
+    .s-ok   { color: #3fb950; }
+    .s-fail { color: #f85149; }
+    .s-prog { color: #d29922; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>SwissUnihockey <span class="badge">Admin</span></h1>
+  <a href="/en">← Site</a>
+  <div class="topbar-right">
+    <button class="btn btn-sm" onclick="loadStats()">↺ Refresh</button>
+    <span id="refresh-ts"></span>
+    <a href="/admin/logout" class="btn btn-sm btn-red" style="text-decoration:none">⎋ Logout</a>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- ══════ LEFT: seasons ══════ -->
+  <div>
+
+    <!-- totals chips -->
+    <div class="totals">
+      <div class="chip"><strong id="t-seasons">—</strong> seasons</div>
+      <div class="chip"><strong id="t-clubs">—</strong> clubs</div>
+      <div class="chip"><strong id="t-teams">—</strong> teams</div>
+      <div class="chip"><strong id="t-players">—</strong> players</div>
+      <div class="chip"><strong id="t-tp">—</strong> roster entries</div>
+      <div class="chip"><strong id="t-pstats">—</strong> player stats</div>
+      <div class="chip"><strong id="t-leagues">—</strong> leagues</div>
+      <div class="chip"><strong id="t-groups">—</strong> groups</div>
+      <div class="chip"><strong id="t-games">—</strong> games</div>
+      <div class="chip"><strong id="t-events">—</strong> events</div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+      <p class="section-title" style="margin-bottom:0">Seasons</p>
+      <button class="btn btn-sm" id="pull-seasons-btn" onclick="pullSeasons()" title="Fetch seasons list from API">↻ Pull Seasons</button>
+    </div>
+    <div id="seasons-container">
+      <div style="color:#6e7681;font-size:.8rem;padding:.5rem 0">Loading…</div>
+    </div>
+
+    <!-- sync table -->
+    <div class="sync-panel" id="sync-panel" style="display:none">
+      <h2>Recent Sync Activity (last 100)</h2>
+      <div style="overflow-x:auto;max-height:350px;overflow-y:auto">
+        <table class="sync-table">
+          <thead><tr>
+            <th>Type</th><th>Entity ID</th><th>Status</th>
+            <th>Last Sync</th><th>Records</th><th>Error</th>
+          </tr></thead>
+          <tbody id="sync-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- scheduler panel -->
+    <div style="margin-top:1.25rem">
+      <p class="section-title">Auto-Scheduler</p>
+      <div class="season-card">
+        <div class="season-header" onclick="toggleEl('sched-body','sched-chv')">
+          <span class="season-year" style="font-size:.85rem">Schedule</span>
+          <span id="sched-badge" class="s-chip empty" style="font-size:.72rem">loading…</span>
+          <span class="chevron" id="sched-chv">▶</span>
+        </div>
+        <div class="season-body" id="sched-body">
+          <!-- controls row -->
+          <div class="quick-row" style="gap:.75rem">
+            <button class="btn btn-green btn-sm" id="sched-enable-btn"  onclick="schedSetEnabled(true)">▶ Enable</button>
+            <button class="btn btn-sm"           id="sched-disable-btn" onclick="schedSetEnabled(false)">⏸ Disable</button>
+            <span style="font-size:.72rem;color:#6e7681;margin-left:.5rem" id="sched-status-txt"></span>
+          </div>
+
+          <!-- upcoming queue -->
+          <div class="task-group-label">Upcoming Queue</div>
+          <div id="sched-queue">
+            <div style="padding:.5rem 1rem;font-size:.75rem;color:#6e7681">No jobs queued.</div>
+          </div>
+
+          <!-- recent history -->
+          <div class="task-group-label">Recent History</div>
+          <div style="overflow-x:auto;max-height:260px;overflow-y:auto">
+            <table class="sync-table" id="sched-hist-table">
+              <thead><tr>
+                <th>Policy</th><th>Task</th><th>Season</th>
+                <th>Status</th><th>Scheduled</th><th>Finished</th><th>Stats</th>
+              </tr></thead>
+              <tbody id="sched-hist-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════ RIGHT: sidebar ══════ -->
+  <div class="sidebar">
+
+    <p class="section-title">Active Jobs</p>
+    <div class="job-panel">
+      <div class="panel-header">
+        Jobs
+        <button class="btn btn-sm" onclick="clearDoneJobs()">Clear done</button>
+      </div>
+      <div id="jobs-container"><div class="no-jobs">No jobs yet.</div></div>
+    </div>
+
+    <p class="section-title">Log</p>
+    <div class="log-panel">
+      <div class="panel-header">
+        Output
+        <button class="btn btn-sm" onclick="clearLog()">Clear</button>
+      </div>
+      <div class="log-box" id="log-box">Ready.</div>
+    </div>
+
+  </div>
+</div><!-- /layout -->
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   Globals
+═══════════════════════════════════════════════════════ */
+const jobs = {};  // job_id → job object
+
+const fmt = n => (n == null ? '—' : Number(n).toLocaleString('de-CH'));
+
+/* ═══════════════════════════════════════════════════════
+   Stats
+═══════════════════════════════════════════════════════ */
+async function loadStats() {
+  try {
+    const r = await fetch('/admin/api/stats');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+
+    const t = d.totals || {};
+    document.getElementById('t-seasons').textContent = fmt(t.seasons);
+    document.getElementById('t-clubs'  ).textContent = fmt(t.clubs);
+    document.getElementById('t-teams'  ).textContent = fmt(t.teams);
+    document.getElementById('t-players').textContent = fmt(t.players);
+    document.getElementById('t-tp'     ).textContent = fmt(t.team_players);    document.getElementById('t-pstats' ).textContent = fmt(t.player_stats);    document.getElementById('t-leagues').textContent = fmt(t.leagues);
+    document.getElementById('t-groups' ).textContent = fmt(t.league_groups);
+    document.getElementById('t-games'  ).textContent = fmt(t.games);
+    document.getElementById('t-events' ).textContent = fmt(t.game_events);
+
+    renderSeasons(d.by_season || []);
+    renderSyncTable(d.sync_status || []);
+
+    document.getElementById('refresh-ts').textContent =
+      'Updated ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    log('error', 'Stats load failed: ' + e.message);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Season accordion
+═══════════════════════════════════════════════════════ */
+function renderSeasons(seasons) {
+  const container = document.getElementById('seasons-container');
+
+  // preserve open state across re-renders
+  const open = new Set(
+    [...container.querySelectorAll('.season-body.open')]
+      .map(el => el.dataset.sid)
+  );
+
+  container.innerHTML = seasons.map(s =>
+    buildSeasonCard(s, open.has(String(s.season_id)))
+  ).join('');
+}
+
+function buildSeasonCard(s, isOpen) {
+  const sid  = s.season_id;
+  const year = `${sid}/${String(sid + 1).slice(-2)}`;
+
+  const summaryChips = [
+    schip(s.clubs,         'clubs'),
+    schip(s.teams,         'teams'),
+    schip(s.team_players,  'players'),
+    schip(s.player_stats,  'stats'),
+    schip(s.leagues,       'leagues'),
+    schip(s.league_groups, 'groups'),
+    schip(s.games,         'games'),
+    schip(s.game_events,   'events'),
+  ].join('');
+
+  return `
+<div class="season-card${s.is_current ? ' current-season' : ''}">
+  <div class="season-header" onclick="toggleSeason(${sid})">
+    <span class="season-year">${year}${s.is_current ? ' <span class="current-badge">&#9733; current</span>' : ''}</span>
+    <div class="season-chips">${summaryChips}</div>
+    <span class="chevron${isOpen ? ' open' : ''}" id="chv-${sid}">▶</span>
+  </div>
+  <div class="season-body${isOpen ? ' open' : ''}" id="sbody-${sid}" data-sid="${sid}">
+
+    <div class="task-group-label">Clubs Path</div>
+    ${trow(sid,'clubs',   'Clubs',                 [p(s.clubs,'clubs')])}
+    ${trow(sid,'teams',   'Teams (per club)',       [p(s.clubs,'clubs'),       p(s.teams,'teams')])}
+    ${trow(sid,'players',      'Players (per team)',     [p(s.teams,'teams'),       p(s.team_players,'roster')])}
+    ${trow(sid,'player_stats', 'Player Statistics',      [p(s.team_players,'roster'), p(s.player_stats,'stats')])}
+
+    <div class="task-group-label">Leagues Path</div>
+    ${trow(sid,'leagues', 'Leagues',                [p(s.leagues,'leagues')])}
+    ${trow(sid,'groups',  'League Groups',          [p(s.leagues,'leagues'),   p(s.league_groups,'groups')])}
+    ${trow(sid,'games',   'Games (per league)',     [p(s.league_groups,'groups'), p(s.games,'games')])}
+    ${trowEvents(sid, s)}
+
+    <div class="quick-row">
+      <button class="btn btn-blue btn-sm"  onclick="triggerIndex(${sid},'clubs_path',  forceFor(${sid}))">▶ Clubs Path</button>
+      <button class="btn btn-blue btn-sm"  onclick="triggerIndex(${sid},'leagues_path',forceFor(${sid}))">▶ Leagues Path</button>
+      <button class="btn btn-green btn-sm" onclick="triggerIndex(${sid},'full',        forceFor(${sid}))">&#9889; Full Season</button>
+      <button class="btn btn-sm ${s.is_current ? 'btn-red' : 'btn-yellow'}" onclick="setCurrentSeason(${sid}, ${s.is_current})" title="${s.is_current ? 'Remove current-season flag' : 'Mark as current season — future seasons will be skipped during indexing'}">${s.is_current ? '&#9733; Unset Current' : '&#9734; Set as Current'}</button>
+      <button class="btn btn-red btn-sm"   onclick="deleteLayer(${sid},'all')">&#128465; Delete Season</button>
+      <label>
+        <input type="checkbox" id="force-${sid}">
+        Force re-index
+      </label>
+    </div>
+  </div>
+</div>`;
+}
+
+function schip(n, label) {
+  const cls = n > 0 ? 'ok' : 'empty';
+  return `<span class="s-chip ${cls}">${fmt(n)} ${label}</span>`;
+}
+function p(n, label) {
+  const cls = n > 0 ? ' has-data' : '';
+  return `<span class="count-pill${cls}">${fmt(n)} ${label}</span>`;
+}
+function trow(sid, task, name, counts, extraCls = '') {
+  return `
+<div class="task-row">
+  <span class="task-name">${name}</span>
+  <div class="task-counts">${counts.join('')}</div>
+  <button class="btn btn-sm ${extraCls}"
+    onclick="triggerIndex(${sid},'${task}',forceFor(${sid}))">▶ Index</button>  <button class="btn btn-sm btn-red"
+    onclick="deleteLayer(${sid},'${task}')" title="Delete ${name} data for this season">&#128465;</button></div>`;
+}
+function trowEvents(sid, s) {
+  const tierOptions = [
+    [1, 'NLA/SML/L-UPL only'],
+    [2, '+ NLB'],
+    [3, '+ 1. Liga'],
+    [4, '+ 2. Liga'],
+    [5, '+ 3. Liga'],
+    [6, '+ 4./5. Liga'],
+    [7, 'All leagues'],
+  ].map(([v, lbl]) => `<option value="${v}"${v===2?' selected':''}>${lbl}</option>`).join('');
+  return `
+<div class="task-row">
+  <span class="task-name">Game Events (finished)</span>
+  <div class="task-counts">
+    ${p(s.games,'games')} ${p(s.game_events,'events')}
+    <select id="tier-${sid}" class="tier-select" title="Max league tier to fetch events for">
+      ${tierOptions}
+    </select>
+  </div>
+  <button class="btn btn-sm"
+    onclick="triggerIndexEvents(${sid},forceFor(${sid}))">&#9654; Index</button>
+  <button class="btn btn-sm btn-red"
+    onclick="deleteLayer(${sid},'events')" title="Delete Game Events data for this season">&#128465;</button>
+</div>`;
+}
+function forceFor(sid) {
+  const cb = document.getElementById('force-' + sid);
+  return cb ? cb.checked : false;
+}
+
+function toggleSeason(sid) {
+  document.getElementById('sbody-' + sid).classList.toggle('open');
+  document.getElementById('chv-'   + sid).classList.toggle('open');
+}
+
+/* ═══════════════════════════════════════════════════════
+   Trigger + poll
+═══════════════════════════════════════════════════════ */
+async function setCurrentSeason(sid, isCurrent) {
+  if (isCurrent) {
+    if (!confirm(`Remove the "current season" flag from ${sid}/${String(sid+1).slice(-2)}?`)) return;
+  }
+  try {
+    const r = await fetch(`/admin/api/season/${sid}/set-current`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) { log('error', 'Failed: ' + (d.detail || JSON.stringify(d))); return; }
+    log('ok', `★ Season ${sid}/${String(sid+1).slice(-2)} marked as current`);
+    loadStats();
+  } catch(e) {
+    log('error', 'Request error: ' + e.message);
+  }
+}
+async function pullSeasons() {
+  const btn = document.getElementById('pull-seasons-btn');
+  if (btn) btn.disabled = true;
+  log('info', '↻ Fetching seasons list from API…');
+  try {
+    const r = await fetch('/admin/api/index', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ season: 0, task: 'seasons', force: true }),
+    });
+    const d = await r.json();
+    if (!r.ok) { log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
+    log('info', `Job ${d.job_id} queued — ${d.label}`);
+    registerJob(d);
+    // Refresh stats once job completes so season list updates
+    setTimeout(loadStats, 3000);
+  } catch(e) {
+    log('error', 'Request error: ' + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+async function triggerIndex(season, task, force) {
+  log('info', `▶ season=${season}  task=${task}  force=${force}`);
+  try {
+    const r = await fetch('/admin/api/index', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ season, task, force: !!force }),
+    });
+    const d = await r.json();
+    if (!r.ok) { log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
+    log('info', `Job ${d.job_id} queued — ${d.label}`);
+    registerJob(d);
+  } catch(e) {
+    log('error', 'Request error: ' + e.message);
+  }
+}
+async function triggerIndexEvents(season, force) {
+  const sel = document.getElementById('tier-' + season);
+  const max_tier = sel ? parseInt(sel.value, 10) : 7;
+  const tierLabel = sel ? sel.options[sel.selectedIndex].text : 'all';
+  log('info', `\u25b6 season=${season}  task=events  force=${force}  tier\u2264${max_tier} (${tierLabel})`);
+  try {
+    const r = await fetch('/admin/api/index', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ season, task: 'events', force: !!force, max_tier }),
+    });
+    const d = await r.json();
+    if (!r.ok) { log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
+    log('info', `Job ${d.job_id} queued \u2014 ${d.label}`);
+    registerJob(d);
+  } catch(e) {
+    log('error', 'Request error: ' + e.message);
+  }
+}
+const _LAYER_LABELS = {
+  events: 'Game Events', games: 'Games', groups: 'League Groups',
+  leagues: 'Leagues', player_stats: 'Player Statistics',
+  players: 'Players (roster)', teams: 'Teams', clubs: 'Clubs', all: 'ALL data',
+};
+async function deleteLayer(season, layer) {
+  const label = _LAYER_LABELS[layer] || layer;
+  const year  = `${season}/${String(season + 1).slice(-2)}`;
+  if (!confirm(`Delete ${label} for season ${year}?\n\nThis cannot be undone.`)) return;
+  log('warn', `🗑 Deleting ${label} for season ${year}…`);
+  try {
+    const r = await fetch(`/admin/api/season/${season}?layer=${layer}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (!r.ok) { log('error', 'Delete failed: ' + (d.detail || JSON.stringify(d))); return; }
+    const total = Object.values(d.deleted || {}).reduce((a, b) => a + b, 0);
+    log('info', `✓ Deleted ${total} rows (${Object.entries(d.deleted || {}).map(([k,v])=>`${k}:${v}`).join(', ')})`);
+    await loadStats();   // refresh counts
+  } catch(e) {
+    log('error', 'Request error: ' + e.message);
+  }
+}
+
+function registerJob(data) {
+  jobs[data.job_id] = { ...data, status: 'running', progress: 0 };
+  renderJobs();
+  setTimeout(() => pollJob(data.job_id), 1200);
+}
+
+const _pollErrors = {};  // job_id → consecutive error count
+const POLL_MAX_ERRORS = 4;
+
+async function pollJob(job_id) {
+  try {
+    const r = await fetch('/admin/api/jobs/' + job_id);
+
+    // 404 = server restarted and lost in-memory state → job is dead
+    if (r.status === 404) {
+      _markJobFailed(job_id, 'Job lost — server may have restarted');
+      return;
+    }
+    if (!r.ok) {
+      _handlePollError(job_id, `HTTP ${r.status}`);
+      return;
+    }
+
+    _pollErrors[job_id] = 0;  // reset error counter on success
+    const d = await r.json();
+
+    (d.log_lines || []).forEach(l =>
+      log(l.level || 'info', `[${job_id.slice(-6)}] ${l.msg}`)
+    );
+    jobs[job_id] = { ...d, log_lines: [] };
+    renderJobs();
+
+    if (d.status === 'running') {
+      setTimeout(() => pollJob(job_id), 1500);
+    } else if (d.status === 'done') {
+      const stats = Object.entries(d.stats || {}).map(([k,v]) => `${k}:${fmt(v)}`).join(' ');
+      log('ok', `✓ Job ${job_id.slice(-6)} done  ${stats}`);
+      setTimeout(loadStats, 600);
+    } else if (d.status === 'stopped') {
+      log('warn', `■ Job ${job_id.slice(-6)} stopped`);
+    } else if (d.status === 'error') {
+      log('error', `✗ Job ${job_id.slice(-6)} failed: ${d.error}`);
+    }
+  } catch(e) {
+    _handlePollError(job_id, e.message);
+  }
+}
+
+function _handlePollError(job_id, msg) {
+  const n = (_pollErrors[job_id] || 0) + 1;
+  _pollErrors[job_id] = n;
+  if (n >= POLL_MAX_ERRORS) {
+    _markJobFailed(job_id, `Lost contact after ${n} attempts (${msg})`);
+  } else {
+    log('warn', `[${job_id.slice(-6)}] Poll error (${n}/${POLL_MAX_ERRORS}): ${msg}`);
+    setTimeout(() => pollJob(job_id), 3000 * n);  // exponential back-off
+  }
+}
+
+function _markJobFailed(job_id, reason) {
+  log('error', `✗ Job ${job_id.slice(-6)} failed: ${reason}`);
+  if (jobs[job_id]) {
+    jobs[job_id].status = 'error';
+    jobs[job_id].error  = reason;
+  }
+  delete _pollErrors[job_id];
+  renderJobs();
+}
+
+/* ═══════════════════════════════════════════════════════
+   Jobs panel
+═══════════════════════════════════════════════════════ */
+function renderJobs() {
+  const c = document.getElementById('jobs-container');
+  const arr = Object.values(jobs);
+  if (!arr.length) { c.innerHTML = '<div class="no-jobs">No jobs yet.</div>'; return; }
+
+  c.innerHTML = [...arr].reverse().map(j => {
+    const st  = j.status || 'running';
+    const pct = j.progress ?? 0;
+    const pulseC    = st === 'running' ? ' pulse' : '';
+    const stopBtn   = st === 'running'
+      ? `<button class="btn btn-sm" style="color:#f85149;border-color:#da3633" onclick="stopJob('${j.job_id}')">■ Stop</button>`
+      : '';
+    return `
+<div class="job-item">
+  <div class="job-item-top">
+    <span class="job-tag ${st}${pulseC}">${st}</span>
+    <span class="job-label">${j.label || j.task || '—'}</span>
+    <span class="job-season">S${j.season}</span>
+    ${stopBtn}
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-bar" style="width:${pct}%"></div>
+  </div>
+</div>`;
+  }).join('');
+}
+
+function clearDoneJobs() {
+  for (const id in jobs) if (jobs[id].status !== 'running') delete jobs[id];
+  renderJobs();
+}
+
+async function stopJob(job_id) {
+  const r = await fetch(`/admin/api/jobs/${job_id}`, { method: 'DELETE' });
+  const d = await r.json();
+  if (d.ok) {
+    log('warn', `■ Job ${job_id} stopped`);
+    if (jobs[job_id]) jobs[job_id].status = 'stopped';
+    renderJobs();
+  } else {
+    log('warn', d.detail || 'Stop failed');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Sync table
+═══════════════════════════════════════════════════════ */
+function renderSyncTable(rows) {
+  const panel = document.getElementById('sync-panel');
+  const tbody = document.getElementById('sync-tbody');
+  if (!rows.length) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  tbody.innerHTML = rows.map(s => {
+    const cls = s.status === 'completed' ? 's-ok'
+              : s.status === 'failed'    ? 's-fail' : 's-prog';
+    const errHtml = s.error
+      ? `<span title="${esc(s.error)}" class="s-fail" style="cursor:help">⚠ ${esc(s.error).slice(0,40)}…</span>`
+      : '—';
+    return `<tr>
+      <td>${s.entity_type}</td>
+      <td style="font-family:monospace;font-size:.68rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.entity_id)}">${s.entity_id}</td>
+      <td class="${cls}">${s.status}</td>
+      <td style="color:#6e7681;white-space:nowrap">${s.last_sync || '—'}</td>
+      <td>${fmt(s.records)}</td>
+      <td>${errHtml}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════
+   Log
+═══════════════════════════════════════════════════════ */
+function log(level, msg) {
+  const box  = document.getElementById('log-box');
+  if (box.textContent === 'Ready.') box.textContent = '';
+  const line = document.createElement('div');
+  line.className = level;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  box.appendChild(line);
+  if (box.children.length > 400) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+}
+function clearLog() {
+  document.getElementById('log-box').innerHTML = '';
+}
+function esc(s) {
+  return String(s || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ═══════════════════════════════════════════════════════
+   Scheduler panel
+═══════════════════════════════════════════════════════ */
+async function loadScheduler() {
+  try {
+    const r = await fetch('/admin/api/scheduler');
+    if (!r.ok) return;
+    const d = await r.json();
+    renderScheduler(d);
+    // Pick up any scheduler-launched jobs not yet tracked in the active jobs panel
+    (d.history || []).forEach(h => {
+      if ((h.status === 'running' || h.status === 'pending') && !jobs[h.job_id]) {
+        jobs[h.job_id] = { job_id: h.job_id, label: h.policy + (h.season ? ` S${h.season}` : ''), season: h.season, task: h.task, status: 'running', progress: 0 };
+        renderJobs();
+        pollJob(h.job_id);
+      }
+    });
+  } catch(e) { /* scheduler may not yet be running */ }
+}
+
+function renderScheduler(d) {
+  const badge   = document.getElementById('sched-badge');
+  const statusTxt = document.getElementById('sched-status-txt');
+  const enableBtn  = document.getElementById('sched-enable-btn');
+  const disableBtn = document.getElementById('sched-disable-btn');
+
+  if (d.enabled) {
+    badge.className   = 's-chip ok';
+    badge.textContent = 'enabled';
+    enableBtn.disabled  = true;
+    disableBtn.disabled = false;
+    statusTxt.textContent = `${d.queue.length} job(s) queued`;
+  } else {
+    badge.className   = 's-chip empty';
+    badge.textContent = 'disabled';
+    enableBtn.disabled  = false;
+    disableBtn.disabled = true;
+    statusTxt.textContent = 'scheduler paused';
+  }
+
+  // Queue
+  const queueEl = document.getElementById('sched-queue');
+  if (!d.queue.length) {
+    queueEl.innerHTML = '<div style="padding:.5rem 1rem;font-size:.75rem;color:#6e7681">Queue empty.</div>';
+  } else {
+    queueEl.innerHTML = d.queue.map(j => `
+<div class="task-row" style="grid-template-columns:180px 1fr 110px auto">
+  <span class="task-name">${j.policy}</span>
+  <div class="task-counts">
+    ${j.season ? `<span class="count-pill has-data">S${j.season}</span>` : '<span class="count-pill">global</span>'}
+    <span class="count-pill">${j.run_at}</span>
+  </div>
+  <span class="count-pill${j.due_in_s < 120 ? ' has-data' : ''}">${fmtDue(j.due_in_s)}</span>
+  <button class="btn btn-sm btn-orange" onclick="schedTrigger('${j.policy}',${j.season||'null'})">▶ Now</button>
+</div>`).join('');
+  }
+
+  // History
+  const tbody = document.getElementById('sched-hist-tbody');
+  tbody.innerHTML = (d.history || []).map(h => {
+    const cls = h.status === 'done' ? 's-ok' : h.status === 'error' ? 's-fail' : 's-prog';
+    const statsStr = h.stats ? Object.entries(h.stats).map(([k,v])=>`${k}:${fmt(v)}`).join(' ') : '—';
+    return `<tr>
+      <td>${h.policy}</td>
+      <td style="font-size:.68rem">${h.task}</td>
+      <td>${h.season || '—'}</td>
+      <td class="${cls}">${h.status}</td>
+      <td style="color:#6e7681;white-space:nowrap">${h.scheduled_at || '—'}</td>
+      <td style="color:#6e7681;white-space:nowrap">${h.finished_at || '—'}</td>
+      <td style="font-size:.68rem;color:#8b949e">${statsStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function schedSetEnabled(v) {
+  const r = await fetch('/admin/api/scheduler', {
+    method:  'POST',
+    headers: {'Content-Type':'application/json'},
+    body:    JSON.stringify({action: v ? 'enable' : 'disable'}),
+  });
+  if (r.ok) await loadScheduler();
+}
+
+async function schedTrigger(policy, season) {
+  const r = await fetch('/admin/api/scheduler', {
+    method:  'POST',
+    headers: {'Content-Type':'application/json'},
+    body:    JSON.stringify({action:'trigger', policy, season}),
+  });
+  const d = await r.json();
+  if (d.ok) {
+    log('info', `▶ scheduler trigger: ${policy} S${season}  job=${d.job_id}`);
+    // Register the newly-launched job in the active jobs panel and start polling
+    if (d.job_id) {
+      registerJob({ job_id: d.job_id, label: d.label || policy, season: d.season, task: d.task || policy });
+    }
+    setTimeout(loadScheduler, 800);
+  } else {
+    log('error', d.detail || 'Trigger failed');
+  }
+}
+
+function fmtDue(secs) {
+  if (secs <= 0)    return 'due now';
+  if (secs < 60)    return `${secs}s`;
+  if (secs < 3600)  return `${Math.round(secs/60)}m`;
+  if (secs < 86400) return `${Math.round(secs/3600)}h`;
+  return `${Math.round(secs/86400)}d`;
+}
+
+function toggleEl(bodyId, chevId) {
+  document.getElementById(bodyId).classList.toggle('open');
+  document.getElementById(chevId).classList.toggle('open');
+}
+
+/* ═══════════════════════════════════════════════════════
+   Boot
+═══════════════════════════════════════════════════════ */
+loadStats();
+loadScheduler();
+setInterval(loadStats, 30000);
+setInterval(loadScheduler, 15000);
+</script>
+</body>
+</html>
