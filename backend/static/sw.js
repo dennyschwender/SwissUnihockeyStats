@@ -3,16 +3,15 @@
  * Handles caching and offline functionality
  */
 
-const CACHE_NAME = 'swissunihockey-v1';
-const STATIC_CACHE = 'static-v1';
-const DYNAMIC_CACHE = 'dynamic-v1';
+const CACHE_NAME = 'swissunihockey-v2';
+const STATIC_CACHE = 'static-v2';
+const DYNAMIC_CACHE = 'dynamic-v2';
 
 // Assets to cache immediately
 const STATIC_ASSETS = [
     '/static/css/main.css',
     '/static/js/favorites.js',
     '/static/js/theme.js',
-    '/static/favicon.ico',
     '/de/',
     '/en/',
     '/fr/',

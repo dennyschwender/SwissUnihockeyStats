@@ -67,10 +67,10 @@ class ThemeManager {
     }
 }
 
-// Initialize theme manager
-const themeManager = new ThemeManager();
+// Initialize theme manager (exposed on window so inline onclick handlers can call it)
+window.themeManager = new ThemeManager();
 
-// Alpine.js component for theme toggle
+// Alpine.js component for theme toggle (kept for backward compat)
 window.themeToggle = function() {
     return {
         theme: themeManager.getCurrentTheme(),

@@ -211,9 +211,18 @@ window.observeLazyImage = (img) => window.imageLazyLoader.observe(img);
 window.unobserveLazyImage = (img) => window.imageLazyLoader.unobserve(img);
 
 // Reinitialize when new content is added (e.g., via htmx)
-document.body.addEventListener('htmx:afterSwap', () => {
-    window.imageLazyLoader.observeImages();
-});
+// Guard against document.body being null if script loads in <head>
+if (document.body) {
+    document.body.addEventListener('htmx:afterSwap', () => {
+        window.imageLazyLoader.observeImages();
+    });
+} else {
+    document.addEventListener('DOMContentLoaded', () => {
+        document.body.addEventListener('htmx:afterSwap', () => {
+            window.imageLazyLoader.observeImages();
+        });
+    });
+}
 
 // Also observe on DOM content loaded
 document.addEventListener('DOMContentLoaded', () => {
