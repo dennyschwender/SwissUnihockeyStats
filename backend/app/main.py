@@ -164,9 +164,9 @@ async def _admin_not_auth_handler(request: Request, exc: _AdminNotAuthenticated)
     return RedirectResponse(url="/admin/login", status_code=302)
 
 
-# DEBUG endpoint to check player index status
+# DEBUG endpoints — admin-only
 @app.get("/debug/player-index")
-async def debug_player_index():
+async def debug_player_index(_: None = Depends(require_admin)):
     """Debug endpoint to see player index status"""
     from app.services.data_cache import get_data_cache
     cache = get_data_cache()
@@ -186,7 +186,7 @@ async def debug_player_index():
 
 
 @app.get("/debug/force-reindex")
-async def debug_force_reindex():
+async def debug_force_reindex(_: None = Depends(require_admin)):
     """Force player reindexing and return detailed logs"""
     from app.services.data_cache import get_data_cache
     import logging
@@ -215,7 +215,7 @@ async def debug_force_reindex():
 
 
 @app.get("/debug/test-games-fetch")
-async def debug_test_games_fetch():
+async def debug_test_games_fetch(_: None = Depends(require_admin)):
     """Debug endpoint to test various API endpoints"""
     client = get_swissunihockey_client()
     from app.services.data_cache import get_data_cache
@@ -1310,23 +1310,29 @@ async def team_detail(request: Request, locale: str, team_id: int, season: int =
 
 
 @app.get("/{locale}/players", response_class=HTMLResponse)
-async def players_page(request: Request, locale: str, order_by: str = "points"):
-    """Players leaderboard page — DB-backed"""
+async def players_page(request: Request, locale: str, order_by: str = "points", page: int = 1):
+    """Players leaderboard page — DB-backed with pagination"""
     from app.services.stats_service import get_player_leaderboard
 
+    per_page = 50
     valid_order = {"points", "goals", "assists", "pim"}
     if order_by not in valid_order:
         order_by = "points"
 
-    players = get_player_leaderboard(limit=50, order_by=order_by)
+    offset = (page - 1) * per_page
+    data = get_player_leaderboard(limit=per_page, offset=offset, order_by=order_by)
+    total_pages = max(1, (data["total"] + per_page - 1) // per_page)
     return templates.TemplateResponse(
         "players.html",
         {
             "request": request,
             "locale": locale,
             "t": get_translations(locale),
-            "players": players,
+            "players": data["players"],
             "order_by": order_by,
+            "page": page,
+            "total_pages": total_pages,
+            "total": data["total"],
         },
     )
 
@@ -1392,20 +1398,26 @@ async def player_detail(request: Request, locale: str, player_id: int):
 # ==================== Other Pages ====================
 
 @app.get("/{locale}/games", response_class=HTMLResponse)
-async def games_page(request: Request, locale: str, scored_only: str = "1"):
-    """Games schedule page — DB-backed"""
+async def games_page(request: Request, locale: str, scored_only: str = "1", page: int = 1):
+    """Games schedule page — DB-backed with pagination"""
     from app.services.stats_service import get_recent_games
 
+    per_page = 50
     with_score = scored_only != "0"
-    games = get_recent_games(limit=100, with_score_only=with_score)
+    offset = (page - 1) * per_page
+    data = get_recent_games(limit=per_page, offset=offset, with_score_only=with_score)
+    total_pages = max(1, (data["total"] + per_page - 1) // per_page)
     return templates.TemplateResponse(
         "games.html",
         {
             "request": request,
             "locale": locale,
             "t": get_translations(locale),
-            "games": games,
+            "games": data["games"],
             "scored_only": with_score,
+            "page": page,
+            "total_pages": total_pages,
+            "total": data["total"],
         },
     )
 
@@ -1437,14 +1449,14 @@ async def rankings_page(request: Request, locale: str):
     """Rankings page — global player leaderboard from DB"""
     from app.services.stats_service import get_player_leaderboard
 
-    topscorers = get_player_leaderboard(limit=50, order_by="points")
+    data = get_player_leaderboard(limit=50, order_by="points")
     return templates.TemplateResponse(
         "rankings.html",
         {
             "request": request,
             "locale": locale,
             "t": get_translations(locale),
-            "topscorers": topscorers,
+            "topscorers": data["players"],
             "standings": [],
         },
     )
@@ -1491,98 +1503,92 @@ async def cache_status():
 
 @app.get("/{locale}/search", response_class=HTMLResponse)
 async def universal_search(request: Request, locale: str, q: str = ""):
-    """Universal search across clubs, leagues, and teams"""
+    """Universal search across players, teams, and leagues — DB-backed."""
     if not q or len(q) < 2:
-        return HTMLResponse(content='<div class="search-results"><p class="text-gray-600">Enter at least 2 characters to search...</p></div>')
-    
-    query_lower = q.lower()
-    all_clubs = []
-    all_leagues = []
-    all_teams = []
-    
-    try:
-        # Fetch data from API client (testable via mocking get_swissunihockey_client)
-        client = get_swissunihockey_client()
-        clubs_data = client.get_clubs()
-        leagues_data = client.get_leagues()
-        teams_data = client.get_teams()
-        
-        all_clubs = clubs_data.get("entries", []) if clubs_data else []
-        all_leagues = leagues_data.get("entries", []) if leagues_data else []
-        all_teams = teams_data.get("entries", []) if teams_data else []
-    except Exception as e:
-        try:
-            # Fallback to cached data if API call fails
-            all_clubs = await get_cached_clubs()
-            all_leagues = await get_cached_leagues()
-            all_teams = await get_cached_teams()
-        except Exception:
-            # If both API and cache fail, return empty results
-            return HTMLResponse(content='<div class="search-results"><p class="text-gray-600" style="text-align: center; padding: 2rem;">Service temporarily unavailable</p></div>')
-    
-    # Search clubs
-    matching_clubs = [
-        club for club in all_clubs
-        if query_lower in club.get("text", "").lower()
-    ][:5]  # Limit to 5 results per category
-    
-    # Search leagues
-    matching_leagues = [
-        league for league in all_leagues
-        if query_lower in league.get("text", "").lower()
-    ][:5]
-    
-    # Search teams (now works instantly with 30,000+ records via cache!)
-    matching_teams = [
-        team for team in all_teams
-        if query_lower in team.get("text", "").lower()
-    ][:5]
-    
-    # Build HTML response
-    html = '<div class="search-results">'
-    
-    total_results = len(matching_clubs) + len(matching_leagues) + len(matching_teams)
-    
-    if total_results == 0:
-        html += '<p class="text-gray-600" style="text-align: center; padding: 2rem;">No results found</p>'
-    elif total_results > 0:
-        # Clubs section
-        if matching_clubs:
-            html += '<div class="search-category"><h3>🏢 Clubs</h3><div class="search-items">'
-            for club in matching_clubs:
-                club_id = club.get("set_in_context", {}).get("club_id", "")
-                html += f'''
-                <div class="search-item" onclick="window.location.href='/{locale}/clubs'">
-                    <strong>{club.get("text", "")}</strong>
-                    <span class="text-gray-600">Club ID: {club_id}</span>
-                </div>
-                '''
-            html += '</div></div>'
-        
-        # Leagues section  
-        if matching_leagues:
-            html += '<div class="search-category"><h3>🏆 Leagues</h3><div class="search-items">'
-            for league in matching_leagues:
-                html += f'''
-                <div class="search-item" onclick="window.location.href='/{locale}/leagues'">
-                    <strong>{league.get("text", "")}</strong>
-                </div>
-                '''
-            html += '</div></div>'
-        
-        # Teams section
-        if matching_teams:
-            html += '<div class="search-category"><h3>👥 Teams</h3><div class="search-items">'
-            for team in matching_teams:
-                html += f'''
-                <div class="search-item" onclick="window.location.href='/{locale}/teams'">
-                    <strong>{team.get("text", "")}</strong>
-                </div>
-                '''
-            html += '</div></div>'
-    
-    html += '</div>'
-    return HTMLResponse(content=html)
+        return HTMLResponse('<div class="search-results"><p style="text-align:center;padding:2rem;color:var(--gray-500)">Enter at least 2 characters to search…</p></div>')
+
+    from app.services.database import get_database_service
+    from app.models.db_models import Player, Team, League
+    from sqlalchemy import or_
+
+    db = get_database_service()
+    html_parts: list[str] = []
+
+    with db.session_scope() as session:
+        # --- Players ---
+        players = (
+            session.query(Player)
+            .filter(Player.full_name.ilike(f"%{q}%"))
+            .limit(8).all()
+        )
+        if players:
+            html_parts.append('<div class="search-category"><h3>🏒 Players</h3><div class="search-items">')
+            for pl in players:
+                name = pl.full_name or f"Player {pl.person_id}"
+                html_parts.append(
+                    f'<div class="search-item" onclick="window.location.href=\'/{locale}/player/{pl.person_id}\'">'
+                    f'<strong>{name}</strong></div>'
+                )
+            html_parts.append('</div></div>')
+
+        # --- Teams (current season only to avoid duplicates) ---
+        teams = (
+            session.query(Team)
+            .filter(
+                or_(Team.name.ilike(f"%{q}%"), Team.text.ilike(f"%{q}%")),
+                Team.name.isnot(None),
+            )
+            .order_by(Team.season_id.desc())
+            .limit(8).all()
+        )
+        # deduplicate by name
+        seen_team_names: set[str] = set()
+        unique_teams = []
+        for t in teams:
+            key = (t.name or t.text or "").lower()
+            if key not in seen_team_names:
+                seen_team_names.add(key)
+                unique_teams.append(t)
+        unique_teams = unique_teams[:5]
+        if unique_teams:
+            html_parts.append('<div class="search-category"><h3>👥 Teams</h3><div class="search-items">')
+            for t in unique_teams:
+                tname = t.name or t.text or f"Team {t.id}"
+                html_parts.append(
+                    f'<div class="search-item" onclick="window.location.href=\'/{locale}/team/{t.id}\'">'
+                    f'<strong>{tname}</strong></div>'
+                )
+            html_parts.append('</div></div>')
+
+        # --- Leagues ---
+        leagues = (
+            session.query(League)
+            .filter(or_(League.name.ilike(f"%{q}%"), League.text.ilike(f"%{q}%")))
+            .order_by(League.season_id.desc())
+            .limit(5).all()
+        )
+        seen_league_names: set[str] = set()
+        unique_leagues = []
+        for lg in leagues:
+            key = (lg.name or lg.text or "").lower()
+            if key not in seen_league_names:
+                seen_league_names.add(key)
+                unique_leagues.append(lg)
+        unique_leagues = unique_leagues[:5]
+        if unique_leagues:
+            html_parts.append('<div class="search-category"><h3>🏆 Leagues</h3><div class="search-items">')
+            for lg in unique_leagues:
+                lgname = lg.name or lg.text or f"League {lg.id}"
+                html_parts.append(
+                    f'<div class="search-item" onclick="window.location.href=\'/{locale}/league/{lg.id}\'">'
+                    f'<strong>{lgname}</strong></div>'
+                )
+            html_parts.append('</div></div>')
+
+    if not html_parts:
+        return HTMLResponse('<div class="search-results"><p style="text-align:center;padding:2rem;color:var(--gray-500)">No results found for <em>' + q + '</em></p></div>')
+
+    return HTMLResponse('<div class="search-results">' + "".join(html_parts) + '</div>')
 
 
 @app.get("/{locale}/favorites", response_class=HTMLResponse)

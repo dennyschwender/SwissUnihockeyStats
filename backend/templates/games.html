@@ -49,5 +49,24 @@
     <p>No games found.</p>
   </div>
   {% endif %}
+
+  {% if total_pages > 1 %}
+  <div style="display:flex;justify-content:center;align-items:center;gap:.5rem;margin-top:2rem;flex-wrap:wrap;">
+    {% if page > 1 %}
+    <a href="?scored_only={{ '1' if scored_only else '0' }}&page={{ page - 1 }}"
+       style="padding:.4rem .9rem;border-radius:.375rem;text-decoration:none;background:var(--gray-100);color:var(--gray-700);">← Prev</a>
+    {% endif %}
+    {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
+    <a href="?scored_only={{ '1' if scored_only else '0' }}&page={{ p }}"
+       style="padding:.4rem .75rem;border-radius:.375rem;text-decoration:none;
+       {% if p == page %}background:var(--swiss-red,#e11d48);color:white{% else %}background:var(--gray-100);color:var(--gray-700){% endif %}">{{ p }}</a>
+    {% endfor %}
+    {% if page < total_pages %}
+    <a href="?scored_only={{ '1' if scored_only else '0' }}&page={{ page + 1 }}"
+       style="padding:.4rem .9rem;border-radius:.375rem;text-decoration:none;background:var(--gray-100);color:var(--gray-700);">Next →</a>
+    {% endif %}
+    <span style="font-size:.8rem;color:var(--gray-500);margin-left:.5rem;">{{ total }} total</span>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

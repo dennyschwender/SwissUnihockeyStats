@@ -347,8 +347,9 @@ def get_player_leaderboard(
     season_id: Optional[int] = None,
     team_id: Optional[int] = None,
     limit: int = 50,
+    offset: int = 0,
     order_by: str = "points",
-) -> list[dict]:
+) -> dict:
     """
     Global player stats leaderboard for a season, optionally filtered by team.
     order_by: 'points' | 'goals' | 'assists' | 'pim'
@@ -379,10 +380,11 @@ def get_player_leaderboard(
             "pim": PlayerStatistics.penalty_minutes,
         }.get(order_by, PlayerStatistics.points)
 
-        q = q.order_by(order_col.desc(), PlayerStatistics.goals.desc()).limit(limit)
+        total = q.count()
+        q = q.order_by(order_col.desc(), PlayerStatistics.goals.desc()).offset(offset).limit(limit)
 
         result = []
-        for i, (ps, pl, tm) in enumerate(q.all(), 1):
+        for i, (ps, pl, tm) in enumerate(q.all(), offset + 1):
             result.append(
                 {
                     "rank": i,
@@ -398,7 +400,7 @@ def get_player_leaderboard(
                     "plus_minus": ps.plus_minus,
                 }
             )
-        return result
+        return {"players": result, "total": total, "offset": offset, "limit": limit}
 
 
 # ---------------------------------------------------------------------------
@@ -525,7 +527,45 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             "game_class": team.game_class,
             "roster": roster,
             "recent_games": recent_games,
+            "upcoming_games": _get_team_upcoming(session, team_id, season_id),
         }
+
+
+def _get_team_upcoming(session, team_id: int, season_id: int) -> list[dict]:
+    """Return upcoming (unscored) games for a team."""
+    from datetime import date as _date
+    uq = (
+        session.query(Game)
+        .filter(
+            or_(Game.home_team_id == team_id, Game.away_team_id == team_id),
+            Game.season_id == season_id,
+            Game.home_score.is_(None),
+            Game.game_date.isnot(None),
+            Game.game_date >= _date.today(),
+        )
+        .order_by(Game.game_date.asc())
+        .limit(10)
+        .all()
+    )
+    opp_ids = {g.home_team_id if g.away_team_id == team_id else g.away_team_id for g in uq}
+    opp_names: dict[int, str] = {}
+    for t in session.query(Team).filter(Team.id.in_(opp_ids), Team.season_id == season_id).all():
+        if t.name or t.text:
+            opp_names[t.id] = t.name or t.text
+    result = []
+    for g in uq:
+        is_home = g.home_team_id == team_id
+        opp_id = g.away_team_id if is_home else g.home_team_id
+        result.append({
+            "game_id": g.id,
+            "date": g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
+            "weekday": g.game_date.strftime("%a") if g.game_date else "",
+            "time": g.game_time or "",
+            "home_away": "H" if is_home else "A",
+            "opponent_id": opp_id,
+            "opponent_name": opp_names.get(opp_id, f"Team {opp_id}"),
+        })
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -799,9 +839,10 @@ def get_game_box_score(game_id: int) -> dict:
 def get_recent_games(
     season_id: Optional[int] = None,
     limit: int = 50,
+    offset: int = 0,
     with_score_only: bool = False,
-) -> list[dict]:
-    """Return recent/upcoming games for a season."""
+) -> dict:
+    """Return recent/upcoming games for a season with pagination metadata."""
     db = get_database_service()
     with db.session_scope() as session:
         if season_id is None:
@@ -811,7 +852,8 @@ def get_recent_games(
         if with_score_only:
             q = q.filter(Game.home_score.isnot(None))
 
-        games_raw = q.order_by(Game.game_date.desc()).limit(limit).all()
+        total = q.count()
+        games_raw = q.order_by(Game.game_date.desc()).offset(offset).limit(limit).all()
 
         # Preload team names in batch
         team_ids = set()
@@ -850,4 +892,4 @@ def get_recent_games(
                     "has_score": g.home_score is not None,
                 }
             )
-        return result
+        return {"games": result, "total": total, "offset": offset, "limit": limit}

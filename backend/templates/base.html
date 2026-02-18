@@ -93,7 +93,7 @@
                     🏒 {{ t.common.app_name }}
                 </a>
                 
-                <nav>
+                <nav id="main-nav">
                     <ul>
                         <li><a href="/{{ locale }}" {% if request.url.path == '/' + locale %}class="active"{% endif %}>{{ t.nav.home }}</a></li>
                         <li><a href="/{{ locale }}/leagues" {% if '/leagues' in request.url.path %}class="active"{% endif %}>{{ t.nav.leagues }}</a></li>
@@ -109,6 +109,11 @@
                         onclick="themeManager.toggle()"
                         aria-label="Toggle theme"
                         title="Toggle dark/light mode">🌙</button>
+
+                <!-- Hamburger (mobile only) -->
+                <button id="hamburger-btn" class="hamburger-btn" onclick="toggleMobileNav()" aria-label="Toggle menu">
+                    <span></span><span></span><span></span>
+                </button>
                 
                 <!-- Language Switcher -->
                 <div class="language-switcher" x-data="{ locale: '{{ locale }}' }">
@@ -188,5 +193,21 @@
     </footer>
 
     {% block scripts %}{% endblock %}
+
+    <script>
+    function toggleMobileNav() {
+        const nav = document.getElementById('main-nav');
+        const btn = document.getElementById('hamburger-btn');
+        nav.classList.toggle('open');
+        btn.classList.toggle('active');
+    }
+    // Close menu on link click
+    document.querySelectorAll('#main-nav a').forEach(a => {
+        a.addEventListener('click', () => {
+            document.getElementById('main-nav').classList.remove('open');
+            document.getElementById('hamburger-btn').classList.remove('active');
+        });
+    });
+    </script>
 </body>
 </html>

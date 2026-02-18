@@ -19,11 +19,11 @@
   {% if team %}
   <div x-data="{ tab: 'roster' }">
     <div style="display:flex;gap:.25rem;border-bottom:2px solid var(--gray-200);margin-bottom:1.5rem;">
-      {% for tid, tlabel in [('roster','Roster & Stats'),('results','Recent Results')] %}
+      {% for tid, tlabel in [('roster','Roster & Stats'),('results','Recent Results'),('upcoming','Upcoming')] %}
       <button @click="tab='{{ tid }}'"
         :style="tab==='{{ tid }}' ? 'border-bottom:2px solid var(--swiss-red,#e11d48);color:var(--swiss-red,#e11d48);margin-bottom:-2px' : 'color:var(--gray-600)'"
         style="padding:.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:.9rem;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-2px;">
-        {{ tlabel }}
+        {{ tlabel }}{% if tid == 'upcoming' and team.upcoming_games %} <span style="background:var(--swiss-red,#e11d48);color:white;border-radius:9999px;font-size:.7rem;padding:.1rem .45rem;margin-left:.3rem;">{{ team.upcoming_games|length }}</span>{% endif %}
       </button>
       {% endfor %}
     </div>
@@ -99,6 +99,33 @@
       <div style="text-align:center;padding:3rem;color:var(--gray-500);">
         <p style="font-size:2rem">📅</p>
         <p>No completed games for this team yet.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- UPCOMING GAMES -->
+    <div x-show="tab==='upcoming'">
+      {% if team.upcoming_games %}
+      <div style="display:flex;flex-direction:column;gap:.5rem;">
+        {% for g in team.upcoming_games %}
+        <a href="/{{ locale }}/game/{{ g.game_id }}" style="text-decoration:none;color:inherit;">
+          <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;gap:.75rem;"
+               onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
+            <span style="width:5.5rem;font-size:.8rem;color:var(--gray-500);flex-shrink:0;">{{ g.weekday }} {{ g.date }}</span>
+            <span style="width:2rem;text-align:center;font-size:.75rem;font-weight:600;border-radius:.25rem;padding:.15rem .4rem;
+              {% if g.home_away=='H' %}background:#dbeafe;color:#1d4ed8{% else %}background:#f3f4f6;color:#374151{% endif %}">
+              {{ g.home_away }}
+            </span>
+            <span style="flex:1;font-weight:500;">{{ g.opponent_name }}</span>
+            {% if g.time %}<span style="font-size:.8rem;color:var(--gray-500);flex-shrink:0;">{{ g.time }}</span>{% endif %}
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
+        <p style="font-size:2rem">✅</p>
+        <p>No upcoming games scheduled.</p>
       </div>
       {% endif %}
     </div>
