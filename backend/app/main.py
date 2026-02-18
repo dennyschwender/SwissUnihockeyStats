@@ -164,6 +164,27 @@ async def _admin_not_auth_handler(request: Request, exc: _AdminNotAuthenticated)
     return RedirectResponse(url="/admin/login", status_code=302)
 
 
+# ============================================================================
+# AUTH HELPERS
+# ============================================================================
+
+def _pin_hash(pin: str) -> str:
+    """Stable hash of the PIN so we never store it plaintext in session."""
+    return hashlib.pbkdf2_hmac(
+        'sha256',
+        pin.encode(),
+        settings.SESSION_SECRET.encode(),
+        1,
+    ).hex()
+
+_ADMIN_TOKEN_KEY = "admin_authed"
+
+def require_admin(request: Request):
+    """FastAPI dependency — raises exception caught by handler below if not logged in."""
+    if request.session.get(_ADMIN_TOKEN_KEY) != _pin_hash(settings.ADMIN_PIN):
+        raise _AdminNotAuthenticated()
+
+
 # DEBUG endpoints — admin-only
 @app.get("/debug/player-index")
 async def debug_player_index(_: None = Depends(require_admin)):
@@ -302,27 +323,6 @@ async def root_redirect(request: Request):
             "t": get_translations(DEFAULT_LOCALE)
         }
     )
-
-
-# ============================================================================
-# AUTH HELPERS
-# ============================================================================
-
-def _pin_hash(pin: str) -> str:
-    """Stable hash of the PIN so we never store it plaintext in session."""
-    return hashlib.pbkdf2_hmac(
-        'sha256',
-        pin.encode(),
-        settings.SESSION_SECRET.encode(),
-        1,
-    ).hex()
-
-_ADMIN_TOKEN_KEY = "admin_authed"
-
-def require_admin(request: Request):
-    """FastAPI dependency — raises exception caught by handler below if not logged in."""
-    if request.session.get(_ADMIN_TOKEN_KEY) != _pin_hash(settings.ADMIN_PIN):
-        raise _AdminNotAuthenticated()
 
 
 # ============================================================================
