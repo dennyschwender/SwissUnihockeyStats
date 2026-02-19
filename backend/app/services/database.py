@@ -79,9 +79,38 @@ class DatabaseService:
         
         # Create all tables
         Base.metadata.create_all(bind=self.engine)
-        
+
+        # ── Schema migrations ────────────────────────────────────────────
+        if self.database_url.startswith("sqlite"):
+            self._run_sqlite_migrations()
+
         self._initialized = True
         logger.info("Database initialized successfully")
+
+    def _run_sqlite_migrations(self):
+        """Run idempotent SQLite migrations to fix schema issues."""
+        from sqlalchemy import text
+        with self.engine.connect() as conn:
+            # ── Fix player_statistics duplicates (caused by NULL team_id in
+            # the old unique index which allowed duplicate rows). Keep the
+            # most-recently-updated row per (player_id, season_id, league_abbrev).
+            conn.execute(text("""
+                DELETE FROM player_statistics
+                WHERE id NOT IN (
+                    SELECT MAX(id)
+                    FROM player_statistics
+                    GROUP BY player_id, season_id, COALESCE(league_abbrev, '')
+                )
+            """))
+
+            # ── Rebuild the unique index on the correct columns ─────────────
+            conn.execute(text("DROP INDEX IF EXISTS idx_stats_unique"))
+            conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_stats_unique
+                ON player_statistics (player_id, season_id, league_abbrev)
+            """))
+            conn.commit()
+            logger.debug("SQLite migrations applied")
     
     def get_session(self) -> Session:
         """Get a new database session

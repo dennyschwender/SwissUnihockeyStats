@@ -302,7 +302,9 @@ class PlayerStatistics(Base):
         ForeignKeyConstraint(['team_id', 'season_id'], ['teams.id', 'teams.season_id']),
         Index('idx_stats_player', 'player_id'),
         Index('idx_stats_season', 'season_id'),
-        Index('idx_stats_unique', 'player_id', 'season_id', 'team_id', unique=True),
+        # Unique per player+season+league (league_abbrev is never NULL; team_id was
+        # previously used but is always NULL which lets SQLite store duplicates).
+        Index('idx_stats_unique', 'player_id', 'season_id', 'league_abbrev', unique=True),
     )
 
 

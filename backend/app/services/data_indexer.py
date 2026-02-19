@@ -545,6 +545,7 @@ class DataIndexer:
                                     .filter(
                                         PlayerStatistics.player_id == person_id,
                                         PlayerStatistics.season_id == season_id,
+                                        PlayerStatistics.league_abbrev == league_abbrev,
                                     ).first()
                                 )
                                 if existing:
