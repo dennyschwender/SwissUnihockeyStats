@@ -51,7 +51,6 @@
               hx-trigger="change"
               hx-target="#recent-games-list"
               hx-swap="innerHTML"
-              hx-include="[name='league_category']"
               style="padding:.35rem .75rem;border:1px solid var(--gray-200);border-radius:.5rem;font-size:.8rem;background:var(--card-bg);color:var(--text-primary);cursor:pointer;">
         <option value="all" {% if league_category == 'all' %}selected{% endif %}>All Leagues</option>
         {% for league in league_filters %}
@@ -81,7 +80,6 @@
               hx-trigger="change"
               hx-target="#upcoming-games-list"
               hx-swap="innerHTML"
-              hx-include="[name='league_category']"
               style="padding:.35rem .75rem;border:1px solid var(--gray-200);border-radius:.5rem;font-size:.8rem;background:var(--card-bg);color:var(--text-primary);cursor:pointer;">
         <option value="all" {% if league_category == 'all' %}selected{% endif %}>All Leagues</option>
         {% for league in league_filters %}
