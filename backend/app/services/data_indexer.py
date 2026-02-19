@@ -505,6 +505,12 @@ class DataIndexer:
                     return 0
 
                 count = 0
+                # staged tracks objects added in this session but not yet flushed,
+                # keyed by (player_id, season_id, league_abbrev).  Without this,
+                # a duplicate within a single player's API response would cause
+                # autoflush to attempt a second INSERT and hit the UNIQUE constraint.
+                staged: dict[tuple, PlayerStatistics] = {}
+
                 for person_id in player_ids:
                     try:
                         stats_data = self.client.get_player_stats(person_id)
@@ -515,15 +521,15 @@ class DataIndexer:
                                 if len(cells) < 4:
                                     continue
 
-                                def _txt(idx):
-                                    v = cells[idx].get("text") if len(cells) > idx else None
+                                def _txt(idx, _cells=cells):
+                                    v = _cells[idx].get("text") if len(_cells) > idx else None
                                     if isinstance(v, list):
                                         v = v[0] if v else None
                                     return (v or "").strip()
 
-                                def _int(idx):
+                                def _int(idx, _cells=cells):
                                     try:
-                                        return int(_txt(idx))
+                                        return int(_txt(idx, _cells))
                                     except (ValueError, TypeError):
                                         return 0
 
@@ -539,26 +545,42 @@ class DataIndexer:
                                 assists          = _int(5)
                                 points           = _int(6)
                                 penalty_minutes  = _int(7) * 2 + _int(8) * 5 + _int(9) * 10
+                                now              = datetime.now(timezone.utc)
 
-                                existing = (
-                                    session.query(PlayerStatistics)
-                                    .filter(
-                                        PlayerStatistics.player_id == person_id,
-                                        PlayerStatistics.season_id == season_id,
-                                        PlayerStatistics.league_abbrev == league_abbrev,
-                                    ).first()
-                                )
+                                key = (person_id, season_id, league_abbrev)
+
+                                def _apply(obj):
+                                    obj.league_abbrev   = league_abbrev
+                                    obj.team_name       = team_name_txt
+                                    obj.games_played    = games_played
+                                    obj.goals           = goals
+                                    obj.assists         = assists
+                                    obj.points          = points
+                                    obj.penalty_minutes = penalty_minutes
+                                    obj.last_updated    = now
+
+                                # 1. Check in-session staged objects first (no DB flush needed)
+                                if key in staged:
+                                    _apply(staged[key])
+                                    count += 1
+                                    continue
+
+                                # 2. Check DB — use no_autoflush to avoid premature flush
+                                with session.no_autoflush:
+                                    existing = (
+                                        session.query(PlayerStatistics)
+                                        .filter(
+                                            PlayerStatistics.player_id == person_id,
+                                            PlayerStatistics.season_id == season_id,
+                                            PlayerStatistics.league_abbrev == league_abbrev,
+                                        ).first()
+                                    )
+
                                 if existing:
-                                    existing.league_abbrev   = league_abbrev
-                                    existing.team_name       = team_name_txt
-                                    existing.games_played    = games_played
-                                    existing.goals           = goals
-                                    existing.assists         = assists
-                                    existing.points          = points
-                                    existing.penalty_minutes = penalty_minutes
-                                    existing.last_updated    = datetime.now(timezone.utc)
+                                    _apply(existing)
+                                    staged[key] = existing
                                 else:
-                                    session.add(PlayerStatistics(
+                                    obj = PlayerStatistics(
                                         player_id       = person_id,
                                         season_id       = season_id,
                                         league_abbrev   = league_abbrev,
@@ -568,8 +590,10 @@ class DataIndexer:
                                         assists         = assists,
                                         points          = points,
                                         penalty_minutes = penalty_minutes,
-                                        last_updated    = datetime.now(timezone.utc),
-                                    ))
+                                        last_updated    = now,
+                                    )
+                                    session.add(obj)
+                                    staged[key] = obj
                                 count += 1
                     except Exception as exc:
                         logger.debug("Could not fetch stats for player %s: %s", person_id, exc)
