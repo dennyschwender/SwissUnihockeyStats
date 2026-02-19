@@ -923,17 +923,18 @@ function fmtRunAt(isoUtc) {
   const diffMs = d - now;
   const diffDays = Math.floor(diffMs / 86400000);
   // Same calendar day → just show time
+  const timeFmt = {hour:'2-digit', minute:'2-digit', hour12: false};
   if (d.toDateString() === now.toDateString())
-    return 'today ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    return 'today ' + d.toLocaleTimeString([], timeFmt);
   // Tomorrow
   const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
   if (d.toDateString() === tomorrow.toDateString())
-    return 'tomorrow ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    return 'tomorrow ' + d.toLocaleTimeString([], timeFmt);
   // Within 7 days → weekday + time
   if (diffDays < 7)
-    return d.toLocaleDateString([], {weekday:'short'}) + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    return d.toLocaleDateString([], {weekday:'short'}) + ' ' + d.toLocaleTimeString([], timeFmt);
   // Farther out → date + time
-  return d.toLocaleDateString([], {month:'short', day:'numeric'}) + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  return d.toLocaleDateString([], {month:'short', day:'numeric'}) + ' ' + d.toLocaleTimeString([], timeFmt);
 }
 
 function toggleEl(bodyId, chevId) {
