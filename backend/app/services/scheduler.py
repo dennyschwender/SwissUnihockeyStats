@@ -525,53 +525,26 @@ class Scheduler:
         )
 
     async def _dispatch_due(self):
-        now = _utcnow()        
+        now = _utcnow()
         due = [j for j in self._queue if j.run_at <= now]
         if not due:
             return
 
-        # Remove from queue
+        # Remove all due jobs from the queue up front
         for j in due:
             self._queue.remove(j)
 
-        # Jobs whose scheduled time is more than one tick old were queued before
-        # the scheduler was paused/restarted.  Rather than dropping them (which
-        # causes an infinite reschedule loop) or launching all at once (thundering
-        # herd), re-enqueue them staggered a few seconds into the future so each
-        # one gets dispatched cleanly on the very next _dispatch_due call.
-        stale_cutoff = now - timedelta(seconds=TICK_SECONDS)
-        stale  = [j for j in due if j.run_at < stale_cutoff]
-        fresh  = [j for j in due if j.run_at >= stale_cutoff]
+        # Sort by (run_at, priority) — oldest/highest-priority first
+        due.sort()
 
-        # Re-enqueue stale jobs with a short stagger (5 s apart) so they run
-        # on the next tick rather than being silently dropped.
-        stale.sort()  # sort by original run_at / priority
-        for i, j in enumerate(stale):
-            j.run_at = now + timedelta(seconds=5 + i * 2)
-            self._queue.append(j)
-            logger.debug(
-                "[scheduler] rescheduled overdue job %s season=%s → %s",
-                j.policy_name, j.season,
-                j.run_at.strftime("%Y-%m-%d %H:%M UTC"),
-            )
-
-        if stale:
-            logger.info(
-                "[scheduler] rescheduled %d overdue job(s) to run shortly",
-                len(stale),
-            )
-
-        # Sort by (run_at, priority) so highest-priority runs first
-        fresh.sort()
-
-        # Enforce concurrency cap: leave overflow jobs back in the queue
-        # (staggered a few seconds apart) so they run once a slot frees up.
+        # Enforce concurrency cap: dispatch up to available slots,
+        # re-enqueue overflow with a short stagger so they fire quickly.
         slots = max(0, self._max_concurrent - self._count_running())
-        to_launch = fresh[:slots]
-        to_defer  = fresh[slots:]
+        to_launch = due[:slots]
+        to_defer  = due[slots:]
 
         for i, j in enumerate(to_defer):
-            j.run_at = now + timedelta(seconds=10 + i * 3)
+            j.run_at = now + timedelta(seconds=5 + i * 3)
             self._queue.append(j)
 
         if to_defer:
@@ -579,9 +552,17 @@ class Scheduler:
                 "[scheduler] deferred %d job(s) (max_concurrent=%d, running=%d)",
                 len(to_defer), self._max_concurrent, self._count_running(),
             )
+            # Schedule a fast follow-up tick so deferred jobs aren't waiting
+            # the full TICK_SECONDS interval before the next dispatch attempt.
+            asyncio.create_task(self._deferred_tick(delay=8))
 
         for job in to_launch:
             await self._launch(job)
+
+    async def _deferred_tick(self, delay: int = 8):
+        """Fire a tick after a short delay to dispatch deferred overflow jobs."""
+        await asyncio.sleep(delay)
+        await self._tick()
 
     async def _launch(self, job: ScheduledJob):
         await self._launch_and_return_id(job)
