@@ -6,7 +6,6 @@
 <style>
   [x-cloak] { display: none !important; }
 
-  /* ── Game detail ── */
   .gd-back { color:var(--gray-500); font-size:.875rem; text-decoration:none; }
   .gd-back:hover { color:var(--swiss-red); }
 
@@ -80,7 +79,16 @@
     letter-spacing: .05em;
     color: var(--gray-500);
     border-bottom: 2px solid var(--gray-200);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
   }
+  .gd-table th:hover { color: var(--swiss-red); }
+  .gd-table th.sort-asc,
+  .gd-table th.sort-desc { color: var(--swiss-red); }
+  .gd-table th .sort-icon { margin-left: .3rem; font-size: .7rem; opacity: .4; }
+  .gd-table th.sort-asc .sort-icon,
+  .gd-table th.sort-desc .sort-icon { opacity: 1; }
   .gd-table td { padding: .65rem .75rem; border-bottom: 1px solid var(--gray-100); }
   .gd-table tbody tr:last-child td { border-bottom: none; }
   .gd-table tbody tr:hover { background: var(--gray-50, #f9fafb); }
@@ -117,6 +125,35 @@
   .gd-empty { text-align:center; padding:3rem 1rem; color:var(--gray-400); }
   .gd-empty-icon { font-size:2.25rem; margin-bottom:.5rem; }
 </style>
+
+<script>
+function sortTable(initialRows, defaultKey, defaultDir) {
+  return {
+    rows: initialRows,
+    key: defaultKey || '',
+    dir: defaultDir || 'asc',
+    get sorted() {
+      if (!this.key) return this.rows;
+      const k = this.key, d = this.dir;
+      return [...this.rows].sort((a, b) => {
+        let va = a[k], vb = b[k];
+        const na = parseFloat(va), nb = parseFloat(vb);
+        if (!isNaN(na) && !isNaN(nb)) { va = na; vb = nb; }
+        else { va = String(va ?? '').toLowerCase(); vb = String(vb ?? '').toLowerCase(); }
+        if (va < vb) return d === 'asc' ? -1 : 1;
+        if (va > vb) return d === 'asc' ?  1 : -1;
+        return 0;
+      });
+    },
+    sortBy(k) {
+      if (this.key === k) { this.dir = this.dir === 'asc' ? 'desc' : 'asc'; }
+      else { this.key = k; this.dir = 'asc'; }
+    },
+    cls(k) { if (this.key !== k) return ''; return this.dir === 'asc' ? 'sort-asc' : 'sort-desc'; },
+    icon(k) { if (this.key !== k) return '\u2195'; return this.dir === 'asc' ? '\u2191' : '\u2193'; }
+  };
+}
+</script>
 
 <div class="container" style="padding-top:2rem;padding-bottom:3rem;">
 
@@ -170,30 +207,31 @@
     <!-- GOALS -->
     <div class="gd-tabpanel" x-show="tab === 'goals'">
       {% if game.goals %}
-      <table class="gd-table">
-        <thead>
-          <tr>
-            <th>Period</th>
-            <th>Time</th>
-            <th>Score</th>
-            <th>Team</th>
-            <th>Player</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for g in game.goals %}
-          <tr>
-            <td>{{ g.period or "—" }}</td>
-            <td>{{ g.time or "—" }}</td>
-            <td class="gd-score-cell">
-              {{ g.score }}{% if g.own_goal %}<span class="gd-og">(OG)</span>{% endif %}
-            </td>
-            <td>{{ g.team or "—" }}</td>
-            <td>{{ g.player or "—" }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div x-data="sortTable({{ game.goals | tojson }}, 'time', 'asc')">
+        <table class="gd-table">
+          <thead><tr>
+            <th :class="cls('period')" @click="sortBy('period')">Period<span class="sort-icon" x-text="icon('period')"></span></th>
+            <th :class="cls('time')"   @click="sortBy('time')"  >Time<span class="sort-icon" x-text="icon('time')"></span></th>
+            <th :class="cls('score')"  @click="sortBy('score')" >Score<span class="sort-icon" x-text="icon('score')"></span></th>
+            <th :class="cls('team')"   @click="sortBy('team')"  >Team<span class="sort-icon" x-text="icon('team')"></span></th>
+            <th :class="cls('player')" @click="sortBy('player')">Player<span class="sort-icon" x-text="icon('player')"></span></th>
+          </tr></thead>
+          <tbody>
+            <template x-for="g in sorted" :key="g.time + g.team">
+              <tr>
+                <td x-text="g.period || '—'"></td>
+                <td x-text="g.time || '—'"></td>
+                <td class="gd-score-cell">
+                  <span x-text="g.score"></span>
+                  <span class="gd-og" x-show="g.own_goal">(OG)</span>
+                </td>
+                <td x-text="g.team || '—'"></td>
+                <td x-text="g.player || '—'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
       {% else %}
       <div class="gd-empty">
         <div class="gd-empty-icon">🥅</div>
@@ -205,30 +243,30 @@
     <!-- PENALTIES -->
     <div class="gd-tabpanel" x-show="tab === 'penalties'">
       {% if game.penalties %}
-      <table class="gd-table">
-        <thead>
-          <tr>
-            <th>Period</th>
-            <th>Time</th>
-            <th>Team</th>
-            <th>Player</th>
-            <th>Min</th>
-            <th>Infraction</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for p in game.penalties %}
-          <tr>
-            <td>{{ p.period or "—" }}</td>
-            <td>{{ p.time or "—" }}</td>
-            <td>{{ p.team }}</td>
-            <td>{{ p.player or "—" }}</td>
-            <td class="gd-min">{{ p.minutes }}'</td>
-            <td class="gd-infraction">{{ p.infraction }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div x-data="sortTable({{ game.penalties | tojson }}, 'time', 'asc')">
+        <table class="gd-table">
+          <thead><tr>
+            <th :class="cls('period')"     @click="sortBy('period')"    >Period<span class="sort-icon" x-text="icon('period')"></span></th>
+            <th :class="cls('time')"       @click="sortBy('time')"      >Time<span class="sort-icon" x-text="icon('time')"></span></th>
+            <th :class="cls('team')"       @click="sortBy('team')"      >Team<span class="sort-icon" x-text="icon('team')"></span></th>
+            <th :class="cls('player')"     @click="sortBy('player')"    >Player<span class="sort-icon" x-text="icon('player')"></span></th>
+            <th :class="cls('minutes')"    @click="sortBy('minutes')"   >Min<span class="sort-icon" x-text="icon('minutes')"></span></th>
+            <th :class="cls('infraction')" @click="sortBy('infraction')">Infraction<span class="sort-icon" x-text="icon('infraction')"></span></th>
+          </tr></thead>
+          <tbody>
+            <template x-for="p in sorted" :key="p.time + p.team + p.player">
+              <tr>
+                <td x-text="p.period || '—'"></td>
+                <td x-text="p.time || '—'"></td>
+                <td x-text="p.team || '—'"></td>
+                <td x-text="p.player || '—'"></td>
+                <td class="gd-min" x-text="p.minutes != null ? p.minutes + \"'\" : '—'"></td>
+                <td class="gd-infraction" x-text="p.infraction || '—'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
       {% else %}
       <div class="gd-empty">
         <div class="gd-empty-icon">🟨</div>
@@ -260,37 +298,41 @@
     <div class="gd-tabpanel" x-show="tab === 'roster'">
       {% if game.roster_home or game.roster_away %}
       <div class="gd-roster">
-        <div>
+        <div x-data="sortTable({{ game.roster_home | tojson }}, 'jersey', 'asc')">
           <div class="gd-roster-header">{{ game.home_team }}</div>
           <table class="gd-table">
-            <thead>
-              <tr><th>#</th><th>Position</th><th>Player</th></tr>
-            </thead>
+            <thead><tr>
+              <th :class="cls('jersey')"   @click="sortBy('jersey')"  >#<span class="sort-icon" x-text="icon('jersey')"></span></th>
+              <th :class="cls('position')" @click="sortBy('position')">Pos<span class="sort-icon" x-text="icon('position')"></span></th>
+              <th :class="cls('player')"   @click="sortBy('player')"  >Player<span class="sort-icon" x-text="icon('player')"></span></th>
+            </tr></thead>
             <tbody>
-              {% for p in game.roster_home %}
-              <tr>
-                <td style="width:2.5rem;font-variant-numeric:tabular-nums;color:var(--gray-500);">{{ p.jersey or "—" }}</td>
-                <td style="width:6rem;font-size:.8rem;color:var(--gray-500);">{{ p.position or "—" }}</td>
-                <td><a href="/{{ locale }}/player/{{ p.player_id }}" style="text-decoration:none;color:inherit;hover:color:var(--swiss-red);">{{ p.player }}</a></td>
-              </tr>
-              {% endfor %}
+              <template x-for="p in sorted" :key="p.player_id || p.player">
+                <tr>
+                  <td style="width:2.5rem;font-variant-numeric:tabular-nums;color:var(--gray-500);" x-text="p.jersey || '—'"></td>
+                  <td style="width:6rem;font-size:.8rem;color:var(--gray-500);" x-text="p.position || '—'"></td>
+                  <td><a :href="'/{{ locale }}/player/' + p.player_id" style="text-decoration:none;color:inherit;" x-text="p.player"></a></td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
-        <div>
+        <div x-data="sortTable({{ game.roster_away | tojson }}, 'jersey', 'asc')">
           <div class="gd-roster-header">{{ game.away_team }}</div>
           <table class="gd-table">
-            <thead>
-              <tr><th>#</th><th>Position</th><th>Player</th></tr>
-            </thead>
+            <thead><tr>
+              <th :class="cls('jersey')"   @click="sortBy('jersey')"  >#<span class="sort-icon" x-text="icon('jersey')"></span></th>
+              <th :class="cls('position')" @click="sortBy('position')">Pos<span class="sort-icon" x-text="icon('position')"></span></th>
+              <th :class="cls('player')"   @click="sortBy('player')"  >Player<span class="sort-icon" x-text="icon('player')"></span></th>
+            </tr></thead>
             <tbody>
-              {% for p in game.roster_away %}
-              <tr>
-                <td style="width:2.5rem;font-variant-numeric:tabular-nums;color:var(--gray-500);">{{ p.jersey or "—" }}</td>
-                <td style="width:6rem;font-size:.8rem;color:var(--gray-500);">{{ p.position or "—" }}</td>
-                <td><a href="/{{ locale }}/player/{{ p.player_id }}" style="text-decoration:none;color:inherit;">{{ p.player }}</a></td>
-              </tr>
-              {% endfor %}
+              <template x-for="p in sorted" :key="p.player_id || p.player">
+                <tr>
+                  <td style="width:2.5rem;font-variant-numeric:tabular-nums;color:var(--gray-500);" x-text="p.jersey || '—'"></td>
+                  <td style="width:6rem;font-size:.8rem;color:var(--gray-500);" x-text="p.position || '—'"></td>
+                  <td><a :href="'/{{ locale }}/player/' + p.player_id" style="text-decoration:none;color:inherit;" x-text="p.player"></a></td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
