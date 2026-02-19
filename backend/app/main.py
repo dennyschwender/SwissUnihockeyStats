@@ -368,14 +368,14 @@ async def admin_page(request: Request, _: None = Depends(require_admin)):
 
 @app.get("/admin/api/stats")
 async def admin_stats(_: None = Depends(require_admin)):
-    """Per-entity DB counts, per-season breakdown, and last 100 sync records.
-
-    All DB work runs in a thread executor so the event loop stays responsive
-    while scheduler jobs are writing concurrently.  Per-season counts use a
-    single GROUP BY pass per table instead of one query per season row.
-    """
+    """Per-entity DB counts, per-season breakdown, and last 100 sync records."""
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _admin_stats_sync)
+    try:
+        return await loop.run_in_executor(None, _admin_stats_sync)
+    except Exception as exc:
+        logger.error("admin_stats failed: %s", exc, exc_info=True)
+        # Return a stub so the UI shows zeros instead of "Stats load failed"
+        return {"totals": {}, "by_season": [], "sync_status": [], "error": str(exc)}
 
 
 def _admin_stats_sync():
@@ -385,52 +385,77 @@ def _admin_stats_sync():
         Season, Club, Team, Player, TeamPlayer,
         League, LeagueGroup, Game, GameEvent, PlayerStatistics, SyncStatus
     )
-    from sqlalchemy import func
+    from sqlalchemy import func, text
 
     db_service = get_database_service()
     with db_service.session_scope() as session:
-        # ── Global totals (10 fast COUNT queries) ─────────────────────────
+        # Increase busy timeout for this read-only stats query so it doesn't
+        # fail when a heavy write job (events indexing) holds the DB lock.
+        try:
+            session.execute(text("PRAGMA busy_timeout=30000"))
+        except Exception:
+            pass
+
+        def safe_count(q):
+            try:
+                return q.scalar() or 0
+            except Exception:
+                return -1
+
+        def safe_group_by(col, season_col):
+            try:
+                return {sid: n for sid, n in session.query(season_col, func.count(col)).group_by(season_col).all()}
+            except Exception:
+                return {}
+
+        # ── Global totals ──────────────────────────────────────────────────
         totals = {
-            "seasons":       session.query(func.count(Season.id)).scalar() or 0,
-            "clubs":         session.query(func.count(Club.id)).scalar() or 0,
-            "teams":         session.query(func.count(Team.id)).scalar() or 0,
-            "players":       session.query(func.count(Player.person_id)).scalar() or 0,
-            "team_players":  session.query(func.count(TeamPlayer.id)).scalar() or 0,
-            "leagues":       session.query(func.count(League.id)).scalar() or 0,
-            "league_groups": session.query(func.count(LeagueGroup.id)).scalar() or 0,
-            "games":         session.query(func.count(Game.id)).scalar() or 0,
-            "game_events":   session.query(func.count(GameEvent.id)).scalar() or 0,
-            "player_stats":  session.query(func.count(PlayerStatistics.id)).scalar() or 0,
+            "seasons":       safe_count(session.query(func.count(Season.id))),
+            "clubs":         safe_count(session.query(func.count(Club.id))),
+            "teams":         safe_count(session.query(func.count(Team.id))),
+            "players":       safe_count(session.query(func.count(Player.person_id))),
+            "team_players":  safe_count(session.query(func.count(TeamPlayer.id))),
+            "leagues":       safe_count(session.query(func.count(League.id))),
+            "league_groups": safe_count(session.query(func.count(LeagueGroup.id))),
+            "games":         safe_count(session.query(func.count(Game.id))),
+            "game_events":   safe_count(session.query(func.count(GameEvent.id))),
+            "player_stats":  safe_count(session.query(func.count(PlayerStatistics.id))),
         }
 
-        # ── Per-season aggregates via GROUP BY (1 query per table) ────────
-        def group_by(col, season_col):
-            return {sid: n for sid, n in session.query(season_col, func.count(col)).group_by(season_col).all()}
+        # ── Per-season aggregates via GROUP BY ─────────────────────────────
+        clubs_by_s   = safe_group_by(Club.id,            Club.season_id)
+        teams_by_s   = safe_group_by(Team.id,            Team.season_id)
+        tp_by_s      = safe_group_by(TeamPlayer.id,      TeamPlayer.season_id)
+        leagues_by_s = safe_group_by(League.id,          League.season_id)
+        games_by_s   = safe_group_by(Game.id,            Game.season_id)
+        pstats_by_s  = safe_group_by(PlayerStatistics.id, PlayerStatistics.season_id)
 
-        clubs_by_s   = group_by(Club.id,          Club.season_id)
-        teams_by_s   = group_by(Team.id,           Team.season_id)
-        tp_by_s      = group_by(TeamPlayer.id,     TeamPlayer.season_id)
-        leagues_by_s = group_by(League.id,         League.season_id)
-        games_by_s   = group_by(Game.id,           Game.season_id)
-        pstats_by_s  = group_by(PlayerStatistics.id, PlayerStatistics.season_id)
+        try:
+            groups_by_s = dict(
+                session.query(League.season_id, func.count(LeagueGroup.id))
+                .join(LeagueGroup, LeagueGroup.league_id == League.id)
+                .group_by(League.season_id)
+                .all()
+            )
+        except Exception:
+            groups_by_s = {}
 
-        # league_groups need a join to reach season_id
-        groups_by_s = dict(
-            session.query(League.season_id, func.count(LeagueGroup.id))
-            .join(LeagueGroup, LeagueGroup.league_id == League.id)
-            .group_by(League.season_id)
-            .all()
-        )
-        # game_events need a join through Game
-        events_by_s = dict(
-            session.query(Game.season_id, func.count(GameEvent.id))
-            .join(GameEvent, GameEvent.game_id == Game.id)
-            .group_by(Game.season_id)
-            .all()
-        )
+        try:
+            events_by_s = dict(
+                session.query(Game.season_id, func.count(GameEvent.id))
+                .join(GameEvent, GameEvent.game_id == Game.id)
+                .group_by(Game.season_id)
+                .all()
+            )
+        except Exception:
+            events_by_s = {}
 
-        season_rows = (session.query(Season.id, Season.text, Season.highlighted)
-                       .order_by(Season.id.desc()).all())
+        try:
+            season_rows = (session.query(Season.id, Season.text, Season.highlighted)
+                           .order_by(Season.id.desc()).all())
+        except Exception:
+            season_rows = []
+
         by_season = [
             {
                 "season_id":     sid,
@@ -449,20 +474,23 @@ def _admin_stats_sync():
         ]
 
         # ── Recent sync records ────────────────────────────────────────────
-        syncs = (session.query(SyncStatus)
-                 .order_by(SyncStatus.last_sync.desc())
-                 .limit(100).all())
-        sync_status = [
-            {
-                "entity_type": s.entity_type,
-                "entity_id":   s.entity_id,
-                "status":      s.sync_status,
-                "last_sync":   s.last_sync.strftime("%Y-%m-%d %H:%M") if s.last_sync else None,
-                "records":     s.records_synced or 0,
-                "error":       s.error_message,
-            }
-            for s in syncs
-        ]
+        try:
+            syncs = (session.query(SyncStatus)
+                     .order_by(SyncStatus.last_sync.desc())
+                     .limit(100).all())
+            sync_status = [
+                {
+                    "entity_type": s.entity_type,
+                    "entity_id":   s.entity_id,
+                    "status":      s.sync_status,
+                    "last_sync":   s.last_sync.strftime("%Y-%m-%d %H:%M") if s.last_sync else None,
+                    "records":     s.records_synced or 0,
+                    "error":       s.error_message,
+                }
+                for s in syncs
+            ]
+        except Exception:
+            sync_status = []
 
     return {"totals": totals, "by_season": by_season, "sync_status": sync_status}
 
