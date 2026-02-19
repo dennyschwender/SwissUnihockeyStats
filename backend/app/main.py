@@ -928,7 +928,9 @@ async def home(request: Request, locale: str):
     # Get overall top scorers across all leagues
     overall_scorers = get_overall_top_scorers(season_id=active_season, limit=10)
     
-    # Get unique league categories for filtering
+    # Get unique league categories for filtering - only include those with upcoming games
+    upcoming_league_cats = set(g.get('league_category', '') for g in upcoming if g.get('league_category'))
+    
     with db.session_scope() as session:
         league_categories = (
             session.query(
@@ -942,10 +944,14 @@ async def home(request: Request, locale: str):
             .all()
         )
         
-        # Group by league_id for cleaner display
+        # Group by league_id for cleaner display - only include if has upcoming games
         leagues_grouped = {}
         for league_id, game_class, name in league_categories:
             key = f"{league_id}_{game_class}"
+            # Only include if this category has upcoming games
+            if key not in upcoming_league_cats:
+                continue
+                
             if league_id not in leagues_grouped:
                 # Extract base name (e.g., "NLB" from "Herren NLB")
                 base_name = name.split()[-1] if name else f"League {league_id}"
