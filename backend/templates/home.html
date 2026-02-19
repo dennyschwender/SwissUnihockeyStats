@@ -45,7 +45,7 @@
       </h2>
       {% if league_filters %}
       <select x-model="selectedLeague" 
-              style="padding:.35rem .75rem;border:1px solid var(--gray-200);border-radius:.5rem;font-size:.8rem;background:white;cursor:pointer;">
+              style="padding:.35rem .75rem;border:1px solid var(--gray-200);border-radius:.5rem;font-size:.8rem;background:var(--card-bg);color:var(--text-primary);cursor:pointer;">
         <option value="all">All Leagues</option>
         {% for league in league_filters %}
           {% for cls in league.classes %}
