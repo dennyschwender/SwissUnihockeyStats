@@ -3,6 +3,110 @@
 {% block title %}{{ game.home_team if game else "Game" }} vs {{ game.away_team if game else "" }} – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
+<style>
+  [x-cloak] { display: none !important; }
+
+  /* ── Game detail ── */
+  .gd-back { color:var(--gray-500); font-size:.875rem; text-decoration:none; }
+  .gd-back:hover { color:var(--swiss-red); }
+
+  .gd-scorebox {
+    background: var(--card-bg, white);
+    border: 1px solid var(--gray-200);
+    border-radius: .75rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    text-align: center;
+  }
+  .gd-meta { font-size:.8rem; color:var(--gray-500); margin-bottom:.75rem; }
+  .gd-teams { display:flex; align-items:center; justify-content:center; gap:2rem; flex-wrap:wrap; }
+  .gd-team { flex:1; min-width:140px; }
+  .gd-team--home { text-align:right; }
+  .gd-team--away { text-align:left; }
+  .gd-team a { font-size:1.35rem; font-weight:700; text-decoration:none; color:inherit; }
+  .gd-team a:hover { color:var(--swiss-red); }
+  .gd-score {
+    font-size:3rem; font-weight:900;
+    font-variant-numeric: tabular-nums;
+    min-width:130px; text-align:center;
+    letter-spacing:.05em;
+    padding: 0 1rem;
+  }
+  .gd-status { margin-top:.6rem; font-size:.8rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:.04em; }
+
+  /* ── Tabs ── */
+  .gd-tabs {
+    background: var(--card-bg, white);
+    border: 1px solid var(--gray-200);
+    border-radius: .75rem;
+    overflow: hidden;
+  }
+  .gd-tabbar {
+    display: flex;
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-50, #f9fafb);
+  }
+  .gd-tab {
+    padding: .75rem 1.5rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: .9rem;
+    font-weight: 500;
+    color: var(--gray-500);
+    border-bottom: 3px solid transparent;
+    margin-bottom: -1px;
+    transition: color .15s, border-color .15s;
+    white-space: nowrap;
+  }
+  .gd-tab:hover { color: var(--swiss-red); }
+  .gd-tab.active {
+    color: var(--swiss-red);
+    border-bottom-color: var(--swiss-red);
+    background: var(--card-bg, white);
+    font-weight: 600;
+  }
+  .gd-tabpanel { padding: 1.5rem; }
+
+  /* ── Tables ── */
+  .gd-table { width:100%; border-collapse:collapse; font-size:.875rem; }
+  .gd-table thead tr { background:var(--gray-50,#f9fafb); }
+  .gd-table th {
+    padding: .6rem .75rem;
+    text-align: left;
+    font-size: .75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--gray-500);
+    border-bottom: 2px solid var(--gray-200);
+  }
+  .gd-table td { padding: .65rem .75rem; border-bottom: 1px solid var(--gray-100); }
+  .gd-table tbody tr:last-child td { border-bottom: none; }
+  .gd-table tbody tr:hover { background: var(--gray-50, #f9fafb); }
+  .gd-score-cell { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .gd-og { font-size:.72rem; color:var(--gray-400); font-weight:400; margin-left:.25rem; }
+  .gd-min { text-align:center; }
+  .gd-infraction { color:var(--gray-600); }
+
+  /* ── Best players ── */
+  .gd-best { display:flex; gap:1rem; flex-wrap:wrap; }
+  .gd-best-card {
+    background: var(--gray-50, #f9fafb);
+    border: 1px solid var(--gray-200);
+    border-radius: .5rem;
+    padding: 1rem 1.5rem;
+    min-width: 180px;
+    flex: 1;
+  }
+  .gd-best-label { font-size:.72rem; color:var(--gray-500); margin-bottom:.25rem; text-transform:uppercase; letter-spacing:.04em; }
+  .gd-best-name { font-size:1rem; font-weight:600; }
+
+  /* ── Empty state ── */
+  .gd-empty { text-align:center; padding:3rem 1rem; color:var(--gray-400); }
+  .gd-empty-icon { font-size:2.25rem; margin-bottom:.5rem; }
+</style>
+
 <div class="container" style="padding-top:2rem;padding-bottom:3rem;">
 
   {% if error_message %}
@@ -12,132 +116,130 @@
   {% endif %}
 
   <div style="margin-bottom:1.5rem;">
-    <a href="javascript:history.back()" style="color:var(--gray-500);font-size:.875rem;text-decoration:none;">← Back</a>
+    <a href="javascript:history.back()" class="gd-back">← Back</a>
   </div>
 
   {% if game %}
   <!-- Score Header -->
-  <div style="background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.75rem;padding:2rem;margin-bottom:2rem;text-align:center;">
-    <div style="font-size:.8rem;color:var(--gray-500);margin-bottom:.75rem;">
+  <div class="gd-scorebox">
+    <div class="gd-meta">
       {{ game.date }}{% if game.time %} · {{ game.time }}{% endif %}{% if game.venue %} · {{ game.venue }}{% endif %}
     </div>
-    <div style="display:flex;align-items:center;justify-content:center;gap:2rem;flex-wrap:wrap;">
-      <div style="flex:1;min-width:120px;text-align:right;">
-        <a href="/{{ locale }}/team/{{ game.home_team_id }}" style="font-size:1.4rem;font-weight:700;text-decoration:none;color:inherit;">
-          {{ game.home_team }}
-        </a>
+    <div class="gd-teams">
+      <div class="gd-team gd-team--home">
+        <a href="/{{ locale }}/team/{{ game.home_team_id }}">{{ game.home_team }}</a>
       </div>
-      <div style="font-size:3rem;font-weight:900;font-variant-numeric:tabular-nums;min-width:120px;text-align:center;letter-spacing:.05em;">
+      <div class="gd-score">
         {% if game.home_score is not none %}
           {{ game.home_score }} : {{ game.away_score }}
         {% else %}
           – : –
         {% endif %}
       </div>
-      <div style="flex:1;min-width:120px;text-align:left;">
-        <a href="/{{ locale }}/team/{{ game.away_team_id }}" style="font-size:1.4rem;font-weight:700;text-decoration:none;color:inherit;">
-          {{ game.away_team }}
-        </a>
+      <div class="gd-team gd-team--away">
+        <a href="/{{ locale }}/team/{{ game.away_team_id }}">{{ game.away_team }}</a>
       </div>
     </div>
     {% if game.status %}
-    <div style="margin-top:.75rem;font-size:.85rem;color:var(--gray-500);">{{ game.status }}</div>
+    <div class="gd-status">{{ game.status }}</div>
     {% endif %}
   </div>
 
-  <div x-data="{ tab: 'goals' }">
-    <div style="display:flex;gap:.25rem;border-bottom:2px solid var(--gray-200);margin-bottom:1.5rem;">
-      {% for tid, tlabel in [('goals','Goals'),('penalties','Penalties'),('best','Best Players')] %}
-      <button @click="tab='{{ tid }}'"
-        :style="tab==='{{ tid }}' ? 'border-bottom:2px solid var(--swiss-red,#e11d48);color:var(--swiss-red,#e11d48);margin-bottom:-2px' : 'color:var(--gray-600)'"
-        style="padding:.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:.9rem;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-2px;">
-        {{ tlabel }}
+  <!-- Tabs -->
+  <div class="gd-tabs" x-data="{ tab: 'goals' }" x-cloak>
+    <div class="gd-tabbar" role="tablist">
+      {% for tid, tlabel, icon in [('goals','Goals','🥅'),('penalties','Penalties','🟨'),('best','Best Players','⭐')] %}
+      <button class="gd-tab" :class="tab === '{{ tid }}' ? 'active' : ''"
+              @click="tab = '{{ tid }}'" role="tab">
+        {{ icon }} {{ tlabel }}
       </button>
       {% endfor %}
     </div>
 
     <!-- GOALS -->
-    <div x-show="tab==='goals'">
+    <div class="gd-tabpanel" x-show="tab === 'goals'">
       {% if game.goals %}
-      <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+      <table class="gd-table">
         <thead>
-          <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
-            <th style="padding:.6rem .75rem;text-align:left;">Period</th>
-            <th style="padding:.6rem .75rem;text-align:left;">Time</th>
-            <th style="padding:.6rem .75rem;text-align:left;">Score</th>
-            <th style="padding:.6rem .75rem;text-align:left;">Team</th>
-            <th style="padding:.6rem .75rem;text-align:left;">Player</th>
+          <tr>
+            <th>Period</th>
+            <th>Time</th>
+            <th>Score</th>
+            <th>Team</th>
+            <th>Player</th>
           </tr>
         </thead>
         <tbody>
           {% for g in game.goals %}
-          <tr style="border-bottom:1px solid var(--gray-100);">
-            <td style="padding:.6rem .75rem;">{{ g.period or "—" }}</td>
-            <td style="padding:.6rem .75rem;font-variant-numeric:tabular-nums;">{{ g.time or "—" }}</td>
-            <td style="padding:.6rem .75rem;font-weight:700;">{{ g.score }}{% if g.own_goal %} <span style="font-size:.75rem;color:var(--gray-500);">(OG)</span>{% endif %}</td>
-            <td style="padding:.6rem .75rem;">{{ g.team }}</td>
-            <td style="padding:.6rem .75rem;">{{ g.player or "—" }}</td>
+          <tr>
+            <td>{{ g.period or "—" }}</td>
+            <td>{{ g.time or "—" }}</td>
+            <td class="gd-score-cell">
+              {{ g.score }}{% if g.own_goal %}<span class="gd-og">(OG)</span>{% endif %}
+            </td>
+            <td>{{ g.team or "—" }}</td>
+            <td>{{ g.player or "—" }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
       {% else %}
-      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
-        <p style="font-size:2rem">🥅</p>
+      <div class="gd-empty">
+        <div class="gd-empty-icon">🥅</div>
         <p>No goal data available for this game.</p>
       </div>
       {% endif %}
     </div>
 
     <!-- PENALTIES -->
-    <div x-show="tab==='penalties'">
+    <div class="gd-tabpanel" x-show="tab === 'penalties'">
       {% if game.penalties %}
-      <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+      <table class="gd-table">
         <thead>
-          <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
-            <th style="padding:.6rem .75rem;text-align:left;">Period</th>
-            <th style="padding:.6rem .75rem;text-align:left;">Time</th>
-            <th style="padding:.6rem .75rem;text-align:left;">Team</th>
-            <th style="padding:.6rem .75rem;text-align:left;">Player</th>
-            <th style="padding:.6rem .75rem;text-align:left;">Minutes</th>
-            <th style="padding:.6rem .75rem;text-align:left;">Infraction</th>
+          <tr>
+            <th>Period</th>
+            <th>Time</th>
+            <th>Team</th>
+            <th>Player</th>
+            <th>Min</th>
+            <th>Infraction</th>
           </tr>
         </thead>
         <tbody>
           {% for p in game.penalties %}
-          <tr style="border-bottom:1px solid var(--gray-100);">
-            <td style="padding:.6rem .75rem;">{{ p.period or "—" }}</td>
-            <td style="padding:.6rem .75rem;font-variant-numeric:tabular-nums;">{{ p.time or "—" }}</td>
-            <td style="padding:.6rem .75rem;">{{ p.team }}</td>
-            <td style="padding:.6rem .75rem;">{{ p.player or "—" }}</td>
-            <td style="padding:.6rem .75rem;text-align:center;">{{ p.minutes }}'</td>
-            <td style="padding:.6rem .75rem;color:var(--gray-600);">{{ p.infraction }}</td>
+          <tr>
+            <td>{{ p.period or "—" }}</td>
+            <td>{{ p.time or "—" }}</td>
+            <td>{{ p.team }}</td>
+            <td>{{ p.player or "—" }}</td>
+            <td class="gd-min">{{ p.minutes }}'</td>
+            <td class="gd-infraction">{{ p.infraction }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
       {% else %}
-      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
-        <p style="font-size:2rem">🟨</p>
+      <div class="gd-empty">
+        <div class="gd-empty-icon">🟨</div>
         <p>No penalty data available for this game.</p>
       </div>
       {% endif %}
     </div>
 
     <!-- BEST PLAYERS -->
-    <div x-show="tab==='best'">
+    <div class="gd-tabpanel" x-show="tab === 'best'">
       {% if game.best_players %}
-      <div style="display:flex;gap:1rem;flex-wrap:wrap;padding:1rem 0;">
+      <div class="gd-best">
         {% for bp in game.best_players %}
-        <div style="background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;padding:1.25rem 1.5rem;min-width:180px;">
-          <div style="font-size:.75rem;color:var(--gray-500);margin-bottom:.25rem;">{{ bp.team }}</div>
-          <div style="font-size:1rem;font-weight:600;">⭐ {{ bp.player or "—" }}</div>
+        <div class="gd-best-card">
+          <div class="gd-best-label">{{ bp.team }}</div>
+          <div class="gd-best-name">⭐ {{ bp.player or "—" }}</div>
         </div>
         {% endfor %}
       </div>
       {% else %}
-      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
-        <p style="font-size:2rem">⭐</p>
+      <div class="gd-empty">
+        <div class="gd-empty-icon">⭐</div>
         <p>No best player data available.</p>
       </div>
       {% endif %}
