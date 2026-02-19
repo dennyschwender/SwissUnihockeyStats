@@ -713,6 +713,9 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
             raise HTTPException(status_code=400, detail="value must be a positive integer")
         sched.set_max_concurrent(n)
         return {"ok": True, "max_concurrent": sched._max_concurrent}
+    if action == "clear_done":
+        removed = sched.clear_done()
+        return {"ok": True, "removed": removed}
     if action == "trigger":
         policy = payload.get("policy")
         season = payload.get("season")

@@ -350,6 +350,12 @@ class Scheduler:
             for r in reversed(self._history[-limit:])
         ]
 
+    def clear_done(self) -> int:
+        """Remove all finished (done/error) entries from history. Returns count removed."""
+        before = len(self._history)
+        self._history = [r for r in self._history if r.status in ("running", "pending")]
+        return before - len(self._history)
+
     async def trigger_now(self, policy_name: str, season: int | None) -> str | None:
         """Immediately launch a job for the given policy, bypassing the queue.
 

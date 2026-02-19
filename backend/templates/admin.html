@@ -674,7 +674,14 @@ function renderJobs() {
   }).join('');
 }
 
-function clearDoneJobs() {
+async function clearDoneJobs() {
+  // Remove finished entries from server history so they don't come back on the next poll
+  await fetch('/admin/api/scheduler', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action: 'clear_done'})
+  });
+  // Also clear locally from the active jobs panel
   for (const id in jobs) if (jobs[id].status !== 'running') delete jobs[id];
   renderJobs();
 }
