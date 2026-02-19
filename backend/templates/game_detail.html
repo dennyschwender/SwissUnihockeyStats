@@ -208,7 +208,8 @@ function eventsTable(goals, penalties) {
       else { this.key = k; this.dir = 'asc'; }
     },
     cls(k) { if (this.key !== k) return ''; return this.dir === 'asc' ? 'sort-asc' : 'sort-desc'; },
-    icon(k) { if (this.key !== k) return '\u2195'; return this.dir === 'asc' ? '\u2191' : '\u2193'; }
+    icon(k) { if (this.key !== k) return '\u2195'; return this.dir === 'asc' ? '\u2191' : '\u2193'; },
+    fmtMin(e) { return e.type === 'penalty' && e.minutes != null ? e.minutes + "'" : '\u2014'; }
   };
 }
 </script>
@@ -316,7 +317,7 @@ function eventsTable(goals, penalties) {
                   </span>
                   <span x-show="e.type !== 'goal'" style="color:var(--gray-300)">—</span>
                 </td>
-                <td class="gd-min" x-text="e.type === 'penalty' ? (e.minutes != null ? e.minutes + \"'\" : '—') : '—'"></td>
+                <td class="gd-min" x-text="fmtMin(e)"></td>
                 <td class="gd-infraction" x-text="e.type === 'penalty' ? (e.infraction || '—') : '—'"></td>
               </tr>
             </template>
