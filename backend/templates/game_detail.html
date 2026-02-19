@@ -130,8 +130,12 @@
   }
   .gd-filter-btn:hover { border-color:var(--swiss-red); color:var(--swiss-red); }
   .gd-filter-btn.active { background:var(--swiss-red); border-color:var(--swiss-red); color:white; }
-  .gd-row-penalty { background: #fffbeb !important; }
-  .gd-row-penalty:hover { background: #fef3c7 !important; }
+  .gd-row-penalty { border-left: 3px solid #f59e0b; }
+  .gd-row-penalty td:first-child { padding-left: calc(.75rem - 3px); }
+  html:not(.dark-mode) .gd-row-penalty { background: #fffbeb !important; }
+  html:not(.dark-mode) .gd-row-penalty:hover { background: #fef3c7 !important; }
+  html.dark-mode .gd-row-penalty { background: rgba(245,158,11,.08) !important; }
+  html.dark-mode .gd-row-penalty:hover { background: rgba(245,158,11,.14) !important; }
 
   /* ── Roster ── */
   .gd-roster { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
