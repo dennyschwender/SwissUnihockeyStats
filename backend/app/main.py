@@ -645,6 +645,7 @@ async def admin_scheduler_status(_: None = Depends(require_admin)):
         "queue":   sched.get_schedule(),
         "history": sched.get_history(200),
         "season_filter": sched.get_season_filter(),
+        "running": sched._count_running(),
     }
 
 
@@ -678,6 +679,12 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
             raise HTTPException(status_code=400, detail="excluded_seasons must be a list of integers")
         sched.set_season_filter(min_season, excluded)
         return {"ok": True, **sched.get_season_filter()}
+    if action == "max_concurrent":
+        n = payload.get("value", 2)
+        if not isinstance(n, int) or n < 1:
+            raise HTTPException(status_code=400, detail="value must be a positive integer")
+        sched.set_max_concurrent(n)
+        return {"ok": True, "max_concurrent": sched._max_concurrent}
     if action == "trigger":
         policy = payload.get("policy")
         season = payload.get("season")

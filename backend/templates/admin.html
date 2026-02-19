@@ -767,7 +767,9 @@ function renderScheduler(d) {
     badge.textContent = 'enabled';
     enableBtn.disabled  = true;
     disableBtn.disabled = false;
-    statusTxt.textContent = `${d.queue.length} job(s) queued`;
+    const running = d.running ?? 0;
+    const maxC    = (d.season_filter || {}).max_concurrent ?? 2;
+    statusTxt.textContent = `${d.queue.length} queued · ${running}/${maxC} running`;
   } else {
     badge.className   = 's-chip empty';
     badge.textContent = 'disabled';
@@ -780,10 +782,13 @@ function renderScheduler(d) {
   const sf = d.season_filter || {};
   const minEl = document.getElementById('sched-min-season');
   const excEl = document.getElementById('sched-excluded');
+  const maxEl = document.getElementById('sched-max-concurrent');
   if (minEl && document.activeElement !== minEl)
     minEl.value = sf.min_season != null ? sf.min_season : '';
   if (excEl && document.activeElement !== excEl)
     excEl.value = (sf.excluded_seasons || []).join(', ');
+  if (maxEl && document.activeElement !== maxEl)
+    maxEl.value = sf.max_concurrent ?? 2;
 
   // Queue
   const queueEl = document.getElementById('sched-queue');
@@ -835,32 +840,42 @@ async function schedSetEnabled(v) {
 async function schedSaveFilter() {
   const rawMin = document.getElementById('sched-min-season').value.trim();
   const rawExc = document.getElementById('sched-excluded').value.trim();
+  const rawMax = document.getElementById('sched-max-concurrent').value.trim();
   const min_season = rawMin ? parseInt(rawMin, 10) : null;
   const excluded_seasons = rawExc
     ? rawExc.split(',').map(s => s.trim()).filter(Boolean).map(Number).filter(n => !isNaN(n))
     : [];
-  const r = await fetch('/admin/api/scheduler', {
-    method:  'POST',
-    headers: {'Content-Type':'application/json'},
-    body:    JSON.stringify({action: 'season_filter', min_season, excluded_seasons}),
+  const max_concurrent = rawMax ? Math.max(1, parseInt(rawMax, 10)) : 2;
+
+  // Save season filter
+  const r1 = await fetch('/admin/api/scheduler', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({action: 'season_filter', min_season, excluded_seasons}),
   });
-  const d = await r.json();
-  if (d.ok) {
-    log('info', `✓ Season filter saved — min: ${d.min_season ?? 'none'}, excluded: ${d.excluded_seasons.join(', ') || 'none'}`);
+  // Save max_concurrent
+  const r2 = await fetch('/admin/api/scheduler', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({action: 'max_concurrent', value: max_concurrent}),
+  });
+  if (r1.ok && r2.ok) {
+    log('info', `✓ Scheduler settings saved — min: ${min_season ?? 'none'}, excluded: ${excluded_seasons.join(', ') || 'none'}, max concurrent: ${max_concurrent}`);
     await loadScheduler();
   } else {
-    log('error', d.detail || 'Failed to save filter');
+    log('error', 'Failed to save scheduler settings');
   }
 }
 
 async function schedClearFilter() {
-  const r = await fetch('/admin/api/scheduler', {
-    method:  'POST',
-    headers: {'Content-Type':'application/json'},
-    body:    JSON.stringify({action: 'season_filter', min_season: null, excluded_seasons: []}),
+  await fetch('/admin/api/scheduler', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({action: 'season_filter', min_season: null, excluded_seasons: []}),
   });
-  const d = await r.json();
-  if (d.ok) { log('info', '✓ Season filter cleared'); await loadScheduler(); }
+  await fetch('/admin/api/scheduler', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({action: 'max_concurrent', value: 2}),
+  });
+  log('info', '✓ Scheduler settings cleared (max concurrent reset to 2)');
+  await loadScheduler();
 }
 
 async function schedTrigger(policy, season) {

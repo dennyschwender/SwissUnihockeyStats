@@ -212,10 +212,12 @@ class Scheduler:
                 data = json.load(f)
                 self._min_season: int | None = data.get("min_season", None)
                 self._excluded_seasons: list[int] = data.get("excluded_seasons", [])
+                self._max_concurrent: int = max(1, int(data.get("max_concurrent", 2)))
                 return bool(data.get("enabled", True))
         except (FileNotFoundError, json.JSONDecodeError):
             self._min_season = None
             self._excluded_seasons = []
+            self._max_concurrent = 2
             return True
 
     def _save_state(self):
@@ -228,6 +230,7 @@ class Scheduler:
                     "enabled": self._enabled,
                     "min_season": self._min_season,
                     "excluded_seasons": self._excluded_seasons,
+                    "max_concurrent": self._max_concurrent,
                 }, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())
@@ -244,7 +247,21 @@ class Scheduler:
         return {
             "min_season": self._min_season,
             "excluded_seasons": sorted(self._excluded_seasons),
+            "max_concurrent": self._max_concurrent,
         }
+
+    def set_max_concurrent(self, n: int):
+        """Set maximum number of jobs that may run simultaneously."""
+        self._max_concurrent = max(1, n)
+        self._save_state()
+        logger.info("[scheduler] max_concurrent set to %d", self._max_concurrent)
+
+    def _count_running(self) -> int:
+        """Count jobs currently in pending/running state."""
+        return sum(
+            1 for r in self._history
+            if r.status in ("pending", "running")
+        )
 
     def set_season_filter(self, min_season: int | None, excluded_seasons: list[int]):
         """Persist season filter settings and clear any queued jobs for filtered seasons."""
@@ -541,7 +558,23 @@ class Scheduler:
         # Sort by (run_at, priority) so highest-priority runs first
         fresh.sort()
 
-        for job in fresh:
+        # Enforce concurrency cap: leave overflow jobs back in the queue
+        # (staggered a few seconds apart) so they run once a slot frees up.
+        slots = max(0, self._max_concurrent - self._count_running())
+        to_launch = fresh[:slots]
+        to_defer  = fresh[slots:]
+
+        for i, j in enumerate(to_defer):
+            j.run_at = now + timedelta(seconds=10 + i * 3)
+            self._queue.append(j)
+
+        if to_defer:
+            logger.info(
+                "[scheduler] deferred %d job(s) (max_concurrent=%d, running=%d)",
+                len(to_defer), self._max_concurrent, self._count_running(),
+            )
+
+        for job in to_launch:
             await self._launch(job)
 
     async def _launch(self, job: ScheduledJob):
