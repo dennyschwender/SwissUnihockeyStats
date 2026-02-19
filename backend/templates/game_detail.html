@@ -130,7 +130,8 @@
   }
   .gd-filter-btn:hover { border-color:var(--swiss-red); color:var(--swiss-red); }
   .gd-filter-btn.active { background:var(--swiss-red); border-color:var(--swiss-red); color:white; }
-  .gd-row-penalty { border-left: 3px solid #f59e0b; }
+  .gd-row-period-start td { border-top: 2px solid var(--gray-300) !important; }
+  html.dark-mode .gd-row-period-start td { border-top-color: var(--gray-500) !important; }
   .gd-row-penalty td:first-child { padding-left: calc(.75rem - 3px); }
   html:not(.dark-mode) .gd-row-penalty { background: #fffbeb !important; }
   html:not(.dark-mode) .gd-row-penalty:hover { background: #fef3c7 !important; }
@@ -214,7 +215,8 @@ function eventsTable(goals, penalties) {
     cls(k) { if (this.key !== k) return ''; return this.dir === 'asc' ? 'sort-asc' : 'sort-desc'; },
     icon(k) { if (this.key !== k) return '\u2195'; return this.dir === 'asc' ? '\u2191' : '\u2193'; },
     fmtMin(e) { return e.type === 'penalty' && e.minutes != null ? e.minutes + "'" : '\u2014'; },
-    fmtPenalty(e) { if (e.type !== 'penalty') return ''; const m = e.minutes != null ? e.minutes + "'" : ''; const i = e.infraction || ''; return m && i ? m + '\u00a0(' + i + ')' : m || i || '\u2014'; }
+    fmtPenalty(e) { if (e.type !== 'penalty') return ''; const m = e.minutes != null ? e.minutes + "'" : ''; const i = e.infraction || ''; return m && i ? m + '\u00a0(' + i + ')' : m || i || '\u2014'; },
+    isPeriodStart(i) { return i === 0 || this.sorted[i].period !== this.sorted[i-1].period; }
   };
 }
 </script>
@@ -306,8 +308,8 @@ function eventsTable(goals, penalties) {
             <th :class="cls('score')"      @click="sortBy('score')"     >Score / Penalty<span class="sort-icon" x-text="icon('score')"></span></th>
           </tr></thead>
           <tbody>
-            <template x-for="e in sorted" :key="e.type + e.time + e.team + (e.player || '')">
-              <tr :class="e.type === 'penalty' ? 'gd-row-penalty' : ''">
+            <template x-for="(e, i) in sorted" :key="e.type + e.time + e.team + (e.player || '')">
+              <tr :class="(e.type === 'penalty' ? 'gd-row-penalty' : '') + (isPeriodStart(i) && i > 0 ? ' gd-row-period-start' : '')">
                 <td x-text="e.period || '—'"></td>
                 <td x-text="e.time || '—'"></td>
                 <td x-text="e.type === 'goal' ? '🥅' : '🟨'"></td>
