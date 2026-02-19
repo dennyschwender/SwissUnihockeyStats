@@ -530,10 +530,27 @@ async def admin_start_indexing(payload: dict, _: None = Depends(require_admin)):
     return {"job_id": job_id, "season": season, "task": task, "label": _TASK_META[task]}
 
 
+_JOB_EXPIRY_SECS = 300  # auto-purge finished jobs after 5 minutes
+
+
 @app.get("/admin/api/jobs")
 async def admin_list_jobs(_: None = Depends(require_admin)):
     """Return all known manual jobs (running + completed)."""
+    _purge_expired_jobs()
     return list(_admin_jobs.values())
+
+
+def _purge_expired_jobs():
+    """Remove finished _admin_jobs older than _JOB_EXPIRY_SECS."""
+    now = datetime.now(timezone.utc)
+    expired = [
+        jid for jid, j in list(_admin_jobs.items())
+        if j.get("status") in ("done", "error", "stopped")
+        and "finished_at" in j
+        and (now - datetime.fromisoformat(j["finished_at"])).total_seconds() > _JOB_EXPIRY_SECS
+    ]
+    for jid in expired:
+        _admin_jobs.pop(jid, None)
 
 
 @app.get("/admin/api/jobs/{job_id}")
@@ -721,7 +738,12 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
         return {"ok": True, "max_concurrent": sched._max_concurrent}
     if action == "clear_done":
         removed = sched.clear_done()
-        return {"ok": True, "removed": removed}
+        # Also purge manual jobs that are finished
+        manual_removed = [jid for jid, j in list(_admin_jobs.items())
+                          if j.get("status") in ("done", "error", "stopped")]
+        for jid in manual_removed:
+            _admin_jobs.pop(jid, None)
+        return {"ok": True, "removed": removed + len(manual_removed)}
     if action == "trigger":
         policy = payload.get("policy")
         season = payload.get("season")
@@ -947,6 +969,8 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         job["error"]  = f"{type(exc).__name__}: {exc}\n\n{traceback.format_exc()}"
         logger.error("Admin indexing job %s failed: %s", job_id, exc, exc_info=True)
     finally:
+        if job.get("status") in ("done", "error", "stopped"):
+            job["finished_at"] = datetime.now(timezone.utc).isoformat()
         _admin_tasks.pop(job_id, None)
 
 

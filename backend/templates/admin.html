@@ -597,10 +597,13 @@ async function pollJob(job_id) {
       const stats = Object.entries(d.stats || {}).map(([k,v]) => `${k}:${fmt(v)}`).join(' ');
       log('ok', `✓ Job ${job_id.slice(-6)} done  ${stats}`);
       setTimeout(loadStats, 600);
+      setTimeout(() => { delete jobs[job_id]; renderJobs(); }, 60000); // auto-remove after 60s
     } else if (d.status === 'stopped') {
       log('warn', `■ Job ${job_id.slice(-6)} stopped`);
+      setTimeout(() => { delete jobs[job_id]; renderJobs(); }, 60000); // auto-remove after 60s
     } else if (d.status === 'error') {
       log('error', `✗ Job ${job_id.slice(-6)} failed: ${d.error}`);
+      setTimeout(() => { delete jobs[job_id]; renderJobs(); }, 60000); // auto-remove after 60s
     }
   } catch(e) {
     _handlePollError(job_id, e.message);
@@ -777,7 +780,11 @@ async function loadScheduler() {
         if (!jobs[j.job_id]) {
           jobs[j.job_id] = { ...j };
           renderJobs();
-          if (j.status === 'running') pollJob(j.job_id);
+          if (j.status === 'running') {
+            pollJob(j.job_id);
+          } else if (['done', 'error', 'stopped'].includes(j.status)) {
+            setTimeout(() => { delete jobs[j.job_id]; renderJobs(); }, 60000); // auto-remove after 60s
+          }
         }
       });
     }
