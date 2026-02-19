@@ -1098,63 +1098,84 @@ class DataIndexer:
                 home_team_id = game_row.home_team_id
                 away_team_id = game_row.away_team_id
 
+                # Pre-fetch valid FK sets to avoid IntegrityError on unknown players/teams
+                from app.models.db_models import Player as _Player, Team as _Team
+                valid_players: set[int] = {
+                    r[0] for r in session.query(_Player.person_id).all()
+                }
+                valid_teams: set[tuple] = {
+                    (r[0], r[1])
+                    for r in session.query(_Team.id, _Team.season_id).all()
+                }
+
                 count = 0
-                for is_home_flag in (1, 0):
-                    team_id = home_team_id if is_home_flag else away_team_id
-                    try:
-                        resp = self.client.get_game_lineup(game_id, is_home_flag)
-                    except Exception:
-                        continue
+                with session.no_autoflush:
+                    for is_home_flag in (1, 0):
+                        team_id = home_team_id if is_home_flag else away_team_id
+                        try:
+                            resp = self.client.get_game_lineup(game_id, is_home_flag)
+                        except Exception:
+                            continue
 
-                    regions = resp.get("data", {}).get("regions", [])
-                    for region in regions:
-                        for row in region.get("rows", []):
-                            cells = row.get("cells", [])
-                            if not cells:
-                                continue
+                        regions = resp.get("data", {}).get("regions", [])
+                        for region in regions:
+                            for row in region.get("rows", []):
+                                cells = row.get("cells", [])
+                                if not cells:
+                                    continue
 
-                            def _txt(cell):
-                                v = cell.get("text", "")
-                                return (v[0] if isinstance(v, list) and v
-                                        else (v if not isinstance(v, list) else "")) or ""
+                                def _txt(cell):
+                                    v = cell.get("text", "")
+                                    return (v[0] if isinstance(v, list) and v
+                                            else (v if not isinstance(v, list) else "")) or ""
 
-                            jersey_raw = _txt(cells[0]) if len(cells) > 0 else ""
-                            position   = _txt(cells[1]) if len(cells) > 1 else None
-                            player_raw = cells[2] if len(cells) > 2 else {}
-                            player_name = _txt(player_raw)
+                                jersey_raw = _txt(cells[0]) if len(cells) > 0 else ""
+                                position   = _txt(cells[1]) if len(cells) > 1 else None
+                                player_raw = cells[2] if len(cells) > 2 else {}
 
-                            # Extract player_id from link
-                            player_id = None
-                            link = player_raw.get("link", {})
-                            if link:
-                                ids = link.get("ids", [])
-                                if ids:
-                                    player_id = ids[0]
+                                # Extract player_id from link
+                                player_id = None
+                                link = player_raw.get("link", {})
+                                if link:
+                                    ids = link.get("ids", [])
+                                    if ids:
+                                        player_id = ids[0]
 
-                            jersey = None
-                            try:
-                                jersey = int(jersey_raw)
-                            except (ValueError, TypeError):
-                                pass
+                                jersey = None
+                                try:
+                                    jersey = int(jersey_raw)
+                                except (ValueError, TypeError):
+                                    pass
 
-                            if player_id is None:
-                                continue  # skip rows without a known player
+                                if player_id is None:
+                                    continue
+                                # Skip if FK would be violated
+                                if player_id not in valid_players:
+                                    logger.debug(
+                                        f"Lineup skip: player {player_id} not in players table"
+                                    )
+                                    continue
+                                if (team_id, season_id) not in valid_teams:
+                                    logger.debug(
+                                        f"Lineup skip: team ({team_id},{season_id}) not in teams table"
+                                    )
+                                    continue
 
-                            gp = GamePlayer(
-                                game_id=game_id,
-                                player_id=player_id,
-                                team_id=team_id,
-                                season_id=season_id,
-                                is_home_team=bool(is_home_flag),
-                                jersey_number=jersey,
-                                position=str(position)[:50] if position else None,
-                                goals=0,
-                                assists=0,
-                                penalty_minutes=0,
-                                last_updated=datetime.now(timezone.utc),
-                            )
-                            session.add(gp)
-                            count += 1
+                                gp = GamePlayer(
+                                    game_id=game_id,
+                                    player_id=player_id,
+                                    team_id=team_id,
+                                    season_id=season_id,
+                                    is_home_team=bool(is_home_flag),
+                                    jersey_number=jersey,
+                                    position=str(position)[:50] if position else None,
+                                    goals=0,
+                                    assists=0,
+                                    penalty_minutes=0,
+                                    last_updated=datetime.now(timezone.utc),
+                                )
+                                session.add(gp)
+                                count += 1
 
                 session.commit()
                 self._mark_sync_complete(session, "game_lineup", entity_id, count)
