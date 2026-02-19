@@ -71,6 +71,7 @@ Thumbs.db
 
 # SQLite database files in data directory
 data/swissunihockey.db*
+data/scheduler_config.json   # runtime-written, instance-specific
 
 # Docker
 .env

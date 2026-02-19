@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "min_season": null,
+  "excluded_seasons": [],
+  "max_concurrent": 2
+}
