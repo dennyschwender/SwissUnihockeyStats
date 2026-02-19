@@ -37,19 +37,22 @@
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:2rem;">
 
   {% if upcoming_games %}
-  <div style="background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.75rem;padding:1.25rem;" 
-       x-data="{ selectedLeague: 'all' }">
+  <div style="background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.75rem;padding:1.25rem;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
       <h2 style="font-size:1rem;font-weight:700;margin:0;display:flex;align-items:center;gap:.4rem;">
         📅 <a href="/{{ locale }}/games" style="color:inherit;text-decoration:none;">Upcoming Games</a>
       </h2>
       {% if league_filters %}
-      <select x-model="selectedLeague" 
+      <select name="league_category"
+              hx-get="/{{ locale }}"
+              hx-trigger="change"
+              hx-target="body"
+              hx-push-url="true"
               style="padding:.35rem .75rem;border:1px solid var(--gray-200);border-radius:.5rem;font-size:.8rem;background:var(--card-bg);color:var(--text-primary);cursor:pointer;">
-        <option value="all">All Leagues</option>
+        <option value="all" {% if league_category == 'all' %}selected{% endif %}>All Leagues</option>
         {% for league in league_filters %}
           {% for cls in league.classes %}
-            <option value="{{ cls.id }}">{{ cls.full_name }}</option>
+            <option value="{{ cls.id }}" {% if league_category == cls.id %}selected{% endif %}>{{ cls.full_name }}</option>
           {% endfor %}
         {% endfor %}
       </select>
@@ -59,9 +62,7 @@
     <div style="display:flex;flex-direction:column;gap:.4rem;">
       {% for g in upcoming_games %}
       <a href="/{{ locale }}/game/{{ g.game_id }}" 
-         style="text-decoration:none;color:inherit;"
-         x-show="selectedLeague === 'all' || '{{ g.league_category | default('') }}' === selectedLeague"
-         x-transition>
+         style="text-decoration:none;color:inherit;">
         <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;border-radius:.375rem;font-size:.82rem;"
              onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
           <span style="min-width:55px;color:var(--gray-400);font-size:.75rem;">{{ g.weekday }} {{ g.date }}{% if g.time %}<br>{{ g.time }}{% endif %}</span>

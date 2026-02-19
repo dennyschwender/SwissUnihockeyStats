@@ -713,9 +713,18 @@ def get_player_detail(person_id: int) -> dict:
 def get_upcoming_games(
     limit: int = 10,
     league_ids: Optional[list] = None,
+    league_category: Optional[str] = None,
     season_id: Optional[int] = None,
 ) -> list[dict]:
-    """Return next scheduled games (no score yet), ordered soonest first."""
+    """
+    Return next scheduled games (no score yet), ordered soonest first.
+    
+    Args:
+        limit: Maximum number of games to return
+        league_ids: Filter by league IDs (legacy parameter)
+        league_category: Filter by league category (e.g., "2_11" for NLB Men)
+        season_id: Season ID to filter by
+    """
     from datetime import date as _date
     db = get_database_service()
     with db.session_scope() as session:
@@ -732,10 +741,26 @@ def get_upcoming_games(
                 Game.game_date >= today,
             )
         )
-        if league_ids:
+        
+        # Filter by league category (e.g., "2_11" = NLB Men)
+        if league_category and league_category != 'all':
+            parts = league_category.split('_')
+            if len(parts) == 2:
+                try:
+                    league_id = int(parts[0])
+                    game_class = int(parts[1])
+                    # Join through LeagueGroup to League
+                    q = (q.join(LeagueGroup, Game.group_id == LeagueGroup.id)
+                          .join(League, LeagueGroup.league_id == League.id)
+                          .filter(League.league_id == league_id, League.game_class == game_class))
+                except ValueError:
+                    pass  # Invalid format, ignore filter
+        elif league_ids:
+            # Legacy filtering by league IDs
             q = q.join(LeagueGroup, Game.group_id == LeagueGroup.id).filter(
                 LeagueGroup.league_id.in_(league_ids)
             )
+            
         games_raw = q.order_by(Game.game_date.asc()).limit(limit).all()
 
         if not games_raw:

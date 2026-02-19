@@ -897,7 +897,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
 
 
 @app.get("/{locale}", response_class=HTMLResponse)
-async def home(request: Request, locale: str):
+async def home(request: Request, locale: str, league_category: str = "all"):
     """Homepage with upcoming games + overall top scorers"""
     from app.services.stats_service import get_upcoming_games, get_overall_top_scorers
     from app.services.database import get_database_service
@@ -922,8 +922,12 @@ async def home(request: Request, locale: str):
         else:
             active_season = get_current_season()
     
-    # Get upcoming games (all leagues by default)
-    upcoming = get_upcoming_games(limit=12, season_id=active_season)
+    # Get upcoming games (filtered by league category if specified)
+    upcoming = get_upcoming_games(
+        limit=12, 
+        league_category=league_category if league_category != "all" else None,
+        season_id=active_season
+    )
     
     # Get overall top scorers across all leagues
     overall_scorers = get_overall_top_scorers(season_id=active_season, limit=10)
@@ -977,6 +981,7 @@ async def home(request: Request, locale: str):
             "upcoming_games": upcoming,
             "overall_top_scorers": overall_scorers,
             "league_filters": league_filters,
+            "league_category": league_category,
         }
     )
 
