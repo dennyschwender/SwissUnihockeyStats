@@ -968,7 +968,8 @@ async def home(request: Request, locale: str, league_category: str = "all"):
                 
             if league_id not in leagues_grouped:
                 # Extract base name (e.g., "NLB" from "Herren NLB")
-                base_name = name.split()[-1] i
+                base_name = name.split()[-1] if name else f"League {league_id}"
+                leagues_grouped[league_id] = {
                     "name": base_name, 
                     "classes": [],
                     "tier": league_tier(league_id)
@@ -983,8 +984,7 @@ async def home(request: Request, locale: str, league_category: str = "all"):
     # Sort leagues by tier (lower tier = higher priority leagues like NLA, NLB)
     league_filters = [
         {"id": lid, "name": data["name"], "classes": data["classes"], "tier": data["tier"]}
-        for lid, data in sorted(leagues_grouped.items(), key=lambda x: (x[1]["tier"], x[0]ata["classes"]}
-        for lid, data in sorted(leagues_grouped.items())
+        for lid, data in sorted(leagues_grouped.items(), key=lambda x: (x[1]["tier"], x[0]))
     ]
     
     return templates.TemplateResponse(
