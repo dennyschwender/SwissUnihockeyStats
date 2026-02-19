@@ -107,7 +107,10 @@ class DataIndexer:
             if not sync:
                 return True
             
-            age = datetime.now(timezone.utc) - sync.last_sync
+            last = sync.last_sync
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=timezone.utc)
+            age = datetime.now(timezone.utc) - last
             return age > timedelta(hours=max_age_hours)
     
     def _mark_sync_start(self, session: Session, entity_type: str, entity_id: str):

@@ -2,7 +2,7 @@
 Main FastAPI application entry point
 """
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 import asyncio
 import hashlib
@@ -863,9 +863,8 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
 
         # ── GAME EVENTS ────────────────────────────────────────────────────
         if task in ("events", "full"):
-            from datetime import datetime as _dt
             from app.services.data_indexer import league_tier
-            _now = _dt.now(datetime.UTC)
+            _now = datetime.now(timezone.utc)
             with db_service.session_scope() as s:
                 # Join Game → League to filter by tier
                 from app.models.db_models import LeagueGroup, League as _League
