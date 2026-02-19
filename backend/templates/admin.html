@@ -668,7 +668,10 @@ function renderJobs() {
     <span class="job-season">${j.season ? 'S'+j.season : ''}</span>
     ${stopBtn}
   </div>
-  <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+  <div style="display:flex;align-items:center;gap:.5rem;">
+    <div class="progress-wrap" style="flex:1"><div class="progress-bar" style="width:${pct}%"></div></div>
+    ${st === 'running' ? `<span style="font-size:.7rem;color:#8b949e;white-space:nowrap;min-width:2.4rem;text-align:right">${pct}%</span>` : ''}
+  </div>
   ${errorRow}${statsRow}
 </div>`;
   }).join('');
