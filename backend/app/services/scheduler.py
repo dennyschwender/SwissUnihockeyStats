@@ -513,6 +513,10 @@ class Scheduler:
                     "[scheduler] job %s done  stats=%s",
                     job_id, record.stats,
                 )
+                # Immediately refresh the queue so any newly-available
+                # entities (e.g. season-scoped jobs after seasons run)
+                # are picked up without waiting for the next 5-min tick.
+                asyncio.create_task(self._tick())
                 return
             if status in ("error", "stopped"):
                 record.status      = status
@@ -522,6 +526,7 @@ class Scheduler:
                     "[scheduler] job %s %s: %s",
                     job_id, status, record.error,
                 )
+                asyncio.create_task(self._tick())
                 return
 
 
