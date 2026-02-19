@@ -807,6 +807,105 @@ def get_upcoming_games(
         ]
 
 
+def get_latest_results(
+    limit: int = 10,
+    league_ids: Optional[list] = None,
+    league_category: Optional[str] = None,
+    season_id: Optional[int] = None,
+) -> list[dict]:
+    """
+    Return recently completed games (with scores), ordered most recent first.
+    
+    Args:
+        limit: Maximum number of games to return
+        league_ids: Filter by league IDs (legacy parameter)
+        league_category: Filter by league category (e.g., "2_11" for NLB Men)
+        season_id: Season ID to filter by
+    """
+    from datetime import date as _date
+    db = get_database_service()
+    with db.session_scope() as session:
+        if season_id is None:
+            season_id = _get_current_season_id(session)
+
+        today = _date.today()
+        q = (
+            session.query(Game)
+            .filter(
+                Game.season_id == season_id,
+                Game.home_score.isnot(None),  # Has score = completed
+                Game.game_date.isnot(None),
+                Game.game_date <= today,
+            )
+        )
+        
+        # Filter by league category (e.g., "2_11" = NLB Men)
+        if league_category and league_category != 'all':
+            parts = league_category.split('_')
+            if len(parts) == 2:
+                try:
+                    league_id = int(parts[0])
+                    game_class = int(parts[1])
+                    # Join through LeagueGroup to League
+                    q = (q.join(LeagueGroup, Game.group_id == LeagueGroup.id)
+                          .join(League, LeagueGroup.league_id == League.id)
+                          .filter(League.league_id == league_id, League.game_class == game_class))
+                except ValueError:
+                    pass  # Invalid format, ignore filter
+        elif league_ids:
+            # Legacy filtering by league IDs
+            q = q.join(LeagueGroup, Game.group_id == LeagueGroup.id).filter(
+                LeagueGroup.league_id.in_(league_ids)
+            )
+            
+        games_raw = q.order_by(Game.game_date.desc()).limit(limit).all()
+
+        if not games_raw:
+            return []
+
+        team_ids = {g.home_team_id for g in games_raw} | {g.away_team_id for g in games_raw}
+        t_names: dict = {}
+        for t in session.query(Team).filter(
+            Team.id.in_(team_ids), Team.season_id == season_id
+        ).all():
+            t_names[t.id] = t.name or t.text or f"Team {t.id}"
+        missing = team_ids - t_names.keys()
+        if missing:
+            for t in session.query(Team).filter(Team.id.in_(missing), Team.name.isnot(None)).all():
+                t_names.setdefault(t.id, t.name)
+
+        # league name per group
+        group_ids = {g.group_id for g in games_raw}
+        grp_league: dict = {}
+        grp_league_category: dict = {}  # For filtering: league_id_game_class
+        grp_name: dict = {}  # Group name/number
+        for grp in session.query(LeagueGroup).filter(LeagueGroup.id.in_(group_ids)).all():
+            lg = session.query(League).filter(League.id == grp.league_id).first()
+            grp_league[grp.id] = lg.name if lg else ""
+            grp_name[grp.id] = grp.name or grp.text or ""
+            if lg:
+                grp_league_category[grp.id] = f"{lg.league_id}_{lg.game_class}"
+
+        return [
+            {
+                "game_id": g.id,
+                "date": g.game_date.strftime("%d.%m") if g.game_date else "",
+                "weekday": g.game_date.strftime("%a") if g.game_date else "",
+                "time": g.game_time or "",
+                "home_team": t_names.get(g.home_team_id, f"Team {g.home_team_id}"),
+                "away_team": t_names.get(g.away_team_id, f"Team {g.away_team_id}"),
+                "home_score": g.home_score or 0,
+                "away_score": g.away_score or 0,
+                "home_team_id": g.home_team_id,
+                "away_team_id": g.away_team_id,
+                "league": grp_league.get(g.group_id, ""),
+                "group_name": grp_name.get(g.group_id, ""),
+                "league_category": grp_league_category.get(g.group_id, ""),
+            }
+            for g in games_raw
+        ]
+
+
 # ---------------------------------------------------------------------------
 # 8. Game detail / box score
 # ---------------------------------------------------------------------------

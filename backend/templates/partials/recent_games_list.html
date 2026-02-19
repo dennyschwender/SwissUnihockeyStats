@@ -1,0 +1,18 @@
+{% for g in recent_games %}
+<a href="/{{ locale }}/game/{{ g.game_id }}" 
+   style="text-decoration:none;color:inherit;">
+  <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;border-radius:.375rem;font-size:.82rem;"
+       onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+    <span style="min-width:55px;color:var(--gray-400);font-size:.75rem;">{{ g.weekday }} {{ g.date }}{% if g.time %}<br>{{ g.time }}{% endif %}</span>
+    <span style="flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ g.home_team }}</span>
+    <span style="min-width:45px;text-align:center;font-weight:700;color:var(--text-primary);font-size:.85rem;">{{ g.home_score }} : {{ g.away_score }}</span>
+    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;">{{ g.away_team }}</span>
+    {% if g.group_name %}
+    <span style="min-width:60px;text-align:right;color:var(--gray-400);font-size:.75rem;font-weight:600;">{{ g.group_name }}</span>
+    {% endif %}
+  </div>
+</a>
+{% endfor %}
+{% if not recent_games %}
+<p style="color:var(--gray-400);font-size:.85rem;text-align:center;padding:1rem 0;">No recent games found.</p>
+{% endif %}

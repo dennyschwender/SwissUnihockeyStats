@@ -899,7 +899,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
 @app.get("/{locale}", response_class=HTMLResponse)
 async def home(request: Request, locale: str, league_category: str = "all"):
     """Homepage with upcoming games + overall top scorers"""
-    from app.services.stats_service import get_upcoming_games, get_overall_top_scorers
+    from app.services.stats_service import get_upcoming_games, get_latest_results, get_overall_top_scorers
     from app.services.database import get_database_service
     from app.models.db_models import League, PlayerStatistics
     from sqlalchemy import distinct, func
@@ -929,11 +929,20 @@ async def home(request: Request, locale: str, league_category: str = "all"):
         season_id=active_season
     )
     
+    # Get recent completed games (filtered by league category if specified)
+    recent = get_latest_results(
+        limit=12, 
+        league_category=league_category if league_category != "all" else None,
+        season_id=active_season
+    )
+    
     # Get overall top scorers across all leagues
     overall_scorers = get_overall_top_scorers(season_id=active_season, limit=10)
     
-    # Get unique league categories for filtering - only include those with upcoming games
+    # Get unique league categories for filtering - include both upcoming and recent games
     upcoming_league_cats = set(g.get('league_category', '') for g in upcoming if g.get('league_category'))
+    recent_league_cats = set(g.get('league_category', '') for g in recent if g.get('league_category'))
+    all_game_cats = upcoming_league_cats | recent_league_cats
     
     with db.session_scope() as session:
         league_categories = (
@@ -948,12 +957,12 @@ async def home(request: Request, locale: str, league_category: str = "all"):
             .all()
         )
         
-        # Group by league_id for cleaner display - only include if has upcoming games
+        # Group by league_id for cleaner display - only include if has games
         leagues_grouped = {}
         for league_id, game_class, name in league_categories:
             key = f"{league_id}_{game_class}"
-            # Only include if this category has upcoming games
-            if key not in upcoming_league_cats:
+            # Only include if this category has games (upcoming or recent)
+            if key not in all_game_cats:
                 continue
                 
             if league_id not in leagues_grouped:
@@ -979,6 +988,7 @@ async def home(request: Request, locale: str, league_category: str = "all"):
             "locale": locale,
             "t": get_translations(locale),
             "upcoming_games": upcoming,
+            "recent_games": recent,
             "overall_top_scorers": overall_scorers,
             "league_filters": league_filters,
             "league_category": league_category,
@@ -1021,6 +1031,45 @@ async def upcoming_games_partial(request: Request, locale: str, league_category:
             "request": request,
             "locale": locale,
             "upcoming_games": upcoming,
+        }
+    )
+
+
+@app.get("/{locale}/recent-games-partial", response_class=HTMLResponse)
+async def recent_games_partial(request: Request, locale: str, league_category: str = "all"):
+    """HTMX endpoint for filtered recent games"""
+    from app.services.stats_service import get_latest_results
+    from app.services.database import get_database_service
+    from app.models.db_models import PlayerStatistics
+    from sqlalchemy import func
+    
+    # Get active season
+    db = get_database_service()
+    with db.session_scope() as session:
+        active_season_row = (
+            session.query(
+                PlayerStatistics.season_id,
+                func.count(PlayerStatistics.id).label('count')
+            )
+            .group_by(PlayerStatistics.season_id)
+            .order_by(func.count(PlayerStatistics.id).desc())
+            .first()
+        )
+        active_season = active_season_row[0] if active_season_row else get_current_season()
+    
+    # Get recent games filtered by league category
+    recent = get_latest_results(
+        limit=12, 
+        league_category=league_category if league_category != "all" else None,
+        season_id=active_season
+    )
+    
+    return templates.TemplateResponse(
+        "partials/recent_games_list.html",
+        {
+            "request": request,
+            "locale": locale,
+            "recent_games": recent,
         }
     )
 
