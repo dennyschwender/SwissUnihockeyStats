@@ -213,7 +213,7 @@ class Scheduler:
                 self._min_season: int | None = data.get("min_season", None)
                 self._excluded_seasons: list[int] = data.get("excluded_seasons", [])
                 self._max_concurrent: int = max(1, int(data.get("max_concurrent", 2)))
-                return bool(data.get("enabled", True))
+                return bool(data.get("enabled", False))
         except (FileNotFoundError, json.JSONDecodeError):
             self._min_season = None
             self._excluded_seasons = []

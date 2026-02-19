@@ -1,5 +1,5 @@
 {
-  "enabled": true,
+  "enabled": false,
   "min_season": null,
   "excluded_seasons": [],
   "max_concurrent": 2
