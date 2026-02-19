@@ -511,19 +511,31 @@ class Scheduler:
         for j in due:
             self._queue.remove(j)
 
-        # Jobs whose scheduled time is more than one tick old were queued
-        # before the scheduler was paused / restarted.  Cancel them instead
-        # of firing a burst; they will be naturally rescheduled on the next
-        # _refresh_queue() call.
+        # Jobs whose scheduled time is more than one tick old were queued before
+        # the scheduler was paused/restarted.  Rather than dropping them (which
+        # causes an infinite reschedule loop) or launching all at once (thundering
+        # herd), re-enqueue them staggered a few seconds into the future so each
+        # one gets dispatched cleanly on the very next _dispatch_due call.
         stale_cutoff = now - timedelta(seconds=TICK_SECONDS)
         stale  = [j for j in due if j.run_at < stale_cutoff]
         fresh  = [j for j in due if j.run_at >= stale_cutoff]
 
-        for j in stale:
-            logger.info(
-                "[scheduler] skipped overdue job %s season=%s (was due %s, scheduler was paused)",
+        # Re-enqueue stale jobs with a short stagger (5 s apart) so they run
+        # on the next tick rather than being silently dropped.
+        stale.sort()  # sort by original run_at / priority
+        for i, j in enumerate(stale):
+            j.run_at = now + timedelta(seconds=5 + i * 2)
+            self._queue.append(j)
+            logger.debug(
+                "[scheduler] rescheduled overdue job %s season=%s → %s",
                 j.policy_name, j.season,
                 j.run_at.strftime("%Y-%m-%d %H:%M UTC"),
+            )
+
+        if stale:
+            logger.info(
+                "[scheduler] rescheduled %d overdue job(s) to run shortly",
+                len(stale),
             )
 
         # Sort by (run_at, priority) so highest-priority runs first
