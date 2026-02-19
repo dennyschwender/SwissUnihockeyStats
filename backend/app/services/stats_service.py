@@ -16,6 +16,7 @@ from sqlalchemy import func, or_
 from app.models.db_models import (
     Game,
     GameEvent,
+    GamePlayer,
     League,
     LeagueGroup,
     Player,
@@ -1148,6 +1149,29 @@ def get_game_box_score(game_id: int) -> dict:
                 deduped_penalties.append(p)
         penalties = deduped_penalties
 
+        # ── Roster ──────────────────────────────────────────────────────────
+        roster_home: list[dict] = []
+        roster_away: list[dict] = []
+        gp_rows = (
+            session.query(GamePlayer)
+            .filter(GamePlayer.game_id == game_id)
+            .order_by(GamePlayer.is_home_team.desc(), GamePlayer.jersey_number)
+            .all()
+        )
+        for gp in gp_rows:
+            pl = session.query(Player).filter(Player.person_id == gp.player_id).first()
+            name = (pl.full_name if pl else None) or f"Player {gp.player_id}"
+            entry = {
+                "jersey": gp.jersey_number,
+                "position": gp.position or "",
+                "player": name,
+                "player_id": gp.player_id,
+            }
+            if gp.is_home_team:
+                roster_home.append(entry)
+            else:
+                roster_away.append(entry)
+
         return {
             "game_id": game_id,
             "season_id": game.season_id,
@@ -1165,6 +1189,8 @@ def get_game_box_score(game_id: int) -> dict:
             "penalties": penalties,
             "period_markers": period_markers,
             "best_players": best_players,
+            "roster_home": roster_home,
+            "roster_away": roster_away,
         }
 
 

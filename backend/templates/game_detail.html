@@ -102,6 +102,17 @@
   .gd-best-label { font-size:.72rem; color:var(--gray-500); margin-bottom:.25rem; text-transform:uppercase; letter-spacing:.04em; }
   .gd-best-name { font-size:1rem; font-weight:600; }
 
+  /* ── Roster ── */
+  .gd-roster { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+  @media (max-width:640px) { .gd-roster { grid-template-columns:1fr; } }
+  .gd-roster-header {
+    font-size:.8rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.05em; color:var(--gray-500);
+    padding:.5rem .75rem;
+    border-bottom:2px solid var(--gray-200);
+    margin-bottom:.5rem;
+  }
+
   /* ── Empty state ── */
   .gd-empty { text-align:center; padding:3rem 1rem; color:var(--gray-400); }
   .gd-empty-icon { font-size:2.25rem; margin-bottom:.5rem; }
@@ -148,7 +159,7 @@
   <!-- Tabs -->
   <div class="gd-tabs" x-data="{ tab: 'goals' }" x-cloak>
     <div class="gd-tabbar" role="tablist">
-      {% for tid, tlabel, icon in [('goals','Goals','🥅'),('penalties','Penalties','🟨'),('best','Best Players','⭐')] %}
+      {% for tid, tlabel, icon in [('goals','Goals','🥅'),('penalties','Penalties','🟨'),('best','Best Players','⭐'),('roster','Roster','👥')] %}
       <button class="gd-tab" :class="tab === '{{ tid }}' ? 'active' : ''"
               @click="tab = '{{ tid }}'" role="tab">
         {{ icon }} {{ tlabel }}
@@ -241,6 +252,53 @@
       <div class="gd-empty">
         <div class="gd-empty-icon">⭐</div>
         <p>No best player data available.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ROSTER -->
+    <div class="gd-tabpanel" x-show="tab === 'roster'">
+      {% if game.roster_home or game.roster_away %}
+      <div class="gd-roster">
+        <div>
+          <div class="gd-roster-header">{{ game.home_team }}</div>
+          <table class="gd-table">
+            <thead>
+              <tr><th>#</th><th>Position</th><th>Player</th></tr>
+            </thead>
+            <tbody>
+              {% for p in game.roster_home %}
+              <tr>
+                <td style="width:2.5rem;font-variant-numeric:tabular-nums;color:var(--gray-500);">{{ p.jersey or "—" }}</td>
+                <td style="width:6rem;font-size:.8rem;color:var(--gray-500);">{{ p.position or "—" }}</td>
+                <td><a href="/{{ locale }}/player/{{ p.player_id }}" style="text-decoration:none;color:inherit;hover:color:var(--swiss-red);">{{ p.player }}</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <div class="gd-roster-header">{{ game.away_team }}</div>
+          <table class="gd-table">
+            <thead>
+              <tr><th>#</th><th>Position</th><th>Player</th></tr>
+            </thead>
+            <tbody>
+              {% for p in game.roster_away %}
+              <tr>
+                <td style="width:2.5rem;font-variant-numeric:tabular-nums;color:var(--gray-500);">{{ p.jersey or "—" }}</td>
+                <td style="width:6rem;font-size:.8rem;color:var(--gray-500);">{{ p.position or "—" }}</td>
+                <td><a href="/{{ locale }}/player/{{ p.player_id }}" style="text-decoration:none;color:inherit;">{{ p.player }}</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% else %}
+      <div class="gd-empty">
+        <div class="gd-empty-icon">👥</div>
+        <p>No roster data available. Run an <em>events</em> index job to fetch lineups.</p>
       </div>
       {% endif %}
     </div>

@@ -1076,6 +1076,94 @@ class DataIndexer:
                 logger.debug(f"Failed to index events for game {game_id}: {e}")
                 return 0
 
+    def index_game_lineup(self, game_id: int, season_id: int,
+                          force: bool = False) -> int:
+        """Fetch and store home + away lineups for a single finished game.
+
+        Returns number of GamePlayer rows inserted/updated.
+        """
+        entity_id = f"game:{game_id}:lineup"
+        if not force and not self._should_update("game_lineup", entity_id, max_age_hours=720):
+            return 0
+
+        with self.db_service.session_scope() as session:
+            try:
+                # Delete stale lineup so re-indexing is idempotent
+                session.query(GamePlayer).filter(GamePlayer.game_id == game_id).delete()
+                session.flush()
+
+                game_row = session.get(Game, game_id)
+                if game_row is None:
+                    return 0
+                home_team_id = game_row.home_team_id
+                away_team_id = game_row.away_team_id
+
+                count = 0
+                for is_home_flag in (1, 0):
+                    team_id = home_team_id if is_home_flag else away_team_id
+                    try:
+                        resp = self.client.get_game_lineup(game_id, is_home_flag)
+                    except Exception:
+                        continue
+
+                    regions = resp.get("data", {}).get("regions", [])
+                    for region in regions:
+                        for row in region.get("rows", []):
+                            cells = row.get("cells", [])
+                            if not cells:
+                                continue
+
+                            def _txt(cell):
+                                v = cell.get("text", "")
+                                return (v[0] if isinstance(v, list) and v
+                                        else (v if not isinstance(v, list) else "")) or ""
+
+                            jersey_raw = _txt(cells[0]) if len(cells) > 0 else ""
+                            position   = _txt(cells[1]) if len(cells) > 1 else None
+                            player_raw = cells[2] if len(cells) > 2 else {}
+                            player_name = _txt(player_raw)
+
+                            # Extract player_id from link
+                            player_id = None
+                            link = player_raw.get("link", {})
+                            if link:
+                                ids = link.get("ids", [])
+                                if ids:
+                                    player_id = ids[0]
+
+                            jersey = None
+                            try:
+                                jersey = int(jersey_raw)
+                            except (ValueError, TypeError):
+                                pass
+
+                            if player_id is None:
+                                continue  # skip rows without a known player
+
+                            gp = GamePlayer(
+                                game_id=game_id,
+                                player_id=player_id,
+                                team_id=team_id,
+                                season_id=season_id,
+                                is_home_team=bool(is_home_flag),
+                                jersey_number=jersey,
+                                position=str(position)[:50] if position else None,
+                                goals=0,
+                                assists=0,
+                                penalty_minutes=0,
+                                last_updated=datetime.now(timezone.utc),
+                            )
+                            session.add(gp)
+                            count += 1
+
+                session.commit()
+                self._mark_sync_complete(session, "game_lineup", entity_id, count)
+                return count
+
+            except Exception as e:
+                logger.debug(f"Failed to index lineup for game {game_id}: {e}")
+                return 0
+
     def backfill_team_names(self, season_id: int, force: bool = False) -> int:
         """Backfill Team.name for stub rows that have no name.
 

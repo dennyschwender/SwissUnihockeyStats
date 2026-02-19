@@ -987,14 +987,17 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             total    = len(finished)
             auto_lbl = " (auto)" if max_tier == 7 else ""
             tier_lbl = f"tier ≤ {effective_tier}{auto_lbl}"
-            push("info", f"Indexing events for {total} past games ({tier_lbl})...")
+            push("info", f"Indexing events + lineups for {total} past games ({tier_lbl})...")
             events_n = 0
+            lineup_n = 0
             for i, (gid, sid_) in enumerate(finished, 1):
                 events_n += indexer.index_game_events(gid, sid_, force=force)
+                lineup_n += indexer.index_game_lineup(gid, sid_, force=force)
                 set_progress(int(i / total * 95) if total else 99)
                 await asyncio.sleep(0)
             stats["game_events"] = events_n
-            push("ok", f"Game events: {events_n}")
+            stats["lineups"] = lineup_n
+            push("ok", f"Game events: {events_n}  Lineups: {lineup_n}")
 
         job["stats"]    = stats
         job["progress"] = 100
