@@ -316,9 +316,9 @@ async def debug_test_games_fetch(_: None = Depends(require_admin)):
 async def root_redirect(request: Request):
     """Redirect root to default locale"""
     return templates.TemplateResponse(
+        request,
         "home.html",
         {
-            "request": request,
             "locale": DEFAULT_LOCALE,
             "t": get_translations(DEFAULT_LOCALE)
         }
@@ -333,7 +333,7 @@ async def root_redirect(request: Request):
 async def admin_login_page(request: Request):
     if request.session.get(_ADMIN_TOKEN_KEY) == _pin_hash(settings.ADMIN_PIN):
         return RedirectResponse("/admin", status_code=302)
-    return templates.TemplateResponse("admin_login.html", {"request": request, "error": None})
+    return templates.TemplateResponse(request, "admin_login.html", {"error": None})
 
 
 @app.post("/admin/login")
@@ -344,8 +344,9 @@ async def admin_login_submit(request: Request):
         request.session[_ADMIN_TOKEN_KEY] = _pin_hash(settings.ADMIN_PIN)
         return RedirectResponse("/admin", status_code=302)
     return templates.TemplateResponse(
+        request,
         "admin_login.html",
-        {"request": request, "error": "Incorrect PIN. Try again."},
+        {"error": "Incorrect PIN. Try again."},
         status_code=401,
     )
 
@@ -362,7 +363,7 @@ async def admin_logout(request: Request):
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request, _: None = Depends(require_admin)):
     """Admin dashboard — indexing status and controls"""
-    return templates.TemplateResponse("admin.html", {"request": request})
+    return templates.TemplateResponse(request, "admin.html", {})
 
 
 @app.get("/admin/api/stats")
@@ -847,7 +848,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         if task in ("events", "full"):
             from datetime import datetime as _dt
             from app.services.data_indexer import league_tier
-            _now = _dt.utcnow()
+            _now = _dt.now(datetime.UTC)
             with db_service.session_scope() as s:
                 # Join Game → League to filter by tier
                 from app.models.db_models import LeagueGroup, League as _League
@@ -894,6 +895,40 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         logger.error("Admin indexing job %s failed: %s", job_id, exc, exc_info=True)
     finally:
         _admin_tasks.pop(job_id, None)
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy"}
+
+
+@app.get("/cache/status")
+async def cache_status():
+    """Cache status endpoint - shows hybrid cache statistics"""
+    from app.services.data_cache import get_data_cache
+    cache = get_data_cache()
+    stats = cache.get_stats()
+
+    if stats["all_loaded"]:
+        status = "fully_loaded"
+    elif stats["teams_popular_loaded"]:
+        status = "popular_teams_loaded"
+    else:
+        status = "partially_loaded"
+
+    return {
+        "status": status,
+        "teams_loaded_all": stats["teams_loaded"],
+        "teams_loaded_popular": stats["teams_popular_loaded"],
+        "clubs_loaded": stats["clubs_loaded"],
+        "leagues_loaded": stats["leagues_loaded"],
+        "teams_count": stats["teams_count"],
+        "clubs_count": stats["clubs_count"],
+        "leagues_count": stats["leagues_count"],
+        "last_updated": stats["last_updated"],
+        "total_records": stats["teams_count"] + stats["clubs_count"] + stats["leagues_count"]
+    }
 
 
 @app.get("/{locale}", response_class=HTMLResponse)
@@ -988,9 +1023,9 @@ async def home(request: Request, locale: str, league_category: str = "all"):
     ]
     
     return templates.TemplateResponse(
+        request,
         "home.html",
         {
-            "request": request,
             "locale": locale,
             "t": get_translations(locale),
             "upcoming_games": upcoming,
@@ -1032,9 +1067,9 @@ async def upcoming_games_partial(request: Request, locale: str, league_category:
     )
     
     return templates.TemplateResponse(
+        request,
         "partials/upcoming_games_list.html",
         {
-            "request": request,
             "locale": locale,
             "upcoming_games": upcoming,
         }
@@ -1071,9 +1106,9 @@ async def recent_games_partial(request: Request, locale: str, league_category: s
     )
     
     return templates.TemplateResponse(
+        request,
         "partials/recent_games_list.html",
         {
-            "request": request,
             "locale": locale,
             "recent_games": recent,
         }
@@ -1087,9 +1122,9 @@ async def clubs_page(request: Request, locale: str):
     clubs_list = await get_cached_clubs()
     
     return templates.TemplateResponse(
+        request,
         "clubs.html",
         {
-            "request": request,
             "locale": locale,
             "t": get_translations(locale),
             "clubs": clubs_list[:100] if isinstance(clubs_list, list) else []  # Limit to 100 for initial display
@@ -1170,9 +1205,9 @@ async def club_detail(request: Request, locale: str, club_id: int):
         error_message = f"Could not load club details: {str(e)}"
     
     return templates.TemplateResponse(
+        request,
         "club_detail.html",
         {
-            "request": request,
             "locale": locale,
             "t": get_translations(locale),
             "club": club_data,
@@ -1235,9 +1270,9 @@ async def leagues_page(request: Request, locale: str, season: Optional[int] = No
     selected_season_name = next((s["name"] for s in all_seasons if s["id"] == season), str(season))
 
     return templates.TemplateResponse(
+        request,
         "leagues.html",
         {
-            "request": request,
             "locale": locale,
             "t": get_translations(locale),
             "gender_tiers": ordered,
@@ -1266,9 +1301,9 @@ async def league_detail(request: Request, locale: str, league_id: int):
     if league_data is None:
         error_message = f"League with ID {league_id} not found."
         return templates.TemplateResponse(
+            request,
             "league_detail.html",
             {
-                "request": request,
                 "locale": locale,
                 "t": get_translations(locale),
                 "league": {},
@@ -1365,9 +1400,9 @@ async def league_detail(request: Request, locale: str, league_id: int):
                 })
 
     return templates.TemplateResponse(
+        request,
         "league_detail.html",
         {
-            "request": request,
             "locale": locale,
             "t": get_translations(locale),
             "league": league_data,
@@ -1391,9 +1426,9 @@ async def teams_page(request: Request, locale: str):
         display_teams = teams_list[:50] if isinstance(teams_list, list) else []
         
         return templates.TemplateResponse(
+            request,
             "teams.html",
             {
-                "request": request,
                 "locale": locale,
                 "t": get_translations(locale),
                 "teams": display_teams,
@@ -1464,9 +1499,9 @@ async def team_detail(request: Request, locale: str, team_id: int, season: int =
         error_message = f"Team {team_id} not found in database."
 
     return templates.TemplateResponse(
+        request,
         "team_detail.html",
         {
-            "request": request,
             "locale": locale,
             "t": get_translations(locale),
             "team": team,
@@ -1489,9 +1524,9 @@ async def players_page(request: Request, locale: str, order_by: str = "points", 
     data = get_player_leaderboard(limit=per_page, offset=offset, order_by=order_by)
     total_pages = max(1, (data["total"] + per_page - 1) // per_page)
     return templates.TemplateResponse(
+        request,
         "players.html",
         {
-            "request": request,
             "locale": locale,
             "t": get_translations(locale),
             "players": data["players"],
@@ -1550,9 +1585,9 @@ async def player_detail(request: Request, locale: str, player_id: int):
         error_message = f"Player {player_id} not found in database."
 
     return templates.TemplateResponse(
+        request,
         "player_detail.html",
         {
-            "request": request,
             "locale": locale,
             "t": get_translations(locale),
             "player": player,
@@ -1574,9 +1609,9 @@ async def games_page(request: Request, locale: str, scored_only: str = "1", page
     data = get_recent_games(limit=per_page, offset=offset, with_score_only=with_score)
     total_pages = max(1, (data["total"] + per_page - 1) // per_page)
     return templates.TemplateResponse(
+        request,
         "games.html",
         {
-            "request": request,
             "locale": locale,
             "t": get_translations(locale),
             "games": data["games"],
@@ -1599,9 +1634,9 @@ async def game_detail(request: Request, locale: str, game_id: int):
         error_message = f"Game {game_id} not found in database."
 
     return templates.TemplateResponse(
+        request,
         "game_detail.html",
         {
-            "request": request,
             "locale": locale,
             "t": get_translations(locale),
             "game": box,
@@ -1617,50 +1652,15 @@ async def rankings_page(request: Request, locale: str):
 
     data = get_player_leaderboard(limit=50, order_by="points")
     return templates.TemplateResponse(
+        request,
         "rankings.html",
         {
-            "request": request,
             "locale": locale,
             "t": get_translations(locale),
             "topscorers": data["players"],
             "standings": [],
         },
     )
-
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy"}
-
-
-@app.get("/cache/status")
-async def cache_status():
-    """Cache status endpoint - shows hybrid cache statistics"""
-    from app.services.data_cache import get_data_cache
-    cache = get_data_cache()
-    stats = cache.get_stats()
-    
-    # Determine status message
-    if stats["all_loaded"]:
-        status = "fully_loaded"
-    elif stats["teams_popular_loaded"]:
-        status = "popular_teams_loaded"
-    else:
-        status = "partially_loaded"
-    
-    return {
-        "status": status,
-        "teams_loaded_all": stats["teams_loaded"],
-        "teams_loaded_popular": stats["teams_popular_loaded"],
-        "clubs_loaded": stats["clubs_loaded"], 
-        "leagues_loaded": stats["leagues_loaded"],
-        "teams_count": stats["teams_count"],
-        "clubs_count": stats["clubs_count"],
-        "leagues_count": stats["leagues_count"],
-        "last_updated": stats["last_updated"],
-        "total_records": stats["teams_count"] + stats["clubs_count"] + stats["leagues_count"]
-    }
 
 
 # ============================================================================
@@ -1761,9 +1761,9 @@ async def universal_search(request: Request, locale: str, q: str = ""):
 async def favorites_page(request: Request, locale: str):
     """Favorites page"""
     return templates.TemplateResponse(
+        request,
         "favorites.html",
         {
-            "request": request,
             "locale": locale,
             "t": get_translations(locale)
         }
@@ -1781,9 +1781,9 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     
     if exc.status_code == 404:
         return templates.TemplateResponse(
+            request,
             "error_404.html",
             {
-                "request": request,
                 "locale": locale,
                 "t": get_translations(locale)
             },
@@ -1806,9 +1806,9 @@ async def general_exception_handler(request: Request, exc: Exception):
     print(f"[ERROR {error_id}] {exc}")
     
     return templates.TemplateResponse(
+        request,
         "error_500.html",
         {
-            "request": request,
             "locale": locale,
             "t": get_translations(locale),
             "error_id": error_id,

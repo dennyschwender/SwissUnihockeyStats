@@ -4,6 +4,7 @@ Application configuration using Pydantic Settings
 from pathlib import Path
 from typing import List
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from pydantic import AnyHttpUrl, field_validator
 
 # Resolve the project-level data directory regardless of CWD.
@@ -61,9 +62,7 @@ class Settings(BaseSettings):
     ADMIN_PIN: str = "1234"          # Override via env: ADMIN_PIN=yourpin
     SESSION_SECRET: str = "change-me-in-production-use-random-32-chars"
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = ConfigDict(env_file=".env", case_sensitive=True)
 
 
 # Global settings instance

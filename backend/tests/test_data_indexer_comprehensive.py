@@ -91,6 +91,7 @@ class TestSeasonIndexing:
     
     def test_index_seasons(self, indexer, mock_client):
         """Test indexing seasons from API"""
+        indexer.client = mock_client  # override: indexer.__init__ ran before patch
         # Mock API response
         mock_client.get_seasons.return_value = {
             "entries": [
@@ -120,6 +121,7 @@ class TestClubIndexing:
     
     def test_index_clubs(self, indexer, mock_client):
         """Test indexing clubs for a season"""
+        indexer.client = mock_client  # override: indexer.__init__ ran before patch
         # Mock API response
         mock_client.get_clubs.return_value = {
             "entries": [
@@ -149,6 +151,7 @@ class TestLeagueIndexing:
     
     def test_index_leagues(self, indexer, mock_client):
         """Test indexing leagues for a season"""
+        indexer.client = mock_client  # override: indexer.__init__ ran before patch
         # Mock API response
         mock_client.get_leagues.return_value = {
             "entries": [

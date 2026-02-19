@@ -5,7 +5,7 @@ SEASONS → CLUBS → TEAMS → PLAYERS
 SEASONS → LEAGUES → GROUPS → GAMES → PLAYERS
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -107,7 +107,7 @@ class DataIndexer:
             if not sync:
                 return True
             
-            age = datetime.utcnow() - sync.last_sync
+            age = datetime.now(timezone.utc) - sync.last_sync
             return age > timedelta(hours=max_age_hours)
     
     def _mark_sync_start(self, session: Session, entity_type: str, entity_id: str):
@@ -124,7 +124,7 @@ class DataIndexer:
             )
             session.add(sync)
         
-        sync.last_sync = datetime.utcnow()
+        sync.last_sync = datetime.now(timezone.utc)
         sync.sync_status = "in_progress"
         sync.error_message = None
         session.commit()
@@ -139,7 +139,7 @@ class DataIndexer:
         if sync:
             sync.sync_status = "completed"
             sync.records_synced = records_count
-            sync.last_sync = datetime.utcnow()
+            sync.last_sync = datetime.now(timezone.utc)
             session.commit()
     
     def _mark_sync_failed(self, session: Session, entity_type: str, entity_id: str, error: str):
@@ -211,7 +211,7 @@ class DataIndexer:
                     
                     season.text = entry.get("text", f"{season_id}/{season_id+1}")
                     season.highlighted = entry.get("highlight", False)
-                    season.last_updated = datetime.utcnow()
+                    season.last_updated = datetime.now(timezone.utc)
                     count += 1
                 
                 session.commit()
@@ -272,7 +272,7 @@ class DataIndexer:
                     club.name = entry.get("text", "")
                     club.text = entry.get("text", "")
                     club.region = entry.get("region")
-                    club.last_updated = datetime.utcnow()
+                    club.last_updated = datetime.now(timezone.utc)
                     count += 1
                 
                 session.commit()
@@ -345,7 +345,7 @@ class DataIndexer:
                     
                     team.name = team_name
                     team.text = team_name
-                    team.last_updated = datetime.utcnow()
+                    team.last_updated = datetime.now(timezone.utc)
                     team_ids.append(team_id)
                     count += 1
                 
@@ -422,7 +422,7 @@ class DataIndexer:
                         )
                         session.add(player)
                     
-                    player.last_updated = datetime.utcnow()
+                    player.last_updated = datetime.now(timezone.utc)
                     
                     # Create or update team roster entry
                     team_player = session.query(TeamPlayer).filter(
@@ -442,7 +442,7 @@ class DataIndexer:
                     # Extract additional info
                     team_player.jersey_number = row.get("number")
                     team_player.position = row.get("position")
-                    team_player.last_updated = datetime.utcnow()
+                    team_player.last_updated = datetime.now(timezone.utc)
                     
                     count += 1
                 
@@ -552,7 +552,7 @@ class DataIndexer:
                                     existing.assists         = assists
                                     existing.points          = points
                                     existing.penalty_minutes = penalty_minutes
-                                    existing.last_updated    = datetime.utcnow()
+                                    existing.last_updated    = datetime.now(timezone.utc)
                                 else:
                                     session.add(PlayerStatistics(
                                         player_id       = person_id,
@@ -564,7 +564,7 @@ class DataIndexer:
                                         assists         = assists,
                                         points          = points,
                                         penalty_minutes = penalty_minutes,
-                                        last_updated    = datetime.utcnow(),
+                                        last_updated    = datetime.now(timezone.utc),
                                     ))
                                 count += 1
                     except Exception as exc:
@@ -632,7 +632,7 @@ class DataIndexer:
                     league.name = entry.get("text", "")
                     league.text = entry.get("text", "")
                     league.mode = context.get("mode")
-                    league.last_updated = datetime.utcnow()
+                    league.last_updated = datetime.now(timezone.utc)
                     count += 1
 
                 session.commit()
@@ -689,7 +689,7 @@ class DataIndexer:
                     else:
                         grp.name = group_name
                         grp.text = group_name
-                    grp.last_updated = datetime.utcnow()
+                    grp.last_updated = datetime.now(timezone.utc)
                     count += 1
 
                 session.commit()
@@ -889,7 +889,7 @@ class DataIndexer:
                             game.status = status
                             game.home_score = home_score
                             game.away_score = away_score
-                            game.last_updated = datetime.utcnow()
+                            game.last_updated = datetime.now(timezone.utc)
                             count += 1
 
                     # Advance to the previous round via the slider
@@ -994,7 +994,7 @@ class DataIndexer:
                             "team": team_name,
                             "player": player_name,
                         },
-                        last_updated=datetime.utcnow(),
+                        last_updated=datetime.now(timezone.utc),
                     )
                     session.add(evt)
                     count += 1
@@ -1127,7 +1127,7 @@ class DataIndexer:
 
         # 6. Optionally index events for past games (game_date < now, regardless of stored status)
         if index_events:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             with self.db_service.session_scope() as session:
                 past_ids = [
                     (g.id, g.season_id)
@@ -1211,7 +1211,7 @@ class DataIndexer:
                 "team_players": session.query(func.count(TeamPlayer.id)).scalar(),
                 "leagues": session.query(func.count(League.id)).scalar(),
                 "games": session.query(func.count(Game.id)).scalar(),
-                "last_updated": datetime.utcnow().isoformat()
+                "last_updated": datetime.now(timezone.utc).isoformat()
             }
 
 

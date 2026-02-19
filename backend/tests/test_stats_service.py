@@ -9,8 +9,8 @@ from app.services.stats_service import (
     get_league_top_scorers,
     get_recent_games,
     get_upcoming_games,
-    get_player_stats,
-    get_team_stats
+    get_player_detail,
+    get_team_detail,
 )
 
 
@@ -21,12 +21,12 @@ class TestLeagueStandings:
         """Test that standings returns a list"""
         # Note: This requires database with data
         # For now, test that function exists and returns proper type
-        result = get_league_standings(league_id=1)
+        result = get_league_standings(db_league_id=1)
         assert isinstance(result, list)
     
     def test_league_standings_structure(self):
         """Test standings have required fields"""
-        result = get_league_standings(league_id=1)
+        result = get_league_standings(db_league_id=1)
         if result:
             standing = result[0]
             # Should have team info
@@ -38,17 +38,17 @@ class TestTopScorers:
     
     def test_get_top_scorers_returns_list(self):
         """Test that top scorers returns a list"""
-        result = get_league_top_scorers(league_id=1, limit=10)
+        result = get_league_top_scorers(db_league_id=1, limit=10)
         assert isinstance(result, list)
     
     def test_top_scorers_respects_limit(self):
         """Test that limit parameter works"""
-        result = get_league_top_scorers(league_id=1, limit=5)
+        result = get_league_top_scorers(db_league_id=1, limit=5)
         assert len(result) <= 5
     
     def test_top_scorers_structure(self):
         """Test top scorers have required fields"""
-        result = get_league_top_scorers(league_id=1, limit=1)
+        result = get_league_top_scorers(db_league_id=1, limit=1)
         if result:
             scorer = result[0]
             # Should have player and stats info
@@ -114,30 +114,29 @@ class TestUpcomingGames:
 class TestPlayerStats:
     """Test player statistics functionality"""
     
-    def test_get_player_stats_returns_dict(self):
-        """Test that player stats returns a dict"""
-        # Note: Requires player_id from database
-        result = get_player_stats(player_id=1, season=2025)
-        assert isinstance(result, (dict, type(None)))
+    def test_get_player_detail_returns_dict(self):
+        """Test that player detail returns a dict"""
+        result = get_player_detail(person_id=1)
+        assert isinstance(result, dict)
     
-    def test_player_stats_with_invalid_id(self):
-        """Test player stats with invalid ID"""
-        result = get_player_stats(player_id=999999, season=2025)
-        assert result is None or result == {}
+    def test_player_detail_with_invalid_id(self):
+        """Test player detail with invalid ID returns empty dict"""
+        result = get_player_detail(person_id=999999)
+        assert isinstance(result, dict)
 
 
 class TestTeamStats:
     """Test team statistics functionality"""
     
-    def test_get_team_stats_returns_dict(self):
-        """Test that team stats returns a dict"""
-        result = get_team_stats(team_id=1, season=2025)
-        assert isinstance(result, (dict, type(None)))
+    def test_get_team_detail_returns_dict(self):
+        """Test that team detail returns a dict"""
+        result = get_team_detail(team_id=1, season_id=2025)
+        assert isinstance(result, dict)
     
-    def test_team_stats_with_invalid_id(self):
-        """Test team stats with invalid ID"""
-        result = get_team_stats(team_id=999999, season=2025)
-        assert result is None or result == {}
+    def test_team_detail_with_invalid_id(self):
+        """Test team detail with invalid ID returns empty dict"""
+        result = get_team_detail(team_id=999999, season_id=2025)
+        assert isinstance(result, dict)
 
 
 class TestStatsCalculations:
@@ -162,7 +161,7 @@ class TestStatsPerformance:
         """Test that standings query is fast enough"""
         import time
         start = time.time()
-        get_league_standings(league_id=1)
+        get_league_standings(db_league_id=1)
         duration = time.time() - start
         
         # Should complete in less than 500ms
@@ -172,7 +171,7 @@ class TestStatsPerformance:
         """Test that top scorers query is fast enough"""
         import time
         start = time.time()
-        get_league_top_scorers(league_id=1, limit=25)
+        get_league_top_scorers(db_league_id=1, limit=25)
         duration = time.time() - start
         
         # Should complete in less than 500ms

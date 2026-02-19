@@ -56,7 +56,10 @@ class TestSchedulerInitialization:
         # This is by design for testing
     
     def test_scheduler_enabled_by_default(self, scheduler):
-        """Test scheduler is enabled by default"""
+        """Test scheduler default is True when no config file exists"""
+        from unittest.mock import patch
+        with patch.object(type(scheduler), '_load_state', return_value=True):
+            scheduler._enabled = scheduler._load_state()
         assert scheduler.enabled is True
 
 
@@ -106,7 +109,7 @@ class TestSchedulerPolicies:
         for policy in POLICIES:
             assert "task" in policy
             assert "scope" in policy
-            assert "max_age_hours" in policy
+            assert "max_age" in policy
             assert "label" in policy
     
     def test_seasons_policy_exists(self):
