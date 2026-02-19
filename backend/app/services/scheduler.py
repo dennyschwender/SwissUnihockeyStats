@@ -209,16 +209,25 @@ class Scheduler:
         """Return the persisted enabled flag (default True if file missing)."""
         try:
             with open(_CONFIG_PATH) as f:
-                return bool(json.load(f).get("enabled", True))
+                data = json.load(f)
+                self._min_season: int | None = data.get("min_season", None)
+                self._excluded_seasons: list[int] = data.get("excluded_seasons", [])
+                return bool(data.get("enabled", True))
         except (FileNotFoundError, json.JSONDecodeError):
+            self._min_season = None
+            self._excluded_seasons = []
             return True
 
     def _save_state(self):
-        """Persist the current enabled flag to disk."""
+        """Persist the current config to disk."""
         try:
             os.makedirs(os.path.dirname(_CONFIG_PATH), exist_ok=True)
             with open(_CONFIG_PATH, "w") as f:
-                json.dump({"enabled": self._enabled}, f)
+                json.dump({
+                    "enabled": self._enabled,
+                    "min_season": self._min_season,
+                    "excluded_seasons": self._excluded_seasons,
+                }, f, indent=2)
         except OSError as exc:
             logger.warning("[scheduler] could not save config: %s", exc)
 
@@ -226,6 +235,38 @@ class Scheduler:
 
     def stop(self):
         self._running = False
+
+    def get_season_filter(self) -> dict:
+        return {
+            "min_season": self._min_season,
+            "excluded_seasons": sorted(self._excluded_seasons),
+        }
+
+    def set_season_filter(self, min_season: int | None, excluded_seasons: list[int]):
+        """Persist season filter settings and clear any queued jobs for filtered seasons."""
+        self._min_season = min_season
+        self._excluded_seasons = list(excluded_seasons)
+        self._save_state()
+        # Drop queued jobs for now-excluded seasons
+        before = len(self._queue)
+        self._queue = [j for j in self._queue if not self._season_filtered(j.season)]
+        dropped = before - len(self._queue)
+        if dropped:
+            logger.info("[scheduler] dropped %d queued job(s) for filtered seasons", dropped)
+        logger.info(
+            "[scheduler] season filter updated: min=%s excluded=%s",
+            min_season, excluded_seasons,
+        )
+
+    def _season_filtered(self, season: int | None) -> bool:
+        """Return True if this season should be skipped."""
+        if season is None:
+            return False  # global-scope jobs are never filtered
+        if self._min_season is not None and season < self._min_season:
+            return True
+        if season in self._excluded_seasons:
+            return True
+        return False
 
     def enable(self, v: bool):
         self._enabled = v
@@ -407,6 +448,8 @@ class Scheduler:
                         self._maybe_schedule(session, policy, season=None)
                     else:
                         for sid in indexed_seasons:
+                            if self._season_filtered(sid):
+                                continue
                             self._maybe_schedule(session, policy, season=sid)
         except Exception as exc:
             logger.error("[scheduler] refresh_queue error: %s", exc)

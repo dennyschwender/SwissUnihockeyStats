@@ -644,6 +644,7 @@ async def admin_scheduler_status(_: None = Depends(require_admin)):
         "enabled": sched.enabled,
         "queue":   sched.get_schedule(),
         "history": sched.get_history(200),
+        "season_filter": sched.get_season_filter(),
     }
 
 
@@ -668,6 +669,15 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
     if action == "disable":
         sched.enable(False)
         return {"ok": True, "enabled": False}
+    if action == "season_filter":
+        min_season = payload.get("min_season")  # int or null
+        excluded   = payload.get("excluded_seasons", [])
+        if min_season is not None and not isinstance(min_season, int):
+            raise HTTPException(status_code=400, detail="min_season must be an integer or null")
+        if not isinstance(excluded, list) or not all(isinstance(s, int) for s in excluded):
+            raise HTTPException(status_code=400, detail="excluded_seasons must be a list of integers")
+        sched.set_season_filter(min_season, excluded)
+        return {"ok": True, **sched.get_season_filter()}
     if action == "trigger":
         policy = payload.get("policy")
         season = payload.get("season")

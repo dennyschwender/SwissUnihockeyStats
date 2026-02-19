@@ -245,6 +245,18 @@
             <span style="font-size:.72rem;color:#6e7681;margin-left:.5rem" id="sched-status-txt"></span>
           </div>
 
+          <!-- season filter row -->
+          <div class="quick-row" style="gap:.5rem;margin-top:.5rem;align-items:center;flex-wrap:wrap">
+            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap">Min season:</label>
+            <input id="sched-min-season" type="number" min="1996" max="2100" placeholder="all"
+              style="width:72px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Exclude seasons:</label>
+            <input id="sched-excluded" type="text" placeholder="e.g. 1996,1997,2001"
+              style="width:160px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+            <button class="btn btn-sm" onclick="schedSaveFilter()" style="white-space:nowrap">💾 Save filter</button>
+            <button class="btn btn-sm" onclick="schedClearFilter()" style="white-space:nowrap;color:#f85149">✕ Clear</button>
+          </div>
+
           <!-- upcoming queue -->
           <div class="task-group-label">Upcoming Queue</div>
           <div id="sched-queue">
@@ -748,6 +760,15 @@ function renderScheduler(d) {
     statusTxt.textContent = 'scheduler paused';
   }
 
+  // Season filter inputs (only update if not focused to avoid clobbering user input)
+  const sf = d.season_filter || {};
+  const minEl = document.getElementById('sched-min-season');
+  const excEl = document.getElementById('sched-excluded');
+  if (minEl && document.activeElement !== minEl)
+    minEl.value = sf.min_season != null ? sf.min_season : '';
+  if (excEl && document.activeElement !== excEl)
+    excEl.value = (sf.excluded_seasons || []).join(', ');
+
   // Queue
   const queueEl = document.getElementById('sched-queue');
   if (!d.queue.length) {
@@ -789,6 +810,37 @@ async function schedSetEnabled(v) {
     body:    JSON.stringify({action: v ? 'enable' : 'disable'}),
   });
   if (r.ok) await loadScheduler();
+}
+
+async function schedSaveFilter() {
+  const rawMin = document.getElementById('sched-min-season').value.trim();
+  const rawExc = document.getElementById('sched-excluded').value.trim();
+  const min_season = rawMin ? parseInt(rawMin, 10) : null;
+  const excluded_seasons = rawExc
+    ? rawExc.split(',').map(s => s.trim()).filter(Boolean).map(Number).filter(n => !isNaN(n))
+    : [];
+  const r = await fetch('/admin/api/scheduler', {
+    method:  'POST',
+    headers: {'Content-Type':'application/json'},
+    body:    JSON.stringify({action: 'season_filter', min_season, excluded_seasons}),
+  });
+  const d = await r.json();
+  if (d.ok) {
+    log('info', `✓ Season filter saved — min: ${d.min_season ?? 'none'}, excluded: ${d.excluded_seasons.join(', ') || 'none'}`);
+    await loadScheduler();
+  } else {
+    log('error', d.detail || 'Failed to save filter');
+  }
+}
+
+async function schedClearFilter() {
+  const r = await fetch('/admin/api/scheduler', {
+    method:  'POST',
+    headers: {'Content-Type':'application/json'},
+    body:    JSON.stringify({action: 'season_filter', min_season: null, excluded_seasons: []}),
+  });
+  const d = await r.json();
+  if (d.ok) { log('info', '✓ Season filter cleared'); await loadScheduler(); }
 }
 
 async function schedTrigger(policy, season) {
