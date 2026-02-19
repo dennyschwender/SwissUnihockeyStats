@@ -339,6 +339,63 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
         return result
 
 
+def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) -> list[dict]:
+    """
+    Overall top scorers across all leagues in a season.
+    
+    Returns players with the highest points from PlayerStatistics,
+    aggregating across all teams they played for in the season.
+    """
+    from app.services.database import get_database_service
+    from app.models.db_models import PlayerStatistics, Player
+    from sqlalchemy import func
+    
+    if season_id is None:
+        from app.main import get_current_season
+        season_id = get_current_season()
+    
+    db = get_database_service()
+    with db.session_scope() as session:
+        # Aggregate stats per player across all teams
+        stats = (
+            session.query(
+                PlayerStatistics.player_id,
+                Player.full_name,
+                func.sum(PlayerStatistics.games_played).label('gp'),
+                func.sum(PlayerStatistics.goals).label('g'),
+                func.sum(PlayerStatistics.assists).label('a'),
+                func.sum(PlayerStatistics.points).label('pts'),
+                func.sum(PlayerStatistics.penalty_minutes).label('pim'),
+                # Use the team name from their most recent stats entry
+                func.max(PlayerStatistics.team_name).label('team_name'),
+                func.max(PlayerStatistics.team_id).label('team_id')
+            )
+            .join(Player, PlayerStatistics.player_id == Player.person_id)
+            .filter(PlayerStatistics.season_id == season_id)
+            .group_by(PlayerStatistics.player_id, Player.full_name)
+            .order_by(func.sum(PlayerStatistics.points).desc(), func.sum(PlayerStatistics.goals).desc())
+            .limit(limit)
+            .all()
+        )
+        
+        result = []
+        for i, (player_id, full_name, gp, g, a, pts, pim, team_name, team_id) in enumerate(stats, 1):
+            result.append({
+                "rank": i,
+                "player_id": player_id,
+                "player_name": full_name or f"Player {player_id}",
+                "team_name": team_name or "Unknown",
+                "team_id": team_id,
+                "gp": gp or 0,
+                "g": g or 0,
+                "a": a or 0,
+                "pts": pts or 0,
+                "pim": pim or 0,
+            })
+        
+        return result
+
+
 # ---------------------------------------------------------------------------
 # 4. Player stats leaderboard (all teams / season)
 # ---------------------------------------------------------------------------
@@ -678,9 +735,12 @@ def get_upcoming_games(
         # league name per group
         group_ids = {g.group_id for g in games_raw}
         grp_league: dict = {}
+        grp_league_category: dict = {}  # For filtering: league_id_game_class
         for grp in session.query(LeagueGroup).filter(LeagueGroup.id.in_(group_ids)).all():
             lg = session.query(League).filter(League.id == grp.league_id).first()
             grp_league[grp.id] = lg.name if lg else ""
+            if lg:
+                grp_league_category[grp.id] = f"{lg.league_id}_{lg.game_class}"
 
         return [
             {
@@ -693,6 +753,7 @@ def get_upcoming_games(
                 "home_team_id": g.home_team_id,
                 "away_team_id": g.away_team_id,
                 "league": grp_league.get(g.group_id, ""),
+                "league_category": grp_league_category.get(g.group_id, ""),
             }
             for g in games_raw
         ]

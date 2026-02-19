@@ -898,10 +898,55 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
 
 @app.get("/{locale}", response_class=HTMLResponse)
 async def home(request: Request, locale: str):
-    """Homepage with upcoming games + NLB top scorers"""
-    from app.services.stats_service import get_upcoming_games, get_league_top_scorers
-    upcoming = get_upcoming_games(limit=8, league_ids=[1, 2])
-    top_scorers = get_league_top_scorers(1, limit=5)
+    """Homepage with upcoming games + overall top scorers"""
+    from app.services.stats_service import get_upcoming_games, get_overall_top_scorers
+    from app.services.database import get_database_service
+    from app.models.db_models import League
+    from sqlalchemy import distinct
+    
+    current_season = get_current_season()
+    
+    # Get upcoming games (all leagues by default)
+    upcoming = get_upcoming_games(limit=12)
+    
+    # Get overall top scorers across all leagues
+    overall_scorers = get_overall_top_scorers(season_id=current_season, limit=10)
+    
+    # Get unique league categories for filtering
+    db = get_database_service()
+    with db.session_scope() as session:
+        league_categories = (
+            session.query(
+                League.league_id,
+                League.game_class,
+                League.name
+            )
+            .filter(League.season_id == current_season)
+            .distinct()
+            .order_by(League.league_id, League.game_class)
+            .all()
+        )
+        
+        # Group by league_id for cleaner display
+        leagues_grouped = {}
+        for league_id, game_class, name in league_categories:
+            key = f"{league_id}_{game_class}"
+            if league_id not in leagues_grouped:
+                # Extract base name (e.g., "NLB" from "Herren NLB")
+                base_name = name.split()[-1] if name else f"League {league_id}"
+                leagues_grouped[league_id] = {"name": base_name, "classes": []}
+            
+            leagues_grouped[league_id]["classes"].append({
+                "id": key,
+                "game_class": game_class,
+                "full_name": name
+            })
+    
+    league_filters = [
+        {"id": lid, "name": data["name"], "classes": data["classes"]}
+        for lid, data in sorted(leagues_grouped.items())
+    ]
+    
     return templates.TemplateResponse(
         "home.html",
         {
@@ -909,7 +954,8 @@ async def home(request: Request, locale: str):
             "locale": locale,
             "t": get_translations(locale),
             "upcoming_games": upcoming,
-            "top_scorers": top_scorers,
+            "overall_top_scorers": overall_scorers,
+            "league_filters": league_filters,
         }
     )
 
