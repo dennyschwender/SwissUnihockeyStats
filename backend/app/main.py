@@ -902,6 +902,7 @@ async def home(request: Request, locale: str, league_category: str = "all"):
     from app.services.stats_service import get_upcoming_games, get_latest_results, get_overall_top_scorers
     from app.services.database import get_database_service
     from app.models.db_models import League, PlayerStatistics
+    from app.services.data_indexer import league_tier
     from sqlalchemy import distinct, func
     
     # Get the season with the most player statistics (active season)
@@ -967,8 +968,11 @@ async def home(request: Request, locale: str, league_category: str = "all"):
                 
             if league_id not in leagues_grouped:
                 # Extract base name (e.g., "NLB" from "Herren NLB")
-                base_name = name.split()[-1] if name else f"League {league_id}"
-                leagues_grouped[league_id] = {"name": base_name, "classes": []}
+                base_name = name.split()[-1] i
+                    "name": base_name, 
+                    "classes": [],
+                    "tier": league_tier(league_id)
+                }
             
             leagues_grouped[league_id]["classes"].append({
                 "id": key,
@@ -976,8 +980,10 @@ async def home(request: Request, locale: str, league_category: str = "all"):
                 "full_name": name
             })
     
+    # Sort leagues by tier (lower tier = higher priority leagues like NLA, NLB)
     league_filters = [
-        {"id": lid, "name": data["name"], "classes": data["classes"]}
+        {"id": lid, "name": data["name"], "classes": data["classes"], "tier": data["tier"]}
+        for lid, data in sorted(leagues_grouped.items(), key=lambda x: (x[1]["tier"], x[0]ata["classes"]}
         for lid, data in sorted(leagues_grouped.items())
     ]
     
