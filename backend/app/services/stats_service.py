@@ -345,6 +345,7 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
     
     Returns players with the highest points from PlayerStatistics,
     aggregating across all teams they played for in the season.
+    Includes the league where they played most games.
     """
     from app.services.database import get_database_service
     from app.models.db_models import PlayerStatistics, Player
@@ -365,10 +366,7 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
                 func.sum(PlayerStatistics.goals).label('g'),
                 func.sum(PlayerStatistics.assists).label('a'),
                 func.sum(PlayerStatistics.points).label('pts'),
-                func.sum(PlayerStatistics.penalty_minutes).label('pim'),
-                # Use the team name from their most recent stats entry
-                func.max(PlayerStatistics.team_name).label('team_name'),
-                func.max(PlayerStatistics.team_id).label('team_id')
+                func.sum(PlayerStatistics.penalty_minutes).label('pim')
             )
             .join(Player, PlayerStatistics.player_id == Player.person_id)
             .filter(PlayerStatistics.season_id == season_id)
@@ -379,13 +377,35 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
         )
         
         result = []
-        for i, (player_id, full_name, gp, g, a, pts, pim, team_name, team_id) in enumerate(stats, 1):
+        for i, (player_id, full_name, gp, g, a, pts, pim) in enumerate(stats, 1):
+            # For each player, find the team/league where they played most games
+            primary_stats = (
+                session.query(
+                    PlayerStatistics.team_name,
+                    PlayerStatistics.team_id,
+                    PlayerStatistics.league_abbrev,
+                    PlayerStatistics.games_played
+                )
+                .filter(
+                    PlayerStatistics.player_id == player_id,
+                    PlayerStatistics.season_id == season_id
+                )
+                .order_by(PlayerStatistics.games_played.desc())
+                .first()
+            )
+            
+            if primary_stats:
+                team_name, team_id, league_abbrev, _ = primary_stats
+            else:
+                team_name, team_id, league_abbrev = "Unknown", None, None
+            
             result.append({
                 "rank": i,
                 "player_id": player_id,
                 "player_name": full_name or f"Player {player_id}",
                 "team_name": team_name or "Unknown",
                 "team_id": team_id,
+                "league": league_abbrev or "",
                 "gp": gp or 0,
                 "g": g or 0,
                 "a": a or 0,

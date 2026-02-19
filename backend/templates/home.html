@@ -97,7 +97,9 @@
           <td style="padding:.35rem .4rem;color:var(--gray-400);">{{ p.rank }}</td>
           <td style="padding:.35rem .4rem;font-weight:500;">
             {{ p.player_name }}<br>
-            <span style="font-size:.72rem;color:var(--gray-400);">{{ p.team_name }}</span>
+            <span style="font-size:.72rem;color:var(--gray-400);">
+              {{ p.team_name }}{% if p.league %} <span style="color:var(--swiss-red);font-weight:600;">• {{ p.league }}</span>{% endif %}
+            </span>
           </td>
           <td style="padding:.35rem .4rem;text-align:center;">{{ p.g }}</td>
           <td style="padding:.35rem .4rem;text-align:center;">{{ p.a }}</td>
