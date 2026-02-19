@@ -285,7 +285,7 @@ function eventsTable(goals, penalties) {
     <!-- EVENTS (goals + penalties merged) -->
     <div class="gd-tabpanel" x-show="tab === 'events'">
       {% if game.goals or game.penalties %}
-      <div x-data="eventsTable({{ game.goals | tojson }}, {{ game.penalties | tojson }})">
+      <div x-data='eventsTable({{ game.goals | tojson }}, {{ game.penalties | tojson }})'>
         <div class="gd-filter-bar">
           <button class="gd-filter-btn" :class="filter === 'all' ? 'active' : ''" @click="filter = 'all'">All</button>
           <button class="gd-filter-btn" :class="filter === 'goal' ? 'active' : ''" @click="filter = 'goal'">🥅 Goals</button>
@@ -336,7 +336,7 @@ function eventsTable(goals, penalties) {
     <div class="gd-tabpanel" x-show="tab === 'roster'">
       {% if game.roster_home or game.roster_away %}
       <div class="gd-roster">
-        <div x-data="sortTable({{ game.roster_home | tojson }}, 'jersey', 'asc')">
+        <div x-data='sortTable({{ game.roster_home | tojson }}, "jersey", "asc")'>
           <div class="gd-roster-header">{{ game.home_team }}</div>
           <table class="gd-table">
             <thead><tr>
@@ -355,7 +355,7 @@ function eventsTable(goals, penalties) {
             </tbody>
           </table>
         </div>
-        <div x-data="sortTable({{ game.roster_away | tojson }}, 'jersey', 'asc')">
+        <div x-data='sortTable({{ game.roster_away | tojson }}, "jersey", "asc")'>
           <div class="gd-roster-header">{{ game.away_team }}</div>
           <table class="gd-table">
             <thead><tr>
