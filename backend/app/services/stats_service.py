@@ -1060,6 +1060,7 @@ def get_game_box_score(game_id: int) -> dict:
                         "team": team_label,
                         "player": player_name,
                         "own_goal": is_own_goal,
+                        "_ev_type": ev_type,  # kept for OG direction detection
                     }
                 )
 
@@ -1101,19 +1102,39 @@ def get_game_box_score(game_id: int) -> dict:
                 deduped_goals.append(g)
 
         h_score, a_score = 0, 0
+        dc_h, dc_a = 0, 0  # running doubled-counter from API embedded scores
         for g in deduped_goals:
             is_home = (g["team"] == home_name)
+            m_emb = _GOAL_RE.match(g.get("_ev_type", ""))
+            emb_h = int(m_emb.group(2)) if m_emb else None
+            emb_a = int(m_emb.group(3)) if m_emb else None
+
             if g.get("own_goal"):
-                # Own goal counts for the opponent
-                if is_home:
-                    a_score += 1
-                else:
-                    h_score += 1
+                if g["team"]:
+                    # Team known: OG scores for the opponent
+                    if is_home:
+                        a_score += 1
+                    else:
+                        h_score += 1
+                elif emb_h is not None:
+                    # Team unknown: detect direction from which doubled-counter incremented
+                    delta_a = emb_a - dc_a
+                    delta_h = emb_h - dc_h
+                    if delta_a > delta_h:
+                        a_score += 1  # A counter went up → A benefited → home scored OG
+                    else:
+                        h_score += 1  # H counter went up → H benefited → away scored OG
+                # fallthrough: if no embedded score, score stays unchanged
             elif is_home:
                 h_score += 1
             else:
                 a_score += 1
+
+            if emb_h is not None:
+                dc_h, dc_a = emb_h, emb_a
             g["score"] = f"{h_score}:{a_score}"
+        for g in deduped_goals:
+            g.pop("_ev_type", None)
         goals = deduped_goals
 
         # ── Deduplicate penalties ────────────────────────────────────────────
