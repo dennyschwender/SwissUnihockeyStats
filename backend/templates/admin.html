@@ -253,7 +253,10 @@
             <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Exclude seasons:</label>
             <input id="sched-excluded" type="text" placeholder="e.g. 1996,1997,2001"
               style="width:160px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
-            <button class="btn btn-sm" onclick="schedSaveFilter()" style="white-space:nowrap">💾 Save filter</button>
+            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Max concurrent:</label>
+            <input id="sched-max-concurrent" type="number" min="1" max="10" placeholder="2"
+              style="width:52px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+            <button class="btn btn-sm" onclick="schedSaveFilter()" style="white-space:nowrap">💾 Save</button>
             <button class="btn btn-sm" onclick="schedClearFilter()" style="white-space:nowrap;color:#f85149">✕ Clear</button>
           </div>
 
