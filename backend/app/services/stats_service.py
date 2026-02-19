@@ -87,6 +87,70 @@ def get_leagues_from_db(season_id: Optional[int] = None) -> list[dict]:
         return result
 
 
+# Mapping from API game_class int to human-readable category label
+_GAME_CLASS_LABEL = {11: "Men", 21: "Women"}
+
+
+def get_teams_list(
+    season_id: Optional[int] = None,
+    mode: Optional[int] = None,
+    q: str = "",
+    sort: str = "name",
+    limit: int = 100,
+) -> list[dict]:
+    """Return teams from DB enriched with league name and category.
+
+    Falls back to an empty list when the DB has no teams yet (fresh install).
+    mode: 1=Men, 2=Women, 3=Mixed
+    sort: 'name' | 'league'
+    """
+    db = get_database_service()
+    with db.session_scope() as session:
+        if season_id is None:
+            season_id = _get_current_season_id(session)
+
+        query = (
+            session.query(Team, League)
+            .outerjoin(
+                League,
+                (Team.league_id == League.league_id)
+                & (Team.season_id == League.season_id)
+                & (Team.game_class == League.game_class),
+            )
+            .filter(Team.season_id == season_id)
+        )
+
+        if mode == 1:
+            query = query.filter(Team.game_class == 11)
+        elif mode == 2:
+            query = query.filter(Team.game_class == 21)
+        elif mode == 3:
+            query = query.filter(Team.game_class.notin_([11, 21]))
+
+        if q:
+            query = query.filter(Team.name.ilike(f"%{q}%"))
+
+        if sort == "league":
+            # COALESCE so teams without a league sort last
+            query = query.order_by(func.coalesce(League.name, "~~~~"), Team.name)
+        else:
+            query = query.order_by(Team.name)
+
+        results = []
+        for team, league in query.limit(limit).all():
+            gc = team.game_class
+            category = _GAME_CLASS_LABEL.get(gc, "Mixed" if gc else None)
+            results.append(
+                {
+                    "id": team.id,
+                    "text": team.text or team.name or "",
+                    "category": category,
+                    "league_name": (league.name or league.text) if league else None,
+                }
+            )
+        return results
+
+
 def get_league_by_id(db_league_id: int) -> Optional[dict]:
     """Return a single league dict by its DB pk (leagues.id)."""
     db = get_database_service()

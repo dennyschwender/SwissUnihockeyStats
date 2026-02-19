@@ -167,10 +167,17 @@
             
             <div class="card-icon">👥</div>
             <h3>{{ team.text }}</h3>
-            {% if team.set_in_context %}
-            <p style="color: var(--gray-600); font-size: 0.875rem;">
-                Club: {{ team.set_in_context.get('club_name', 'N/A') }}<br>
-                League: {{ team.set_in_context.get('league_name', 'N/A') }}
+            {% if team.category or team.league_name %}
+            <p style="margin: 0.4rem 0 0; display: flex; flex-direction: column; gap: 0.2rem;">
+                {% if team.category %}
+                <span style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+                    color: {% if team.category == 'Men' %}#3b82f6{% elif team.category == 'Women' %}#ec4899{% else %}#8b5cf6{% endif %};">
+                    {{ team.category }}
+                </span>
+                {% endif %}
+                {% if team.league_name %}
+                <span style="font-size: 0.8rem; color: var(--gray-600);">{{ team.league_name }}</span>
+                {% endif %}
             </p>
             {% endif %}
         </div>

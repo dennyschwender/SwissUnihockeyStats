@@ -1471,21 +1471,27 @@ async def league_detail(request: Request, locale: str, league_id: int):
 @app.get("/{locale}/teams", response_class=HTMLResponse)
 async def teams_page(request: Request, locale: str):
     """Teams listing page"""
+    from app.services.stats_service import get_teams_list
     try:
-        teams_list = await get_cached_teams()
+        teams_list = get_teams_list(limit=100)
         error_message = None
-        
-        # Limit to first 50 teams for initial display
-        display_teams = teams_list[:50] if isinstance(teams_list, list) else []
-        
+
+        if not teams_list:
+            # DB is empty (fresh install) — fall back to API cache
+            cached = await get_cached_teams()
+            teams_list = [
+                {"id": t.get("id"), "text": t.get("text", ""), "category": None, "league_name": None}
+                for t in cached[:100]
+            ]
+
         return templates.TemplateResponse(
             request,
             "teams.html",
             {
                 "locale": locale,
                 "t": get_translations(locale),
-                "teams": display_teams,
-                "error_message": error_message
+                "teams": teams_list,
+                "error_message": error_message,
             }
         )
     except Exception as e:
@@ -1494,48 +1500,49 @@ async def teams_page(request: Request, locale: str):
 
 
 @app.get("/{locale}/teams/search", response_class=HTMLResponse)
-async def teams_search(request: Request, locale: str, q: str = "", mode: str = "all"):
+async def teams_search(request: Request, locale: str, q: str = "", mode: str = "all", sort: str = "name"):
     """HTMX endpoint for team search"""
-    # Use cached data instead of API call - instant results! (loads on-demand if needed)
-    all_teams = await get_cached_teams()
-    
-    # Filter teams by search query and mode
-    filtered_teams = all_teams
-    if q:
-        filtered_teams = [
-            team for team in filtered_teams
-            if q.lower() in team.get("text", "").lower()
+    from app.services.stats_service import get_teams_list
+
+    mode_int = int(mode) if mode.isdigit() else None
+    teams = get_teams_list(q=q, mode=mode_int, sort=sort, limit=50)
+
+    if not teams:
+        # DB empty — fall back to API cache with basic name filter
+        all_teams = await get_cached_teams()
+        if q:
+            all_teams = [t for t in all_teams if q.lower() in t.get("text", "").lower()]
+        teams = [
+            {"id": t.get("id"), "text": t.get("text", ""), "category": None, "league_name": None}
+            for t in all_teams[:50]
         ]
-    
-    if mode != "all":
-        filtered_teams = [
-            team for team in filtered_teams
-            if str(team.get("set_in_context", {}).get("mode", "")) == mode
-        ]
-    
-    filtered_teams = filtered_teams[:50]
-    
-    # Return partial HTML for htmx
+
+    cat_colors = {"Men": "#3b82f6", "Women": "#ec4899", "Mixed": "#8b5cf6"}
+
     html = '<div class="cards-grid">'
-    for team in filtered_teams:
-        club_name = team.get("set_in_context", {}).get("club_name", "N/A")
-        league_name = team.get("set_in_context", {}).get("league_name", "N/A")
-        team_id = team.get("id", "")
+    for team in teams:
+        team_id  = team.get("id", "")
+        name     = team.get("text", "")
+        category = team.get("category") or ""
+        league   = team.get("league_name") or ""
+        cat_color   = cat_colors.get(category, "var(--text-secondary)")
+        badge_html  = (f'<span style="font-size:0.7rem;font-weight:700;color:{cat_color};'
+                       f'text-transform:uppercase;letter-spacing:0.05em;">{category}</span>') if category else ""
+        league_html = f'<span style="font-size:0.8rem;color:var(--gray-600);">{league}</span>' if league else ""
+        meta_html   = (f'<p style="margin:0.4rem 0 0;display:flex;flex-direction:column;gap:0.2rem;">'
+                       f'{badge_html}{league_html}</p>') if (category or league) else ""
         html += f'''
         <div class="card" style="cursor: pointer;" onclick="window.location='/{locale}/team/{team_id}'">
             <div class="card-icon">👥</div>
-            <h3>{team.get("text", "")}</h3>
-            <p style="color: var(--gray-600); font-size: 0.875rem;">
-                Club: {club_name}<br>
-                League: {league_name}
-            </p>
+            <h3>{name}</h3>
+            {meta_html}
         </div>
         '''
     html += '</div>'
-    
-    if not filtered_teams:
+
+    if not teams:
         html = '<div style="text-align: center; padding: 3rem; color: var(--gray-600);"><p>No teams found</p></div>'
-    
+
     return HTMLResponse(content=html)
 
 
