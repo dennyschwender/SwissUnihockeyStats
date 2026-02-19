@@ -901,7 +901,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         raise  # let asyncio clean up properly
     except Exception as exc:
         job["status"] = "error"
-        job["error"]  = str(exc)
+        job["error"]  = f"{type(exc).__name__}: {exc}\n\n{traceback.format_exc()}"
         logger.error("Admin indexing job %s failed: %s", job_id, exc, exc_info=True)
     finally:
         _admin_tasks.pop(job_id, None)

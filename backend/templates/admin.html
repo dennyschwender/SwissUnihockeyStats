@@ -269,7 +269,7 @@
             <table class="sync-table" id="sched-hist-table">
               <thead><tr>
                 <th>Policy</th><th>Task</th><th>Season</th>
-                <th>Status</th><th>Scheduled</th><th>Finished</th><th>Stats</th>
+                <th>Status</th><th>Scheduled</th><th>Finished</th><th>Stats / Error</th>
               </tr></thead>
               <tbody id="sched-hist-tbody"></tbody>
             </table>
@@ -636,21 +636,37 @@ function renderJobs() {
   c.innerHTML = [...arr].reverse().map(j => {
     const st  = j.status || 'running';
     const pct = j.progress ?? 0;
-    const pulseC    = st === 'running' ? ' pulse' : '';
-    const stopBtn   = st === 'running'
+    const pulseC  = st === 'running' ? ' pulse' : '';
+    const stopBtn = st === 'running'
       ? `<button class="btn btn-sm" style="color:#f85149;border-color:#da3633" onclick="stopJob('${j.job_id}')">■ Stop</button>`
+      : '';
+    const stats = j.stats ? Object.entries(j.stats).map(([k,v])=>`${k}:${fmt(v)}`).join(' ') : '';
+    const errorRow = (st === 'error' || st === 'stopped') && j.error
+      ? (() => {
+          const lines = j.error.split('\n');
+          const summary = esc(lines[0]);
+          const full    = esc(j.error);
+          const id      = 'err-' + j.job_id;
+          return `<div style="margin-top:.3rem;font-size:.72rem;color:#f85149">
+            <span>⚠ ${summary}</span>
+            ${lines.length > 1 ? `<span style="cursor:pointer;color:#8b949e;margin-left:.4rem" onclick="const el=document.getElementById('${id}');el.style.display=el.style.display==='none'?'block':'none'">▶ details</span>
+            <pre id="${id}" style="display:none;margin:.3rem 0 0;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:.4rem .6rem;font-size:.68rem;color:#cdd9e5;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${full}</pre>` : ''}
+          </div>`;
+        })()
+      : '';
+    const statsRow = st === 'done' && stats
+      ? `<div style="margin-top:.2rem;font-size:.7rem;color:#8b949e">${stats}</div>`
       : '';
     return `
 <div class="job-item">
   <div class="job-item-top">
     <span class="job-tag ${st}${pulseC}">${st}</span>
     <span class="job-label">${j.label || j.task || '—'}</span>
-    <span class="job-season">S${j.season}</span>
+    <span class="job-season">${j.season ? 'S'+j.season : ''}</span>
     ${stopBtn}
   </div>
-  <div class="progress-wrap">
-    <div class="progress-bar" style="width:${pct}%"></div>
-  </div>
+  <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+  ${errorRow}${statsRow}
 </div>`;
   }).join('');
 }
@@ -790,7 +806,10 @@ function renderScheduler(d) {
   const tbody = document.getElementById('sched-hist-tbody');
   tbody.innerHTML = (d.history || []).slice(0, 50).map(h => {
     const cls = h.status === 'done' ? 's-ok' : h.status === 'error' ? 's-fail' : 's-prog';
-    const statsStr = h.stats ? Object.entries(h.stats).map(([k,v])=>`${k}:${fmt(v)}`).join(' ') : '—';
+    const statsStr = h.stats ? Object.entries(h.stats).map(([k,v])=>`${k}:${fmt(v)}`).join(' ') : '';
+    const infoCell = h.status === 'error' && h.error
+      ? `<span class="s-fail" title="${esc(h.error)}" style="cursor:help;font-size:.68rem">⚠ ${esc(h.error).length > 60 ? esc(h.error).slice(0,57)+'…' : esc(h.error)}</span>`
+      : `<span style="font-size:.68rem;color:#8b949e">${statsStr || '—'}</span>`;
     return `<tr>
       <td>${h.policy}</td>
       <td style="font-size:.68rem">${h.task}</td>
@@ -798,8 +817,9 @@ function renderScheduler(d) {
       <td class="${cls}">${h.status}</td>
       <td style="color:#6e7681;white-space:nowrap">${h.scheduled_at || '—'}</td>
       <td style="color:#6e7681;white-space:nowrap">${h.finished_at || '—'}</td>
-      <td style="font-size:.68rem;color:#8b949e">${statsStr}</td>
+      <td>${infoCell}</td>
     </tr>`;
+    
   }).join('');
 }
 
