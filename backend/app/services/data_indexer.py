@@ -953,6 +953,10 @@ class DataIndexer:
 
         with self.db_service.session_scope() as session:
             try:
+                # Delete stale events so re-indexing is idempotent
+                session.query(GameEvent).filter(GameEvent.game_id == game_id).delete()
+                session.flush()
+
                 events_data = self.client.get_game_events_by_id(game_id)
                 rows = self._extract_table_data(events_data)
                 if not rows:
@@ -983,14 +987,14 @@ class DataIndexer:
                         game_row.home_score = home_score_val
                         game_row.away_score = away_score_val
 
-                # Skip non-event rows (e.g. "Spielende" header)
-                # Actual columns from /api/game_events/{id}:
+                # ── Collect raw events ───────────────────────────────────────
+                # Columns from /api/game_events/{id}:
                 #   0 – clock time ("32:16", "")
-                #   1 – event type text ("Torschütze", "Strafe", "Spielende", …)
-                #   2 – team name (text only, no link/id)
-                #   3 – player name / note (text only, no link/id)
-                count = 0
+                #   1 – event type text ("Torschütze", "Strafe", …)
+                #   2 – team name
+                #   3 – player name / note
                 SKIP_EVENTS = {"spielende", "spielbeginn", "beginn", "ende", ""}
+                raw_events: list[dict] = []
                 for row in rows:
                     cells = row.get("cells", [])
                     if not cells:
@@ -1000,28 +1004,65 @@ class DataIndexer:
                         v = cell.get("text", "")
                         return (v[0] if isinstance(v, list) and v else (v if not isinstance(v, list) else "")) or ""
 
-                    time_str   = _txt(cells[0]) if len(cells) > 0 else None
-                    event_type = _txt(cells[1]) if len(cells) > 1 else "unknown"
-                    team_name  = _txt(cells[2]) if len(cells) > 2 else None
+                    time_str    = _txt(cells[0]) if len(cells) > 0 else None
+                    event_type  = _txt(cells[1]) if len(cells) > 1 else "unknown"
+                    team_name   = _txt(cells[2]) if len(cells) > 2 else None
                     player_name = _txt(cells[3]) if len(cells) > 3 else None
 
                     if event_type.lower() in SKIP_EVENTS:
                         continue
 
+                    raw_events.append({
+                        "event_type": event_type,
+                        "time": time_str,
+                        "team": team_name,
+                        "player": player_name,
+                    })
+
+                # ── Deduplicate ──────────────────────────────────────────────
+                # Goals: API emits 2 rows per assisted goal (scorer-only, then
+                # scorer+assist). Merge by (time, team), keeping the richer player.
+                # Penalties: API emits 2 identical rows — keep only one.
+                deduped: list[dict] = []
+                seen_pen: set[tuple] = set()
+                for ev in raw_events:
+                    etype_lo = ev["event_type"].lower()
+                    is_goal    = etype_lo.startswith(("torschütze", "eigentor"))
+                    is_penalty = "'-strafe" in etype_lo
+
+                    if is_penalty:
+                        key = (ev["event_type"], ev["time"], ev["team"])
+                        if key in seen_pen:
+                            continue
+                        seen_pen.add(key)
+                        deduped.append(ev)
+                    elif is_goal:
+                        found = False
+                        for d in deduped:
+                            if (d["time"] == ev["time"] and d["team"] == ev["team"]
+                                    and d["event_type"].lower().startswith(
+                                        ("torschütze", "eigentor"))):
+                                if len(ev["player"] or "") > len(d["player"] or ""):
+                                    d["player"] = ev["player"]
+                                found = True
+                                break
+                        if not found:
+                            deduped.append(ev)
+                    else:
+                        deduped.append(ev)
+
+                # ── Insert ───────────────────────────────────────────────────
+                count = 0
+                for ev in deduped:
                     evt = GameEvent(
                         game_id=game_id,
-                        event_type=str(event_type)[:50],
+                        event_type=str(ev["event_type"])[:50],
                         period=None,
-                        time=time_str or None,
+                        time=ev["time"] or None,
                         team_id=None,
                         season_id=None,
                         player_id=None,
-                        raw_data={
-                            "time": time_str,
-                            "event_type": event_type,
-                            "team": team_name,
-                            "player": player_name,
-                        },
+                        raw_data=ev,
                         last_updated=datetime.now(timezone.utc),
                     )
                     session.add(evt)

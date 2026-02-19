@@ -1084,6 +1084,49 @@ def get_game_box_score(game_id: int) -> dict:
             elif kind == "best_player":
                 best_players.append({"team": team_label, "player": player_name})
 
+        # ── Deduplicate goals ────────────────────────────────────────────────
+        # The API emits 2 rows per assisted goal: one scorer-only and one
+        # scorer+assist. Merge by (time, team), keeping the richer player string,
+        # then reconstruct the running H:A score from scratch.
+        deduped_goals: list[dict] = []
+        for g in goals:
+            merged = False
+            for dg in deduped_goals:
+                if dg["time"] == g["time"] and dg["team"] == g["team"]:
+                    if len(g["player"] or "") > len(dg["player"] or ""):
+                        dg["player"] = g["player"]
+                    merged = True
+                    break
+            if not merged:
+                deduped_goals.append(g)
+
+        h_score, a_score = 0, 0
+        for g in deduped_goals:
+            is_home = (g["team"] == home_name)
+            if g.get("own_goal"):
+                # Own goal counts for the opponent
+                if is_home:
+                    a_score += 1
+                else:
+                    h_score += 1
+            elif is_home:
+                h_score += 1
+            else:
+                a_score += 1
+            g["score"] = f"{h_score}:{a_score}"
+        goals = deduped_goals
+
+        # ── Deduplicate penalties ────────────────────────────────────────────
+        # The API also emits 2 identical rows per penalty.
+        seen_penalties: set[tuple] = set()
+        deduped_penalties: list[dict] = []
+        for p in penalties:
+            key = (p["time"], p["team"], p["player"], p["minutes"])
+            if key not in seen_penalties:
+                seen_penalties.add(key)
+                deduped_penalties.append(p)
+        penalties = deduped_penalties
+
         return {
             "game_id": game_id,
             "season_id": game.season_id,
