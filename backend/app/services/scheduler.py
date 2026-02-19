@@ -219,15 +219,19 @@ class Scheduler:
             return True
 
     def _save_state(self):
-        """Persist the current config to disk."""
+        """Persist the current config to disk (atomic write to avoid truncation)."""
         try:
             os.makedirs(os.path.dirname(_CONFIG_PATH), exist_ok=True)
-            with open(_CONFIG_PATH, "w") as f:
+            tmp = _CONFIG_PATH + ".tmp"
+            with open(tmp, "w") as f:
                 json.dump({
                     "enabled": self._enabled,
                     "min_season": self._min_season,
                     "excluded_seasons": self._excluded_seasons,
                 }, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, _CONFIG_PATH)  # atomic on POSIX
         except OSError as exc:
             logger.warning("[scheduler] could not save config: %s", exc)
 
@@ -452,7 +456,7 @@ class Scheduler:
                                 continue
                             self._maybe_schedule(session, policy, season=sid)
         except Exception as exc:
-            logger.error("[scheduler] refresh_queue error: %s", exc)
+            logger.error("[scheduler] refresh_queue error: %s", exc, exc_info=True)
 
     def _maybe_schedule(self, session, policy: dict, season: int | None):
         """Schedule a job if none is already queued for this policy+season."""
