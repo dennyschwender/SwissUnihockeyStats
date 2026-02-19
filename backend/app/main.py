@@ -951,10 +951,24 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         # ── GAME EVENTS ────────────────────────────────────────────────────
         if task in ("events", "full"):
             from app.services.data_indexer import league_tier
+            from app.models.db_models import LeagueGroup, League as _League
             _now = datetime.now(timezone.utc)
+
+            # Auto-detect effective tier from leagues actually indexed for this season
+            effective_tier = max_tier
+            if max_tier == 7:
+                with db_service.session_scope() as _s2:
+                    _db_lids = [
+                        r[0]
+                        for r in _s2.query(_League.league_id)
+                        .filter(_League.season_id == season)
+                        .all()
+                    ]
+                if _db_lids:
+                    effective_tier = max(league_tier(lid) for lid in _db_lids)
+
             with db_service.session_scope() as s:
                 # Join Game → League to filter by tier
-                from app.models.db_models import LeagueGroup, League as _League
                 rows = (
                     s.query(Game.id, Game.season_id, _League.league_id)
                     .join(LeagueGroup, Game.group_id == LeagueGroup.id, isouter=True)
@@ -968,10 +982,11 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                 finished = [
                     (r.id, r.season_id)
                     for r in rows
-                    if league_tier(r.league_id or 0) <= max_tier
+                    if league_tier(r.league_id or 0) <= effective_tier
                 ]
             total    = len(finished)
-            tier_lbl = f"tier ≤ {max_tier}" if max_tier < 7 else "all tiers"
+            auto_lbl = " (auto)" if max_tier == 7 else ""
+            tier_lbl = f"tier ≤ {effective_tier}{auto_lbl}"
             push("info", f"Indexing events for {total} past games ({tier_lbl})...")
             events_n = 0
             for i, (gid, sid_) in enumerate(finished, 1):

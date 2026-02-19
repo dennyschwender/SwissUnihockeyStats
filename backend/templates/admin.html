@@ -337,7 +337,7 @@ async function loadStats() {
     renderSyncTable(d.sync_status || []);
 
     document.getElementById('refresh-ts').textContent =
-      'Updated ' + new Date().toLocaleTimeString();
+      'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
   } catch(e) {
     log('error', 'Stats load failed: ' + e.message);
   }
@@ -737,7 +737,7 @@ function log(level, msg) {
   if (box.textContent === 'Ready.') box.textContent = '';
   const line = document.createElement('div');
   line.className = level;
-  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  line.textContent = `[${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false})}] ${msg}`;
   box.appendChild(line);
   if (box.children.length > 400) box.removeChild(box.firstChild);
   box.scrollTop = box.scrollHeight;
