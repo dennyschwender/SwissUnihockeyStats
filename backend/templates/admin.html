@@ -810,9 +810,9 @@ function renderScheduler(d) {
   <span class="task-name">${j.policy}</span>
   <div class="task-counts">
     ${j.season ? `<span class="count-pill has-data">S${j.season}</span>` : '<span class="count-pill">global</span>'}
-    <span class="count-pill">${j.run_at}</span>
+    <span class="count-pill" title="${j.run_at.replace('T',' ').replace('Z',' UTC')}">${fmtRunAt(j.run_at)}</span>
   </div>
-  <span class="count-pill${j.due_in_s < 120 ? ' has-data' : ''}">${fmtDue(j.due_in_s)}</span>
+  <span class="count-pill${j.due_in_s < 120 ? ' has-data' : ''}" title="${j.run_at.replace('T',' ').replace('Z',' UTC')}">${fmtDue(j.due_in_s)}</span>
   <button class="btn btn-sm btn-orange" onclick="schedTrigger('${j.policy}',${j.season||'null'})">▶ Now</button>
 </div>`).join('');
   }
@@ -913,6 +913,27 @@ function fmtDue(secs) {
   if (secs < 3600)  return `${Math.round(secs/60)}m`;
   if (secs < 86400) return `${Math.round(secs/3600)}h`;
   return `${Math.round(secs/86400)}d`;
+}
+
+function fmtRunAt(isoUtc) {
+  if (!isoUtc) return '—';
+  const d = new Date(isoUtc);
+  if (isNaN(d)) return isoUtc;
+  const now = new Date();
+  const diffMs = d - now;
+  const diffDays = Math.floor(diffMs / 86400000);
+  // Same calendar day → just show time
+  if (d.toDateString() === now.toDateString())
+    return 'today ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  // Tomorrow
+  const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
+  if (d.toDateString() === tomorrow.toDateString())
+    return 'tomorrow ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  // Within 7 days → weekday + time
+  if (diffDays < 7)
+    return d.toLocaleDateString([], {weekday:'short'}) + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  // Farther out → date + time
+  return d.toLocaleDateString([], {month:'short', day:'numeric'}) + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 }
 
 function toggleEl(bodyId, chevId) {

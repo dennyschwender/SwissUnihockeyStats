@@ -328,7 +328,7 @@ class Scheduler:
                 "task":     job.task,
                 "season":   job.season,
                 "label":    job.label,
-                "run_at":    job.run_at.strftime("%Y-%m-%d %H:%M UTC"),
+                "run_at":   job.run_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "due_in_s": max(0, int((job.run_at - now).total_seconds())),
             })
         return out
