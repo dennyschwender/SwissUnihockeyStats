@@ -213,7 +213,8 @@ function eventsTable(goals, penalties) {
     },
     cls(k) { if (this.key !== k) return ''; return this.dir === 'asc' ? 'sort-asc' : 'sort-desc'; },
     icon(k) { if (this.key !== k) return '\u2195'; return this.dir === 'asc' ? '\u2191' : '\u2193'; },
-    fmtMin(e) { return e.type === 'penalty' && e.minutes != null ? e.minutes + "'" : '\u2014'; }
+    fmtMin(e) { return e.type === 'penalty' && e.minutes != null ? e.minutes + "'" : '\u2014'; },
+    fmtPenalty(e) { if (e.type !== 'penalty') return ''; const m = e.minutes != null ? e.minutes + "'" : ''; const i = e.infraction || ''; return m && i ? m + '\u00a0(' + i + ')' : m || i || '\u2014'; }
   };
 }
 </script>
@@ -302,9 +303,7 @@ function eventsTable(goals, penalties) {
             <th :class="cls('type')"       @click="sortBy('type')"      >Type<span class="sort-icon" x-text="icon('type')"></span></th>
             <th :class="cls('team')"       @click="sortBy('team')"      >Team<span class="sort-icon" x-text="icon('team')"></span></th>
             <th :class="cls('player')"     @click="sortBy('player')"    >Player<span class="sort-icon" x-text="icon('player')"></span></th>
-            <th :class="cls('score')"      @click="sortBy('score')"     >Score<span class="sort-icon" x-text="icon('score')"></span></th>
-            <th :class="cls('minutes')"    @click="sortBy('minutes')"   >Min<span class="sort-icon" x-text="icon('minutes')"></span></th>
-            <th :class="cls('infraction')" @click="sortBy('infraction')">Infraction<span class="sort-icon" x-text="icon('infraction')"></span></th>
+            <th :class="cls('score')"      @click="sortBy('score')"     >Score / Penalty<span class="sort-icon" x-text="icon('score')"></span></th>
           </tr></thead>
           <tbody>
             <template x-for="e in sorted" :key="e.type + e.time + e.team + (e.player || '')">
@@ -315,14 +314,13 @@ function eventsTable(goals, penalties) {
                 <td x-text="e.team || '—'"></td>
                 <td x-text="e.player || '—'"></td>
                 <td class="gd-score-cell">
-                  <span x-show="e.type === 'goal'">
-                    <span x-text="e.score"></span>
-                    <span class="gd-og" x-show="e.own_goal">(OG)</span>
-                  </span>
-                  <span x-show="e.type !== 'goal'" style="color:var(--gray-300)">—</span>
+                  <template x-if="e.type === 'goal'">
+                    <span><span x-text="e.score"></span><span class="gd-og" x-show="e.own_goal"> (OG)</span></span>
+                  </template>
+                  <template x-if="e.type !== 'goal'">
+                    <span x-text="fmtPenalty(e)"></span>
+                  </template>
                 </td>
-                <td class="gd-min" x-text="fmtMin(e)"></td>
-                <td class="gd-infraction" x-text="e.type === 'penalty' ? (e.infraction || '—') : '—'"></td>
               </tr>
             </template>
           </tbody>
