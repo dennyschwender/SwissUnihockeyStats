@@ -97,18 +97,41 @@
   .gd-min { text-align:center; }
   .gd-infraction { color:var(--gray-600); }
 
-  /* ── Best players ── */
-  .gd-best { display:flex; gap:1rem; flex-wrap:wrap; }
-  .gd-best-card {
-    background: var(--gray-50, #f9fafb);
-    border: 1px solid var(--gray-200);
-    border-radius: .5rem;
-    padding: 1rem 1.5rem;
-    min-width: 180px;
-    flex: 1;
+  /* ── Best players (scorebox) ── */
+  .gd-best-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-top: 1rem;
+    padding-top: .75rem;
+    border-top: 1px solid var(--gray-100);
+    font-size: .8rem;
+    gap: 1rem;
   }
-  .gd-best-label { font-size:.72rem; color:var(--gray-500); margin-bottom:.25rem; text-transform:uppercase; letter-spacing:.04em; }
-  .gd-best-name { font-size:1rem; font-weight:600; }
+  .gd-best-side { display:flex; flex-direction:column; gap:.1rem; flex:1; }
+  .gd-best-side--home { text-align:right; }
+  .gd-best-side--away { text-align:left; }
+  .gd-best-center { color:var(--gray-400); font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; align-self:center; white-space:nowrap; }
+  .gd-best-player-label { color:var(--gray-400); font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; }
+  .gd-best-player-name { font-weight:600; color:var(--gray-700); }
+
+  /* ── Events filter bar ── */
+  .gd-filter-bar { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; align-items:center; }
+  .gd-filter-btn {
+    padding:.3rem .85rem;
+    border-radius:1rem;
+    border:1px solid var(--gray-200);
+    background:none;
+    cursor:pointer;
+    font-size:.8rem;
+    font-weight:500;
+    color:var(--gray-500);
+    transition:all .15s;
+  }
+  .gd-filter-btn:hover { border-color:var(--swiss-red); color:var(--swiss-red); }
+  .gd-filter-btn.active { background:var(--swiss-red); border-color:var(--swiss-red); color:white; }
+  .gd-row-penalty { background: #fffbeb !important; }
+  .gd-row-penalty:hover { background: #fef3c7 !important; }
 
   /* ── Roster ── */
   .gd-roster { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
@@ -136,6 +159,41 @@ function sortTable(initialRows, defaultKey, defaultDir) {
       if (!this.key) return this.rows;
       const k = this.key, d = this.dir;
       return [...this.rows].sort((a, b) => {
+        let va = a[k], vb = b[k];
+        const na = parseFloat(va), nb = parseFloat(vb);
+        if (!isNaN(na) && !isNaN(nb)) { va = na; vb = nb; }
+        else { va = String(va ?? '').toLowerCase(); vb = String(vb ?? '').toLowerCase(); }
+        if (va < vb) return d === 'asc' ? -1 : 1;
+        if (va > vb) return d === 'asc' ?  1 : -1;
+        return 0;
+      });
+    },
+    sortBy(k) {
+      if (this.key === k) { this.dir = this.dir === 'asc' ? 'desc' : 'asc'; }
+      else { this.key = k; this.dir = 'asc'; }
+    },
+    cls(k) { if (this.key !== k) return ''; return this.dir === 'asc' ? 'sort-asc' : 'sort-desc'; },
+    icon(k) { if (this.key !== k) return '\u2195'; return this.dir === 'asc' ? '\u2191' : '\u2193'; }
+  };
+}
+
+function eventsTable(goals, penalties) {
+  const allRows = [
+    ...goals.map(g => ({ ...g, type: 'goal', minutes: null, infraction: null })),
+    ...penalties.map(p => ({ ...p, type: 'penalty', score: null, own_goal: false }))
+  ];
+  return {
+    rows: allRows,
+    filter: 'all',
+    key: 'time',
+    dir: 'asc',
+    get filtered() {
+      return this.filter === 'all' ? this.rows : this.rows.filter(r => r.type === this.filter);
+    },
+    get sorted() {
+      if (!this.key) return this.filtered;
+      const k = this.key, d = this.dir;
+      return [...this.filtered].sort((a, b) => {
         let va = a[k], vb = b[k];
         const na = parseFloat(va), nb = parseFloat(vb);
         if (!isNaN(na) && !isNaN(nb)) { va = na; vb = nb; }
@@ -191,12 +249,31 @@ function sortTable(initialRows, defaultKey, defaultDir) {
     {% if game.status %}
     <div class="gd-status">{{ game.status }}</div>
     {% endif %}
+    {% if game.best_players %}
+    <div class="gd-best-row">
+      {% set home_best = game.best_players | selectattr('team', 'equalto', game.home_team) | first | default(none) %}
+      {% set away_best = game.best_players | selectattr('team', 'equalto', game.away_team) | first | default(none) %}
+      <div class="gd-best-side gd-best-side--home">
+        {% if home_best %}
+        <span class="gd-best-player-label">⭐ Best Player</span>
+        <span class="gd-best-player-name">{{ home_best.player or '—' }}</span>
+        {% endif %}
+      </div>
+      <div class="gd-best-center">Best Players</div>
+      <div class="gd-best-side gd-best-side--away">
+        {% if away_best %}
+        <span class="gd-best-player-label">⭐ Best Player</span>
+        <span class="gd-best-player-name">{{ away_best.player or '—' }}</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <!-- Tabs -->
-  <div class="gd-tabs" x-data="{ tab: 'goals' }" x-cloak>
+  <div class="gd-tabs" x-data="{ tab: 'events' }" x-cloak>
     <div class="gd-tabbar" role="tablist">
-      {% for tid, tlabel, icon in [('goals','Goals','🥅'),('penalties','Penalties','🟨'),('best','Best Players','⭐'),('roster','Roster','👥')] %}
+      {% for tid, tlabel, icon in [('events','Events','📋'),('roster','Roster','👥')] %}
       <button class="gd-tab" :class="tab === '{{ tid }}' ? 'active' : ''"
               @click="tab = '{{ tid }}'" role="tab">
         {{ icon }} {{ tlabel }}
@@ -204,64 +281,43 @@ function sortTable(initialRows, defaultKey, defaultDir) {
       {% endfor %}
     </div>
 
-    <!-- GOALS -->
-    <div class="gd-tabpanel" x-show="tab === 'goals'">
-      {% if game.goals %}
-      <div x-data="sortTable({{ game.goals | tojson }}, 'time', 'asc')">
-        <table class="gd-table">
-          <thead><tr>
-            <th :class="cls('period')" @click="sortBy('period')">Period<span class="sort-icon" x-text="icon('period')"></span></th>
-            <th :class="cls('time')"   @click="sortBy('time')"  >Time<span class="sort-icon" x-text="icon('time')"></span></th>
-            <th :class="cls('score')"  @click="sortBy('score')" >Score<span class="sort-icon" x-text="icon('score')"></span></th>
-            <th :class="cls('team')"   @click="sortBy('team')"  >Team<span class="sort-icon" x-text="icon('team')"></span></th>
-            <th :class="cls('player')" @click="sortBy('player')">Player<span class="sort-icon" x-text="icon('player')"></span></th>
-          </tr></thead>
-          <tbody>
-            <template x-for="g in sorted" :key="g.time + g.team">
-              <tr>
-                <td x-text="g.period || '—'"></td>
-                <td x-text="g.time || '—'"></td>
-                <td class="gd-score-cell">
-                  <span x-text="g.score"></span>
-                  <span class="gd-og" x-show="g.own_goal">(OG)</span>
-                </td>
-                <td x-text="g.team || '—'"></td>
-                <td x-text="g.player || '—'"></td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <div class="gd-empty">
-        <div class="gd-empty-icon">🥅</div>
-        <p>No goal data available for this game.</p>
-      </div>
-      {% endif %}
-    </div>
-
-    <!-- PENALTIES -->
-    <div class="gd-tabpanel" x-show="tab === 'penalties'">
-      {% if game.penalties %}
-      <div x-data="sortTable({{ game.penalties | tojson }}, 'time', 'asc')">
+    <!-- EVENTS (goals + penalties merged) -->
+    <div class="gd-tabpanel" x-show="tab === 'events'">
+      {% if game.goals or game.penalties %}
+      <div x-data="eventsTable({{ game.goals | tojson }}, {{ game.penalties | tojson }})">
+        <div class="gd-filter-bar">
+          <button class="gd-filter-btn" :class="filter === 'all' ? 'active' : ''" @click="filter = 'all'">All</button>
+          <button class="gd-filter-btn" :class="filter === 'goal' ? 'active' : ''" @click="filter = 'goal'">🥅 Goals</button>
+          <button class="gd-filter-btn" :class="filter === 'penalty' ? 'active' : ''" @click="filter = 'penalty'">🟨 Penalties</button>
+        </div>
         <table class="gd-table">
           <thead><tr>
             <th :class="cls('period')"     @click="sortBy('period')"    >Period<span class="sort-icon" x-text="icon('period')"></span></th>
             <th :class="cls('time')"       @click="sortBy('time')"      >Time<span class="sort-icon" x-text="icon('time')"></span></th>
+            <th :class="cls('type')"       @click="sortBy('type')"      >Type<span class="sort-icon" x-text="icon('type')"></span></th>
             <th :class="cls('team')"       @click="sortBy('team')"      >Team<span class="sort-icon" x-text="icon('team')"></span></th>
             <th :class="cls('player')"     @click="sortBy('player')"    >Player<span class="sort-icon" x-text="icon('player')"></span></th>
+            <th :class="cls('score')"      @click="sortBy('score')"     >Score<span class="sort-icon" x-text="icon('score')"></span></th>
             <th :class="cls('minutes')"    @click="sortBy('minutes')"   >Min<span class="sort-icon" x-text="icon('minutes')"></span></th>
             <th :class="cls('infraction')" @click="sortBy('infraction')">Infraction<span class="sort-icon" x-text="icon('infraction')"></span></th>
           </tr></thead>
           <tbody>
-            <template x-for="p in sorted" :key="p.time + p.team + p.player">
-              <tr>
-                <td x-text="p.period || '—'"></td>
-                <td x-text="p.time || '—'"></td>
-                <td x-text="p.team || '—'"></td>
-                <td x-text="p.player || '—'"></td>
-                <td class="gd-min" x-text="p.minutes != null ? p.minutes + \"'\" : '—'"></td>
-                <td class="gd-infraction" x-text="p.infraction || '—'"></td>
+            <template x-for="e in sorted" :key="e.type + e.time + e.team + (e.player || '')">
+              <tr :class="e.type === 'penalty' ? 'gd-row-penalty' : ''">
+                <td x-text="e.period || '—'"></td>
+                <td x-text="e.time || '—'"></td>
+                <td x-text="e.type === 'goal' ? '🥅' : '🟨'"></td>
+                <td x-text="e.team || '—'"></td>
+                <td x-text="e.player || '—'"></td>
+                <td class="gd-score-cell">
+                  <span x-show="e.type === 'goal'">
+                    <span x-text="e.score"></span>
+                    <span class="gd-og" x-show="e.own_goal">(OG)</span>
+                  </span>
+                  <span x-show="e.type !== 'goal'" style="color:var(--gray-300)">—</span>
+                </td>
+                <td class="gd-min" x-text="e.type === 'penalty' ? (e.minutes != null ? e.minutes + \"'\" : '—') : '—'"></td>
+                <td class="gd-infraction" x-text="e.type === 'penalty' ? (e.infraction || '—') : '—'"></td>
               </tr>
             </template>
           </tbody>
@@ -269,27 +325,8 @@ function sortTable(initialRows, defaultKey, defaultDir) {
       </div>
       {% else %}
       <div class="gd-empty">
-        <div class="gd-empty-icon">🟨</div>
-        <p>No penalty data available for this game.</p>
-      </div>
-      {% endif %}
-    </div>
-
-    <!-- BEST PLAYERS -->
-    <div class="gd-tabpanel" x-show="tab === 'best'">
-      {% if game.best_players %}
-      <div class="gd-best">
-        {% for bp in game.best_players %}
-        <div class="gd-best-card">
-          <div class="gd-best-label">{{ bp.team }}</div>
-          <div class="gd-best-name">⭐ {{ bp.player or "—" }}</div>
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div class="gd-empty">
-        <div class="gd-empty-icon">⭐</div>
-        <p>No best player data available.</p>
+        <div class="gd-empty-icon">📋</div>
+        <p>No event data available for this game.</p>
       </div>
       {% endif %}
     </div>
