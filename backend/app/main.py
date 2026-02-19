@@ -901,19 +901,34 @@ async def home(request: Request, locale: str):
     """Homepage with upcoming games + overall top scorers"""
     from app.services.stats_service import get_upcoming_games, get_overall_top_scorers
     from app.services.database import get_database_service
-    from app.models.db_models import League
-    from sqlalchemy import distinct
+    from app.models.db_models import League, PlayerStatistics
+    from sqlalchemy import distinct, func
     
-    current_season = get_current_season()
+    # Get the season with the most player statistics (active season)
+    db = get_database_service()
+    with db.session_scope() as session:
+        active_season_row = (
+            session.query(
+                PlayerStatistics.season_id,
+                func.count(PlayerStatistics.id).label('count')
+            )
+            .group_by(PlayerStatistics.season_id)
+            .order_by(func.count(PlayerStatistics.id).desc())
+            .first()
+        )
+        
+        if active_season_row:
+            active_season = active_season_row[0]
+        else:
+            active_season = get_current_season()
     
     # Get upcoming games (all leagues by default)
-    upcoming = get_upcoming_games(limit=12)
+    upcoming = get_upcoming_games(limit=12, season_id=active_season)
     
     # Get overall top scorers across all leagues
-    overall_scorers = get_overall_top_scorers(season_id=current_season, limit=10)
+    overall_scorers = get_overall_top_scorers(season_id=active_season, limit=10)
     
     # Get unique league categories for filtering
-    db = get_database_service()
     with db.session_scope() as session:
         league_categories = (
             session.query(
@@ -921,7 +936,7 @@ async def home(request: Request, locale: str):
                 League.game_class,
                 League.name
             )
-            .filter(League.season_id == current_season)
+            .filter(League.season_id == active_season)
             .distinct()
             .order_by(League.league_id, League.game_class)
             .all()
