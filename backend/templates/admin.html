@@ -750,19 +750,34 @@ function esc(s) {
 ═══════════════════════════════════════════════════════ */
 async function loadScheduler() {
   try {
-    const r = await fetch('/admin/api/scheduler');
-    if (!r.ok) return;
-    const d = await r.json();
-    renderScheduler(d);
-    // Pick up any scheduler-launched jobs not yet tracked in the active jobs panel
-    (d.history || []).forEach(h => {
-      if (!jobs[h.job_id]) {
-        const isRunning = h.status === 'running' || h.status === 'pending';
-        jobs[h.job_id] = { job_id: h.job_id, label: h.policy + (h.season ? ` S${h.season}` : ''), season: h.season, task: h.task, status: isRunning ? 'running' : h.status, progress: isRunning ? 0 : 100 };
-        renderJobs();
-        if (isRunning) pollJob(h.job_id);
-      }
-    });
+    const [schedResp, jobsResp] = await Promise.all([
+      fetch('/admin/api/scheduler'),
+      fetch('/admin/api/jobs'),
+    ]);
+    if (schedResp.ok) {
+      const d = await schedResp.json();
+      renderScheduler(d);
+      // Pick up scheduler-launched jobs not yet tracked in the active jobs panel
+      (d.history || []).forEach(h => {
+        if (!jobs[h.job_id]) {
+          const isRunning = h.status === 'running' || h.status === 'pending';
+          jobs[h.job_id] = { job_id: h.job_id, label: h.policy + (h.season ? ` S${h.season}` : ''), season: h.season, task: h.task, status: isRunning ? 'running' : h.status, progress: isRunning ? 0 : 100 };
+          renderJobs();
+          if (isRunning) pollJob(h.job_id);
+        }
+      });
+    }
+    // Pick up manually-triggered jobs (survive page refresh)
+    if (jobsResp.ok) {
+      const manualJobs = await jobsResp.json();
+      manualJobs.forEach(j => {
+        if (!jobs[j.job_id]) {
+          jobs[j.job_id] = { ...j };
+          renderJobs();
+          if (j.status === 'running') pollJob(j.job_id);
+        }
+      });
+    }
   } catch(e) { /* scheduler may not yet be running */ }
 }
 

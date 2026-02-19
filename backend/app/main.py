@@ -530,6 +530,12 @@ async def admin_start_indexing(payload: dict, _: None = Depends(require_admin)):
     return {"job_id": job_id, "season": season, "task": task, "label": _TASK_META[task]}
 
 
+@app.get("/admin/api/jobs")
+async def admin_list_jobs(_: None = Depends(require_admin)):
+    """Return all known manual jobs (running + completed)."""
+    return list(_admin_jobs.values())
+
+
 @app.get("/admin/api/jobs/{job_id}")
 async def admin_job_status(job_id: str, _: None = Depends(require_admin)):
     """Return current status and buffered log lines for a running job."""
