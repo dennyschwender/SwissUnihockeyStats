@@ -155,6 +155,18 @@
 </style>
 
 <script>
+function toSortVal(k, v) {
+  if (k === 'time' && typeof v === 'string' && v.includes(':')) {
+    const p = v.split(':'); return parseInt(p[0]) * 60 + (parseInt(p[1]) || 0);
+  }
+  const n = parseFloat(v);
+  return isNaN(n) ? String(v ?? '').toLowerCase() : n;
+}
+
+function cmp(a, b, d) {
+  return a < b ? (d === 'asc' ? -1 : 1) : a > b ? (d === 'asc' ? 1 : -1) : 0;
+}
+
 function sortTable(initialRows, defaultKey, defaultDir) {
   return {
     rows: initialRows,
@@ -163,15 +175,7 @@ function sortTable(initialRows, defaultKey, defaultDir) {
     get sorted() {
       if (!this.key) return this.rows;
       const k = this.key, d = this.dir;
-      return [...this.rows].sort((a, b) => {
-        let va = a[k], vb = b[k];
-        const na = parseFloat(va), nb = parseFloat(vb);
-        if (!isNaN(na) && !isNaN(nb)) { va = na; vb = nb; }
-        else { va = String(va ?? '').toLowerCase(); vb = String(vb ?? '').toLowerCase(); }
-        if (va < vb) return d === 'asc' ? -1 : 1;
-        if (va > vb) return d === 'asc' ?  1 : -1;
-        return 0;
-      });
+      return [...this.rows].sort((a, b) => cmp(toSortVal(k, a[k]), toSortVal(k, b[k]), d));
     },
     sortBy(k) {
       if (this.key === k) { this.dir = this.dir === 'asc' ? 'desc' : 'asc'; }
@@ -198,15 +202,7 @@ function eventsTable(goals, penalties) {
     get sorted() {
       if (!this.key) return this.filtered;
       const k = this.key, d = this.dir;
-      return [...this.filtered].sort((a, b) => {
-        let va = a[k], vb = b[k];
-        const na = parseFloat(va), nb = parseFloat(vb);
-        if (!isNaN(na) && !isNaN(nb)) { va = na; vb = nb; }
-        else { va = String(va ?? '').toLowerCase(); vb = String(vb ?? '').toLowerCase(); }
-        if (va < vb) return d === 'asc' ? -1 : 1;
-        if (va > vb) return d === 'asc' ?  1 : -1;
-        return 0;
-      });
+      return [...this.filtered].sort((a, b) => cmp(toSortVal(k, a[k]), toSortVal(k, b[k]), d));
     },
     sortBy(k) {
       if (this.key === k) { this.dir = this.dir === 'asc' ? 'desc' : 'asc'; }
