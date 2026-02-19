@@ -993,6 +993,33 @@ def _classify_event(event_type: str) -> str:
     return "other"
 
 
+def _period_from_time(time_str: str) -> str | None:
+    """Derive period label from a 'MM:SS' (or 'MM') clock string.
+
+    0–19:59  → "1"
+    20–39:59 → "2"
+    40–59:59 → "3"
+    60–69:59 → "OT"
+    70+      → "PS"
+    """
+    if not time_str:
+        return None
+    try:
+        parts = str(time_str).split(":")
+        minutes = int(parts[0])
+        if minutes < 20:
+            return "1"
+        if minutes < 40:
+            return "2"
+        if minutes < 60:
+            return "3"
+        if minutes < 70:
+            return "OT"
+        return "PS"
+    except (ValueError, IndexError):
+        return None
+
+
 def get_game_box_score(game_id: int) -> dict:
     """
     Parse game_events for a game and return a structured box score dict.
@@ -1033,7 +1060,7 @@ def get_game_box_score(game_id: int) -> dict:
             ev_type = ev.event_type or ""
             kind = _classify_event(ev_type)
             time_str = raw.get("time") or ev.time or ""
-            period = ev.period
+            period = ev.period or _period_from_time(time_str)
 
             # Determine team label
             team_label = raw.get("team", "")
