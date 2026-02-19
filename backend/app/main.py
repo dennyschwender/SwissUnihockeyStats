@@ -643,7 +643,7 @@ async def admin_scheduler_status(_: None = Depends(require_admin)):
     return {
         "enabled": sched.enabled,
         "queue":   sched.get_schedule(),
-        "history": sched.get_history(50),
+        "history": sched.get_history(200),
     }
 
 

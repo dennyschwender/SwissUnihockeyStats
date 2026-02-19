@@ -718,10 +718,11 @@ async function loadScheduler() {
     renderScheduler(d);
     // Pick up any scheduler-launched jobs not yet tracked in the active jobs panel
     (d.history || []).forEach(h => {
-      if ((h.status === 'running' || h.status === 'pending') && !jobs[h.job_id]) {
-        jobs[h.job_id] = { job_id: h.job_id, label: h.policy + (h.season ? ` S${h.season}` : ''), season: h.season, task: h.task, status: 'running', progress: 0 };
+      if (!jobs[h.job_id]) {
+        const isRunning = h.status === 'running' || h.status === 'pending';
+        jobs[h.job_id] = { job_id: h.job_id, label: h.policy + (h.season ? ` S${h.season}` : ''), season: h.season, task: h.task, status: isRunning ? 'running' : h.status, progress: isRunning ? 0 : 100 };
         renderJobs();
-        pollJob(h.job_id);
+        if (isRunning) pollJob(h.job_id);
       }
     });
   } catch(e) { /* scheduler may not yet be running */ }
@@ -766,7 +767,7 @@ function renderScheduler(d) {
 
   // History
   const tbody = document.getElementById('sched-hist-tbody');
-  tbody.innerHTML = (d.history || []).map(h => {
+  tbody.innerHTML = (d.history || []).slice(0, 50).map(h => {
     const cls = h.status === 'done' ? 's-ok' : h.status === 'error' ? 's-fail' : 's-prog';
     const statsStr = h.stats ? Object.entries(h.stats).map(([k,v])=>`${k}:${fmt(v)}`).join(' ') : '—';
     return `<tr>
@@ -828,7 +829,7 @@ function toggleEl(bodyId, chevId) {
 loadStats();
 loadScheduler();
 setInterval(loadStats, 30000);
-setInterval(loadScheduler, 15000);
+setInterval(loadScheduler, 3000);
 </script>
 </body>
 </html>
