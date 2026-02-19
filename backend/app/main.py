@@ -986,6 +986,45 @@ async def home(request: Request, locale: str, league_category: str = "all"):
     )
 
 
+@app.get("/{locale}/upcoming-games-partial", response_class=HTMLResponse)
+async def upcoming_games_partial(request: Request, locale: str, league_category: str = "all"):
+    """HTMX endpoint for filtered upcoming games"""
+    from app.services.stats_service import get_upcoming_games
+    from app.services.database import get_database_service
+    from app.models.db_models import PlayerStatistics
+    from sqlalchemy import func
+    
+    # Get active season
+    db = get_database_service()
+    with db.session_scope() as session:
+        active_season_row = (
+            session.query(
+                PlayerStatistics.season_id,
+                func.count(PlayerStatistics.id).label('count')
+            )
+            .group_by(PlayerStatistics.season_id)
+            .order_by(func.count(PlayerStatistics.id).desc())
+            .first()
+        )
+        active_season = active_season_row[0] if active_season_row else get_current_season()
+    
+    # Get upcoming games filtered by league category
+    upcoming = get_upcoming_games(
+        limit=12, 
+        league_category=league_category if league_category != "all" else None,
+        season_id=active_season
+    )
+    
+    return templates.TemplateResponse(
+        "partials/upcoming_games_list.html",
+        {
+            "request": request,
+            "locale": locale,
+            "upcoming_games": upcoming,
+        }
+    )
+
+
 @app.get("/{locale}/clubs", response_class=HTMLResponse)
 async def clubs_page(request: Request, locale: str):
     """Clubs listing page"""

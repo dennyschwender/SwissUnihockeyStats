@@ -781,9 +781,11 @@ def get_upcoming_games(
         group_ids = {g.group_id for g in games_raw}
         grp_league: dict = {}
         grp_league_category: dict = {}  # For filtering: league_id_game_class
+        grp_name: dict = {}  # Group name/number
         for grp in session.query(LeagueGroup).filter(LeagueGroup.id.in_(group_ids)).all():
             lg = session.query(League).filter(League.id == grp.league_id).first()
             grp_league[grp.id] = lg.name if lg else ""
+            grp_name[grp.id] = grp.name or grp.text or ""
             if lg:
                 grp_league_category[grp.id] = f"{lg.league_id}_{lg.game_class}"
 
@@ -798,6 +800,7 @@ def get_upcoming_games(
                 "home_team_id": g.home_team_id,
                 "away_team_id": g.away_team_id,
                 "league": grp_league.get(g.group_id, ""),
+                "group_name": grp_name.get(g.group_id, ""),
                 "league_category": grp_league_category.get(g.group_id, ""),
             }
             for g in games_raw

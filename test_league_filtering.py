@@ -30,7 +30,8 @@ print("=" * 80)
 all_games = get_upcoming_games(limit=12, season_id=active_season)
 print(f"Found {len(all_games)} games")
 for i, g in enumerate(all_games, 1):
-    print(f"{i}. {g['date']} {g['time']:5s} | {g['home_team']:30s} vs {g['away_team']:30s} | Category: {g.get('league_category', 'N/A')}")
+    group = f"[{g.get('group_name', 'N/A')}]" if g.get('group_name') else ""
+    print(f"{i}. {g['date']} {g['time']:5s} | {g['home_team']:30s} vs {g['away_team']:30s} | {group:15s} | Category: {g.get('league_category', 'N/A')}")
 
 # Test 2: Filter by specific league category
 print("\n" + "=" * 80)
@@ -39,7 +40,8 @@ print("=" * 80)
 filtered_games = get_upcoming_games(limit=12, league_category='14_19', season_id=active_season)
 print(f"Found {len(filtered_games)} games")
 for i, g in enumerate(filtered_games, 1):
-    print(f"{i}. {g['date']} {g['time']:5s} | {g['home_team']:30s} vs {g['away_team']:30s} | Category: {g.get('league_category', 'N/A')}")
+    group = f"[{g.get('group_name', 'N/A')}]" if g.get('group_name') else ""
+    print(f"{i}. {g['date']} {g['time']:5s} | {g['home_team']:30s} vs {g['away_team']:30s} | {group:15s} | Category: {g.get('league_category', 'N/A')}")
 
 # Test 3: Another league category
 print("\n" + "=" * 80)
@@ -48,7 +50,8 @@ print("=" * 80)
 nlb_games = get_upcoming_games(limit=12, league_category='2_11', season_id=active_season)
 print(f"Found {len(nlb_games)} games")
 for i, g in enumerate(nlb_games, 1):
-    print(f"{i}. {g['date']} {g['time']:5s} | {g['home_team']:30s} vs {g['away_team']:30s} | Category: {g.get('league_category', 'N/A')}")
+    group = f"[{g.get('group_name', 'N/A')}]" if g.get('group_name') else ""
+    print(f"{i}. {g['date']} {g['time']:5s} | {g['home_team']:30s} vs {g['away_team']:30s} | {group:15s} | Category: {g.get('league_category', 'N/A')}")
 
 # Summary
 print("\n" + "=" * 80)

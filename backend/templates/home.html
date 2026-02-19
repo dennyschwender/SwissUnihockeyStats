@@ -44,10 +44,11 @@
       </h2>
       {% if league_filters %}
       <select name="league_category"
-              hx-get="/{{ locale }}"
+              hx-get="/{{ locale }}/upcoming-games-partial"
               hx-trigger="change"
-              hx-target="body"
-              hx-push-url="true"
+              hx-target="#upcoming-games-list"
+              hx-swap="innerHTML"
+              hx-include="[name='league_category']"
               style="padding:.35rem .75rem;border:1px solid var(--gray-200);border-radius:.5rem;font-size:.8rem;background:var(--card-bg);color:var(--text-primary);cursor:pointer;">
         <option value="all" {% if league_category == 'all' %}selected{% endif %}>All Leagues</option>
         {% for league in league_filters %}
@@ -59,19 +60,8 @@
       {% endif %}
     </div>
     
-    <div style="display:flex;flex-direction:column;gap:.4rem;">
-      {% for g in upcoming_games %}
-      <a href="/{{ locale }}/game/{{ g.game_id }}" 
-         style="text-decoration:none;color:inherit;">
-        <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;border-radius:.375rem;font-size:.82rem;"
-             onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
-          <span style="min-width:55px;color:var(--gray-400);font-size:.75rem;">{{ g.weekday }} {{ g.date }}{% if g.time %}<br>{{ g.time }}{% endif %}</span>
-          <span style="flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ g.home_team }}</span>
-          <span style="color:var(--gray-300);padding:0 .25rem;">vs</span>
-          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;">{{ g.away_team }}</span>
-        </div>
-      </a>
-      {% endfor %}
+    <div id="upcoming-games-list" style="display:flex;flex-direction:column;gap:.4rem;">
+      {% include "partials/upcoming_games_list.html" %}
     </div>
   </div>
   {% endif %}
