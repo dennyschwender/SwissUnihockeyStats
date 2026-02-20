@@ -154,37 +154,19 @@
 
 <!-- Teams List -->
 <div id="teams-list" style="margin-top: 2rem;">
-    <div class="cards-grid">
+    {% if teams %}
+    <div class="teams-list">
         {% for team in teams %}
-        <div class="card" style="position: relative; cursor: pointer;" onclick="window.location='/{{ locale }}/team/{{ team.id }}'">
-            <!-- Favorite Button -->
-            <button 
-                @click.stop="toggleFavorite('teams', {{ loop.index }}, `{{ team.text | replace('`', '\\`') }}`, {})"
-                :class="isFavorite('teams', {{ loop.index }}) ? 'active' : 'inactive'"
-                class="favorite-btn favorite-indicator"
-                title="Add to favorites"
-            >⭐</button>
-            
-            <div class="card-icon">👥</div>
-            <h3>{{ team.text }}</h3>
-            {% if team.category or team.league_name %}
-            <p style="margin: 0.4rem 0 0; display: flex; flex-direction: column; gap: 0.2rem;">
-                {% if team.category %}
-                <span style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
-                    color: {% if team.category == 'Men' %}#3b82f6{% elif team.category == 'Women' %}#ec4899{% else %}#8b5cf6{% endif %};">
-                    {{ team.category }}
-                </span>
-                {% endif %}
-                {% if team.league_name %}
-                <span style="font-size: 0.8rem; color: var(--gray-600);">{{ team.league_name }}</span>
-                {% endif %}
-            </p>
-            {% endif %}
-        </div>
+        {% set cat_color = '#3b82f6' if team.category == 'Men' else ('#ec4899' if team.category == 'Women' else '#8b5cf6') %}
+        <a href="/{{ locale }}/team/{{ team.id }}" class="teams-list-row">
+            <span class="teams-list-badge" style="color:{{ cat_color }}">{{ team.category or '—' }}</span>
+            <span class="teams-list-name">{{ team.text }}</span>
+            <span class="teams-list-league">{{ team.league_name or '' }}</span>
+            <span class="teams-list-arrow">›</span>
+        </a>
         {% endfor %}
     </div>
-    
-    {% if not teams %}
+    {% else %}
     <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
         <div class="loading"></div>
         <p style="margin-top: 1rem;">{{ t.common.loading }}</p>
