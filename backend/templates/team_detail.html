@@ -11,9 +11,25 @@
   </div>
   {% endif %}
 
-  <div style="margin-bottom:2rem;">
+  <div style="margin-bottom:1.5rem;">
     <a href="javascript:history.back()" style="color:var(--gray-500);font-size:.875rem;text-decoration:none;">← Back</a>
-    <h1 style="margin:.5rem 0 0;font-size:2rem;font-weight:700;">👥 {{ team.name if team else "Team" }}</h1>
+    <h1 style="margin:.5rem 0 .2rem;font-size:2rem;font-weight:700;">👥 {{ team.name if team else "Team" }}</h1>
+    {% if team and (team.league_name or team.season_name) %}
+    <div style="font-size:.9rem;color:var(--gray-500);display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+      {% if team.league_name %}<span>{{ team.league_name }}</span>{% endif %}
+      {% if team.league_name and team.season_name %}<span style="color:var(--gray-300);">·</span>{% endif %}
+      {% if team.season_name %}<span>{{ team.season_name }}</span>{% endif %}
+    </div>
+    {% endif %}
+    {% if team and team.available_seasons | length > 1 %}
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.75rem;">
+      {% for s in team.available_seasons %}
+      <a href="/{{ locale }}/team/{{ team.id }}?season={{ s.season_id }}"
+        style="padding:.25rem .7rem;border-radius:9999px;font-size:.8rem;font-weight:500;text-decoration:none;border:1px solid;
+               {% if s.season_id == team.season_id %}background:var(--swiss-red,#e11d48);color:white;border-color:var(--swiss-red,#e11d48);{% else %}background:var(--card-bg,white);color:var(--gray-600);border-color:var(--gray-300);{% endif %}">{{ s.season_name }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
   </div>
 
   {% if team %}
@@ -85,6 +101,7 @@
               <th style="{{ th_ctr }}"><button @click="sort('a')" style="{{ btn }}">A<span style="font-size:.7rem;opacity:.55;" x-text="icon('a')"></span></button></th>
               <th style="{{ th_ctr }}font-weight:700;"><button @click="sort('pts')" style="{{ btn }}font-weight:700;">PTS<span style="font-size:.7rem;opacity:.55;" x-text="icon('pts')"></span></button></th>
               <th style="{{ th_ctr }}"><button @click="sort('pim')" style="{{ btn }}">PIM<span style="font-size:.7rem;opacity:.55;" x-text="icon('pim')"></span></button></th>
+              <th style="{{ th_ctr }};font-size:.75rem;color:var(--gray-400);">src</th>
             </tr>
           </thead>
           <tbody>
@@ -100,11 +117,13 @@
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="p.a"></td>
                 <td style="padding:.6rem .75rem;text-align:center;font-weight:700;" x-text="p.pts"></td>
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="p.pim"></td>
+                <td style="padding:.5rem .3rem;text-align:center;font-size:.75rem;color:var(--gray-400);" :title="p.from_games ? 'Seen in game lineups, not in official roster' : 'Official roster'" x-text="p.from_games ? 'G' : ''"></td>
               </tr>
             </template>
           </tbody>
         </table>
         <p x-show="rows.length === 0 && q" style="text-align:center;padding:2rem;color:var(--gray-500);">No players match your search.</p>
+        <p x-show="roster.some(p => p.from_games)" style="font-size:.75rem;color:var(--gray-400);margin-top:.5rem;"><strong>G</strong> = player seen in game lineups but absent from official roster</p>
       </div>
       {% else %}
       <div style="text-align:center;padding:3rem;color:var(--gray-500);">

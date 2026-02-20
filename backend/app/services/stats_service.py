@@ -624,11 +624,37 @@ def get_player_leaderboard(
 def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
     """
     Return dict with: team info, roster (with per-player stats), and recent games.
+    Roster is built from official TeamPlayer index, enriched with game lineup data
+    to fill missing jersey numbers / positions and add unlisted players.
     """
+    _UNKNOWN_POS = {"nicht bekannt", ""}
+
     db = get_database_service()
     with db.session_scope() as session:
+        # All seasons this team_id exists in (for the season selector)
+        all_season_rows = (
+            session.query(Team.season_id, Season.text, Season.highlighted)
+            .join(Season, Team.season_id == Season.id)
+            .filter(Team.id == team_id)
+            .order_by(Team.season_id.desc())
+            .all()
+        )
+        available_seasons = [
+            {
+                "season_id": r[0],
+                "season_name": r[1] or str(r[0]),
+                "is_current": bool(r[2]),
+            }
+            for r in all_season_rows
+        ]
+        valid_season_ids = {r[0] for r in all_season_rows}
+
         if season_id is None:
-            season_id = _get_current_season_id(session)
+            # Prefer the highlighted (current) season; fall back to most recent
+            highlighted = next((r[0] for r in all_season_rows if r[2]), None)
+            season_id = highlighted or (all_season_rows[0][0] if all_season_rows else _get_current_season_id(session))
+        elif season_id not in valid_season_ids and all_season_rows:
+            season_id = all_season_rows[0][0]
 
         team = session.query(Team).filter(
             Team.id == team_id,
@@ -638,7 +664,53 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
         if team is None:
             return {}
 
-        # Roster with stats
+        # Season and league display labels
+        season_row = session.get(Season, season_id)
+        season_name = season_row.text if season_row else str(season_id)
+        league_row = (
+            session.query(League).filter(League.id == team.league_id).first()
+            if team.league_id else None
+        )
+        league_name = (
+            (league_row.name or league_row.text if league_row else None)
+            or team.game_class
+            or ""
+        )
+
+        # ── Step 1: game_players lookup ──────────────────────────────────────
+        # Aggregate all lineup appearances for this team/season so we can:
+        #  a) fill missing jersey/position in the official roster
+        #  b) add players seen in games who are absent from the official roster
+        gp_agg: dict[int, dict] = {}
+        for gp, pl in (
+            session.query(GamePlayer, Player)
+            .join(Player, GamePlayer.player_id == Player.person_id)
+            .filter(
+                GamePlayer.team_id == team_id,
+                GamePlayer.season_id == season_id,
+            )
+            .all()
+        ):
+            pid = pl.person_id
+            if pid not in gp_agg:
+                gp_agg[pid] = {
+                    "player_id": pid,
+                    "name": pl.full_name or f"Player {pid}",
+                    "number": None, "position": None,
+                    "gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0,
+                }
+            entry = gp_agg[pid]
+            if gp.jersey_number and not entry["number"]:
+                entry["number"] = gp.jersey_number
+            if gp.position and gp.position.lower() not in _UNKNOWN_POS and not entry["position"]:
+                entry["position"] = gp.position
+            entry["gp"]  += 1
+            entry["g"]   += gp.goals or 0
+            entry["a"]   += gp.assists or 0
+            entry["pts"] += (gp.goals or 0) + (gp.assists or 0)
+            entry["pim"] += gp.penalty_minutes or 0
+
+        # ── Step 2: official TeamPlayer roster ───────────────────────────────
         roster = []
         roster_source = "official"  # "official" | "games"
         tp_rows = (
@@ -654,8 +726,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
 
         if tp_rows:
             pids = [pl.person_id for _, pl in tp_rows]
-            # Aggregate all stat rows for each player in this season (team_id is not
-            # stored in player_statistics, so we sum across all league entries)
+            # Aggregate PlayerStatistics rows (no team_id stored there)
             player_stat_map: dict[int, dict] = {}
             for ps in (
                 session.query(PlayerStatistics)
@@ -676,12 +747,20 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
 
             for tp, pl in tp_rows:
                 ps = player_stat_map.get(pl.person_id) or {}
+                gp_info = gp_agg.get(pl.person_id, {})
+                # Fill in number / position from game history if blank or unknown
+                number = tp.jersey_number or gp_info.get("number")
+                pos_raw = tp.position or ""
+                position = (
+                    pos_raw if pos_raw.lower() not in _UNKNOWN_POS
+                    else (gp_info.get("position") or "")
+                )
                 roster.append(
                     {
                         "player_id": pl.person_id,
                         "name": pl.full_name or f"Player {pl.person_id}",
-                        "number": tp.jersey_number,
-                        "position": tp.position or "",
+                        "number": number,
+                        "position": position,
                         "gp": ps.get("gp", 0),
                         "g":  ps.get("g", 0),
                         "a":  ps.get("a", 0),
@@ -689,41 +768,43 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                         "pim": ps.get("pim", 0),
                     }
                 )
+
+            # Add players seen in game lineups but absent from the official roster
+            official_pids = {pl.person_id for _, pl in tp_rows}
+            for pid, info in gp_agg.items():
+                if pid not in official_pids:
+                    roster.append(
+                        {
+                            "player_id": pid,
+                            "name": info["name"],
+                            "number": info["number"],
+                            "position": info["position"] or "",
+                            "gp": info["gp"],
+                            "g":  info["g"],
+                            "a":  info["a"],
+                            "pts": info["pts"],
+                            "pim": info["pim"],
+                            "from_games": True,
+                        }
+                    )
         else:
-            # Roster not indexed yet — fall back to players seen in game lineups
+            # Roster not indexed — build entirely from game lineups
             roster_source = "games"
-            gp_rows = (
-                session.query(GamePlayer, Player)
-                .join(Player, GamePlayer.player_id == Player.person_id)
-                .filter(
-                    GamePlayer.team_id == team_id,
-                    GamePlayer.season_id == season_id,
-                )
-                .all()
-            )
-            # Aggregate per player
-            agg: dict[int, dict] = {}
-            for gp, pl in gp_rows:
-                pid = pl.person_id
-                if pid not in agg:
-                    agg[pid] = {
+            for pid, info in gp_agg.items():
+                roster.append(
+                    {
                         "player_id": pid,
-                        "name": pl.full_name or f"Player {pid}",
-                        "number": gp.jersey_number,
-                        "position": gp.position or "",
-                        "gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0,
+                        "name": info["name"],
+                        "number": info["number"],
+                        "position": info["position"] or "",
+                        "gp": info["gp"],
+                        "g":  info["g"],
+                        "a":  info["a"],
+                        "pts": info["pts"],
+                        "pim": info["pim"],
                     }
-                agg[pid]["gp"] += 1
-                agg[pid]["g"]   += gp.goals or 0
-                agg[pid]["a"]   += gp.assists or 0
-                agg[pid]["pts"] += (gp.goals or 0) + (gp.assists or 0)
-                agg[pid]["pim"] += gp.penalty_minutes or 0
-                # Keep most recent jersey/position if set
-                if gp.jersey_number:
-                    agg[pid]["number"] = gp.jersey_number
-                if gp.position:
-                    agg[pid]["position"] = gp.position
-            roster = sorted(agg.values(), key=lambda r: (r["number"] or 99, r["name"]))
+                )
+            roster.sort(key=lambda r: (r["number"] if r["number"] is not None else 99, r["name"]))
 
         # Recent games (last 10 with a score)
         recent_games_raw = (
@@ -780,8 +861,11 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             "id": team.id,
             "name": team.name or team.text or f"Team {team_id}",
             "season_id": season_id,
+            "season_name": season_name,
             "league_id": team.league_id,
+            "league_name": league_name,
             "game_class": team.game_class,
+            "available_seasons": available_seasons,
             "roster": roster,
             "roster_source": roster_source,
             "recent_games": recent_games,
