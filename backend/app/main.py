@@ -1580,8 +1580,13 @@ async def teams_search(request: Request, locale: str, q: str = "", sort: str = "
     """HTMX endpoint for team search"""
     from app.services.stats_service import get_teams_list
 
+    all_seasons = (season == 0)
     league_names = [n.strip() for n in leagues.split(",") if n.strip()] if leagues else None
-    teams = get_teams_list(season_id=season, q=q, sort=sort, league_names=league_names, limit=200)
+    teams = get_teams_list(
+        season_id=None if all_seasons else season,
+        all_seasons=all_seasons,
+        q=q, sort=sort, league_names=league_names, limit=400 if all_seasons else 200
+    )
 
     if not teams and not any([q, league_names]):
         # DB empty — fall back to API cache with basic name filter
@@ -1598,18 +1603,22 @@ async def teams_search(request: Request, locale: str, q: str = "", sort: str = "
     if not teams:
         return HTMLResponse(content='<div style="text-align:center;padding:3rem;color:var(--gray-600);"><p>No teams found matching your filters.</p></div>')
 
-    html = f'<div class="teams-list-meta">{len(teams)} team{"s" if len(teams) != 1 else ""}</div><div class="teams-list">'
+    list_class = "teams-list teams-list--all-seasons" if all_seasons else "teams-list"
+    html = f'<div class="teams-list-meta">{len(teams)} team{"s" if len(teams) != 1 else ""}</div><div class="{list_class}">'
     for team in teams:
-        team_id  = team.get("id", "")
-        name     = team.get("text", "")
-        category = team.get("category") or ""
-        league   = team.get("league_name") or ""
+        team_id   = team.get("id", "")
+        name      = team.get("text", "")
+        category  = team.get("category") or ""
+        league    = team.get("league_name") or ""
+        season_nm = team.get("season_name") or ""
         cat_color = cat_colors.get(category, "var(--gray-400)")
+        season_span = f'<span class="teams-list-season">{season_nm}</span>' if all_seasons else ""
         html += (
             f'<a href="/{locale}/team/{team_id}" class="teams-list-row">'
             f'<span class="teams-list-badge" style="color:{cat_color}">{category or "\u2014"}</span>'
             f'<span class="teams-list-name">{name}</span>'
             f'<span class="teams-list-league">{league}</span>'
+            f'{season_span}'
             f'<span class="teams-list-arrow">\u203a</span>'
             f'</a>'
         )

@@ -301,6 +301,16 @@ html.dark-mode .filter-select { background: var(--bg-secondary); }
   color: var(--gray-500);
   text-align: right;
 }
+.teams-list-season {
+  font-size: .72rem;
+  color: var(--gray-400);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+.teams-list--all-seasons .teams-list-row {
+  grid-template-columns: 4.5rem 1fr auto auto 1.5rem;
+}
 .teams-list-arrow {
   font-size: 1.1rem;
   color: var(--gray-400);

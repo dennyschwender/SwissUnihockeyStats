@@ -176,8 +176,12 @@
             </template>
         </div>
         {% if seasons | length > 1 %}
-        <div style="display:flex; align-items:center; gap:.5rem;">
+        <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
             <span class="filter-label">Season</span>
+            <button
+                @click="season=0; leagues=[]; activeTier='all'; fetch()"
+                :class="season===0 ? 'chip chip-active' : 'chip'"
+            >All Seasons</button>
             {% for s in seasons %}
             <button
                 @click="season={{ s.id }}; leagues=[]; activeTier='all'; fetch()"

@@ -151,27 +151,41 @@ def get_teams_list(
     sort: str = "league",
     league_names: Optional[list] = None,
     limit: int = 200,
+    all_seasons: bool = False,
 ) -> list[dict]:
     """Return teams from DB enriched with league name and category.
 
     sort: 'name' | 'league'
     league_names: list of league name prefixes (OR'd ilike); e.g. ['Herren NLB', 'Damen NLB']
+    all_seasons: if True, return teams across all seasons that have data (includes season_name in results)
     """
     db = get_database_service()
     with db.session_scope() as session:
-        if season_id is None:
-            season_id = _get_current_season_id(session)
-
-        query = (
-            session.query(Team, League)
-            .outerjoin(
-                League,
-                (Team.league_id == League.league_id)
-                & (Team.season_id == League.season_id)
-                & (Team.game_class == League.game_class),
+        if all_seasons:
+            query = (
+                session.query(Team, League, Season)
+                .outerjoin(
+                    League,
+                    (Team.league_id == League.league_id)
+                    & (Team.season_id == League.season_id)
+                    & (Team.game_class == League.game_class),
+                )
+                .join(Season, Team.season_id == Season.id)
             )
-            .filter(Team.season_id == season_id)
-        )
+        else:
+            if season_id is None:
+                season_id = _get_current_season_id(session)
+            query = (
+                session.query(Team, League, Season)
+                .outerjoin(
+                    League,
+                    (Team.league_id == League.league_id)
+                    & (Team.season_id == League.season_id)
+                    & (Team.game_class == League.game_class),
+                )
+                .join(Season, Team.season_id == Season.id)
+                .filter(Team.season_id == season_id)
+            )
 
         # Multi-select league name filter — each value used as ilike prefix
         if league_names:
@@ -185,13 +199,19 @@ def get_teams_list(
             )
 
         if sort == "league":
-            # Sort by tier level first, then league name, then team name
-            query = query.order_by(_tier_order_expr(), func.coalesce(League.name, "~~~~"), Team.name)
+            # Sort by tier level first, then season desc, then league name, then team name
+            order = [_tier_order_expr(), func.coalesce(League.name, "~~~~"), Team.name]
+            if all_seasons:
+                order.insert(1, Season.id.desc())
+            query = query.order_by(*order)
         else:
-            query = query.order_by(Team.name)
+            order = [Team.name]
+            if all_seasons:
+                order.insert(0, Season.id.desc())
+            query = query.order_by(*order)
 
         results = []
-        for team, league in query.limit(limit).all():
+        for team, league, season_row in query.limit(limit).all():
             gc = team.game_class
             category = _GAME_CLASS_LABEL.get(gc, "Mixed" if gc else None)
             results.append(
@@ -200,6 +220,7 @@ def get_teams_list(
                     "text": team.text or team.name or "",
                     "category": category,
                     "league_name": (league.name or league.text) if league else None,
+                    "season_name": (season_row.text or str(season_row.id)) if season_row else None,
                 }
             )
         return results
