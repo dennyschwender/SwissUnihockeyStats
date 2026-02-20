@@ -130,14 +130,12 @@ def get_teams_list(
     season_id: Optional[int] = None,
     q: str = "",
     sort: str = "league",
-    tier: str = "all",
     league_names: Optional[list] = None,
     limit: int = 200,
 ) -> list[dict]:
     """Return teams from DB enriched with league name and category.
 
     sort: 'name' | 'league'
-    tier: 'all' | 'national' | 'liga' | 'youth' | 'senior'
     league_names: list of league name prefixes (OR'd ilike); e.g. ['Herren NLB', 'Damen NLB']
     """
     db = get_database_service()
@@ -165,26 +163,6 @@ def get_teams_list(
         if q:
             query = query.filter(
                 or_(Team.name.ilike(f"%{q}%"), League.name.ilike(f"%{q}%"))
-            )
-
-        # Tier filter based on league name patterns
-        if tier == "national":
-            query = query.filter(
-                or_(League.name.ilike("%NLA%"), League.name.ilike("%NLB%"))
-            )
-        elif tier == "liga":
-            query = query.filter(
-                League.name.ilike("% Liga%"),
-            ).filter(
-                ~League.name.ilike("%Junior%")
-            )
-        elif tier == "youth":
-            query = query.filter(
-                or_(League.name.ilike("%Junioren%"), League.name.ilike("%Juniorinnen%"))
-            )
-        elif tier == "senior":
-            query = query.filter(
-                ~or_(League.name.ilike("%Junioren%"), League.name.ilike("%Juniorinnen%"))
             )
 
         if sort == "league":

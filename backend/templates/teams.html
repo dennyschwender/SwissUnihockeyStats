@@ -29,10 +29,30 @@
      x-data="{
        q: '',
        leagues: [],
-       tier: 'all',
+       activeTier: 'all',
        sort: 'league',
        _t: null,
+       _herren:      ['Herren NLB','Herren L-UPL','Herren 1. Liga','Herren 2. Liga','Herren 3. Liga','Herren 4. Liga','Herren 5. Liga'],
+       _damen:       ['Damen NLB','Damen L-UPL','Damen 1. Liga','Damen 2. Liga','Damen 3. Liga'],
+       _juniorenAll: ['Junioren U21','Junioren U18','Junioren U16','Junioren U14','Junioren A','Junioren B','Junioren C','Junioren D','Junioren E'],
+       _juniorinnenAll: ['Juniorinnen U21','Juniorinnen U17','Juniorinnen A','Juniorinnen B','Juniorinnen C','Juniorinnen D'],
+       get _presets() {
+         return {
+           all:      [],
+           national: ['Herren NLB','Herren L-UPL','Damen NLB','Damen L-UPL'],
+           liga:     ['Herren 1. Liga','Herren 2. Liga','Herren 3. Liga','Herren 4. Liga','Herren 5. Liga',
+                      'Damen 1. Liga','Damen 2. Liga','Damen 3. Liga'],
+           senior:   [...this._herren, ...this._damen],
+           youth:    [...this._juniorenAll, ...this._juniorinnenAll]
+         };
+       },
+       selectTier(t) {
+         this.activeTier = t;
+         this.leagues = [...(this._presets[t] || [])];
+         this.fetch();
+       },
        toggleLeague(v) {
+         this.activeTier = 'all';
          this.leagues = this.leagues.includes(v)
            ? this.leagues.filter(x => x !== v)
            : [...this.leagues, v];
@@ -43,12 +63,11 @@
          const url = '/{{ locale }}/teams/search'
            + '?q='       + encodeURIComponent(this.q)
            + '&leagues=' + encodeURIComponent(this.leagues.join(','))
-           + '&tier='    + this.tier
            + '&sort='    + this.sort;
          this._t = setTimeout(() => htmx.ajax('GET', url, {target:'#teams-list', swap:'innerHTML'}), delay || 0);
        },
        get anyActive() {
-         return this.q !== '' || this.leagues.length > 0 || this.tier !== 'all' || this.sort !== 'league';
+         return this.q !== '' || this.leagues.length > 0 || this.sort !== 'league';
        }
      }">
 
@@ -110,19 +129,19 @@
     <!-- Filter rows -->
     <div style="display:flex; flex-direction:column; gap:.6rem;">
 
-        <!-- Level -->
+        <!-- Level presets -->
         <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
             <span class="filter-label">Level</span>
             <template x-for="opt in [
                 {v:'all',      l:'All'},
                 {v:'national', l:'National (NLA/NLB)'},
                 {v:'liga',     l:'Liga'},
-                {v:'senior',   l:'Senior'},
+                {v:'senior',   l:'Senior (all adult)'},
                 {v:'youth',    l:'Youth (Junioren)'}
             ]" :key="opt.v">
                 <button
-                    @click="tier=opt.v; fetch()"
-                    :class="tier===opt.v ? 'chip chip-active' : 'chip'"
+                    @click="selectTier(opt.v)"
+                    :class="activeTier===opt.v ? 'chip chip-active' : 'chip'"
                     x-text="opt.l">
                 </button>
             </template>
@@ -143,7 +162,7 @@
             </template>
             <button
                 x-show="anyActive"
-                @click="q=''; leagues=[]; tier='all'; sort='league'; fetch()"
+                @click="q=''; leagues=[]; activeTier='all'; sort='league'; fetch()"
                 class="chip"
                 style="margin-left:.5rem; border-color:var(--gray-400); color:var(--gray-500);"
             >✕ Clear</button>
