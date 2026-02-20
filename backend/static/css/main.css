@@ -216,6 +216,39 @@ main {
   margin-top: 3rem;
 }
 
+/* Filter chips */
+.filter-label {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  min-width: 4.5rem;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: .28rem .7rem;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 2rem;
+  font-size: .78rem;
+  font-weight: 600;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color .12s, color .12s, background .12s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.chip:hover { border-color: var(--swiss-red); color: var(--swiss-red); }
+.chip-active { background: var(--swiss-red) !important; border-color: var(--swiss-red) !important; color: #fff !important; }
+.teams-list-meta {
+  font-size: .78rem;
+  color: var(--gray-500);
+  margin-bottom: .5rem;
+}
+
 /* Teams compact list */
 .teams-list {
   display: flex;

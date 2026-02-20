@@ -1570,26 +1570,29 @@ async def teams_page(request: Request, locale: str):
 
 
 @app.get("/{locale}/teams/search", response_class=HTMLResponse)
-async def teams_search(request: Request, locale: str, q: str = "", mode: str = "all", sort: str = "name"):
+async def teams_search(request: Request, locale: str, q: str = "", mode: str = "all", sort: str = "name", tier: str = "all"):
     """HTMX endpoint for team search"""
     from app.services.stats_service import get_teams_list
 
     mode_int = int(mode) if mode.isdigit() else None
-    teams = get_teams_list(q=q, mode=mode_int, sort=sort, limit=50)
+    teams = get_teams_list(q=q, mode=mode_int, sort=sort, tier=tier, limit=200)
 
-    if not teams:
+    if not teams and not any([q, mode_int, tier != "all"]):
         # DB empty — fall back to API cache with basic name filter
         all_teams = await get_cached_teams()
         if q:
             all_teams = [t for t in all_teams if q.lower() in t.get("text", "").lower()]
         teams = [
             {"id": t.get("id"), "text": t.get("text", ""), "category": None, "league_name": None}
-            for t in all_teams[:50]
+            for t in all_teams[:200]
         ]
 
     cat_colors = {"Men": "#3b82f6", "Women": "#ec4899", "Mixed": "#8b5cf6"}
 
-    html = '<div class="teams-list">'
+    if not teams:
+        return HTMLResponse(content='<div style="text-align:center;padding:3rem;color:var(--gray-600);"><p>No teams found matching your filters.</p></div>')
+
+    html = f'<div class="teams-list-meta">{len(teams)} team{"s" if len(teams) != 1 else ""}</div><div class="teams-list">'
     for team in teams:
         team_id  = team.get("id", "")
         name     = team.get("text", "")
@@ -1605,9 +1608,6 @@ async def teams_search(request: Request, locale: str, q: str = "", mode: str = "
             f'</a>'
         )
     html += '</div>'
-
-    if not teams:
-        html = '<div style="text-align: center; padding: 3rem; color: var(--gray-600);"><p>No teams found</p></div>'
 
     return HTMLResponse(content=html)
 

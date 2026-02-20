@@ -97,13 +97,15 @@ def get_teams_list(
     mode: Optional[int] = None,
     q: str = "",
     sort: str = "name",
-    limit: int = 100,
+    tier: str = "all",
+    limit: int = 200,
 ) -> list[dict]:
     """Return teams from DB enriched with league name and category.
 
     Falls back to an empty list when the DB has no teams yet (fresh install).
     mode: 1=Men, 2=Women, 3=Mixed
     sort: 'name' | 'league'
+    tier: 'all' | 'national' | 'liga' | 'youth' | 'senior'
     """
     db = get_database_service()
     with db.session_scope() as session:
@@ -129,7 +131,29 @@ def get_teams_list(
             query = query.filter(Team.game_class.notin_([11, 21]))
 
         if q:
-            query = query.filter(Team.name.ilike(f"%{q}%"))
+            query = query.filter(
+                or_(Team.name.ilike(f"%{q}%"), League.name.ilike(f"%{q}%"))
+            )
+
+        # Tier filter based on league name patterns
+        if tier == "national":
+            query = query.filter(
+                or_(League.name.ilike("%NLA%"), League.name.ilike("%NLB%"))
+            )
+        elif tier == "liga":
+            query = query.filter(
+                League.name.ilike("% Liga%"),
+            ).filter(
+                ~League.name.ilike("%Junior%")
+            )
+        elif tier == "youth":
+            query = query.filter(
+                or_(League.name.ilike("%Junioren%"), League.name.ilike("%Juniorinnen%"))
+            )
+        elif tier == "senior":
+            query = query.filter(
+                ~or_(League.name.ilike("%Junioren%"), League.name.ilike("%Juniorinnen%"))
+            )
 
         if sort == "league":
             # COALESCE so teams without a league sort last
