@@ -383,7 +383,7 @@ def _admin_stats_sync():
     from app.services.database import get_database_service
     from app.models.db_models import (
         Season, Club, Team, Player, TeamPlayer,
-        League, LeagueGroup, Game, GameEvent, PlayerStatistics, SyncStatus
+        League, LeagueGroup, Game, GamePlayer, GameEvent, PlayerStatistics, SyncStatus
     )
     from sqlalchemy import func, text
 
@@ -419,6 +419,7 @@ def _admin_stats_sync():
             "league_groups": safe_count(session.query(func.count(LeagueGroup.id))),
             "games":         safe_count(session.query(func.count(Game.id))),
             "game_events":   safe_count(session.query(func.count(GameEvent.id))),
+            "game_players":  safe_count(session.query(func.count(GamePlayer.id))),
             "player_stats":  safe_count(session.query(func.count(PlayerStatistics.id))),
         }
 
@@ -428,6 +429,7 @@ def _admin_stats_sync():
         tp_by_s      = safe_group_by(TeamPlayer.id,      TeamPlayer.season_id)
         leagues_by_s = safe_group_by(League.id,          League.season_id)
         games_by_s   = safe_group_by(Game.id,            Game.season_id)
+        gp_by_s      = safe_group_by(GamePlayer.id,      GamePlayer.season_id)
         pstats_by_s  = safe_group_by(PlayerStatistics.id, PlayerStatistics.season_id)
 
         try:
@@ -467,6 +469,7 @@ def _admin_stats_sync():
                 "league_groups": groups_by_s.get(sid, 0),
                 "games":         games_by_s.get(sid, 0),
                 "game_events":   events_by_s.get(sid, 0),
+                "game_players":  gp_by_s.get(sid, 0),
                 "player_stats":  pstats_by_s.get(sid, 0),
                 "is_current":    bool(shighlighted),
             }
@@ -507,19 +510,21 @@ async def _submit_job(job_id: str, season: int | None, task: str, force: bool = 
 
 # Task definitions: human label + which tasks it maps to internally
 _TASK_META = {
-    "seasons":      "Index Seasons",
-    "clubs":        "Index Clubs",
-    "teams":        "Index Teams (all clubs)",
-    "players":      "Index Players (all teams)",
-    "clubs_path":   "Index Clubs Path (clubs + teams + players)",
-    "leagues":      "Index Leagues",
-    "groups":       "Index League Groups",
-    "games":        "Index Games",
-    "events":       "Index Game Events (finished games)",
-    "player_stats": "Index Player Statistics",
-    "team_names":   "Backfill Team Names (from rankings API)",
-    "leagues_path": "Index Leagues Path (leagues + groups + games)",
-    "full":         "Full Index (clubs path + leagues path)",
+    "seasons":           "Index Seasons",
+    "clubs":             "Index Clubs",
+    "teams":             "Index Teams (all clubs)",
+    "players":           "Index Players (all teams)",
+    "clubs_path":        "Index Clubs Path (clubs + teams + players)",
+    "leagues":           "Index Leagues",
+    "groups":            "Index League Groups",
+    "games":             "Index Games",
+    "events":            "Index Game Events (finished games)",
+    "player_stats":      "Index Player Statistics",
+    "player_game_stats": "Index Player Game Stats (G/A/PIM per game)",
+    "game_lineups":      "Index Game Lineups (player appearances per game)",
+    "team_names":        "Backfill Team Names (from rankings API)",
+    "leagues_path":      "Index Leagues Path (leagues + groups + games)",
+    "full":              "Full Index (clubs path + leagues path + lineups + game stats)",
 }
 
 
@@ -897,6 +902,38 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             stats["player_stats"] = stats_n
             push("ok", f"Player stats: {stats_n}")
             set_progress(60)
+
+        # ── GAME LINEUPS (standalone — without events) ─────────────────────
+        if task == "game_lineups":
+            from app.services.data_indexer import league_tier
+            effective_tier_gl = max_tier if max_tier != 7 else 3
+            with db_service.session_scope() as s:
+                t_rows = s.query(Team.id, Team.league_id).filter(Team.season_id == season).distinct().all()
+            t_ids = {r[0] for r in t_rows if league_tier(r[1] or 0) <= effective_tier_gl}
+            with db_service.session_scope() as s:
+                game_ids_gl = [
+                    g.id for g in s.query(Game.id).filter(
+                        Game.season_id == season,
+                        Game.home_score.isnot(None),
+                        (Game.home_team_id.in_(t_ids)) | (Game.away_team_id.in_(t_ids)),
+                    ).all()
+                ]
+            total_gl = len(game_ids_gl)
+            push("info", f"Indexing lineups for {total_gl} games (tier ≤ {effective_tier_gl})...")
+            lineup_n2 = 0
+            for i, gid in enumerate(game_ids_gl, 1):
+                lineup_n2 += max(0, indexer.index_game_lineup(gid, season, force=force))
+                set_progress(int(i / total_gl * 95) if total_gl else 99)
+                await asyncio.sleep(0)
+            stats["game_lineups"] = lineup_n2
+            push("ok", f"Game lineups: {lineup_n2}")
+
+        # ── PLAYER GAME STATS (standalone or as part of full) ──────────────
+        if task in ("player_game_stats", "full"):
+            push("info", f"Updating per-game G/A/PIM for season {season}...")
+            pgstats_n = indexer.index_player_game_stats_for_season(season_id=season, force=force)
+            stats["player_game_stats"] = pgstats_n
+            push("ok", f"Player game stats: {pgstats_n}")
 
         # ── LEAGUES ────────────────────────────────────────────────────────
         if task in ("leagues", "groups", "games", "leagues_path", "full"):

@@ -203,6 +203,7 @@
       <div class="chip"><strong id="t-leagues">—</strong> leagues</div>
       <div class="chip"><strong id="t-groups">—</strong> groups</div>
       <div class="chip"><strong id="t-games">—</strong> games</div>
+      <div class="chip"><strong id="t-gp">—</strong> lineups</div>
       <div class="chip"><strong id="t-events">—</strong> events</div>
     </div>
 
@@ -331,6 +332,7 @@ async function loadStats() {
     document.getElementById('t-tp'     ).textContent = fmt(t.team_players);    document.getElementById('t-pstats' ).textContent = fmt(t.player_stats);    document.getElementById('t-leagues').textContent = fmt(t.leagues);
     document.getElementById('t-groups' ).textContent = fmt(t.league_groups);
     document.getElementById('t-games'  ).textContent = fmt(t.games);
+    document.getElementById('t-gp'     ).textContent = fmt(t.game_players);
     document.getElementById('t-events' ).textContent = fmt(t.game_events);
 
     renderSeasons(d.by_season || []);
@@ -372,6 +374,7 @@ function buildSeasonCard(s, isOpen) {
     schip(s.leagues,       'leagues'),
     schip(s.league_groups, 'groups'),
     schip(s.games,         'games'),
+    schip(s.game_players,  'lineups'),
     schip(s.game_events,   'events'),
   ].join('');
 
@@ -387,8 +390,10 @@ function buildSeasonCard(s, isOpen) {
     <div class="task-group-label">Clubs Path</div>
     ${trow(sid,'clubs',   'Clubs',                 [p(s.clubs,'clubs')])}
     ${trow(sid,'teams',   'Teams (per club)',       [p(s.clubs,'clubs'),       p(s.teams,'teams')])}
-    ${trow(sid,'players',      'Players (per team)',     [p(s.teams,'teams'),       p(s.team_players,'roster')])}
-    ${trow(sid,'player_stats', 'Player Statistics',      [p(s.team_players,'roster'), p(s.player_stats,'stats')])}
+    ${trow(sid,'players',          'Players (per team)',        [p(s.teams,'teams'),          p(s.team_players,'roster')])}
+    ${trow(sid,'player_stats',      'Player Statistics',         [p(s.team_players,'roster'),  p(s.player_stats,'stats')])}
+    ${trow(sid,'game_lineups',      'Game Lineups',              [p(s.games,'games'),          p(s.game_players,'lineups')])}
+    ${trow(sid,'player_game_stats', 'Player Game Stats (G/A/PIM)',[p(s.game_players,'lineups'), p(s.player_stats,'stats')])}
 
     <div class="task-group-label">Leagues Path</div>
     ${trow(sid,'leagues', 'Leagues',                [p(s.leagues,'leagues')])}
