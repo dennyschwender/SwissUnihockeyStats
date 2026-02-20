@@ -1110,6 +1110,9 @@ def get_player_detail(person_id: int) -> dict:
                 "score": score_str,
                 "result": result_label,
                 "season_id": g.season_id,
+                "g": gp.goals or 0,
+                "a": gp.assists or 0,
+                "pim": gp.penalty_minutes or 0,
             })
 
         result = {

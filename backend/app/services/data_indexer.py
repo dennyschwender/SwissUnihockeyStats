@@ -1412,7 +1412,124 @@ class DataIndexer:
         logger.info(f"=== CLUBS PATH indexing complete ===")
         logger.info(f"Stats: {stats}")
         return stats
-    
+
+    # ==================== PLAYER GAME STATS PATH ====================
+
+    def index_player_game_stats(self, player_id: int, season_id: int, force: bool = False) -> int:
+        """Update game_players.goals/assists/penalty_minutes for one player using
+        GET /api/players/:id/overview (per-game breakdown).
+
+        Overview cell layout (0-indexed):
+          0 – date, 1 – location, 2 – status/time,
+          3 – home team, 4 – away team, 5 – score,
+          6 – goals (T), 7 – assists (A), 8 – points (P), 9 – penalty minutes (SM)
+
+        Returns the number of game_players rows updated.
+        """
+        entity_id = f"player_game_stats:{player_id}:{season_id}"
+        if not force and not self._should_update("player_game_stats", entity_id, max_age_hours=4):
+            return 0
+
+        try:
+            data = self.client.get_player_overview(player_id, season=season_id)
+            regions = data.get("data", {}).get("regions", [])
+        except Exception as exc:
+            logger.debug("Could not fetch overview for player %s: %s", player_id, exc)
+            return 0
+
+        # Build mapping: game_id -> (goals, assists, pim)
+        game_stats: dict[int, tuple[int, int, int]] = {}
+        for region in regions:
+            for row in region.get("rows", []):
+                row_id = row.get("id")
+                if not row_id:
+                    continue
+                cells = row.get("cells", [])
+                if len(cells) < 10:
+                    continue
+
+                def _txt(idx, _c=cells):
+                    v = _c[idx].get("text") if len(_c) > idx else None
+                    if isinstance(v, list):
+                        v = v[0] if v else None
+                    return (v or "").strip()
+
+                # Skip rows where player did not play
+                if _txt(6) in ("Nicht gespielt", ""):
+                    continue
+
+                def _int(idx, _c=cells):
+                    try:
+                        return int(_txt(idx, _c))
+                    except (ValueError, TypeError):
+                        return 0
+
+                game_stats[row_id] = (_int(6), _int(7), _int(9))  # goals, assists, pim
+
+        if not game_stats:
+            return 0
+
+        updated = 0
+        with self.db_service.session_scope() as session:
+            try:
+                for game_id, (goals, assists, pim) in game_stats.items():
+                    n = (
+                        session.query(GamePlayer)
+                        .filter(
+                            GamePlayer.game_id == game_id,
+                            GamePlayer.player_id == player_id,
+                        )
+                        .update({"goals": goals, "assists": assists, "penalty_minutes": pim})
+                    )
+                    updated += n or 0
+                session.commit()
+                if updated:
+                    self._mark_sync_complete(session, "player_game_stats", entity_id, updated)
+            except Exception as exc:
+                logger.error("Failed updating game stats for player %s: %s", player_id, exc, exc_info=True)
+        return updated
+
+    def index_player_game_stats_for_season(self, season_id: int, force: bool = False) -> int:
+        """Update game_players G/A/PIM for all known players in a season.
+
+        Iterates every player active in the season (from team_players union
+        game_players) and calls index_player_game_stats() for each.
+        Returns total game_players rows updated.
+        """
+        entity_id = f"season_game_stats:{season_id}"
+        if not force and not self._should_update("player_game_stats_season", entity_id, max_age_hours=4):
+            return 0
+
+        with self.db_service.session_scope() as session:
+            tp_ids = {
+                r[0] for r in
+                session.query(TeamPlayer.player_id)
+                .filter(TeamPlayer.season_id == season_id)
+                .distinct().all()
+            }
+            gp_ids = {
+                r[0] for r in
+                session.query(GamePlayer.player_id)
+                .filter(GamePlayer.season_id == season_id)
+                .distinct().all()
+            }
+            player_ids = list(tp_ids | gp_ids)
+
+        if not player_ids:
+            logger.info("No players found for season %s", season_id)
+            return 0
+
+        logger.info("Updating per-game G/A/PIM for %d players in season %s...", len(player_ids), season_id)
+        total = 0
+        for pid in player_ids:
+            n = self.index_player_game_stats(pid, season_id=season_id, force=force)
+            total += n
+
+        with self.db_service.session_scope() as session:
+            self._mark_sync_complete(session, "player_game_stats_season", entity_id, total)
+        logger.info("\u2713 Updated %d game_players rows with G/A/PIM for season %s", total, season_id)
+        return total
+
     def get_indexing_stats(self) -> Dict[str, Any]:
         """Get current indexing statistics
         

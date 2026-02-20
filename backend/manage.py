@@ -168,6 +168,17 @@ def index_player_stats(season: int, force: bool):
 
 @cli.command()
 @click.option("--season", default=2025, help="Season ID")
+@click.option("--force", is_flag=True, default=False, help="Force re-index even if recently synced")
+def index_player_game_stats(season: int, force: bool):
+    """Update game_players G/A/PIM for all known players using the overview API."""
+    click.echo(f"Updating per-game G/A/PIM for season {season} (force={force})...")
+    indexer = get_data_indexer()
+    count = indexer.index_player_game_stats_for_season(season_id=season, force=force)
+    click.echo(f"✓ Updated {count} game_players rows with G/A/PIM")
+
+
+@cli.command()
+@click.option("--season", default=2025, help="Season ID")
 @click.option("--max-tier", default=3, help="Max league tier to include (default: 3)")
 @click.option("--force", is_flag=True, default=False, help="Force re-index even if recently synced")
 def index_game_lineups(season: int, max_tier: int, force: bool):

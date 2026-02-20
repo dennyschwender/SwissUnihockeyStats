@@ -100,6 +100,10 @@
             <th style="padding:.6rem .35rem;text-align:center;font-size:.75rem;color:var(--gray-500);">H/A</th>
             <th style="padding:.6rem .75rem;text-align:left;">Opponent</th>
             <th style="padding:.6rem .75rem;text-align:center;font-weight:700;">Result</th>
+            <th style="padding:.6rem .5rem;text-align:center;">G</th>
+            <th style="padding:.6rem .5rem;text-align:center;">A</th>
+            <th style="padding:.6rem .5rem;text-align:center;">Pts</th>
+            <th style="padding:.6rem .5rem;text-align:center;">PIM</th>
           </tr>
         </thead>
         <tbody>
@@ -123,6 +127,10 @@
               <span style="color:var(--gray-400);">–</span>
               {% endif %}
             </td>
+            <td style="padding:.6rem .5rem;text-align:center;">{{ g.g if g.g else '–' }}</td>
+            <td style="padding:.6rem .5rem;text-align:center;">{{ g.a if g.a else '–' }}</td>
+            <td style="padding:.6rem .5rem;text-align:center;font-weight:{% if g.g or g.a %}600{% else %}400{% endif %};">{{ (g.g + g.a) if (g.g or g.a) else '–' }}</td>
+            <td style="padding:.6rem .5rem;text-align:center;color:{% if g.pim %}#dc2626{% else %}inherit{% endif %};">{{ g.pim if g.pim else '–' }}</td>
           </tr>
           {% endfor %}
         </tbody>
