@@ -991,17 +991,43 @@ def get_player_detail(person_id: int) -> dict:
     Return player profile + per-season stats across all seasons.
     Uses team_name / league_abbrev text columns (populated since schema migration).
     """
+    from app.services.data_indexer import LEAGUE_TIERS
+    _DEFAULT_TIER = 99
+    _STRIP_PREFIXES = ("herren ", "damen ", "junioren ", "juniorinnen ",
+                       "junioren/-innen ", "senioren ")
+
     db = get_database_service()
     with db.session_scope() as session:
         player = session.query(Player).filter(Player.person_id == person_id).first()
         if player is None:
             return {}
 
+        # Build a league-name-abbreviation → tier lookup so career rows can be
+        # sorted by tier within each season (best league first).
+        # PlayerStatistics stores a short name like "NLB" or "U21 B" derived from
+        # the API stats page; League.name stores the full name like "Herren NLB".
+        # We strip common gender/age prefixes to produce the short form.
+        abbrev_tier: dict[str, int] = {}
+        for (lname, lid) in (
+            session.query(League.name, League.league_id).distinct().all()
+        ):
+            if not lname:
+                continue
+            t = LEAGUE_TIERS.get(lid, _DEFAULT_TIER)
+            short = lname
+            for pfx in _STRIP_PREFIXES:
+                if short.lower().startswith(pfx):
+                    short = short[len(pfx):]
+                    break
+            # Store both full name and short name; keep the best (lowest) tier
+            for key in (lname, short):
+                if key not in abbrev_tier or abbrev_tier[key] > t:
+                    abbrev_tier[key] = t
+
         stats_rows = (
             session.query(PlayerStatistics, Season)
             .join(Season, PlayerStatistics.season_id == Season.id)
             .filter(PlayerStatistics.player_id == person_id)
-            .order_by(Season.id.desc())
             .all()
         )
 
@@ -1019,8 +1045,14 @@ def get_player_detail(person_id: int) -> dict:
                     "a": ps.assists,
                     "pts": ps.points,
                     "pim": ps.penalty_minutes,
+                    "_tier": abbrev_tier.get(ps.league_abbrev or "", _DEFAULT_TIER),
                 }
             )
+
+        # Sort: most recent season first, then by tier (best league first) within season
+        career.sort(key=lambda r: (-r["season_id"], r["_tier"]))
+        for r in career:
+            r.pop("_tier", None)
 
         # Career totals
         totals = {
@@ -1031,7 +1063,7 @@ def get_player_detail(person_id: int) -> dict:
             "pim": sum(r["pim"] for r in career),
         }
 
-        return {
+        result = {
             "person_id": player.person_id,
             "name": player.full_name or f"Player {player.person_id}",
             "first_name": player.first_name or "",
@@ -1039,7 +1071,24 @@ def get_player_detail(person_id: int) -> dict:
             "year_of_birth": player.year_of_birth,
             "career": career,
             "totals": totals,
+            "photo_url": None,
         }
+
+    # Fetch photo URL from API outside the DB session (HTTP call)
+    try:
+        from app.services.swissunihockey import get_swissunihockey_client
+        client = get_swissunihockey_client()
+        api_data = client.get_player_details(person_id)
+        regions = api_data.get("data", {}).get("regions", [])
+        if regions:
+            cells = regions[0].get("rows", [{}])[0].get("cells", [])
+            if cells:
+                img = cells[0].get("image", {})
+                result["photo_url"] = img.get("url") or None
+    except Exception:
+        pass
+
+    return result
 
 
 # ---------------------------------------------------------------------------
