@@ -108,26 +108,34 @@ def backfill_team_names(season: int, force: bool):
 
 @cli.command()
 @click.option("--season", default=2025, help="Season ID")
-@click.option("--league-ids", default=None, help="Comma-separated league DB IDs to index (e.g. 1,2,3). Default: all leagues in season.")
-@click.option("--max-tier", default=7, help="Max league tier to index (1=NLA/L-UPL only, 2=+NLB, 3=+1.Liga … 7=all). Default: 7 (all).")
+@click.option("--team-id", default=None, type=int, help="Index a single team only")
+@click.option("--league-ids", default=None, help="Comma-separated league DB IDs (e.g. 1,2,3). Default: all.")
+@click.option("--max-tier", default=7, help="Max league tier (1=NLA, 2=+NLB, 3=+1.Liga … 7=all). Default: 7.")
 @click.option("--force", is_flag=True, default=False, help="Force re-index even if recently synced")
-def index_team_rosters(season: int, league_ids: str, max_tier: int, force: bool):
-    """Index player rosters for all teams filtered by league tier.
+def index_team_rosters(season: int, team_id: int, league_ids: str, max_tier: int, force: bool):
+    """Index player rosters for teams.
 
     Tier reference: 1=NLA/L-UPL, 2=NLB, 3=1.Liga, 4=2.Liga,
-    5=3.Liga, 6=4./5.Liga, 7=Youth/Regional
+    5=3.Liga, 6=4./5.Liga, 7=Youth/Regional.
+
+    With --team-id: updates a single team immediately (ignores --max-tier/--league-ids).
     """
     from app.services.database import get_database_service
     from app.models.db_models import Team, League
     from app.services.data_indexer import league_tier
 
-    click.echo(f"Indexing team rosters for season {season} (tier ≤ {max_tier}, force={force})...")
     db = get_database_service()
     indexer = get_data_indexer()
 
+    if team_id:
+        click.echo(f"Indexing roster for team {team_id}, season {season}...")
+        n = indexer.index_players_for_team(team_id=team_id, season_id=season, force=force)
+        click.echo(f"✓ {n} players indexed")
+        return
+
+    click.echo(f"Indexing team rosters for season {season} (tier ≤ {max_tier}, force={force})...")
     with db.session_scope() as session:
         if league_ids:
-            # Filter by explicit league DB IDs
             ids = [int(x.strip()) for x in league_ids.split(",")]
             rows = (
                 session.query(Team.id)
@@ -139,83 +147,207 @@ def index_team_rosters(season: int, league_ids: str, max_tier: int, force: bool)
             )
             team_ids = sorted(r[0] for r in rows)
         else:
-            # Filter by tier using Team.league_id (API league_id)
             rows = session.query(Team.id, Team.league_id).filter(Team.season_id == season).distinct().all()
             team_ids = sorted(r[0] for r in rows if league_tier(r[1] or 0) <= max_tier)
 
     click.echo(f"Found {len(team_ids)} teams (tier ≤ {max_tier}). Indexing rosters...")
-
     total = 0
     for i, tid in enumerate(team_ids, 1):
         n = indexer.index_players_for_team(team_id=tid, season_id=season, force=force)
         total += n
         if n > 0 or i % 20 == 0:
             click.echo(f"  [{i}/{len(team_ids)}] Team {tid}: {n} players")
-
     click.echo(f"\n✓ Total players indexed: {total}")
 
 
 @cli.command()
 @click.option("--season", default=2025, help="Season ID")
+@click.option("--player-id", default=None, type=int, help="Index a single player only (person_id)")
 @click.option("--force", is_flag=True, default=False, help="Force re-index even if recently synced")
-def index_player_stats(season: int, force: bool):
-    """Index player statistics for all known players in a season."""
-    click.echo(f"Indexing player stats for season {season} (force={force})...")
+def index_player_stats(season: int, player_id: int, force: bool):
+    """Index player statistics from /api/players/:id/statistics.
+
+    Without --player-id: processes every known player in the season (~1 API call/player).
+    With --player-id: updates a single player immediately.
+    """
     indexer = get_data_indexer()
-    count = indexer.index_player_stats_for_season(season_id=season, force=force)
-    click.echo(f"✓ Indexed {count} player stat rows")
+    if player_id:
+        click.echo(f"Indexing stats for player {player_id}, season {season}...")
+        count = indexer.index_player_stats_one(player_id=player_id, season_id=season, force=force)
+        click.echo(f"✓ {count} stat rows upserted")
+    else:
+        click.echo(f"Indexing player stats for season {season} (force={force})...")
+        count = indexer.index_player_stats_for_season(season_id=season, force=force)
+        click.echo(f"✓ Indexed {count} player stat rows")
 
 
 @cli.command()
 @click.option("--season", default=2025, help="Season ID")
+@click.option("--player-id", default=None, type=int, help="Update a single player only (person_id)")
 @click.option("--force", is_flag=True, default=False, help="Force re-index even if recently synced")
-def index_player_game_stats(season: int, force: bool):
-    """Update game_players G/A/PIM for all known players using the overview API."""
-    click.echo(f"Updating per-game G/A/PIM for season {season} (force={force})...")
+def index_player_game_stats(season: int, player_id: int, force: bool):
+    """Update game_players G/A/PIM from /api/players/:id/overview.
+
+    Without --player-id: processes every known player in the season.
+    With --player-id: updates a single player immediately.
+    """
     indexer = get_data_indexer()
-    count = indexer.index_player_game_stats_for_season(season_id=season, force=force)
-    click.echo(f"✓ Updated {count} game_players rows with G/A/PIM")
+    if player_id:
+        click.echo(f"Updating per-game G/A/PIM for player {player_id}, season {season}...")
+        count = indexer.index_player_game_stats(player_id=player_id, season_id=season, force=force)
+        click.echo(f"✓ Updated {count} game_players rows")
+    else:
+        click.echo(f"Updating per-game G/A/PIM for season {season} (force={force})...")
+        count = indexer.index_player_game_stats_for_season(season_id=season, force=force)
+        click.echo(f"✓ Updated {count} game_players rows with G/A/PIM")
 
 
 @cli.command()
 @click.option("--season", default=2025, help="Season ID")
+@click.option("--game-id", default=None, type=int, help="Index a single game only")
+@click.option("--since", default=None, help="Only process games on or after this date (YYYY-MM-DD)")
 @click.option("--max-tier", default=3, help="Max league tier to include (default: 3)")
 @click.option("--force", is_flag=True, default=False, help="Force re-index even if recently synced")
-def index_game_lineups(season: int, max_tier: int, force: bool):
-    """Index home+away player lineups for all scored games in a season."""
+def index_game_lineups(season: int, game_id: int, since: str, max_tier: int, force: bool):
+    """Index home+away player lineups for scored games.
+
+    With --game-id: updates a single game immediately.
+    With --since YYYY-MM-DD: only processes games played on or after that date
+      (useful for incremental nightly runs).
+    Without either: processes all scored games in the season up to --max-tier.
+    """
     from app.services.database import get_database_service
     from app.models.db_models import Game, Team
     from app.services.data_indexer import league_tier
-    click.echo(f"Indexing game lineups for season {season} (max_tier={max_tier}, force={force})...")
+    from datetime import date as date_type
+
     indexer = get_data_indexer()
     db = get_database_service()
+
+    if game_id:
+        click.echo(f"Indexing lineup for game {game_id} (season {season})...")
+        n = indexer.index_game_lineup(game_id, season_id=season, force=force)
+        click.echo(f"✓ {n} game-player rows indexed")
+        return
+
+    since_date = None
+    if since:
+        try:
+            since_date = date_type.fromisoformat(since)
+        except ValueError:
+            click.echo(f"ERROR: --since must be YYYY-MM-DD, got '{since}'", err=True)
+            raise SystemExit(1)
+
+    click.echo(f"Indexing game lineups for season {season} (max_tier={max_tier}"
+               + (f", since={since}" if since_date else "") + f", force={force})...")
+
     total = 0
     skipped = 0
     with db.session_scope() as session:
-        # Collect team IDs in leagues up to max_tier
         rows = session.query(Team.id, Team.league_id).filter(Team.season_id == season).distinct().all()
         team_ids = {r[0] for r in rows if league_tier(r[1] or 0) <= max_tier}
 
-        games = (
+        q = (
             session.query(Game.id)
             .filter(
                 Game.season_id == season,
                 Game.home_score.isnot(None),
                 (Game.home_team_id.in_(team_ids)) | (Game.away_team_id.in_(team_ids)),
             )
-            .all()
         )
-        game_ids = [g.id for g in games]
+        if since_date:
+            q = q.filter(Game.game_date >= since_date)
+        game_ids = [g.id for g in q.all()]
 
     click.echo(f"  Found {len(game_ids)} scored games to process...")
-    for game_id in game_ids:
-        n = indexer.index_game_lineup(game_id, season_id=season, force=force)
+    for gid in game_ids:
+        n = indexer.index_game_lineup(gid, season_id=season, force=force)
         if n > 0:
             total += n
         else:
             skipped += 1
 
     click.echo(f"✓ Indexed {total} game-player rows ({skipped} games skipped/cached)")
+
+
+@cli.command()
+@click.option("--season", default=2025, help="Season ID")
+@click.option("--max-tier", default=3, help="Max league tier (1=NLA, 2=+NLB, 3=+1.Liga). Default: 3.")
+@click.option("--force", is_flag=True, default=False, help="Force re-index even if recently synced")
+def full_sync(season: int, max_tier: int, force: bool):
+    """Run the complete indexing pipeline for a season in dependency order.
+
+    Step order (each step depends on the previous):
+
+    \b
+      1. index-seasons          (anchor for all season-scoped queries)
+      2. index-leagues           (league hierarchy)
+      3. index-leagues-path      (groups + games, no events)
+      4. index-clubs-path        (clubs → teams → official rosters)
+      5. index-team-rosters      (per-team player lists, tier ≤ max-tier)
+      6. index-game-lineups      (player-game rows, tier ≤ max-tier)
+      7. index-player-stats      (aggregate stats per player per league)
+      8. index-player-game-stats (per-game G/A/PIM from overview API)
+
+    Run individual steps for faster incremental refreshes.
+    """
+    click.echo(f"\n{'='*55}")
+    click.echo(f"  Full sync  season={season}  max_tier={max_tier}  force={force}")
+    click.echo(f"{'='*55}\n")
+
+    indexer = get_data_indexer()
+
+    def step(label, fn, *args, **kwargs):
+        click.echo(f"[{label}] starting...")
+        result = fn(*args, **kwargs)
+        click.echo(f"[{label}] done → {result}")
+        return result
+
+    from app.services.data_indexer import league_tier
+    from app.services.database import get_database_service
+    from app.models.db_models import Team, Game
+
+    step("1/8 seasons",     indexer.index_seasons, force=force)
+    step("2/8 leagues",     indexer.index_leagues, season_id=season, force=force)
+    step("3/8 leagues-path", indexer.index_leagues_path,
+         season_id=season, index_games=True, index_events=False, force=force)
+    step("4/8 clubs-path",  indexer.index_current_season_clubs_path, season_id=season)
+
+    db = get_database_service()
+    with db.session_scope() as session:
+        rows = session.query(Team.id, Team.league_id).filter(Team.season_id == season).distinct().all()
+        team_ids = sorted(r[0] for r in rows if league_tier(r[1] or 0) <= max_tier)
+
+    click.echo(f"[5/8 team-rosters] {len(team_ids)} teams (tier ≤ {max_tier})...")
+    roster_total = 0
+    for i, tid in enumerate(team_ids, 1):
+        roster_total += indexer.index_players_for_team(team_id=tid, season_id=season, force=force)
+    click.echo(f"[5/8 team-rosters] done → {roster_total} players")
+
+    with db.session_scope() as session:
+        team_id_set = set(team_ids)
+        game_ids = [
+            g.id for g in
+            session.query(Game.id)
+            .filter(
+                Game.season_id == season,
+                Game.home_score.isnot(None),
+                (Game.home_team_id.in_(team_id_set)) | (Game.away_team_id.in_(team_id_set)),
+            ).all()
+        ]
+
+    click.echo(f"[6/8 game-lineups] {len(game_ids)} games...")
+    lineup_total = 0
+    for gid in game_ids:
+        lineup_total += max(0, indexer.index_game_lineup(gid, season_id=season, force=force))
+    click.echo(f"[6/8 game-lineups] done → {lineup_total} game-player rows")
+
+    step("7/8 player-stats",     indexer.index_player_stats_for_season,  season_id=season, force=force)
+    step("8/8 player-game-stats", indexer.index_player_game_stats_for_season, season_id=season, force=force)
+
+    click.echo(f"\n{'='*55}")
+    click.echo("  Full sync complete.")
+    click.echo(f"{'='*55}\n")
 
 
 @cli.command()

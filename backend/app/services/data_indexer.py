@@ -474,12 +474,24 @@ class DataIndexer:
                 self._mark_sync_failed(session, "players", entity_id, str(e))
                 return 0
     
-    def index_player_stats_for_season(self, season_id: int, force: bool = False) -> int:
-        """Index player statistics for every known player in a season.
+    # ------------------------------------------------------------------
+    # Internal helper shared by both the single-player and full-season
+    # stats indexing paths.
+    # ------------------------------------------------------------------
 
-        Calls GET /api/players/:player_id/statistics for each player that has a
-        roster entry in this season and upserts into the player_statistics table.
-        Rows whose season label doesn't match the requested season_id are skipped.
+    def _upsert_player_stats_from_api(
+        self,
+        person_id: int,
+        season_id: int,
+        season_label: str,
+        session,
+        staged: dict,
+    ) -> int:
+        """Fetch /api/players/:id/statistics and upsert matching rows.
+
+        Uses the caller-supplied session so it can be embedded in a larger
+        transaction (season loop) or a standalone one (single-player call).
+        Returns the number of rows upserted for this player.
 
         Cell layout (0-indexed):
           0 – season text (e.g. "2025/26")
@@ -492,24 +504,129 @@ class DataIndexer:
           7 – 2-min penalties
           8 – 5-min penalties
           9 – 10-min penalties
-          10 – match penalties
+         10 – match penalties
         """
+        try:
+            stats_data = self.client.get_player_stats(person_id)
+        except Exception as exc:
+            logger.debug("Could not fetch stats for player %s: %s", person_id, exc)
+            return 0
+
+        regions = stats_data.get("data", {}).get("regions", [])
+        count = 0
+        for region in regions:
+            for row in region.get("rows", []):
+                cells = row.get("cells", [])
+                if len(cells) < 4:
+                    continue
+
+                def _txt(idx, _c=cells):
+                    v = _c[idx].get("text") if len(_c) > idx else None
+                    if isinstance(v, list):
+                        v = v[0] if v else None
+                    return (v or "").strip()
+
+                def _int(idx, _c=cells):
+                    try:
+                        return int(_txt(idx, _c))
+                    except (ValueError, TypeError):
+                        return 0
+
+                row_season = _txt(0)
+                if season_label and row_season != season_label:
+                    continue
+
+                league_abbrev   = _txt(1)
+                team_name_txt   = _txt(2)
+                games_played    = _int(3)
+                goals           = _int(4)
+                assists         = _int(5)
+                points          = _int(6)
+                penalty_minutes = _int(7) * 2 + _int(8) * 5 + _int(9) * 10
+                now             = datetime.now(timezone.utc)
+                key             = (person_id, season_id, league_abbrev)
+
+                def _apply(obj):
+                    obj.league_abbrev   = league_abbrev
+                    obj.team_name       = team_name_txt
+                    obj.games_played    = games_played
+                    obj.goals           = goals
+                    obj.assists         = assists
+                    obj.points          = points
+                    obj.penalty_minutes = penalty_minutes
+                    obj.last_updated    = now
+
+                if key in staged:
+                    _apply(staged[key])
+                    count += 1
+                    continue
+
+                with session.no_autoflush:
+                    existing = (
+                        session.query(PlayerStatistics)
+                        .filter(
+                            PlayerStatistics.player_id == person_id,
+                            PlayerStatistics.season_id == season_id,
+                            PlayerStatistics.league_abbrev == league_abbrev,
+                        ).first()
+                    )
+
+                if existing:
+                    _apply(existing)
+                    staged[key] = existing
+                else:
+                    obj = PlayerStatistics(
+                        player_id       = person_id,
+                        season_id       = season_id,
+                        league_abbrev   = league_abbrev,
+                        team_name       = team_name_txt,
+                        games_played    = games_played,
+                        goals           = goals,
+                        assists         = assists,
+                        points          = points,
+                        penalty_minutes = penalty_minutes,
+                        last_updated    = now,
+                    )
+                    session.add(obj)
+                    staged[key] = obj
+                count += 1
+        return count
+
+    def index_player_stats_one(self, player_id: int, season_id: int, force: bool = False) -> int:
+        """Index statistics for a single player in one season.
+
+        Useful for targeted refreshes (e.g. after a game) without running the
+        full season sweep.  Returns the number of stat rows upserted.
+        """
+        entity_id = f"player:{player_id}:{season_id}"
+        if not force and not self._should_update("player_stats_one", entity_id, max_age_hours=1):
+            return 0
+
+        from app.models.db_models import Season as SeasonModel
+        with self.db_service.session_scope() as session:
+            season_row = session.get(SeasonModel, season_id)
+            season_label = season_row.text if season_row and season_row.text else str(season_id)
+            staged: dict[tuple, PlayerStatistics] = {}
+            count = self._upsert_player_stats_from_api(player_id, season_id, season_label, session, staged)
+            session.commit()
+            if count:
+                self._mark_sync_complete(session, "player_stats_one", entity_id, count)
+        return count
+
+    def index_player_stats_for_season(self, season_id: int, force: bool = False) -> int:
+        """Index player statistics for every known player in a season."""
         entity_id = f"season:{season_id}"
         if not force and not self._should_update("player_stats", entity_id, max_age_hours=4):
             return 0
 
-        logger.info(f"Indexing player stats for season {season_id}...")
+        logger.info("Indexing player stats for season %s...", season_id)
 
         with self.db_service.session_scope() as session:
             try:
-                # Resolve the human-readable season label used in API rows (e.g. "2025/26")
-                from app.models.db_models import Season as SeasonModel
+                from app.models.db_models import Season as SeasonModel, GamePlayer as _GamePlayer
                 season_row = session.get(SeasonModel, season_id)
                 season_label = season_row.text if season_row and season_row.text else str(season_id)
 
-                # Collect all player IDs active in this season:
-                # official roster + players seen in game lineups (stubs)
-                from app.models.db_models import GamePlayer as _GamePlayer
                 tp_ids = {
                     r[0] for r in
                     session.query(TeamPlayer.player_id)
@@ -529,98 +646,11 @@ class DataIndexer:
                     return 0
 
                 count = 0
-                # staged tracks objects added in this session but not yet flushed,
-                # keyed by (player_id, season_id, league_abbrev).  Without this,
-                # a duplicate within a single player's API response would cause
-                # autoflush to attempt a second INSERT and hit the UNIQUE constraint.
                 staged: dict[tuple, PlayerStatistics] = {}
-
                 for person_id in player_ids:
-                    try:
-                        stats_data = self.client.get_player_stats(person_id)
-                        regions = stats_data.get("data", {}).get("regions", [])
-                        for region in regions:
-                            for row in region.get("rows", []):
-                                cells = row.get("cells", [])
-                                if len(cells) < 4:
-                                    continue
-
-                                def _txt(idx, _cells=cells):
-                                    v = _cells[idx].get("text") if len(_cells) > idx else None
-                                    if isinstance(v, list):
-                                        v = v[0] if v else None
-                                    return (v or "").strip()
-
-                                def _int(idx, _cells=cells):
-                                    try:
-                                        return int(_txt(idx, _cells))
-                                    except (ValueError, TypeError):
-                                        return 0
-
-                                row_season = _txt(0)   # e.g. "2025/26"
-                                # Only store rows belonging to the requested season
-                                if season_label and row_season != season_label:
-                                    continue
-
-                                league_abbrev    = _txt(1)  # e.g. "NLB", "NLA", "L-UPL"
-                                team_name_txt    = _txt(2)  # e.g. "Unihockey Basel Regio"
-                                games_played     = _int(3)
-                                goals            = _int(4)
-                                assists          = _int(5)
-                                points           = _int(6)
-                                penalty_minutes  = _int(7) * 2 + _int(8) * 5 + _int(9) * 10
-                                now              = datetime.now(timezone.utc)
-
-                                key = (person_id, season_id, league_abbrev)
-
-                                def _apply(obj):
-                                    obj.league_abbrev   = league_abbrev
-                                    obj.team_name       = team_name_txt
-                                    obj.games_played    = games_played
-                                    obj.goals           = goals
-                                    obj.assists         = assists
-                                    obj.points          = points
-                                    obj.penalty_minutes = penalty_minutes
-                                    obj.last_updated    = now
-
-                                # 1. Check in-session staged objects first (no DB flush needed)
-                                if key in staged:
-                                    _apply(staged[key])
-                                    count += 1
-                                    continue
-
-                                # 2. Check DB — use no_autoflush to avoid premature flush
-                                with session.no_autoflush:
-                                    existing = (
-                                        session.query(PlayerStatistics)
-                                        .filter(
-                                            PlayerStatistics.player_id == person_id,
-                                            PlayerStatistics.season_id == season_id,
-                                            PlayerStatistics.league_abbrev == league_abbrev,
-                                        ).first()
-                                    )
-
-                                if existing:
-                                    _apply(existing)
-                                    staged[key] = existing
-                                else:
-                                    obj = PlayerStatistics(
-                                        player_id       = person_id,
-                                        season_id       = season_id,
-                                        league_abbrev   = league_abbrev,
-                                        team_name       = team_name_txt,
-                                        games_played    = games_played,
-                                        goals           = goals,
-                                        assists         = assists,
-                                        points          = points,
-                                        penalty_minutes = penalty_minutes,
-                                        last_updated    = now,
-                                    )
-                                    session.add(obj)
-                                    staged[key] = obj
-                                count += 1
-                    except Exception as exc:
-                        logger.debug("Could not fetch stats for player %s: %s", person_id, exc)
+                    count += self._upsert_player_stats_from_api(
+                        person_id, season_id, season_label, session, staged
+                    )
 
                 session.commit()
                 self._mark_sync_complete(session, "player_stats", entity_id, count)
@@ -628,7 +658,7 @@ class DataIndexer:
                 return count
 
             except Exception as e:
-                logger.error(f"Failed to index player stats for season {season_id}: {e}", exc_info=True)
+                logger.error("Failed to index player stats for season %s: %s", season_id, e, exc_info=True)
                 self._mark_sync_failed(session, "player_stats", entity_id, str(e))
                 return 0
 
