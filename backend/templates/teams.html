@@ -28,18 +28,21 @@
 <div style="max-width: 1000px; margin: 2rem auto;"
      x-data="{
        q: '',
-       mode: 'all',
+       leagueType: 'all',
        tier: 'all',
        sort: 'league',
        _t: null,
        fetch(delay) {
          clearTimeout(this._t);
          const url = '/{{ locale }}/teams/search'
-           + '?q=' + encodeURIComponent(this.q)
-           + '&mode=' + this.mode
-           + '&tier=' + this.tier
-           + '&sort=' + this.sort;
+           + '?q='           + encodeURIComponent(this.q)
+           + '&league_type=' + this.leagueType
+           + '&tier='        + this.tier
+           + '&sort='        + this.sort;
          this._t = setTimeout(() => htmx.ajax('GET', url, {target:'#teams-list', swap:'innerHTML'}), delay || 0);
+       },
+       get anyActive() {
+         return this.q !== '' || this.leagueType !== 'all' || this.tier !== 'all' || this.sort !== 'league';
        }
      }">
 
@@ -60,18 +63,19 @@
     <!-- Filter rows -->
     <div style="display:flex; flex-direction:column; gap:.6rem;">
 
-        <!-- Category -->
+        <!-- Category (league type) -->
         <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
             <span class="filter-label">Category</span>
             <template x-for="opt in [
-                {v:'all', l:'All'},
-                {v:'1',   l:'Men'},
-                {v:'2',   l:'Women'},
-                {v:'3',   l:'Mixed / Youth'}
+                {v:'all',          l:'All'},
+                {v:'herren',       l:'Herren'},
+                {v:'damen',        l:'Damen'},
+                {v:'junioren',     l:'Junioren'},
+                {v:'juniorinnen',  l:'Juniorinnen'}
             ]" :key="opt.v">
                 <button
-                    @click="mode=opt.v; fetch()"
-                    :class="mode===opt.v ? 'chip chip-active' : 'chip'"
+                    @click="leagueType=opt.v; fetch()"
+                    :class="leagueType===opt.v ? 'chip chip-active' : 'chip'"
                     x-text="opt.l">
                 </button>
             </template>
@@ -99,8 +103,8 @@
         <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
             <span class="filter-label">Sort</span>
             <template x-for="opt in [
-                {v:'name',   l:'Name A–Z'},
-                {v:'league', l:'By League'}
+                {v:'league', l:'By League'},
+                {v:'name',   l:'Name A–Z'}
             ]" :key="opt.v">
                 <button
                     @click="sort=opt.v; fetch()"
@@ -109,8 +113,8 @@
                 </button>
             </template>
             <button
-                x-show="q!=='' || mode!=='all' || tier!=='all' || sort!=='name'"
-                @click="q=''; mode='all'; tier='all'; sort='name'; fetch()"
+                x-show="anyActive"
+                @click="q=''; leagueType='all'; tier='all'; sort='league'; fetch()"
                 class="chip"
                 style="margin-left:.5rem; border-color:var(--gray-400); color:var(--gray-500);"
             >✕ Clear</button>

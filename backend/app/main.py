@@ -1570,14 +1570,14 @@ async def teams_page(request: Request, locale: str):
 
 
 @app.get("/{locale}/teams/search", response_class=HTMLResponse)
-async def teams_search(request: Request, locale: str, q: str = "", mode: str = "all", sort: str = "league", tier: str = "all"):
+async def teams_search(request: Request, locale: str, q: str = "", mode: str = "all", sort: str = "league", tier: str = "all", league_type: str = "all"):
     """HTMX endpoint for team search"""
     from app.services.stats_service import get_teams_list
 
     mode_int = int(mode) if mode.isdigit() else None
-    teams = get_teams_list(q=q, mode=mode_int, sort=sort, tier=tier, limit=200)
+    teams = get_teams_list(q=q, mode=mode_int, sort=sort, tier=tier, league_type=league_type, limit=200)
 
-    if not teams and not any([q, mode_int, tier != "all"]):
+    if not teams and not any([q, mode_int, tier != "all", league_type != "all"]):
         # DB empty — fall back to API cache with basic name filter
         all_teams = await get_cached_teams()
         if q:

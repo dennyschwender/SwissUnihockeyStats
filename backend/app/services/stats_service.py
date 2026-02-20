@@ -97,11 +97,13 @@ def _tier_order_expr():
     return case(
         (League.name.ilike("%NLA%"), 1),
         (League.name.ilike("%NLB%"), 2),
-        (League.name.ilike("%1. Liga%"), 3),
-        (League.name.ilike("%2. Liga%"), 4),
-        (League.name.ilike("%3. Liga%"), 5),
-        (League.name.ilike("%4. Liga%"), 6),
-        (League.name.ilike("%5. Liga%"), 7),
+        (League.name.ilike("%L-UPL%"), 3),
+        (League.name.ilike("%Supercup%"), 4),
+        (League.name.ilike("%1. Liga%"), 5),
+        (League.name.ilike("%2. Liga%"), 6),
+        (League.name.ilike("%3. Liga%"), 7),
+        (League.name.ilike("%4. Liga%"), 8),
+        (League.name.ilike("%5. Liga%"), 9),
         (League.name.ilike("%Junioren A%"), 20),
         (League.name.ilike("%Juniorinnen A%"), 20),
         (League.name.ilike("%Junioren U21%"), 21),
@@ -126,18 +128,19 @@ def _tier_order_expr():
 
 def get_teams_list(
     season_id: Optional[int] = None,
-    mode: Optional[int] = None,
+    mode: Optional[int] = None,  # kept for compat; prefer league_type
     q: str = "",
     sort: str = "league",
     tier: str = "all",
+    league_type: str = "all",
     limit: int = 200,
 ) -> list[dict]:
     """Return teams from DB enriched with league name and category.
 
-    Falls back to an empty list when the DB has no teams yet (fresh install).
-    mode: 1=Men, 2=Women, 3=Mixed
+    mode: 1=Men, 2=Women, 3=Mixed (legacy)
     sort: 'name' | 'league'
     tier: 'all' | 'national' | 'liga' | 'youth' | 'senior'
+    league_type: 'all' | 'herren' | 'damen' | 'junioren' | 'juniorinnen'
     """
     db = get_database_service()
     with db.session_scope() as session:
@@ -155,7 +158,17 @@ def get_teams_list(
             .filter(Team.season_id == season_id)
         )
 
-        if mode == 1:
+        # League-type filter (based on league name prefix — more accurate than game_class)
+        _lt = league_type.lower()
+        if _lt == "herren":
+            query = query.filter(League.name.ilike("Herren%"))
+        elif _lt == "damen":
+            query = query.filter(League.name.ilike("Damen%"))
+        elif _lt == "junioren":
+            query = query.filter(League.name.ilike("Junioren%"))
+        elif _lt == "juniorinnen":
+            query = query.filter(League.name.ilike("Juniorinnen%"))
+        elif mode == 1:  # legacy fallback
             query = query.filter(Team.game_class == 11)
         elif mode == 2:
             query = query.filter(Team.game_class == 21)
