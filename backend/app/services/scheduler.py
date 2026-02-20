@@ -78,6 +78,7 @@ POLICIES: list[dict] = [
         "scope":       "season",
         "label":       "Players refresh",
         "priority":    40,
+        "max_tier":    3,   # NLA/L-UPL + NLB + 1.Liga (112 teams) — keeps daily runs fast
     },
     {
         "name":        "leagues",
@@ -153,6 +154,7 @@ class ScheduledJob:
     task: str        = field(compare=False)
     season: int | None = field(compare=False, default=None)
     label: str       = field(compare=False, default="")
+    max_tier: int    = field(compare=False, default=7)
 
 
 @dataclass
@@ -189,11 +191,11 @@ class Scheduler:
     def __init__(
         self,
         admin_jobs: dict,
-        submit_job: Callable[[str, int | None, str, bool], Awaitable[str]],
+        submit_job: Callable[[str, int | None, str, bool, int], Awaitable[str]],
     ):
         """
         admin_jobs  – the _admin_jobs dict shared with the admin routes
-        submit_job  – async callable(job_id, season, task, force) → None
+        submit_job  – async callable(job_id, season, task, force, max_tier) → None
                       that starts the indexer coroutine for the given job_id
         """
         self._admin_jobs = admin_jobs
@@ -372,6 +374,7 @@ class Scheduler:
             task=policy["task"],
             season=season,
             label=policy["label"] + (f" S{season}" if season else ""),
+            max_tier=policy.get("max_tier", 7),
         )
         job_id = await self._launch_and_return_id(job)
         return job_id
@@ -413,7 +416,7 @@ class Scheduler:
         record.started_at = _utcnow()
 
         try:
-            await self._submit(job_id, job.season, job.task, force=False)
+            await self._submit(job_id, job.season, job.task, force=False, max_tier=job.max_tier)
             asyncio.create_task(
                 self._watch(job_id, record),
                 name=f"sched-watch-{job_id}",
@@ -517,6 +520,7 @@ class Scheduler:
             task=policy["task"],
             season=season,
             label=f"{policy['label']}{season_label}",
+            max_tier=policy.get("max_tier", 7),
         )
         self._queue.append(job)
         logger.debug(
