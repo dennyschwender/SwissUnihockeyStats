@@ -28,46 +28,86 @@
     </div>
 
     <!-- ROSTER -->
-    <div x-show="tab==='roster'">
+    {% if team.roster %}
+    <script>window._rosterData = {{ team.roster | tojson }};</script>
+    {% endif %}
+    <div x-show="tab==='roster'" x-data="{
+      roster: window._rosterData || [],
+      sortCol: 'pts',
+      sortAsc: false,
+      q: '',
+      get rows() {
+        let r = this.roster;
+        const q = this.q.toLowerCase().trim();
+        if (q) r = r.filter(p =>
+          (p.name || '').toLowerCase().includes(q) ||
+          (p.position || '').toLowerCase().includes(q)
+        );
+        const col = this.sortCol, asc = this.sortAsc;
+        return [...r].sort((a, b) => {
+          let va = a[col], vb = b[col];
+          if (col === 'name' || col === 'position') {
+            va = (va || '').toLowerCase(); vb = (vb || '').toLowerCase();
+            return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+          }
+          if (va === null || va === undefined || va === '') return 1;
+          if (vb === null || vb === undefined || vb === '') return -1;
+          return asc ? va - vb : vb - va;
+        });
+      },
+      sort(col) {
+        if (this.sortCol === col) this.sortAsc = !this.sortAsc;
+        else { this.sortCol = col; this.sortAsc = (col === 'name' || col === 'position'); }
+      },
+      icon(col) { return this.sortCol === col ? (this.sortAsc ? ' ↑' : ' ↓') : ''; }
+    }">
       {% if team.roster_source == 'games' %}
       <p style="font-size:.8rem;color:var(--gray-500);margin-bottom:.75rem;">⚠️ Official roster not yet indexed — showing players seen in recorded game lineups.</p>
       {% endif %}
       {% if team.roster %}
+      <div style="margin-bottom:.75rem;">
+        <input x-model="q" type="search" placeholder="Search name or position…"
+          style="width:100%;max-width:22rem;padding:.4rem .75rem;border:1px solid var(--gray-300);border-radius:.4rem;font-size:.875rem;background:var(--card-bg,white);color:var(--text-primary);">
+      </div>
       <div style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
           <thead>
             <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
-              <th style="padding:.6rem .5rem;text-align:center;">#</th>
-              <th style="padding:.6rem .75rem;text-align:left;">Player</th>
-              <th style="padding:.6rem .75rem;text-align:left;">Position</th>
-              <th style="padding:.6rem .5rem;text-align:center;">GP</th>
-              <th style="padding:.6rem .5rem;text-align:center;">G</th>
-              <th style="padding:.6rem .5rem;text-align:center;">A</th>
-              <th style="padding:.6rem .75rem;text-align:center;font-weight:700;">PTS</th>
-              <th style="padding:.6rem .5rem;text-align:center;">PIM</th>
-              <th style="padding:.6rem .5rem;text-align:center;">+/-</th>
+              {% set th_num  = "padding:.5rem .5rem;text-align:center;white-space:nowrap;" %}
+              {% set th_left = "padding:.5rem .75rem;text-align:left;white-space:nowrap;" %}
+              {% set th_ctr  = "padding:.5rem .5rem;text-align:center;white-space:nowrap;" %}
+              {% set btn = "background:none;border:none;cursor:pointer;font-weight:600;color:inherit;font-size:.875rem;padding:0;display:inline-flex;align-items:center;gap:.1rem;" %}
+              <th style="{{ th_num }}"><button @click="sort('number')" style="{{ btn }}">#<span style="font-size:.7rem;opacity:.55;" x-text="icon('number')"></span></button></th>
+              <th style="{{ th_left }}"><button @click="sort('name')" style="{{ btn }}">Player<span style="font-size:.7rem;opacity:.55;" x-text="icon('name')"></span></button></th>
+              <th style="{{ th_left }}"><button @click="sort('position')" style="{{ btn }}">Position<span style="font-size:.7rem;opacity:.55;" x-text="icon('position')"></span></button></th>
+              <th style="{{ th_ctr }}"><button @click="sort('gp')" style="{{ btn }}">GP<span style="font-size:.7rem;opacity:.55;" x-text="icon('gp')"></span></button></th>
+              <th style="{{ th_ctr }}"><button @click="sort('g')" style="{{ btn }}">G<span style="font-size:.7rem;opacity:.55;" x-text="icon('g')"></span></button></th>
+              <th style="{{ th_ctr }}"><button @click="sort('a')" style="{{ btn }}">A<span style="font-size:.7rem;opacity:.55;" x-text="icon('a')"></span></button></th>
+              <th style="{{ th_ctr }}font-weight:700;"><button @click="sort('pts')" style="{{ btn }}font-weight:700;">PTS<span style="font-size:.7rem;opacity:.55;" x-text="icon('pts')"></span></button></th>
+              <th style="{{ th_ctr }}"><button @click="sort('pim')" style="{{ btn }}">PIM<span style="font-size:.7rem;opacity:.55;" x-text="icon('pim')"></span></button></th>
+              <th style="{{ th_ctr }}"><button @click="sort('plus_minus')" style="{{ btn }}">+/-<span style="font-size:.7rem;opacity:.55;" x-text="icon('plus_minus')"></span></button></th>
             </tr>
           </thead>
           <tbody>
-            {% for p in team.roster %}
-            <tr onclick="window.location='/{{ locale }}/player/{{ p.player_id }}'"
-              style="cursor:pointer;border-bottom:1px solid var(--gray-100);"
-              onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
-              <td style="padding:.6rem .5rem;text-align:center;color:var(--gray-500);">{{ p.number or "—" }}</td>
-              <td style="padding:.6rem .75rem;font-weight:500;">{{ p.name }}</td>
-              <td style="padding:.6rem .75rem;color:var(--gray-600);">{{ p.position or "—" }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;">{{ p.gp }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;">{{ p.g }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;">{{ p.a }}</td>
-              <td style="padding:.6rem .75rem;text-align:center;font-weight:700;">{{ p.pts }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;">{{ p.pim }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;{% if p.plus_minus > 0 %}color:#16a34a{% elif p.plus_minus < 0 %}color:#dc2626{% endif %}">
-                {{ "+" if p.plus_minus > 0 else "" }}{{ p.plus_minus }}
-              </td>
-            </tr>
-            {% endfor %}
+            <template x-for="p in rows" :key="p.player_id">
+              <tr @click="window.location='/{{ locale }}/player/' + p.player_id"
+                style="cursor:pointer;border-bottom:1px solid var(--gray-100);"
+                onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+                <td style="padding:.6rem .5rem;text-align:center;color:var(--gray-500);" x-text="p.number ?? '—'"></td>
+                <td style="padding:.6rem .75rem;font-weight:500;" x-text="p.name"></td>
+                <td style="padding:.6rem .75rem;color:var(--gray-600);" x-text="p.position || '—'"></td>
+                <td style="padding:.6rem .5rem;text-align:center;" x-text="p.gp"></td>
+                <td style="padding:.6rem .5rem;text-align:center;" x-text="p.g"></td>
+                <td style="padding:.6rem .5rem;text-align:center;" x-text="p.a"></td>
+                <td style="padding:.6rem .75rem;text-align:center;font-weight:700;" x-text="p.pts"></td>
+                <td style="padding:.6rem .5rem;text-align:center;" x-text="p.pim"></td>
+                <td :style="'padding:.6rem .5rem;text-align:center;' + (p.plus_minus > 0 ? 'color:#16a34a' : (p.plus_minus < 0 ? 'color:#dc2626' : ''))"
+                    x-text="(p.plus_minus > 0 ? '+' : '') + p.plus_minus"></td>
+              </tr>
+            </template>
           </tbody>
         </table>
+        <p x-show="rows.length === 0 && q" style="text-align:center;padding:2rem;color:var(--gray-500);">No players match your search.</p>
       </div>
       {% else %}
       <div style="text-align:center;padding:3rem;color:var(--gray-500);">
