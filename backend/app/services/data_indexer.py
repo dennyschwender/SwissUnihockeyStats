@@ -507,13 +507,22 @@ class DataIndexer:
                 season_row = session.get(SeasonModel, season_id)
                 season_label = season_row.text if season_row and season_row.text else str(season_id)
 
-                # Collect all player IDs active in this season
-                player_ids = [
+                # Collect all player IDs active in this season:
+                # official roster + players seen in game lineups (stubs)
+                from app.models.db_models import GamePlayer as _GamePlayer
+                tp_ids = {
                     r[0] for r in
                     session.query(TeamPlayer.player_id)
                     .filter(TeamPlayer.season_id == season_id)
                     .distinct().all()
-                ]
+                }
+                gp_ids = {
+                    r[0] for r in
+                    session.query(_GamePlayer.player_id)
+                    .filter(_GamePlayer.season_id == season_id)
+                    .distinct().all()
+                }
+                player_ids = list(tp_ids | gp_ids)
 
                 if not player_ids:
                     logger.info("No players found for season %s", season_id)

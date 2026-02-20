@@ -788,22 +788,46 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             # Exclude players who are officially registered on a DIFFERENT team this
             # season — they are guests/loan players and don't belong here.
             official_pids = {pl.person_id for _, pl in tp_rows}
-            for pid, info in gp_agg.items():
-                if pid not in official_pids and pid not in other_team_pids:
-                    roster.append(
-                        {
-                            "player_id": pid,
-                            "name": info["name"],
-                            "number": info["number"],
-                            "position": info["position"] or "",
-                            "gp": info["gp"],
-                            "g":  info["g"],
-                            "a":  info["a"],
-                            "pts": info["pts"],
-                            "pim": info["pim"],
-                            "from_games": True,
-                        }
+            extras_pids = [
+                pid for pid in gp_agg
+                if pid not in official_pids and pid not in other_team_pids
+            ]
+            # Look up PlayerStatistics for these extras (same as official path)
+            extras_stat_map: dict[int, dict] = {}
+            if extras_pids:
+                for ps in (
+                    session.query(PlayerStatistics)
+                    .filter(
+                        PlayerStatistics.player_id.in_(extras_pids),
+                        PlayerStatistics.season_id == season_id,
                     )
+                    .all()
+                ):
+                    pid = ps.player_id
+                    if pid not in extras_stat_map:
+                        extras_stat_map[pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0}
+                    extras_stat_map[pid]["gp"]  += ps.games_played or 0
+                    extras_stat_map[pid]["g"]   += ps.goals or 0
+                    extras_stat_map[pid]["a"]   += ps.assists or 0
+                    extras_stat_map[pid]["pts"] += ps.points or 0
+                    extras_stat_map[pid]["pim"] += ps.penalty_minutes or 0
+            for pid in extras_pids:
+                info = gp_agg[pid]
+                ps = extras_stat_map.get(pid) or {}
+                roster.append(
+                    {
+                        "player_id": pid,
+                        "name": info["name"],
+                        "number": info["number"],
+                        "position": info["position"] or "",
+                        "gp": ps.get("gp") or info["gp"],
+                        "g":  ps.get("g", 0),
+                        "a":  ps.get("a", 0),
+                        "pts": ps.get("pts", 0),
+                        "pim": ps.get("pim", 0),
+                        "from_games": True,
+                    }
+                )
         else:
             # Roster not indexed — build entirely from game lineups,
             # but still skip players officially on other teams.
