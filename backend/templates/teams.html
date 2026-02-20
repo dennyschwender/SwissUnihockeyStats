@@ -85,9 +85,38 @@
         >
     </div>
 
-    <!-- League multi-select chips grouped by category -->
+    <!-- Chip filter box: level presets + category chips -->
     <div style="display:flex; flex-direction:column; gap:.5rem; padding:.75rem 1rem; background:var(--bg-secondary); border:1px solid var(--gray-200); border-radius:.625rem; margin-bottom:.75rem;">
 
+        <!-- Level presets row + Clear on far right -->
+        <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
+            <span class="filter-label">Quick</span>
+            <template x-for="opt in [
+                {v:'all',      l:'All'},
+                {v:'national', l:'National'},
+                {v:'liga',     l:'Liga'},
+                {v:'senior',   l:'Senior'},
+                {v:'youth',    l:'Youth'}
+            ]" :key="opt.v">
+                <button
+                    @click="selectTier(opt.v)"
+                    :class="activeTier===opt.v ? 'chip chip-active' : 'chip'"
+                    x-text="opt.l">
+                </button>
+            </template>
+            <button
+                x-show="anyActive"
+                x-transition
+                @click="q=''; leagues=[]; activeTier='all'; sort='league'; fetch()"
+                class="chip"
+                style="margin-left:auto; border-color:var(--swiss-red); color:var(--swiss-red);"
+            >✕ Clear filters</button>
+        </div>
+
+        <!-- Divider -->
+        <div style="border-top:1px solid var(--gray-200);"></div>
+
+        <!-- Herren -->
         <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
             <span class="filter-label">Herren</span>
             <template x-for="v in ['Herren NLB','Herren L-UPL','Herren 1. Liga','Herren 2. Liga','Herren 3. Liga','Herren 4. Liga','Herren 5. Liga']" :key="v">
@@ -95,6 +124,7 @@
             </template>
         </div>
 
+        <!-- Damen -->
         <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
             <span class="filter-label">Damen</span>
             <template x-for="v in ['Damen NLB','Damen L-UPL','Damen 1. Liga','Damen 2. Liga','Damen 3. Liga']" :key="v">
@@ -102,6 +132,7 @@
             </template>
         </div>
 
+        <!-- Junioren -->
         <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
             <span class="filter-label">Junioren</span>
             <template x-for="opt in [
@@ -113,6 +144,7 @@
             </template>
         </div>
 
+        <!-- Juniorinnen -->
         <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
             <span class="filter-label">Juniorinnen</span>
             <template x-for="opt in [
@@ -126,49 +158,21 @@
 
     </div>
 
-    <!-- Filter rows -->
-    <div style="display:flex; flex-direction:column; gap:.6rem;">
-
-        <!-- Level presets -->
-        <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
-            <span class="filter-label">Level</span>
-            <template x-for="opt in [
-                {v:'all',      l:'All'},
-                {v:'national', l:'National (NLA/NLB)'},
-                {v:'liga',     l:'Liga'},
-                {v:'senior',   l:'Senior (all adult)'},
-                {v:'youth',    l:'Youth (Junioren)'}
-            ]" :key="opt.v">
-                <button
-                    @click="selectTier(opt.v)"
-                    :class="activeTier===opt.v ? 'chip chip-active' : 'chip'"
-                    x-text="opt.l">
-                </button>
-            </template>
-        </div>
-
-        <!-- Sort + Clear -->
-        <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
-            <span class="filter-label">Sort</span>
-            <template x-for="opt in [
-                {v:'league', l:'By League'},
-                {v:'name',   l:'Name A–Z'}
-            ]" :key="opt.v">
-                <button
-                    @click="sort=opt.v; fetch()"
-                    :class="sort===opt.v ? 'chip chip-active' : 'chip'"
-                    x-text="opt.l">
-                </button>
-            </template>
+    <!-- Sort -->
+    <div style="display:flex; align-items:center; gap:.5rem;">
+        <span class="filter-label">Sort</span>
+        <template x-for="opt in [
+            {v:'league', l:'By League'},
+            {v:'name',   l:'Name A–Z'}
+        ]" :key="opt.v">
             <button
-                x-show="anyActive"
-                @click="q=''; leagues=[]; activeTier='all'; sort='league'; fetch()"
-                class="chip"
-                style="margin-left:.5rem; border-color:var(--gray-400); color:var(--gray-500);"
-            >✕ Clear</button>
-        </div>
-
+                @click="sort=opt.v; fetch()"
+                :class="sort===opt.v ? 'chip chip-active' : 'chip'"
+                x-text="opt.l">
+            </button>
+        </template>
     </div>
+
 </div>
 
 <!-- Teams List -->
