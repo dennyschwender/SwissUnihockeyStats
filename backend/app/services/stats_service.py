@@ -656,32 +656,41 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
 
         if tp_rows:
             pids = [pl.person_id for _, pl in tp_rows]
-            player_stat_map: dict[int, PlayerStatistics] = {}
+            # Aggregate all stat rows for each player in this season (team_id is not
+            # stored in player_statistics, so we sum across all league entries)
+            player_stat_map: dict[int, dict] = {}
             for ps in (
                 session.query(PlayerStatistics)
                 .filter(
                     PlayerStatistics.player_id.in_(pids),
                     PlayerStatistics.season_id == season_id,
-                    PlayerStatistics.team_id == team_id,
                 )
                 .all()
             ):
-                player_stat_map[ps.player_id] = ps
+                pid = ps.player_id
+                if pid not in player_stat_map:
+                    player_stat_map[pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0, "plus_minus": 0}
+                player_stat_map[pid]["gp"]        += ps.games_played or 0
+                player_stat_map[pid]["g"]         += ps.goals or 0
+                player_stat_map[pid]["a"]         += ps.assists or 0
+                player_stat_map[pid]["pts"]       += ps.points or 0
+                player_stat_map[pid]["pim"]       += ps.penalty_minutes or 0
+                player_stat_map[pid]["plus_minus"] += ps.plus_minus or 0
 
             for tp, pl in tp_rows:
-                ps = player_stat_map.get(pl.person_id)
+                ps = player_stat_map.get(pl.person_id) or {}
                 roster.append(
                     {
                         "player_id": pl.person_id,
                         "name": pl.full_name or f"Player {pl.person_id}",
                         "number": tp.jersey_number,
                         "position": tp.position or "",
-                        "gp": ps.games_played if ps else 0,
-                        "g": ps.goals if ps else 0,
-                        "a": ps.assists if ps else 0,
-                        "pts": ps.points if ps else 0,
-                        "pim": ps.penalty_minutes if ps else 0,
-                        "plus_minus": ps.plus_minus if ps else 0,
+                        "gp": ps.get("gp", 0),
+                        "g":  ps.get("g", 0),
+                        "a":  ps.get("a", 0),
+                        "pts": ps.get("pts", 0),
+                        "pim": ps.get("pim", 0),
+                        "plus_minus": ps.get("plus_minus", 0),
                     }
                 )
         else:

@@ -442,9 +442,24 @@ class DataIndexer:
                         )
                         session.add(team_player)
                     
-                    # Extract additional info
-                    team_player.jersey_number = row.get("number")
-                    team_player.position = row.get("position")
+                    # Extract additional info from cells: [0]=jersey#, [1]=position
+                    if len(cells) >= 1:
+                        num_cell = cells[0]
+                        num_txt = num_cell.get("text", "") if isinstance(num_cell, dict) else ""
+                        if isinstance(num_txt, list): num_txt = num_txt[0] if num_txt else ""
+                        try:
+                            team_player.jersey_number = int(num_txt) if num_txt else None
+                        except (ValueError, TypeError):
+                            team_player.jersey_number = None
+                    else:
+                        team_player.jersey_number = row.get("number")
+                    if len(cells) >= 2:
+                        pos_cell = cells[1]
+                        pos_txt = pos_cell.get("text", "") if isinstance(pos_cell, dict) else ""
+                        if isinstance(pos_txt, list): pos_txt = pos_txt[0] if pos_txt else ""
+                        team_player.position = pos_txt or None
+                    else:
+                        team_player.position = row.get("position")
                     team_player.last_updated = datetime.now(timezone.utc)
                     
                     count += 1
