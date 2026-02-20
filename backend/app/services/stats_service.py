@@ -11,7 +11,7 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 
 from app.models.db_models import (
     Game,
@@ -92,11 +92,43 @@ def get_leagues_from_db(season_id: Optional[int] = None) -> list[dict]:
 _GAME_CLASS_LABEL = {11: "Men", 21: "Women"}
 
 
+def _tier_order_expr():
+    """Return a SQLAlchemy CASE expression that maps league names to a sort order (lower = higher tier)."""
+    return case(
+        (League.name.ilike("%NLA%"), 1),
+        (League.name.ilike("%NLB%"), 2),
+        (League.name.ilike("%1. Liga%"), 3),
+        (League.name.ilike("%2. Liga%"), 4),
+        (League.name.ilike("%3. Liga%"), 5),
+        (League.name.ilike("%4. Liga%"), 6),
+        (League.name.ilike("%5. Liga%"), 7),
+        (League.name.ilike("%Junioren A%"), 20),
+        (League.name.ilike("%Juniorinnen A%"), 20),
+        (League.name.ilike("%Junioren U21%"), 21),
+        (League.name.ilike("%Juniorinnen U21%"), 21),
+        (League.name.ilike("%Junioren B%"), 22),
+        (League.name.ilike("%Juniorinnen B%"), 22),
+        (League.name.ilike("%Junioren U18%"), 23),
+        (League.name.ilike("%Juniorinnen U18%"), 23),
+        (League.name.ilike("%Junioren C%"), 24),
+        (League.name.ilike("%Juniorinnen C%"), 24),
+        (League.name.ilike("%Junioren U16%"), 25),
+        (League.name.ilike("%Juniorinnen U16%"), 25),
+        (League.name.ilike("%Junioren U14%"), 26),
+        (League.name.ilike("%Juniorinnen U14%"), 26),
+        (League.name.ilike("%Junioren D%"), 27),
+        (League.name.ilike("%Juniorinnen D%"), 27),
+        (League.name.ilike("%Junioren E%"), 28),
+        (League.name.ilike("%Juniorinnen E%"), 28),
+        else_=50,
+    )
+
+
 def get_teams_list(
     season_id: Optional[int] = None,
     mode: Optional[int] = None,
     q: str = "",
-    sort: str = "name",
+    sort: str = "league",
     tier: str = "all",
     limit: int = 200,
 ) -> list[dict]:
@@ -156,8 +188,8 @@ def get_teams_list(
             )
 
         if sort == "league":
-            # COALESCE so teams without a league sort last
-            query = query.order_by(func.coalesce(League.name, "~~~~"), Team.name)
+            # Sort by tier level first, then league name, then team name
+            query = query.order_by(_tier_order_expr(), func.coalesce(League.name, "~~~~"), Team.name)
         else:
             query = query.order_by(Team.name)
 

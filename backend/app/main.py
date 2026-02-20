@@ -1543,7 +1543,7 @@ async def teams_page(request: Request, locale: str):
     """Teams listing page"""
     from app.services.stats_service import get_teams_list
     try:
-        teams_list = get_teams_list(limit=100)
+        teams_list = get_teams_list(sort="league", limit=200)
         error_message = None
 
         if not teams_list:
@@ -1551,7 +1551,7 @@ async def teams_page(request: Request, locale: str):
             cached = await get_cached_teams()
             teams_list = [
                 {"id": t.get("id"), "text": t.get("text", ""), "category": None, "league_name": None}
-                for t in cached[:100]
+                for t in cached[:200]
             ]
 
         return templates.TemplateResponse(
@@ -1570,7 +1570,7 @@ async def teams_page(request: Request, locale: str):
 
 
 @app.get("/{locale}/teams/search", response_class=HTMLResponse)
-async def teams_search(request: Request, locale: str, q: str = "", mode: str = "all", sort: str = "name", tier: str = "all"):
+async def teams_search(request: Request, locale: str, q: str = "", mode: str = "all", sort: str = "league", tier: str = "all"):
     """HTMX endpoint for team search"""
     from app.services.stats_service import get_teams_list
 
