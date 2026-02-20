@@ -167,6 +167,47 @@ def index_player_stats(season: int, force: bool):
 
 
 @cli.command()
+@click.option("--season", default=2025, help="Season ID")
+@click.option("--max-tier", default=3, help="Max league tier to include (default: 3)")
+@click.option("--force", is_flag=True, default=False, help="Force re-index even if recently synced")
+def index_game_lineups(season: int, max_tier: int, force: bool):
+    """Index home+away player lineups for all scored games in a season."""
+    from app.services.database import get_database_service
+    from app.models.db_models import Game, Team
+    from app.services.data_indexer import league_tier
+    click.echo(f"Indexing game lineups for season {season} (max_tier={max_tier}, force={force})...")
+    indexer = get_data_indexer()
+    db = get_database_service()
+    total = 0
+    skipped = 0
+    with db.session_scope() as session:
+        # Collect team IDs in leagues up to max_tier
+        rows = session.query(Team.id, Team.league_id).filter(Team.season_id == season).distinct().all()
+        team_ids = {r[0] for r in rows if league_tier(r[1] or 0) <= max_tier}
+
+        games = (
+            session.query(Game.id)
+            .filter(
+                Game.season_id == season,
+                Game.home_score.isnot(None),
+                (Game.home_team_id.in_(team_ids)) | (Game.away_team_id.in_(team_ids)),
+            )
+            .all()
+        )
+        game_ids = [g.id for g in games]
+
+    click.echo(f"  Found {len(game_ids)} scored games to process...")
+    for game_id in game_ids:
+        n = indexer.index_game_lineup(game_id, season_id=season, force=force)
+        if n > 0:
+            total += n
+        else:
+            skipped += 1
+
+    click.echo(f"✓ Indexed {total} game-player rows ({skipped} games skipped/cached)")
+
+
+@cli.command()
 def stats():
     """Show database statistics"""
     from app.services.database import get_database_service

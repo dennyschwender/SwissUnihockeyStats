@@ -1126,7 +1126,9 @@ class DataIndexer:
                 count = 0
                 with session.no_autoflush:
                     for is_home_flag in (1, 0):
-                        team_id = home_team_id if is_home_flag else away_team_id
+                        # API: is_home=0 returns the HOME team lineup,
+                        #       is_home=1 returns the AWAY team lineup.
+                        team_id = away_team_id if is_home_flag else home_team_id
                         try:
                             resp = self.client.get_game_lineup(game_id, is_home_flag)
                         except Exception:
@@ -1164,12 +1166,25 @@ class DataIndexer:
 
                                 if player_id is None:
                                     continue
-                                # Skip if FK would be violated
+
+                                # Auto-create a player stub if not yet in the table
                                 if player_id not in valid_players:
-                                    logger.debug(
-                                        f"Lineup skip: player {player_id} not in players table"
+                                    player_name = _txt(player_raw)
+                                    parts = player_name.split(" ", 1)
+                                    stub = _Player(
+                                        person_id=player_id,
+                                        first_name=parts[0] if parts else None,
+                                        last_name=parts[1] if len(parts) > 1 else None,
+                                        full_name=player_name or f"Player {player_id}",
+                                        name_normalized=(player_name or "").lower(),
+                                        last_updated=datetime.now(timezone.utc),
                                     )
-                                    continue
+                                    session.add(stub)
+                                    valid_players.add(player_id)
+                                    logger.debug(
+                                        f"Lineup: created player stub {player_id} '{player_name}'"
+                                    )
+
                                 if (team_id, season_id) not in valid_teams:
                                     logger.debug(
                                         f"Lineup skip: team ({team_id},{season_id}) not in teams table"
@@ -1181,7 +1196,7 @@ class DataIndexer:
                                     player_id=player_id,
                                     team_id=team_id,
                                     season_id=season_id,
-                                    is_home_team=bool(is_home_flag),
+                                    is_home_team=not bool(is_home_flag),  # flag=0→home, flag=1→away
                                     jersey_number=jersey,
                                     position=str(position)[:50] if position else None,
                                     goals=0,
