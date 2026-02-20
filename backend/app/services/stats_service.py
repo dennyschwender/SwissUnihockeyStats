@@ -128,19 +128,17 @@ def _tier_order_expr():
 
 def get_teams_list(
     season_id: Optional[int] = None,
-    mode: Optional[int] = None,  # kept for compat; prefer league_type
     q: str = "",
     sort: str = "league",
     tier: str = "all",
-    league_type: str = "all",
+    league_names: Optional[list] = None,
     limit: int = 200,
 ) -> list[dict]:
     """Return teams from DB enriched with league name and category.
 
-    mode: 1=Men, 2=Women, 3=Mixed (legacy)
     sort: 'name' | 'league'
     tier: 'all' | 'national' | 'liga' | 'youth' | 'senior'
-    league_type: 'all' | 'herren' | 'damen' | 'junioren' | 'juniorinnen'
+    league_names: list of league name prefixes (OR'd ilike); e.g. ['Herren NLB', 'Damen NLB']
     """
     db = get_database_service()
     with db.session_scope() as session:
@@ -158,22 +156,11 @@ def get_teams_list(
             .filter(Team.season_id == season_id)
         )
 
-        # League-type filter (based on league name prefix — more accurate than game_class)
-        _lt = league_type.lower()
-        if _lt == "herren":
-            query = query.filter(League.name.ilike("Herren%"))
-        elif _lt == "damen":
-            query = query.filter(League.name.ilike("Damen%"))
-        elif _lt == "junioren":
-            query = query.filter(League.name.ilike("Junioren%"))
-        elif _lt == "juniorinnen":
-            query = query.filter(League.name.ilike("Juniorinnen%"))
-        elif mode == 1:  # legacy fallback
-            query = query.filter(Team.game_class == 11)
-        elif mode == 2:
-            query = query.filter(Team.game_class == 21)
-        elif mode == 3:
-            query = query.filter(Team.game_class.notin_([11, 21]))
+        # Multi-select league name filter — each value used as ilike prefix
+        if league_names:
+            query = query.filter(
+                or_(*[League.name.ilike(f"{n}%") for n in league_names])
+            )
 
         if q:
             query = query.filter(

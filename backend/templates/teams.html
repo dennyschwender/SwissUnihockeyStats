@@ -28,21 +28,27 @@
 <div style="max-width: 1000px; margin: 2rem auto;"
      x-data="{
        q: '',
-       leagueType: 'all',
+       leagues: [],
        tier: 'all',
        sort: 'league',
        _t: null,
+       toggleLeague(v) {
+         this.leagues = this.leagues.includes(v)
+           ? this.leagues.filter(x => x !== v)
+           : [...this.leagues, v];
+         this.fetch();
+       },
        fetch(delay) {
          clearTimeout(this._t);
          const url = '/{{ locale }}/teams/search'
-           + '?q='           + encodeURIComponent(this.q)
-           + '&league_type=' + this.leagueType
-           + '&tier='        + this.tier
-           + '&sort='        + this.sort;
+           + '?q='       + encodeURIComponent(this.q)
+           + '&leagues=' + encodeURIComponent(this.leagues.join(','))
+           + '&tier='    + this.tier
+           + '&sort='    + this.sort;
          this._t = setTimeout(() => htmx.ajax('GET', url, {target:'#teams-list', swap:'innerHTML'}), delay || 0);
        },
        get anyActive() {
-         return this.q !== '' || this.leagueType !== 'all' || this.tier !== 'all' || this.sort !== 'league';
+         return this.q !== '' || this.leagues.length > 0 || this.tier !== 'all' || this.sort !== 'league';
        }
      }">
 
@@ -60,20 +66,45 @@
         >
     </div>
 
-    <!-- Category dropdown -->
-    <div style="display:flex; align-items:center; gap:.75rem; margin-bottom:.75rem;">
-        <span class="filter-label">Category</span>
-        <select
-            x-model="leagueType"
-            @change="fetch()"
-            class="filter-select"
-        >
-            <option value="all">All categories</option>
-            <option value="herren">Herren</option>
-            <option value="damen">Damen</option>
-            <option value="junioren">Junioren</option>
-            <option value="juniorinnen">Juniorinnen</option>
-        </select>
+    <!-- League multi-select chips grouped by category -->
+    <div style="display:flex; flex-direction:column; gap:.5rem; padding:.75rem 1rem; background:var(--bg-secondary); border:1px solid var(--gray-200); border-radius:.625rem; margin-bottom:.75rem;">
+
+        <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
+            <span class="filter-label">Herren</span>
+            <template x-for="v in ['Herren NLB','Herren L-UPL','Herren 1. Liga','Herren 2. Liga','Herren 3. Liga','Herren 4. Liga','Herren 5. Liga']" :key="v">
+                <button @click="toggleLeague(v)" :class="leagues.includes(v) ? 'chip chip-active' : 'chip'" x-text="v.replace('Herren ','')"></button>
+            </template>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
+            <span class="filter-label">Damen</span>
+            <template x-for="v in ['Damen NLB','Damen L-UPL','Damen 1. Liga','Damen 2. Liga','Damen 3. Liga']" :key="v">
+                <button @click="toggleLeague(v)" :class="leagues.includes(v) ? 'chip chip-active' : 'chip'" x-text="v.replace('Damen ','')"></button>
+            </template>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
+            <span class="filter-label">Junioren</span>
+            <template x-for="opt in [
+                {v:'Junioren U21',l:'U21'},{v:'Junioren U18',l:'U18'},{v:'Junioren U16',l:'U16'},
+                {v:'Junioren U14',l:'U14'},{v:'Junioren A',l:'A Reg.'},{v:'Junioren B',l:'B Reg.'},
+                {v:'Junioren C',l:'C Reg.'},{v:'Junioren D',l:'D Reg.'},{v:'Junioren E',l:'E Reg.'}
+            ]" :key="opt.v">
+                <button @click="toggleLeague(opt.v)" :class="leagues.includes(opt.v) ? 'chip chip-active' : 'chip'" x-text="opt.l"></button>
+            </template>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
+            <span class="filter-label">Juniorinnen</span>
+            <template x-for="opt in [
+                {v:'Juniorinnen U21',l:'U21'},{v:'Juniorinnen U17',l:'U17'},
+                {v:'Juniorinnen A',l:'A Reg.'},{v:'Juniorinnen B',l:'B Reg.'},
+                {v:'Juniorinnen C',l:'C Reg.'},{v:'Juniorinnen D',l:'D Reg.'}
+            ]" :key="opt.v">
+                <button @click="toggleLeague(opt.v)" :class="leagues.includes(opt.v) ? 'chip chip-active' : 'chip'" x-text="opt.l"></button>
+            </template>
+        </div>
+
     </div>
 
     <!-- Filter rows -->
@@ -112,7 +143,7 @@
             </template>
             <button
                 x-show="anyActive"
-                @click="q=''; leagueType='all'; tier='all'; sort='league'; fetch()"
+                @click="q=''; leagues=[]; tier='all'; sort='league'; fetch()"
                 class="chip"
                 style="margin-left:.5rem; border-color:var(--gray-400); color:var(--gray-500);"
             >✕ Clear</button>
