@@ -741,16 +741,42 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
 
         if tp_rows:
             pids = [pl.person_id for _, pl in tp_rows]
-            # Aggregate PlayerStatistics rows (no team_id stored there)
-            player_stat_map: dict[int, dict] = {}
+
+            # Determine which league_abbrev in PlayerStatistics corresponds to
+            # this team's league. A player who also plays at U21, 2nd-team etc.
+            # will have multiple rows with the same team_name; we want only the
+            # league the team itself plays in. We find it by majority vote across
+            # all official roster players.
+            from collections import Counter
+            abbrev_votes: Counter = Counter()
             for ps in (
-                session.query(PlayerStatistics)
+                session.query(
+                    PlayerStatistics.league_abbrev,
+                    PlayerStatistics.games_played,
+                )
                 .filter(
                     PlayerStatistics.player_id.in_(pids),
                     PlayerStatistics.season_id == season_id,
+                    PlayerStatistics.team_name == team.name,
                 )
                 .all()
             ):
+                abbrev_votes[ps.league_abbrev] += ps.games_played or 1
+            team_league_abbrev: str | None = (
+                abbrev_votes.most_common(1)[0][0] if abbrev_votes else None
+            )
+
+            # Aggregate PlayerStatistics rows for this team/league only
+            ps_filter = [
+                PlayerStatistics.player_id.in_(pids),
+                PlayerStatistics.season_id == season_id,
+                PlayerStatistics.team_name == team.name,
+            ]
+            if team_league_abbrev:
+                ps_filter.append(PlayerStatistics.league_abbrev == team_league_abbrev)
+
+            player_stat_map: dict[int, dict] = {}
+            for ps in session.query(PlayerStatistics).filter(*ps_filter).all():
                 pid = ps.player_id
                 if pid not in player_stat_map:
                     player_stat_map[pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0}
@@ -795,14 +821,16 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             # Look up PlayerStatistics for these extras (same as official path)
             extras_stat_map: dict[int, dict] = {}
             if extras_pids:
-                for ps in (
-                    session.query(PlayerStatistics)
-                    .filter(
-                        PlayerStatistics.player_id.in_(extras_pids),
-                        PlayerStatistics.season_id == season_id,
+                ps_filter_extras = [
+                    PlayerStatistics.player_id.in_(extras_pids),
+                    PlayerStatistics.season_id == season_id,
+                    PlayerStatistics.team_name == team.name,
+                ]
+                if team_league_abbrev:
+                    ps_filter_extras.append(
+                        PlayerStatistics.league_abbrev == team_league_abbrev
                     )
-                    .all()
-                ):
+                for ps in session.query(PlayerStatistics).filter(*ps_filter_extras).all():
                     pid = ps.player_id
                     if pid not in extras_stat_map:
                         extras_stat_map[pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0}
