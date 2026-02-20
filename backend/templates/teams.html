@@ -60,26 +60,24 @@
         >
     </div>
 
+    <!-- Category dropdown -->
+    <div style="display:flex; align-items:center; gap:.75rem; margin-bottom:.75rem;">
+        <span class="filter-label">Category</span>
+        <select
+            x-model="leagueType"
+            @change="fetch()"
+            class="filter-select"
+        >
+            <option value="all">All categories</option>
+            <option value="herren">Herren</option>
+            <option value="damen">Damen</option>
+            <option value="junioren">Junioren</option>
+            <option value="juniorinnen">Juniorinnen</option>
+        </select>
+    </div>
+
     <!-- Filter rows -->
     <div style="display:flex; flex-direction:column; gap:.6rem;">
-
-        <!-- Category (league type) -->
-        <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
-            <span class="filter-label">Category</span>
-            <template x-for="opt in [
-                {v:'all',          l:'All'},
-                {v:'herren',       l:'Herren'},
-                {v:'damen',        l:'Damen'},
-                {v:'junioren',     l:'Junioren'},
-                {v:'juniorinnen',  l:'Juniorinnen'}
-            ]" :key="opt.v">
-                <button
-                    @click="leagueType=opt.v; fetch()"
-                    :class="leagueType===opt.v ? 'chip chip-active' : 'chip'"
-                    x-text="opt.l">
-                </button>
-            </template>
-        </div>
 
         <!-- Level -->
         <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">

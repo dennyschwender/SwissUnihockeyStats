@@ -243,6 +243,20 @@ main {
 }
 .chip:hover { border-color: var(--swiss-red); color: var(--swiss-red); }
 .chip-active { background: var(--swiss-red) !important; border-color: var(--swiss-red) !important; color: #fff !important; }
+.filter-select {
+  padding: .35rem .75rem;
+  border: 1.5px solid var(--gray-300);
+  border-radius: .5rem;
+  font-size: .875rem;
+  font-weight: 600;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  min-width: 11rem;
+  transition: border-color .12s;
+}
+.filter-select:focus { outline: none; border-color: var(--swiss-red); }
+html.dark-mode .filter-select { background: var(--bg-secondary); }
 .teams-list-meta {
   font-size: .78rem;
   color: var(--gray-500);
