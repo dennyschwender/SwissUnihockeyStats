@@ -30,6 +30,9 @@
 
     <!-- ROSTER -->
     <div x-show="tab==='roster'">
+      {% if team.roster_source == 'games' %}
+      <p style="font-size:.8rem;color:var(--gray-500);margin-bottom:.75rem;">⚠️ Official roster not yet indexed — showing players seen in recorded game lineups.</p>
+      {% endif %}
       {% if team.roster %}
       <div style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:.875rem;">

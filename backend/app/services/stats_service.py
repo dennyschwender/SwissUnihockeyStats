@@ -642,6 +642,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
 
         # Roster with stats
         roster = []
+        roster_source = "official"  # "official" | "games"
         tp_rows = (
             session.query(TeamPlayer, Player)
             .join(Player, TeamPlayer.player_id == Player.person_id)
@@ -653,9 +654,9 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             .all()
         )
 
-        player_stat_map: dict[int, PlayerStatistics] = {}
         if tp_rows:
             pids = [pl.person_id for _, pl in tp_rows]
+            player_stat_map: dict[int, PlayerStatistics] = {}
             for ps in (
                 session.query(PlayerStatistics)
                 .filter(
@@ -667,22 +668,57 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             ):
                 player_stat_map[ps.player_id] = ps
 
-        for tp, pl in tp_rows:
-            ps = player_stat_map.get(pl.person_id)
-            roster.append(
-                {
-                    "player_id": pl.person_id,
-                    "name": pl.full_name or f"Player {pl.person_id}",
-                    "number": tp.jersey_number,
-                    "position": tp.position or "",
-                    "gp": ps.games_played if ps else 0,
-                    "g": ps.goals if ps else 0,
-                    "a": ps.assists if ps else 0,
-                    "pts": ps.points if ps else 0,
-                    "pim": ps.penalty_minutes if ps else 0,
-                    "plus_minus": ps.plus_minus if ps else 0,
-                }
+            for tp, pl in tp_rows:
+                ps = player_stat_map.get(pl.person_id)
+                roster.append(
+                    {
+                        "player_id": pl.person_id,
+                        "name": pl.full_name or f"Player {pl.person_id}",
+                        "number": tp.jersey_number,
+                        "position": tp.position or "",
+                        "gp": ps.games_played if ps else 0,
+                        "g": ps.goals if ps else 0,
+                        "a": ps.assists if ps else 0,
+                        "pts": ps.points if ps else 0,
+                        "pim": ps.penalty_minutes if ps else 0,
+                        "plus_minus": ps.plus_minus if ps else 0,
+                    }
+                )
+        else:
+            # Roster not indexed yet — fall back to players seen in game lineups
+            roster_source = "games"
+            gp_rows = (
+                session.query(GamePlayer, Player)
+                .join(Player, GamePlayer.player_id == Player.person_id)
+                .filter(
+                    GamePlayer.team_id == team_id,
+                    GamePlayer.season_id == season_id,
+                )
+                .all()
             )
+            # Aggregate per player
+            agg: dict[int, dict] = {}
+            for gp, pl in gp_rows:
+                pid = pl.person_id
+                if pid not in agg:
+                    agg[pid] = {
+                        "player_id": pid,
+                        "name": pl.full_name or f"Player {pid}",
+                        "number": gp.jersey_number,
+                        "position": gp.position or "",
+                        "gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0, "plus_minus": 0,
+                    }
+                agg[pid]["gp"] += 1
+                agg[pid]["g"]   += gp.goals or 0
+                agg[pid]["a"]   += gp.assists or 0
+                agg[pid]["pts"] += (gp.goals or 0) + (gp.assists or 0)
+                agg[pid]["pim"] += gp.penalty_minutes or 0
+                # Keep most recent jersey/position if set
+                if gp.jersey_number:
+                    agg[pid]["number"] = gp.jersey_number
+                if gp.position:
+                    agg[pid]["position"] = gp.position
+            roster = sorted(agg.values(), key=lambda r: (r["number"] or 99, r["name"]))
 
         # Recent games (last 10 with a score)
         recent_games_raw = (
@@ -742,6 +778,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             "league_id": team.league_id,
             "game_class": team.game_class,
             "roster": roster,
+            "roster_source": roster_source,
             "recent_games": recent_games,
             "upcoming_games": _get_team_upcoming(session, team_id, season_id),
         }
