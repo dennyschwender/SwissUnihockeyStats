@@ -710,6 +710,21 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             entry["pts"] += (gp.goals or 0) + (gp.assists or 0)
             entry["pim"] += gp.penalty_minutes or 0
 
+        # Players in gp_agg who are officially on a different team this season
+        # (guests / loan appearances) — must be excluded from any extras list.
+        other_team_pids: set[int] = set()
+        if gp_agg:
+            other_team_pids = {
+                pid
+                for (pid,) in session.query(TeamPlayer.player_id)
+                .filter(
+                    TeamPlayer.season_id == season_id,
+                    TeamPlayer.team_id != team_id,
+                    TeamPlayer.player_id.in_(list(gp_agg.keys())),
+                )
+                .all()
+            }
+
         # ── Step 2: official TeamPlayer roster ───────────────────────────────
         roster = []
         roster_source = "official"  # "official" | "games"
@@ -769,10 +784,12 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                     }
                 )
 
-            # Add players seen in game lineups but absent from the official roster
+            # Add players seen in game lineups but absent from the official roster.
+            # Exclude players who are officially registered on a DIFFERENT team this
+            # season — they are guests/loan players and don't belong here.
             official_pids = {pl.person_id for _, pl in tp_rows}
             for pid, info in gp_agg.items():
-                if pid not in official_pids:
+                if pid not in official_pids and pid not in other_team_pids:
                     roster.append(
                         {
                             "player_id": pid,
@@ -788,9 +805,12 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                         }
                     )
         else:
-            # Roster not indexed — build entirely from game lineups
+            # Roster not indexed — build entirely from game lineups,
+            # but still skip players officially on other teams.
             roster_source = "games"
             for pid, info in gp_agg.items():
+                if pid in other_team_pids:
+                    continue
                 roster.append(
                     {
                         "player_id": pid,
