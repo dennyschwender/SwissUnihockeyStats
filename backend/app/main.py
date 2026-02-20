@@ -1489,6 +1489,8 @@ async def league_detail(request: Request, locale: str, league_id: int):
     standings = get_league_standings(league_id)
     topscorers = get_league_top_scorers(league_id, limit=25)
 
+    db = get_database_service()
+
     # Upcoming (unscored) games for this league
     from app.services.stats_service import get_upcoming_games
     group_ids_for_league = [g["id"] for g in league_data.get("groups", [])]
@@ -1531,7 +1533,6 @@ async def league_detail(request: Request, locale: str, league_id: int):
                 })
 
     # Recent results for this league
-    db = get_database_service()
     recent_games = []
     with db.session_scope() as session:
         from app.models.db_models import Team
