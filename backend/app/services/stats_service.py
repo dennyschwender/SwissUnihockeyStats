@@ -1063,6 +1063,55 @@ def get_player_detail(person_id: int) -> dict:
             "pim": sum(r["pim"] for r in career),
         }
 
+        # Recent game appearances (last 10 across all seasons, most recent first)
+        from app.models.db_models import Game as _Game, Team as _Team
+        recent_game_rows = (
+            session.query(GamePlayer, _Game)
+            .join(_Game, GamePlayer.game_id == _Game.id)
+            .filter(GamePlayer.player_id == person_id)
+            .order_by(_Game.game_date.desc())
+            .limit(10)
+            .all()
+        )
+        # Preload team names needed
+        team_ids_needed = set()
+        for _, g in recent_game_rows:
+            team_ids_needed.add(g.home_team_id)
+            team_ids_needed.add(g.away_team_id)
+        team_names = {
+            t.id: t.name
+            for t in session.query(_Team).filter(_Team.id.in_(team_ids_needed)).all()
+        }
+
+        recent_games: list[dict] = []
+        for gp, g in recent_game_rows:
+            is_home = (gp.team_id == g.home_team_id)
+            opp_id = g.away_team_id if is_home else g.home_team_id
+            opp_name = team_names.get(opp_id, f"Team {opp_id}")
+            if g.home_score is not None and g.away_score is not None:
+                my_score = g.home_score if is_home else g.away_score
+                opp_score = g.away_score if is_home else g.home_score
+                if my_score > opp_score:
+                    result_label = "W"
+                elif my_score < opp_score:
+                    result_label = "L"
+                else:
+                    result_label = "D"
+                score_str = f"{my_score}–{opp_score}"
+            else:
+                result_label = ""
+                score_str = ""
+            recent_games.append({
+                "game_id": g.id,
+                "date": g.game_date.strftime("%Y-%m-%d") if g.game_date else "",
+                "home_away": "H" if is_home else "A",
+                "opponent": opp_name,
+                "opponent_id": opp_id,
+                "score": score_str,
+                "result": result_label,
+                "season_id": g.season_id,
+            })
+
         result = {
             "person_id": player.person_id,
             "name": player.full_name or f"Player {player.person_id}",
@@ -1071,6 +1120,7 @@ def get_player_detail(person_id: int) -> dict:
             "year_of_birth": player.year_of_birth,
             "career": career,
             "totals": totals,
+            "recent_games": recent_games,
             "photo_url": None,
         }
 
