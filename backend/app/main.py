@@ -798,8 +798,9 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
     """Module-level coroutine that drives a single indexing job.
 
     Args:
-        max_tier: For events tasks, only process leagues with tier <= max_tier.
-                  1=L-UPL/NLA only, 2=+NLB, … 7=all (default).
+        max_tier: For players (roster) and events tasks, only process leagues
+                  with tier <= max_tier.  1=L-UPL/NLA only, 2=+NLB, … 7=all
+                  (default auto-detects from leagues indexed for the season).
     """
     job = _admin_jobs[job_id]
 
@@ -865,16 +866,26 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
 
         # ── PLAYERS ────────────────────────────────────────────────────────
         if task in ("players", "clubs_path", "full"):
-            if "team_id_list" not in dir():
-                with db_service.session_scope() as s:
-                    team_id_list = [r[0] for r in
-                                    s.query(Team.id).filter(Team.season_id == season).distinct().all()]
+            from app.services.data_indexer import league_tier as _lt
+            # Auto-detect effective tier from leagues already indexed for this season
+            effective_tier_p = max_tier
+            if max_tier == 7:
+                with db_service.session_scope() as _sp:
+                    _lids = [r[0] for r in
+                             _sp.query(League.league_id).filter(League.season_id == season).all()]
+                if _lids:
+                    effective_tier_p = max(_lt(lid) for lid in _lids)
+            # Build tier-filtered team list fresh (ensures newly indexed teams are included)
+            with db_service.session_scope() as s:
+                _t_rows = s.query(Team.id, Team.league_id).filter(Team.season_id == season).distinct().all()
+            team_id_list = [r[0] for r in _t_rows if _lt(r[1] or 0) <= effective_tier_p]
+            auto_lbl_p = " (auto)" if max_tier == 7 else ""
             total = len(team_id_list)
-            push("info", f"Indexing players for {total} teams...")
+            push("info", f"Indexing players for {total} teams (tier ≤ {effective_tier_p}{auto_lbl_p})...")
             players_n = 0
             for i, tid in enumerate(team_id_list, 1):
                 players_n += indexer.index_players_for_team(tid, season, force=force)
-                set_progress(35 + int(i / total * 25))
+                set_progress(35 + int(i / total * 25) if total else 60)
                 await asyncio.sleep(0)
             stats["players"] = players_n
             push("ok", f"Players: {players_n}")

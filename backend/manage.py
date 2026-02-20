@@ -109,39 +109,41 @@ def backfill_team_names(season: int, force: bool):
 @cli.command()
 @click.option("--season", default=2025, help="Season ID")
 @click.option("--league-ids", default=None, help="Comma-separated league DB IDs to index (e.g. 1,2,3). Default: all leagues in season.")
+@click.option("--max-tier", default=7, help="Max league tier to index (1=NLA/L-UPL only, 2=+NLB, 3=+1.Liga … 7=all). Default: 7 (all).")
 @click.option("--force", is_flag=True, default=False, help="Force re-index even if recently synced")
-def index_team_rosters(season: int, league_ids: str, force: bool):
-    """Index player rosters for all teams in the given leagues (via games table)."""
-    from app.services.database import get_database_service
-    from app.models.db_models import Game, LeagueGroup, Team
-    from sqlalchemy import distinct as sa_distinct
+def index_team_rosters(season: int, league_ids: str, max_tier: int, force: bool):
+    """Index player rosters for all teams filtered by league tier.
 
-    click.echo(f"Indexing team rosters for season {season} (force={force})...")
+    Tier reference: 1=NLA/L-UPL, 2=NLB, 3=1.Liga, 4=2.Liga,
+    5=3.Liga, 6=4./5.Liga, 7=Youth/Regional
+    """
+    from app.services.database import get_database_service
+    from app.models.db_models import Team, League
+    from app.services.data_indexer import league_tier
+
+    click.echo(f"Indexing team rosters for season {season} (tier ≤ {max_tier}, force={force})...")
     db = get_database_service()
     indexer = get_data_indexer()
 
     with db.session_scope() as session:
-        q = session.query(sa_distinct(Game.home_team_id)).join(
-            LeagueGroup, Game.group_id == LeagueGroup.id
-        ).filter(Game.season_id == season, Game.home_team_id.isnot(None))
-
         if league_ids:
+            # Filter by explicit league DB IDs
             ids = [int(x.strip()) for x in league_ids.split(",")]
-            q = q.filter(LeagueGroup.league_id.in_(ids))
+            rows = (
+                session.query(Team.id)
+                .filter(Team.season_id == season)
+                .join(League, (Team.league_id == League.league_id) & (Team.season_id == League.season_id))
+                .filter(League.id.in_(ids))
+                .distinct()
+                .all()
+            )
+            team_ids = sorted(r[0] for r in rows)
+        else:
+            # Filter by tier using Team.league_id (API league_id)
+            rows = session.query(Team.id, Team.league_id).filter(Team.season_id == season).distinct().all()
+            team_ids = sorted(r[0] for r in rows if league_tier(r[1] or 0) <= max_tier)
 
-        home_ids = [r[0] for r in q.all()]
-
-        q2 = session.query(sa_distinct(Game.away_team_id)).join(
-            LeagueGroup, Game.group_id == LeagueGroup.id
-        ).filter(Game.season_id == season, Game.away_team_id.isnot(None))
-
-        if league_ids:
-            q2 = q2.filter(LeagueGroup.league_id.in_(ids))
-
-        away_ids = [r[0] for r in q2.all()]
-
-    team_ids = sorted(set(home_ids) | set(away_ids))
-    click.echo(f"Found {len(team_ids)} distinct teams. Indexing rosters...")
+    click.echo(f"Found {len(team_ids)} teams (tier ≤ {max_tier}). Indexing rosters...")
 
     total = 0
     for i, tid in enumerate(team_ids, 1):
