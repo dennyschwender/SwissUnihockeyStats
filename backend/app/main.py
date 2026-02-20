@@ -1539,11 +1539,15 @@ async def league_detail(request: Request, locale: str, league_id: int):
 
 
 @app.get("/{locale}/teams", response_class=HTMLResponse)
-async def teams_page(request: Request, locale: str):
+async def teams_page(request: Request, locale: str, season: int = None):
     """Teams listing page"""
-    from app.services.stats_service import get_teams_list
+    from app.services.stats_service import get_teams_list, get_seasons_with_teams
     try:
-        teams_list = get_teams_list(sort="league", limit=200)
+        seasons = get_seasons_with_teams()
+        if season is None:
+            season = next((s["id"] for s in seasons if s["current"]), seasons[0]["id"] if seasons else None)
+
+        teams_list = get_teams_list(season_id=season, sort="league", limit=200)
         error_message = None
 
         if not teams_list:
@@ -1561,6 +1565,8 @@ async def teams_page(request: Request, locale: str):
                 "locale": locale,
                 "t": get_translations(locale),
                 "teams": teams_list,
+                "seasons": seasons,
+                "current_season_id": season,
                 "error_message": error_message,
             }
         )
@@ -1570,12 +1576,12 @@ async def teams_page(request: Request, locale: str):
 
 
 @app.get("/{locale}/teams/search", response_class=HTMLResponse)
-async def teams_search(request: Request, locale: str, q: str = "", sort: str = "league", leagues: str = ""):
+async def teams_search(request: Request, locale: str, q: str = "", sort: str = "league", leagues: str = "", season: int = None):
     """HTMX endpoint for team search"""
     from app.services.stats_service import get_teams_list
 
     league_names = [n.strip() for n in leagues.split(",") if n.strip()] if leagues else None
-    teams = get_teams_list(q=q, sort=sort, league_names=league_names, limit=200)
+    teams = get_teams_list(season_id=season, q=q, sort=sort, league_names=league_names, limit=200)
 
     if not teams and not any([q, league_names]):
         # DB empty — fall back to API cache with basic name filter

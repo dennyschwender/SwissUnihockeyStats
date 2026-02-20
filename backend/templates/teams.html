@@ -31,6 +31,7 @@
        leagues: [],
        activeTier: 'all',
        sort: 'league',
+       season: {{ current_season_id }},
        _t: null,
        _herren:      ['Herren NLB','Herren L-UPL','Herren 1. Liga','Herren 2. Liga','Herren 3. Liga','Herren 4. Liga','Herren 5. Liga'],
        _damen:       ['Damen NLB','Damen L-UPL','Damen 1. Liga','Damen 2. Liga','Damen 3. Liga'],
@@ -63,11 +64,12 @@
          const url = '/{{ locale }}/teams/search'
            + '?q='       + encodeURIComponent(this.q)
            + '&leagues=' + encodeURIComponent(this.leagues.join(','))
-           + '&sort='    + this.sort;
+           + '&sort='    + this.sort
+           + '&season='  + this.season;
          this._t = setTimeout(() => htmx.ajax('GET', url, {target:'#teams-list', swap:'innerHTML'}), delay || 0);
        },
        get anyActive() {
-         return this.q !== '' || this.leagues.length > 0 || this.sort !== 'league';
+         return this.q !== '' || this.leagues.length > 0 || this.sort !== 'league' || this.season !== {{ current_season_id }};
        }
      }">
 
@@ -107,7 +109,7 @@
             <button
                 x-show="anyActive"
                 x-transition
-                @click="q=''; leagues=[]; activeTier='all'; sort='league'; fetch()"
+                @click="q=''; leagues=[]; activeTier='all'; sort='league'; season={{ current_season_id }}; fetch()"
                 class="chip"
                 style="margin-left:auto; border-color:var(--swiss-red); color:var(--swiss-red);"
             >✕ Clear filters</button>
@@ -158,19 +160,32 @@
 
     </div>
 
-    <!-- Sort -->
-    <div style="display:flex; align-items:center; gap:.5rem;">
-        <span class="filter-label">Sort</span>
-        <template x-for="opt in [
-            {v:'league', l:'By League'},
-            {v:'name',   l:'Name A–Z'}
-        ]" :key="opt.v">
+    <!-- Sort + Season -->
+    <div style="display:flex; align-items:center; gap:1.25rem; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:.5rem;">
+            <span class="filter-label">Sort</span>
+            <template x-for="opt in [
+                {v:'league', l:'By League'},
+                {v:'name',   l:'Name A\u2013Z'}
+            ]" :key="opt.v">
+                <button
+                    @click="sort=opt.v; fetch()"
+                    :class="sort===opt.v ? 'chip chip-active' : 'chip'"
+                    x-text="opt.l">
+                </button>
+            </template>
+        </div>
+        {% if seasons | length > 1 %}
+        <div style="display:flex; align-items:center; gap:.5rem;">
+            <span class="filter-label">Season</span>
+            {% for s in seasons %}
             <button
-                @click="sort=opt.v; fetch()"
-                :class="sort===opt.v ? 'chip chip-active' : 'chip'"
-                x-text="opt.l">
-            </button>
-        </template>
+                @click="season={{ s.id }}; leagues=[]; activeTier='all'; fetch()"
+                :class="season==={{ s.id }} ? 'chip chip-active' : 'chip'"
+            >{{ s.name }}</button>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 
 </div>

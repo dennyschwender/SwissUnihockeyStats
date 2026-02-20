@@ -57,6 +57,25 @@ def get_all_seasons() -> list[dict]:
         ]
 
 
+def get_seasons_with_teams() -> list[dict]:
+    """Return only seasons that have at least one team indexed, ordered descending."""
+    db = get_database_service()
+    with db.session_scope() as session:
+        current_id = _get_current_season_id(session)
+        rows = (
+            session.query(Season.id, Season.text, func.count(Team.id).label("tc"))
+            .outerjoin(Team, Team.season_id == Season.id)
+            .group_by(Season.id)
+            .having(func.count(Team.id) > 0)
+            .order_by(Season.id.desc())
+            .all()
+        )
+        return [
+            {"id": r.id, "name": r.text or str(r.id), "current": r.id == current_id}
+            for r in rows
+        ]
+
+
 def get_leagues_from_db(season_id: Optional[int] = None) -> list[dict]:
     """Return all leagues for a season, grouped metadata for template use."""
     db = get_database_service()
