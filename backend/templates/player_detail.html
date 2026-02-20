@@ -46,7 +46,6 @@
           <th style="padding:.6rem .5rem;text-align:center;">A</th>
           <th style="padding:.6rem .75rem;text-align:center;font-weight:700;">PTS</th>
           <th style="padding:.6rem .5rem;text-align:center;">PIM</th>
-          <th style="padding:.6rem .5rem;text-align:center;">+/-</th>
         </tr>
       </thead>
       <tbody>
@@ -61,9 +60,6 @@
           <td style="padding:.6rem .5rem;text-align:center;">{{ row.a }}</td>
           <td style="padding:.6rem .75rem;text-align:center;font-weight:700;">{{ row.pts }}</td>
           <td style="padding:.6rem .5rem;text-align:center;">{{ row.pim }}</td>
-          <td style="padding:.6rem .5rem;text-align:center;{% if row.plus_minus > 0 %}color:#16a34a{% elif row.plus_minus < 0 %}color:#dc2626{% endif %}">
-            {{ "+" if row.plus_minus > 0 else "" }}{{ row.plus_minus }}
-          </td>
         </tr>
         {% endfor %}
         <!-- Totals row -->
@@ -74,7 +70,6 @@
           <td style="padding:.6rem .5rem;text-align:center;">{{ player.totals.a }}</td>
           <td style="padding:.6rem .75rem;text-align:center;">{{ player.totals.pts }}</td>
           <td style="padding:.6rem .5rem;text-align:center;">{{ player.totals.pim }}</td>
-          <td style="padding:.6rem .5rem;text-align:center;">—</td>
         </tr>
       </tbody>
     </table>

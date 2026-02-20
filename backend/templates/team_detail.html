@@ -85,7 +85,6 @@
               <th style="{{ th_ctr }}"><button @click="sort('a')" style="{{ btn }}">A<span style="font-size:.7rem;opacity:.55;" x-text="icon('a')"></span></button></th>
               <th style="{{ th_ctr }}font-weight:700;"><button @click="sort('pts')" style="{{ btn }}font-weight:700;">PTS<span style="font-size:.7rem;opacity:.55;" x-text="icon('pts')"></span></button></th>
               <th style="{{ th_ctr }}"><button @click="sort('pim')" style="{{ btn }}">PIM<span style="font-size:.7rem;opacity:.55;" x-text="icon('pim')"></span></button></th>
-              <th style="{{ th_ctr }}"><button @click="sort('plus_minus')" style="{{ btn }}">+/-<span style="font-size:.7rem;opacity:.55;" x-text="icon('plus_minus')"></span></button></th>
             </tr>
           </thead>
           <tbody>
@@ -101,8 +100,6 @@
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="p.a"></td>
                 <td style="padding:.6rem .75rem;text-align:center;font-weight:700;" x-text="p.pts"></td>
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="p.pim"></td>
-                <td :style="'padding:.6rem .5rem;text-align:center;' + (p.plus_minus > 0 ? 'color:#16a34a' : (p.plus_minus < 0 ? 'color:#dc2626' : ''))"
-                    x-text="(p.plus_minus > 0 ? '+' : '') + p.plus_minus"></td>
               </tr>
             </template>
           </tbody>

@@ -472,7 +472,6 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
                     "a": ps.assists,
                     "pts": ps.points,
                     "pim": ps.penalty_minutes,
-                    "plus_minus": ps.plus_minus,
                 }
             )
         return result
@@ -613,7 +612,6 @@ def get_player_leaderboard(
                     "a": ps.assists,
                     "pts": ps.points,
                     "pim": ps.penalty_minutes,
-                    "plus_minus": ps.plus_minus,
                 }
             )
         return {"players": result, "total": total, "offset": offset, "limit": limit}
@@ -650,7 +648,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                 TeamPlayer.team_id == team_id,
                 TeamPlayer.season_id == season_id,
             )
-            .order_by(TeamPlayer.jersey_number)
+            .order_by(TeamPlayer.jersey_number.nulls_last())
             .all()
         )
 
@@ -669,13 +667,12 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             ):
                 pid = ps.player_id
                 if pid not in player_stat_map:
-                    player_stat_map[pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0, "plus_minus": 0}
-                player_stat_map[pid]["gp"]        += ps.games_played or 0
-                player_stat_map[pid]["g"]         += ps.goals or 0
-                player_stat_map[pid]["a"]         += ps.assists or 0
-                player_stat_map[pid]["pts"]       += ps.points or 0
-                player_stat_map[pid]["pim"]       += ps.penalty_minutes or 0
-                player_stat_map[pid]["plus_minus"] += ps.plus_minus or 0
+                    player_stat_map[pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0}
+                player_stat_map[pid]["gp"]  += ps.games_played or 0
+                player_stat_map[pid]["g"]   += ps.goals or 0
+                player_stat_map[pid]["a"]   += ps.assists or 0
+                player_stat_map[pid]["pts"] += ps.points or 0
+                player_stat_map[pid]["pim"] += ps.penalty_minutes or 0
 
             for tp, pl in tp_rows:
                 ps = player_stat_map.get(pl.person_id) or {}
@@ -690,7 +687,6 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                         "a":  ps.get("a", 0),
                         "pts": ps.get("pts", 0),
                         "pim": ps.get("pim", 0),
-                        "plus_minus": ps.get("plus_minus", 0),
                     }
                 )
         else:
@@ -715,7 +711,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                         "name": pl.full_name or f"Player {pid}",
                         "number": gp.jersey_number,
                         "position": gp.position or "",
-                        "gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0, "plus_minus": 0,
+                        "gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0,
                     }
                 agg[pid]["gp"] += 1
                 agg[pid]["g"]   += gp.goals or 0
@@ -867,7 +863,6 @@ def get_player_detail(person_id: int) -> dict:
                     "a": ps.assists,
                     "pts": ps.points,
                     "pim": ps.penalty_minutes,
-                    "plus_minus": ps.plus_minus,
                 }
             )
 
