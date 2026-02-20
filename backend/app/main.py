@@ -1589,25 +1589,21 @@ async def teams_search(request: Request, locale: str, q: str = "", mode: str = "
 
     cat_colors = {"Men": "#3b82f6", "Women": "#ec4899", "Mixed": "#8b5cf6"}
 
-    html = '<div class="cards-grid">'
+    html = '<div class="teams-list">'
     for team in teams:
         team_id  = team.get("id", "")
         name     = team.get("text", "")
         category = team.get("category") or ""
         league   = team.get("league_name") or ""
-        cat_color   = cat_colors.get(category, "var(--text-secondary)")
-        badge_html  = (f'<span style="font-size:0.7rem;font-weight:700;color:{cat_color};'
-                       f'text-transform:uppercase;letter-spacing:0.05em;">{category}</span>') if category else ""
-        league_html = f'<span style="font-size:0.8rem;color:var(--gray-600);">{league}</span>' if league else ""
-        meta_html   = (f'<p style="margin:0.4rem 0 0;display:flex;flex-direction:column;gap:0.2rem;">'
-                       f'{badge_html}{league_html}</p>') if (category or league) else ""
-        html += f'''
-        <div class="card" style="cursor: pointer;" onclick="window.location='/{locale}/team/{team_id}'">
-            <div class="card-icon">👥</div>
-            <h3>{name}</h3>
-            {meta_html}
-        </div>
-        '''
+        cat_color = cat_colors.get(category, "var(--gray-400)")
+        html += (
+            f'<a href="/{locale}/team/{team_id}" class="teams-list-row">'
+            f'<span class="teams-list-badge" style="color:{cat_color}">{category or "\u2014"}</span>'
+            f'<span class="teams-list-name">{name}</span>'
+            f'<span class="teams-list-league">{league}</span>'
+            f'<span class="teams-list-arrow">\u203a</span>'
+            f'</a>'
+        )
     html += '</div>'
 
     if not teams:

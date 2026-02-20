@@ -194,25 +194,14 @@
 
 <!-- Loading skeleton template for htmx -->
 <template id="teams-loading-skeleton">
-    <div class="cards-grid">
-        <div class="skeleton-card">
-            <div class="skeleton skeleton-avatar" style="margin-bottom: 1rem;"></div>
-            <div class="skeleton skeleton-title"></div>
-            <div class="skeleton skeleton-text"></div>
-            <div class="skeleton skeleton-text"></div>
+    <div class="teams-list">
+        {% for _ in range(8) %}
+        <div class="teams-list-row" style="pointer-events:none">
+            <span class="skeleton" style="width:3rem;height:.9rem;border-radius:.25rem;"></span>
+            <span class="skeleton" style="width:40%;height:.9rem;border-radius:.25rem;"></span>
+            <span class="skeleton" style="width:30%;height:.9rem;border-radius:.25rem;"></span>
         </div>
-        <div class="skeleton-card">
-            <div class="skeleton skeleton-avatar" style="margin-bottom: 1rem;"></div>
-            <div class="skeleton skeleton-title"></div>
-            <div class="skeleton skeleton-text"></div>
-            <div class="skeleton skeleton-text"></div>
-        </div>
-        <div class="skeleton-card">
-            <div class="skeleton skeleton-avatar" style="margin-bottom: 1rem;"></div>
-            <div class="skeleton skeleton-title"></div>
-            <div class="skeleton skeleton-text"></div>
-            <div class="skeleton skeleton-text"></div>
-        </div>
+        {% endfor %}
     </div>
 </template>
 {% endblock %}
