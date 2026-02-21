@@ -497,6 +497,20 @@ html.dark-mode .search-item:hover {
   background: var(--bg-secondary);
 }
 
+html.dark-mode .universal-search-bar {
+  background: var(--bg-secondary);
+}
+
+html.dark-mode .universal-search-input {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+html.dark-mode .universal-search-results {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
 
 /* ============================================
    PWA INSTALL PROMPT
@@ -761,7 +775,7 @@ html.dark-mode .search-item:hover {
   position: relative;
   display: flex;
   align-items: center;
-  background: var(--swiss-white);
+  background: var(--card-bg);
   border-radius: 50px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
@@ -786,6 +800,7 @@ html.dark-mode .search-item:hover {
   border-radius: 50px;
   outline: none;
   background: transparent;
+  color: var(--text-primary);
 }
 
 .universal-search-input::placeholder {
@@ -797,7 +812,7 @@ html.dark-mode .search-item:hover {
   top: calc(100% + 0.5rem);
   left: 0;
   right: 0;
-  background: var(--swiss-white);
+  background: var(--card-bg);
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   max-height: 600px;
