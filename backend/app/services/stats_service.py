@@ -649,7 +649,7 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
     Includes the league where they played most games.
     """
     from app.services.database import get_database_service
-    from app.models.db_models import PlayerStatistics, Player
+    from app.models.db_models import PlayerStatistics, Player, League
     from sqlalchemy import func
     
     if season_id is None:
@@ -658,6 +658,24 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
     
     db = get_database_service()
     with db.session_scope() as session:
+        # Build team_name → gender via Game→LeagueGroup→League (avoids ambiguous abbrev)
+        _GC_GENDER = {11: "M", 21: "W"}
+        team_gender: dict[str, str] = {}
+        for _tname, _gc in (
+            session.query(Team.name, League.game_class)
+            .join(Game, or_(
+                (Game.home_team_id == Team.id) & (Game.season_id == Team.season_id),
+                (Game.away_team_id == Team.id) & (Game.season_id == Team.season_id)
+            ))
+            .join(LeagueGroup, LeagueGroup.id == Game.group_id)
+            .join(League, League.id == LeagueGroup.league_id)
+            .filter(League.season_id == season_id, League.game_class.in_([11, 21]))
+            .distinct()
+            .all()
+        ):
+            if _tname:
+                team_gender[_tname] = _GC_GENDER[_gc]
+
         # Aggregate stats per player across all teams
         stats = (
             session.query(
@@ -699,7 +717,7 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
                 team_name, team_id, league_abbrev, _ = primary_stats
             else:
                 team_name, team_id, league_abbrev = "Unknown", None, None
-            
+
             result.append({
                 "rank": i,
                 "player_id": player_id,
@@ -707,6 +725,7 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
                 "team_name": team_name or "Unknown",
                 "team_id": team_id,
                 "league": league_abbrev or "",
+                "gender": team_gender.get(team_name or "", ""),
                 "gp": gp or 0,
                 "g": g or 0,
                 "a": a or 0,
@@ -730,53 +749,99 @@ def get_player_leaderboard(
 ) -> dict:
     """
     Global player stats leaderboard for a season, optionally filtered by team.
+    Aggregates across all leagues/teams a player appeared in that season.
     order_by: 'points' | 'goals' | 'assists' | 'pim'
     """
+    from sqlalchemy import func as _func
     db = get_database_service()
     with db.session_scope() as session:
         if season_id is None:
             season_id = _get_current_season_id(session)
 
-        q = (
-            session.query(PlayerStatistics, Player, Team)
-            .join(Player, PlayerStatistics.player_id == Player.person_id)
-            .join(
-                Team,
-                (Team.id == PlayerStatistics.team_id)
-                & (Team.season_id == PlayerStatistics.season_id),
-                isouter=True,
+        gp_sum  = _func.sum(PlayerStatistics.games_played)
+        g_sum   = _func.sum(PlayerStatistics.goals)
+        a_sum   = _func.sum(PlayerStatistics.assists)
+        pts_sum = _func.sum(PlayerStatistics.points)
+        pim_sum = _func.sum(PlayerStatistics.penalty_minutes)
+
+        order_expr = {
+            "goals":   g_sum.desc(),
+            "assists": a_sum.desc(),
+            "pim":     pim_sum.desc(),
+        }.get(order_by, pts_sum.desc())
+
+        base_filter = [PlayerStatistics.season_id == season_id]
+        if team_id is not None:
+            base_filter.append(PlayerStatistics.team_name.in_(
+                session.query(Team.name).filter(Team.id == team_id)
+            ))
+
+        total = (
+            session.query(_func.count(_func.distinct(PlayerStatistics.player_id)))
+            .filter(*base_filter)
+            .scalar()
+        ) or 0
+
+        rows = (
+            session.query(
+                PlayerStatistics.player_id,
+                Player.full_name,
+                gp_sum.label('gp'),
+                g_sum.label('g'),
+                a_sum.label('a'),
+                pts_sum.label('pts'),
+                pim_sum.label('pim'),
             )
-            .filter(PlayerStatistics.season_id == season_id)
+            .join(Player, PlayerStatistics.player_id == Player.person_id)
+            .filter(*base_filter)
+            .group_by(PlayerStatistics.player_id, Player.full_name)
+            .order_by(order_expr, g_sum.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
         )
 
-        if team_id is not None:
-            q = q.filter(PlayerStatistics.team_id == team_id)
-
-        order_col = {
-            "goals": PlayerStatistics.goals,
-            "assists": PlayerStatistics.assists,
-            "pim": PlayerStatistics.penalty_minutes,
-        }.get(order_by, PlayerStatistics.points)
-
-        total = q.count()
-        q = q.order_by(order_col.desc(), PlayerStatistics.goals.desc()).offset(offset).limit(limit)
+        # Build team_name → gender via Game→LeagueGroup→League (avoids ambiguous abbrev)
+        _GC_GENDER = {11: "M", 21: "W"}
+        team_gender: dict[str, str] = {}
+        for _tname, _gc in (
+            session.query(Team.name, League.game_class)
+            .join(Game, or_(
+                (Game.home_team_id == Team.id) & (Game.season_id == Team.season_id),
+                (Game.away_team_id == Team.id) & (Game.season_id == Team.season_id)
+            ))
+            .join(LeagueGroup, LeagueGroup.id == Game.group_id)
+            .join(League, League.id == LeagueGroup.league_id)
+            .filter(League.season_id == season_id, League.game_class.in_([11, 21]))
+            .distinct()
+            .all()
+        ):
+            if _tname:
+                team_gender[_tname] = _GC_GENDER[_gc]
 
         result = []
-        for i, (ps, pl, tm) in enumerate(q.all(), offset + 1):
-            result.append(
-                {
-                    "rank": i,
-                    "player_id": pl.person_id,
-                    "player_name": pl.full_name or f"Player {pl.person_id}",
-                    "team_name": (tm.name if tm else None) or f"Team {ps.team_id}",
-                    "team_id": ps.team_id,
-                    "gp": ps.games_played,
-                    "g": ps.goals,
-                    "a": ps.assists,
-                    "pts": ps.points,
-                    "pim": ps.penalty_minutes,
-                }
+        for i, (player_id, full_name, gp, g, a, pts, pim) in enumerate(rows, offset + 1):
+            primary = (
+                session.query(PlayerStatistics.team_name, PlayerStatistics.league_abbrev)
+                .filter(PlayerStatistics.player_id == player_id,
+                        PlayerStatistics.season_id == season_id)
+                .order_by(PlayerStatistics.games_played.desc())
+                .first()
             )
+            _abbrev = (primary[1] if primary else None) or ""
+            result.append({
+                "rank": i,
+                "player_id": player_id,
+                "player_name": full_name or f"Player {player_id}",
+                "team_name": (primary[0] if primary else None) or "—",
+                "league": _abbrev,
+                "gender": team_gender.get((primary[0] if primary else None) or "", ""),
+                "gp": gp or 0,
+                "g": g or 0,
+                "a": a or 0,
+                "pts": pts or 0,
+                "pim": pim or 0,
+            })
         return {"players": result, "total": total, "offset": offset, "limit": limit}
 
 

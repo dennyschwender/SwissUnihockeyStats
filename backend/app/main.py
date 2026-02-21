@@ -1833,14 +1833,29 @@ async def team_detail(request: Request, locale: str, team_id: int, season: int =
 async def players_page(request: Request, locale: str, order_by: str = "points", page: int = 1):
     """Players leaderboard page — DB-backed with pagination"""
     from app.services.stats_service import get_player_leaderboard
+    from app.services.database import get_database_service
+    from app.models.db_models import PlayerStatistics as _PS
+    from sqlalchemy import func as _func
 
     per_page = 50
     valid_order = {"points", "goals", "assists", "pim"}
     if order_by not in valid_order:
         order_by = "points"
 
+    # Use the same active-season logic as the home page:
+    # the season with the most PlayerStatistics rows in the DB.
+    db = get_database_service()
+    with db.session_scope() as session:
+        row = (
+            session.query(_PS.season_id, _func.count(_PS.id).label('cnt'))
+            .group_by(_PS.season_id)
+            .order_by(_func.count(_PS.id).desc())
+            .first()
+        )
+        active_season = row[0] if row else None
+
     offset = (page - 1) * per_page
-    data = get_player_leaderboard(limit=per_page, offset=offset, order_by=order_by)
+    data = get_player_leaderboard(season_id=active_season, limit=per_page, offset=offset, order_by=order_by)
     total_pages = max(1, (data["total"] + per_page - 1) // per_page)
     return templates.TemplateResponse(
         request,
@@ -1960,24 +1975,6 @@ async def game_detail(request: Request, locale: str, game_id: int):
             "t": get_translations(locale),
             "game": box,
             "error_message": error_message,
-        },
-    )
-
-
-@app.get("/{locale}/rankings", response_class=HTMLResponse)
-async def rankings_page(request: Request, locale: str):
-    """Rankings page — global player leaderboard from DB"""
-    from app.services.stats_service import get_player_leaderboard
-
-    data = get_player_leaderboard(limit=50, order_by="points")
-    return templates.TemplateResponse(
-        request,
-        "rankings.html",
-        {
-            "locale": locale,
-            "t": get_translations(locale),
-            "topscorers": data["players"],
-            "standings": [],
         },
     )
 

@@ -39,6 +39,7 @@
           <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
           <th style="padding:.6rem .75rem;text-align:left;">Player</th>
           <th style="padding:.6rem .75rem;text-align:left;">Team</th>
+          <th style="padding:.6rem .75rem;text-align:left;">League</th>
           <th style="padding:.6rem .5rem;text-align:center;">GP</th>
           <th style="padding:.6rem .5rem;text-align:center;">G</th>
           <th style="padding:.6rem .5rem;text-align:center;">A</th>
@@ -56,6 +57,7 @@
           </td>
           <td style="padding:.6rem .75rem;font-weight:500;">{{ row.player_name }}</td>
           <td style="padding:.6rem .75rem;color:var(--gray-600);">{{ row.team_name }}</td>
+          <td style="padding:.6rem .75rem;font-size:.8rem;color:var(--gray-500);white-space:nowrap;">{% if row.gender %}{{ row.gender }} · {% endif %}{{ row.league }}</td>
           <td style="padding:.6rem .5rem;text-align:center;">{{ row.gp }}</td>
           <td style="padding:.6rem .5rem;text-align:center;">{{ row.g }}</td>
           <td style="padding:.6rem .5rem;text-align:center;">{{ row.a }}</td>

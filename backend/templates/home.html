@@ -105,13 +105,14 @@
 <div style="margin-top:1.5rem;">
   <div style="background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.75rem;padding:1.25rem;">
     <h2 style="font-size:1rem;font-weight:700;margin:0 0 1rem;display:flex;align-items:center;gap:.4rem;">
-      🏅 <a href="/{{ locale }}/rankings" style="color:inherit;text-decoration:none;">Overall Top Scorers</a>
+      🏅 <a href="/{{ locale }}/players" style="color:inherit;text-decoration:none;">Overall Top Scorers</a>
     </h2>
     <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
       <thead>
         <tr style="color:var(--gray-400);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;">
           <th style="padding:.25rem .4rem;text-align:left;">#</th>
           <th style="padding:.25rem .4rem;text-align:left;">Player</th>
+          <th style="padding:.25rem .4rem;text-align:center;">GP</th>
           <th style="padding:.25rem .4rem;text-align:center;">G</th>
           <th style="padding:.25rem .4rem;text-align:center;">A</th>
           <th style="padding:.25rem .4rem;text-align:center;font-weight:700;">PTS</th>
@@ -125,9 +126,10 @@
           <td style="padding:.35rem .4rem;font-weight:500;">
             {{ p.player_name }}<br>
             <span style="font-size:.72rem;color:var(--gray-400);">
-              {{ p.team_name }}{% if p.league %} <span style="color:var(--swiss-red);font-weight:600;">• {{ p.league }}</span>{% endif %}
+              {% if p.gender %}{{ p.gender }} · {% endif %}{{ p.team_name }}{% if p.league %} <span style="color:var(--swiss-red);font-weight:600;">• {{ p.league }}</span>{% endif %}
             </span>
           </td>
+          <td style="padding:.35rem .4rem;text-align:center;color:var(--gray-500);">{{ p.gp }}</td>
           <td style="padding:.35rem .4rem;text-align:center;">{{ p.g }}</td>
           <td style="padding:.35rem .4rem;text-align:center;">{{ p.a }}</td>
           <td style="padding:.35rem .4rem;text-align:center;font-weight:700;">{{ p.pts }}</td>
@@ -135,7 +137,7 @@
         {% endfor %}
       </tbody>
     </table>
-    <a href="/{{ locale }}/rankings" style="display:block;text-align:right;margin-top:.75rem;font-size:.78rem;color:var(--swiss-red,#e11d48);text-decoration:none;">View all rankings →</a>
+    <a href="/{{ locale }}/players" style="display:block;text-align:right;margin-top:.75rem;font-size:.78rem;color:var(--swiss-red,#e11d48);text-decoration:none;">View all players →</a>
   </div>
 </div>
 {% endif %}
@@ -171,11 +173,11 @@
         <p>{{ t.games.subtitle }}</p>
     </a>
 
-    <!-- Rankings Card -->
-    <a href="/{{ locale }}/rankings" class="card">
-        <div class="card-icon">📊</div>
-        <h3>{{ t.nav.rankings }}</h3>
-        <p>{{ t.rankings.subtitle }}</p>
+    <!-- Players Card -->
+    <a href="/{{ locale }}/players" class="card">
+        <div class="card-icon">🏅</div>
+        <h3>{{ t.nav.players }}</h3>
+        <p>{{ t.players.subtitle }}</p>
     </a>
 
     <!-- Favorites Card -->
