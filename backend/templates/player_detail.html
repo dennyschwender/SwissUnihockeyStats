@@ -28,6 +28,25 @@
 
   {% if player %}
 
+  <!-- Career totals summary -->
+  {% if player.totals and player.totals.gp %}
+  <div style="display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:2rem;">
+    {% set stats = [
+      ('GP',  player.totals.gp),
+      ('G',   player.totals.g),
+      ('A',   player.totals.a),
+      ('PTS', player.totals.pts),
+      ('PIM', player.totals.pim),
+    ] %}
+    {% for label, val in stats %}
+    <div style="display:flex;flex-direction:column;align-items:center;padding:.6rem 1.1rem;background:var(--card-bg,white);border:1px solid var(--gray-200,#e5e7eb);border-radius:.5rem;min-width:64px;">
+      <span style="font-size:1.35rem;font-weight:700;">{{ val }}</span>
+      <span style="font-size:.7rem;font-weight:600;color:var(--gray-400);letter-spacing:.05em;margin-top:.1rem;">{{ label }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <!-- Season History (collapsible) -->
   {% if player.career %}
   <div x-data="{ expanded: false }" style="margin-bottom:2rem;">
@@ -58,9 +77,15 @@
           <tr style="border-bottom:1px solid var(--gray-100);"
             {% if loop.index > 5 %}x-show="expanded"{% endif %}
             onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
-            <td style="padding:.6rem .75rem;font-weight:500;">{{ row.season_text }}</td>
-            <td style="padding:.6rem .75rem;color:var(--gray-500);font-size:.8rem;">{{ row.league }}</td>
-            <td style="padding:.6rem .75rem;color:var(--gray-600);">{{ row.team_name }}</td>
+            <td style="padding:.6rem .75rem;font-weight:500;">
+              <a href="/{{ locale }}/leagues?season={{ row.season_id }}" style="color:inherit;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ row.season_text }}</a>
+            </td>
+            <td style="padding:.6rem .75rem;color:var(--gray-500);font-size:.8rem;">
+              {% if row.league_db_id %}<a href="/{{ locale }}/league/{{ row.league_db_id }}" style="color:inherit;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ row.league }}</a>{% else %}{{ row.league }}{% endif %}
+            </td>
+            <td style="padding:.6rem .75rem;color:var(--gray-600);">
+              {% if row.team_db_id %}<a href="/{{ locale }}/team/{{ row.team_db_id }}?season={{ row.season_id }}" style="color:inherit;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ row.team_name }}</a>{% else %}{{ row.team_name }}{% endif %}
+            </td>
             <td style="padding:.6rem .5rem;text-align:center;">{{ row.gp }}</td>
             <td style="padding:.6rem .5rem;text-align:center;">{{ row.g }}</td>
             <td style="padding:.6rem .5rem;text-align:center;">{{ row.a }}</td>

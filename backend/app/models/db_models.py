@@ -290,6 +290,10 @@ class PlayerStatistics(Base):
     assists = Column(Integer, default=0)
     points = Column(Integer, default=0)
     penalty_minutes = Column(Integer, default=0)
+    pen_2min  = Column(Integer, default=0)   # count of 2-minute penalties
+    pen_5min  = Column(Integer, default=0)   # count of 5-minute penalties
+    pen_10min = Column(Integer, default=0)   # count of 10-minute penalties
+    pen_match = Column(Integer, default=0)   # count of match penalties
     plus_minus = Column(Integer, default=0)
     last_updated = Column(DateTime, default=datetime.utcnow)
     

@@ -32,7 +32,26 @@
   },
   "leagues": {
     "title": "Ligen",
-    "subtitle": "Alle Schweizer Unihockey-Ligen"
+    "subtitle": "Alle Schweizer Unihockey-Ligen",
+    "filter_sex": "Geschlecht",
+    "filter_age": "Kategorie",
+    "filter_field": "Feld",
+    "filter_all": "Alle",
+    "filter_men": "Herren",
+    "filter_women": "Damen",
+    "filter_mixed": "Mixed",
+    "filter_senior": "Aktive",
+    "filter_senioren": "Senioren",
+    "big_field": "Grossfeld",
+    "small_field": "Kleinfeld",
+    "gender_men": "Herren",
+    "gender_women": "Damen",
+    "gender_mixed": "Mixed",
+    "gender_other": "Andere",
+    "count_one": "Liga angezeigt",
+    "count_many": "Ligen angezeigt",
+    "no_match": "Keine Ligen entsprechen den aktuellen Filtern.",
+    "clear_filters": "Filter zurücksetzen"
   },
   "teams": {
     "title": "Teams",

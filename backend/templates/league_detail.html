@@ -13,12 +13,30 @@
 
   <div style="margin-bottom:2rem;">
     <a href="/{{ locale }}/leagues" style="color:var(--gray-500);font-size:.875rem;text-decoration:none;">← Leagues</a>
-    <h1 style="margin:.5rem 0 0;font-size:2rem;font-weight:700;">🏆 {{ league.name if league else "League" }}</h1>
-    {% if league.game_class %}
-    <span style="font-size:.875rem;color:var(--gray-500);">
-      {% if league.game_class in [11,12] %}Men{% elif league.game_class in [21,22] %}Women{% elif league.game_class == 31 %}Mixed{% endif %}
-    </span>
-    {% endif %}
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-top:.5rem;">
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+        <h1 style="margin:0;font-size:2rem;font-weight:700;">🏆 {{ league.name if league else "League" }}</h1>
+        {% if league.game_class %}
+        <span style="font-size:.875rem;color:var(--gray-500);">
+          {% if league.game_class in [11,12] %}Men{% elif league.game_class in [21,22] %}Women{% elif league.game_class == 31 %}Mixed{% endif %}
+        </span>
+        {% endif %}
+        {% if selected_season_name and available_seasons|length <= 1 %}
+        <span style="font-size:.875rem;color:var(--gray-500);">{{ selected_season_name }}</span>
+        {% endif %}
+      </div>
+      {% if available_seasons|length > 1 %}
+      <div style="display:flex;align-items:center;gap:.5rem;">
+        <label style="font-size:.85rem;font-weight:600;color:var(--gray-500,#6b7280);">Season</label>
+        <select onchange="window.location='/{{ locale }}/league/'+this.value"
+                style="padding:.35rem .75rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;font-size:.9rem;background:var(--card-bg,white);color:inherit;cursor:pointer;">
+          {% for s in available_seasons %}
+          <option value="{{ s.league_db_id }}"{% if s.id == league.season_id %} selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    </div>
   </div>
 
   <style>
@@ -29,111 +47,298 @@
     .league-tab .tab-badge{font-size:.7rem;padding:.1rem .4rem;border-radius:9999px;background:rgba(0,0,0,.12);margin-left:.1rem;}
     [x-cloak]{display:none!important;}
   </style>
+  <script>
+    const _leagueGroups    = {{ groups | tojson }};
+    const _allStandings    = {{ standings | tojson }};
+    const _standingsByGrp  = {{ standings_by_group | tojson }};
+    const _allGames        = {{ games | tojson }};
+    const _allUpcoming     = {{ upcoming_games | tojson }};
+    document.addEventListener('alpine:init', () => {
+      // When the league has multiple groups, default to the first one.
+      const defaultGroup = _leagueGroups.length > 1 ? _leagueGroups[0].name : 'all';
+      Alpine.store('leagueFilter', { group: defaultGroup });
+    });
+  </script>
 
-  <div x-data="{ tab: 'standings' }" x-cloak>
+  <div x-data="{
+    tab: 'standings',
+    _playoffSpots: {{ playoff_spots }},
+    _playoutSpots: {{ playout_spots }},
+    get shownStandings() {
+      const ag = Alpine.store('leagueFilter').group;
+      return ag === 'all' ? _allStandings : (_standingsByGrp[ag] || []);
+    },
+    playoffSpots(total) {
+      if (this._playoffSpots > 0) return this._playoffSpots;
+      return total >= 10 ? 4 : 2;
+    },
+    playoutSpots(total) {
+      if (this._playoutSpots > 0) return this._playoutSpots;
+      return total >= 4 ? 2 : 1;
+    },
+    rowZone(rank, total) {
+      if (rank <= this.playoffSpots(total)) return 'playoff';
+      if (rank > total - this.playoutSpots(total)) return 'playout';
+      return null;
+    },
+    get shownUpcoming() {
+      const ag = Alpine.store('leagueFilter').group;
+      return ag === 'all' ? _allUpcoming : _allUpcoming.filter(g => g.group_name === ag);
+    },
+  }" x-cloak>
     <div class="league-tabs">
       <button @click="tab='standings'" :class="tab==='standings' ? 'league-tab active' : 'league-tab'">
         <span>📊</span> Standings
-        {% if standings %}<span class="tab-badge">{{ standings|length }}</span>{% endif %}
       </button>
       <button @click="tab='topscorers'" :class="tab==='topscorers' ? 'league-tab active' : 'league-tab'">
         <span>⭐</span> Top Scorers
-        {% if topscorers %}<span class="tab-badge">{{ topscorers|length }}</span>{% endif %}
+      </button>
+      <button @click="tab='penalties'" :class="tab==='penalties' ? 'league-tab active' : 'league-tab'">
+        <span>🟥</span> Penalties
       </button>
       <button @click="tab='results'" :class="tab==='results' ? 'league-tab active' : 'league-tab'">
         <span>🏒</span> Results
-        {% if games %}<span class="tab-badge">{{ games|length }}</span>{% endif %}
       </button>
       <button @click="tab='upcoming'" :class="tab==='upcoming' ? 'league-tab active' : 'league-tab'">
         <span>📅</span> Upcoming
-        {% if upcoming_games %}<span class="tab-badge">{{ upcoming_games|length }}</span>{% endif %}
       </button>
     </div>
 
+    <!-- Group selector (only shown when league has multiple groups) -->
+    <template x-if="_leagueGroups.length > 1">
+      <div style="display:flex;gap:.375rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+        <template x-for="grp in _leagueGroups" :key="grp.name">
+          <button
+            @click="Alpine.store('leagueFilter').group = grp.name"
+            :style="Alpine.store('leagueFilter').group === grp.name
+              ? 'padding:.35rem .85rem;border:1.5px solid var(--swiss-red,#e11d48);border-radius:9999px;background:var(--swiss-red,#e11d48);color:#fff;cursor:pointer;font-size:.82rem;font-weight:600;'
+              : 'padding:.35rem .85rem;border:1.5px solid var(--gray-200,#e5e7eb);border-radius:9999px;background:transparent;color:inherit;cursor:pointer;font-size:.82rem;font-weight:500;'"
+            x-text="grp.name">
+          </button>
+        </template>
+      </div>
+    </template>
+
     <!-- STANDINGS -->
     <div x-show="tab==='standings'">
-      {% if standings %}
-      <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
-          <thead>
-            <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
-              <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
-              <th style="padding:.6rem .75rem;text-align:left;">Team</th>
-              <th style="padding:.6rem .5rem;text-align:center;" title="Games Played">GP</th>
-              <th style="padding:.6rem .5rem;text-align:center;" title="Wins">W</th>
-              <th style="padding:.6rem .5rem;text-align:center;" title="Losses">L</th>
-              <th style="padding:.6rem .5rem;text-align:center;" title="Goals For">GF</th>
-              <th style="padding:.6rem .5rem;text-align:center;" title="Goals Against">GA</th>
-              <th style="padding:.6rem .5rem;text-align:center;" title="Goal Difference">GD</th>
-              <th style="padding:.6rem .75rem;text-align:center;font-weight:700;" title="Points">PTS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in standings %}
-            <tr onclick="window.location='/{{ locale }}/team/{{ row.team_id }}'"
-              style="cursor:pointer;border-bottom:1px solid var(--gray-100);{% if row.rank <= 4 %}border-left:3px solid #16a34a;{% elif row.rank > standings|length - 2 %}border-left:3px solid #dc2626;{% endif %}"
-              onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
-              <td style="padding:.6rem .5rem;text-align:center;font-weight:600;color:var(--gray-500);">{{ row.rank }}</td>
-              <td style="padding:.6rem .75rem;font-weight:500;">{{ row.team_name }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;">{{ row.gp }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;color:#16a34a;">{{ row.w }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;color:#dc2626;">{{ row.l }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;">{{ row.gf }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;">{{ row.ga }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;{% if row.gd > 0 %}color:#16a34a{% elif row.gd < 0 %}color:#dc2626{% endif %}">
-                {{ "+" if row.gd > 0 else "" }}{{ row.gd }}
-              </td>
-              <td style="padding:.6rem .75rem;text-align:center;font-weight:700;font-size:1rem;">{{ row.pts }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
-        <p style="font-size:2rem">📊</p>
-        <p>No standings data available. Standings require finished games.</p>
-      </div>
-      {% endif %}
+      <template x-if="shownStandings.length > 0">
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+            <thead>
+              <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
+                <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
+                <th style="padding:.6rem .75rem;text-align:left;">Team</th>
+                <th style="padding:.6rem .5rem;text-align:center;" title="Games Played">GP</th>
+                <th style="padding:.6rem .5rem;text-align:center;" title="Wins">W</th>
+                <th style="padding:.6rem .5rem;text-align:center;" title="Losses">L</th>
+                <th style="padding:.6rem .5rem;text-align:center;" title="Goals For">GF</th>
+                <th style="padding:.6rem .5rem;text-align:center;" title="Goals Against">GA</th>
+                <th style="padding:.6rem .5rem;text-align:center;" title="Goal Difference">GD</th>
+                <th style="padding:.6rem .75rem;text-align:center;font-weight:700;" title="Points">PTS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="row in shownStandings" :key="row.team_id">
+                <tr @click="window.location='/{{ locale }}/team/' + row.team_id"
+                  :style="'cursor:pointer;border-bottom:1px solid var(--gray-100);border-left:3px solid ' + (rowZone(row.rank, shownStandings.length) === 'playoff' ? '#16a34a' : rowZone(row.rank, shownStandings.length) === 'playout' ? '#dc2626' : 'transparent')"
+                  onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+                  <td style="padding:.6rem .5rem;text-align:center;font-weight:600;color:var(--gray-500);" x-text="row.rank"></td>
+                  <td style="padding:.6rem .75rem;font-weight:500;" x-text="row.team_name"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gp"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;color:#16a34a;" x-text="row.w"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;color:#dc2626;" x-text="row.l"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gf"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.ga"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;"
+                    :style="row.gd > 0 ? 'color:#16a34a' : row.gd < 0 ? 'color:#dc2626' : ''"
+                    x-text="(row.gd > 0 ? '+' : '') + row.gd"></td>
+                  <td style="padding:.6rem .75rem;text-align:center;font-weight:700;font-size:1rem;" x-text="row.pts"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </template>
+      <!-- Zone legend -->
+      <template x-if="shownStandings.length > 0">
+        <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:.75rem;font-size:.78rem;color:var(--gray-500);">
+          <span style="display:flex;align-items:center;gap:.35rem;">
+            <span style="display:inline-block;width:.7rem;height:.7rem;border-radius:2px;background:#16a34a;"></span>
+            Playoff
+          </span>
+          <span style="display:flex;align-items:center;gap:.35rem;">
+            <span style="display:inline-block;width:.7rem;height:.7rem;border-radius:2px;background:#dc2626;"></span>
+            Playout / Relegation
+          </span>
+        </div>
+      </template>
+      <template x-if="shownStandings.length === 0">
+        <div style="text-align:center;padding:3rem;color:var(--gray-500);">
+          <p style="font-size:2rem">📊</p>
+          <p>No standings data available. Standings require finished games.</p>
+        </div>
+      </template>
     </div>
 
     <!-- TOP SCORERS -->
     <div x-show="tab==='topscorers'">
       {% if topscorers %}
-      <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
-          <thead>
-            <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
-              <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
-              <th style="padding:.6rem .75rem;text-align:left;">Player</th>
-              <th style="padding:.6rem .75rem;text-align:left;">Team</th>
-              <th style="padding:.6rem .5rem;text-align:center;">GP</th>
-              <th style="padding:.6rem .5rem;text-align:center;">G</th>
-              <th style="padding:.6rem .5rem;text-align:center;">A</th>
-              <th style="padding:.6rem .75rem;text-align:center;font-weight:700;">PTS</th>
-              <th style="padding:.6rem .5rem;text-align:center;">PIM</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in topscorers %}
-            <tr onclick="window.location='/{{ locale }}/player/{{ row.player_id }}'"
-              style="cursor:pointer;border-bottom:1px solid var(--gray-100);"
-              onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
-              <td style="padding:.6rem .5rem;text-align:center;font-weight:600;color:var(--gray-500);">
-                {% if row.rank == 1 %}🥇{% elif row.rank == 2 %}🥈{% elif row.rank == 3 %}🥉{% else %}{{ row.rank }}{% endif %}
-              </td>
-              <td style="padding:.6rem .75rem;font-weight:500;">{{ row.player_name }}</td>
-              <td style="padding:.6rem .75rem;color:var(--gray-600);">{{ row.team_name }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;">{{ row.gp }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;">{{ row.g }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;">{{ row.a }}</td>
-              <td style="padding:.6rem .75rem;text-align:center;font-weight:700;">{{ row.pts }}</td>
-              <td style="padding:.6rem .5rem;text-align:center;">{{ row.pim }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <script type="application/json" id="scorers-data">{{ topscorers | tojson }}</script>
+      <div x-data="scorersTable()">
+        <!-- filter bar -->
+        <div style="margin-bottom:.75rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;">
+          <!-- name text filter -->
+          <div style="position:relative;flex:1;min-width:140px;">
+            <input x-model="nameFilter" type="text" placeholder="Search player…"
+              style="width:100%;box-sizing:border-box;padding:.45rem 1.6rem .45rem .75rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;font-size:.875rem;background:var(--card-bg,white);color:inherit;">
+            <span x-show="nameFilter" @click="nameFilter=''" style="position:absolute;right:.4rem;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--gray-400);font-size:1rem;" title="Clear">✕</span>
+          </div>
+          <!-- team multi-select dropdown -->
+          <div style="position:relative;flex:1;min-width:160px;" x-data="{ open: false }" @click.outside="open=false">
+            <button @click="open=!open" type="button"
+              style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:.45rem .75rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;font-size:.875rem;background:var(--card-bg,white);color:inherit;cursor:pointer;text-align:left;">
+              <span x-text="teamFilter.length === 0 ? 'All teams' : teamFilter.length === 1 ? teamFilter[0] : teamFilter.length + ' teams selected'"></span>
+              <span style="font-size:.7rem;margin-left:.4rem;" x-text="open ? '▲' : '▼'"></span>
+            </button>
+            <div x-show="open" x-transition
+              style="position:absolute;z-index:50;top:calc(100% + 2px);left:0;right:0;background:var(--card-bg,white);border:1px solid var(--gray-200,#e5e7eb);border-radius:.375rem;box-shadow:0 4px 12px rgba(0,0,0,.1);max-height:220px;overflow-y:auto;">
+              <!-- clear all -->
+              <div style="display:flex;justify-content:space-between;padding:.35rem .65rem;border-bottom:1px solid var(--gray-100);font-size:.8rem;">
+                <span @click="teamFilter=[]" style="cursor:pointer;color:var(--gray-500);">Clear all</span>
+                <span @click="teamFilter=teams.slice()" style="cursor:pointer;color:var(--gray-500);">Select all</span>
+              </div>
+              <template x-for="team in teams" :key="team">
+                <label style="display:flex;align-items:center;gap:.5rem;padding:.35rem .65rem;font-size:.875rem;cursor:pointer;"
+                  onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+                  <input type="checkbox" :value="team" x-model="teamFilter" style="cursor:pointer;">
+                  <span x-text="team"></span>
+                </label>
+              </template>
+            </div>
+          </div>
+          <!-- per-game toggle -->
+          <button @click="showPerGame = !showPerGame" type="button"
+            :style="'padding:.45rem .75rem;border:1px solid ' + (showPerGame ? 'var(--primary,#3b82f6);background:var(--primary,#3b82f6);color:#fff' : 'var(--gray-300,#d1d5db);background:var(--card-bg,white);color:inherit') + ';border-radius:.375rem;font-size:.8rem;cursor:pointer;white-space:nowrap;'">
+            /GP
+          </button>
+          <!-- result count -->
+          <span style="font-size:.8rem;color:var(--gray-400);white-space:nowrap;"
+            x-text="isFiltered ? (filteredRows().length + ' / ' + allRows.length) : (Math.min(visibleCount, filteredRows().length) + ' / ' + allRows.length)"></span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+            <thead>
+              <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
+                <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
+                <th style="padding:.6rem .75rem;text-align:left;">Player</th>
+                <th style="padding:.6rem .75rem;text-align:left;">Team</th>
+                <th style="padding:.6rem .5rem;text-align:center;">GP</th>
+                <th @click="sort('g')" style="padding:.6rem .5rem;text-align:center;cursor:pointer;user-select:none;white-space:nowrap;">
+                  G <span x-text="arrow('g')" style="font-size:.7rem;opacity:.6;"></span></th>
+                <th @click="sort('a')" style="padding:.6rem .5rem;text-align:center;cursor:pointer;user-select:none;white-space:nowrap;">
+                  A <span x-text="arrow('a')" style="font-size:.7rem;opacity:.6;"></span></th>
+                <th @click="sort('pts')" style="padding:.6rem .75rem;text-align:center;font-weight:700;cursor:pointer;user-select:none;white-space:nowrap;">
+                  PTS <span x-text="arrow('pts')" style="font-size:.7rem;opacity:.6;"></span></th>
+                <th x-show="showPerGame" @click="sort('g_pg')" style="padding:.6rem .5rem;text-align:center;cursor:pointer;user-select:none;white-space:nowrap;color:var(--gray-500);">
+                  G/GP <span x-text="arrow('g_pg')" style="font-size:.7rem;opacity:.6;"></span></th>
+                <th x-show="showPerGame" @click="sort('a_pg')" style="padding:.6rem .5rem;text-align:center;cursor:pointer;user-select:none;white-space:nowrap;color:var(--gray-500);">
+                  A/GP <span x-text="arrow('a_pg')" style="font-size:.7rem;opacity:.6;"></span></th>
+                <th x-show="showPerGame" @click="sort('pts_pg')" style="padding:.6rem .75rem;text-align:center;font-weight:700;cursor:pointer;user-select:none;white-space:nowrap;color:var(--primary,#3b82f6);">
+                  P/GP <span x-text="arrow('pts_pg')" style="font-size:.7rem;opacity:.6;"></span></th>
+                <th style="padding:.6rem .5rem;text-align:center;">PIM</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="(row, idx) in rows()" :key="row.player_id">
+                <tr @click="window.location='/{{ locale }}/player/' + row.player_id"
+                  style="cursor:pointer;border-bottom:1px solid var(--gray-100);"
+                  onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+                  <td style="padding:.6rem .5rem;text-align:center;font-weight:600;color:var(--gray-500);"
+                    x-text="idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1"></td>
+                  <td style="padding:.6rem .75rem;font-weight:500;" x-text="row.player_name"></td>
+                  <td style="padding:.6rem .75rem;color:var(--gray-600);" x-text="row.team_name"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gp"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.g"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.a"></td>
+                  <td style="padding:.6rem .75rem;text-align:center;font-weight:700;" x-text="row.pts"></td>
+                  <td x-show="showPerGame" style="padding:.6rem .5rem;text-align:center;color:var(--gray-500);" x-text="row.gp > 0 ? row.g_pg.toFixed(2) : '-'"></td>
+                  <td x-show="showPerGame" style="padding:.6rem .5rem;text-align:center;color:var(--gray-500);" x-text="row.gp > 0 ? row.a_pg.toFixed(2) : '-'"></td>
+                  <td x-show="showPerGame" style="padding:.6rem .75rem;text-align:center;font-weight:700;color:var(--primary,#3b82f6);" x-text="row.gp > 0 ? row.pts_pg.toFixed(2) : '-'"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.pim"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <!-- Load more -->
+        <div x-show="hasMore" style="text-align:center;margin-top:1rem;">
+          <button @click="loadMore()"
+            style="padding:.5rem 1.5rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;background:var(--card-bg,white);color:inherit;font-size:.875rem;cursor:pointer;"
+            onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+            Load more <span x-text="'(' + Math.min(25, filteredRows().length - visibleCount) + ' more)'"></span>
+          </button>
+        </div>
       </div>
+      <script>
+        document.addEventListener('alpine:init', () => {
+          Alpine.data('scorersTable', () => ({
+            allRows: JSON.parse(document.getElementById('scorers-data').textContent),
+            nameFilter: '',
+            teamFilter: [],
+            sortCol: 'pts',
+            sortDir: -1,
+            visibleCount: 25,
+            showPerGame: false,
+            get isFiltered() {
+              return this.nameFilter.trim() !== '' || this.teamFilter.length > 0;
+            },
+            get teams() {
+              return [...new Set(this.allRows.map(x => x.team_name))].sort();
+            },
+            filteredRows() {
+              let q = this.nameFilter.trim().toLowerCase();
+              let tf = this.teamFilter;
+              let r = this.allRows.filter(x => {
+                if (q && !x.player_name.toLowerCase().includes(q)) return false;
+                if (tf.length && !tf.includes(x.team_name)) return false;
+                return true;
+              });
+              // attach per-game computed values for sorting
+              r = r.map(x => ({
+                ...x,
+                g_pg:   x.gp > 0 ? +(x.g   / x.gp).toFixed(2) : 0,
+                a_pg:   x.gp > 0 ? +(x.a   / x.gp).toFixed(2) : 0,
+                pts_pg: x.gp > 0 ? +(x.pts / x.gp).toFixed(2) : 0,
+              }));
+              let col = this.sortCol, dir = this.sortDir;
+              r.sort((a, b) => {
+                let av = a[col], bv = b[col];
+                if (typeof av === 'string') return dir * av.localeCompare(bv);
+                return dir * (av - bv);
+              });
+              return r;
+            },
+            rows() {
+              let r = this.filteredRows();
+              return this.isFiltered ? r : r.slice(0, this.visibleCount);
+            },
+            loadMore() {
+              this.visibleCount += 25;
+            },
+            get hasMore() {
+              return !this.isFiltered && this.filteredRows().length > this.visibleCount;
+            },
+            sort(col) {
+              if (this.sortCol === col) { this.sortDir *= -1; }
+              else { this.sortCol = col; this.sortDir = -1; }
+            },
+            arrow(col) {
+              if (this.sortCol !== col) return '↕';
+              return this.sortDir === -1 ? '↓' : '↑';
+            }
+          }));
+        });
+      </script>
       {% else %}
       <div style="text-align:center;padding:3rem;color:var(--gray-500);">
         <p style="font-size:2rem">🏒</p>
@@ -142,52 +347,208 @@
       {% endif %}
     </div>
 
-    <!-- RESULTS -->
-    <div x-show="tab==='results'">
-      {% if games %}
-      <div style="display:flex;flex-direction:column;gap:.5rem;">
-        {% for g in games %}
-        <a href="/{{ locale }}/game/{{ g.game_id }}" style="text-decoration:none;color:inherit;">
-          <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;"
-               onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
-            <span style="width:90px;font-size:.8rem;color:var(--gray-500);">{{ g.date }}</span>
-            <span style="flex:1;font-weight:500;text-align:right;padding-right:.75rem;">{{ g.home_team }}</span>
-            <span style="width:70px;text-align:center;font-weight:700;font-size:1.1rem;">{{ g.home_score }} : {{ g.away_score }}</span>
-            <span style="flex:1;font-weight:500;padding-left:.75rem;">{{ g.away_team }}</span>
+    <!-- PENALTIES -->
+    <div x-show="tab==='penalties'">
+      {% if topscorers %}
+      <div x-data="penaltiesTable()">
+        <div style="margin-bottom:.75rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;">
+          <div style="position:relative;flex:1;min-width:140px;">
+            <input x-model="nameFilter" type="text" placeholder="Search player…"
+              style="width:100%;box-sizing:border-box;padding:.45rem 1.6rem .45rem .75rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;font-size:.875rem;background:var(--card-bg,white);color:inherit;">
+            <span x-show="nameFilter" @click="nameFilter=''" style="position:absolute;right:.4rem;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--gray-400);font-size:1rem;" title="Clear">✕</span>
           </div>
-        </a>
-        {% endfor %}
+          <span style="font-size:.8rem;color:var(--gray-400);white-space:nowrap;"
+            x-text="(nameFilter ? filteredRows().length : Math.min(visibleCount, filteredRows().length)) + ' / ' + allRows.length"></span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+            <thead>
+              <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
+                <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
+                <th style="padding:.6rem .75rem;text-align:left;">Player</th>
+                <th style="padding:.6rem .75rem;text-align:left;">Team</th>
+                <th style="padding:.6rem .5rem;text-align:center;">GP</th>
+                <th @click="sort('pim')" style="padding:.6rem .75rem;text-align:center;font-weight:700;cursor:pointer;user-select:none;white-space:nowrap;">
+                  PIM <span x-text="arrow('pim')" style="font-size:.7rem;opacity:.6;"></span></th>
+                <th @click="sort('pen_2')" style="padding:.6rem .5rem;text-align:center;cursor:pointer;user-select:none;white-space:nowrap;" title="2-minute penalties">
+                  2' <span x-text="arrow('pen_2')" style="font-size:.7rem;opacity:.6;"></span></th>
+                <th @click="sort('pen_5')" style="padding:.6rem .5rem;text-align:center;cursor:pointer;user-select:none;white-space:nowrap;" title="5-minute penalties">
+                  5' <span x-text="arrow('pen_5')" style="font-size:.7rem;opacity:.6;"></span></th>
+                <th @click="sort('pen_10')" style="padding:.6rem .5rem;text-align:center;cursor:pointer;user-select:none;white-space:nowrap;" title="10-minute penalties">
+                  10' <span x-text="arrow('pen_10')" style="font-size:.7rem;opacity:.6;"></span></th>
+                <th @click="sort('pen_match')" style="padding:.6rem .5rem;text-align:center;cursor:pointer;user-select:none;white-space:nowrap;color:#dc2626;" title="Match penalties">
+                  MP <span x-text="arrow('pen_match')" style="font-size:.7rem;opacity:.6;"></span></th>
+                <th @click="sort('pim_pg')" style="padding:.6rem .5rem;text-align:center;cursor:pointer;user-select:none;white-space:nowrap;color:var(--gray-500);" title="Penalty minutes per game">
+                  PIM/GP <span x-text="arrow('pim_pg')" style="font-size:.7rem;opacity:.6;"></span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="(row, idx) in rows()" :key="row.player_id">
+                <tr @click="window.location='/{{ locale }}/player/' + row.player_id"
+                  style="cursor:pointer;border-bottom:1px solid var(--gray-100);"
+                  onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+                  <td style="padding:.6rem .5rem;text-align:center;font-weight:600;color:var(--gray-500);" x-text="idx + 1"></td>
+                  <td style="padding:.6rem .75rem;font-weight:500;" x-text="row.player_name"></td>
+                  <td style="padding:.6rem .75rem;color:var(--gray-600);" x-text="row.team_name"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gp"></td>
+                  <td style="padding:.6rem .75rem;text-align:center;font-weight:700;" x-text="row.pim"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.pen_2"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.pen_5"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.pen_10"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;" :style="row.pen_match > 0 ? 'color:#dc2626;font-weight:700;' : ''" x-text="row.pen_match || '-'"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;color:var(--gray-500);" x-text="row.gp > 0 ? row.pim_pg.toFixed(2) : '-'"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div x-show="!nameFilter && filteredRows().length > visibleCount" style="text-align:center;margin-top:1rem;">
+          <button @click="visibleCount += 25"
+            style="padding:.5rem 1.5rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;background:var(--card-bg,white);color:inherit;font-size:.875rem;cursor:pointer;"
+            onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+            Load more <span x-text="'(' + Math.min(25, filteredRows().length - visibleCount) + ' more)'"></span>
+          </button>
+        </div>
       </div>
+      <script>
+        document.addEventListener('alpine:init', () => {
+          Alpine.data('penaltiesTable', () => ({
+            allRows: JSON.parse(document.getElementById('scorers-data').textContent)
+              .map(x => ({ ...x, pim_pg: x.gp > 0 ? +(x.pim / x.gp).toFixed(2) : 0 }))
+              .filter(x => x.pim > 0)
+              .sort((a, b) => b.pim - a.pim || b.pen_match - a.pen_match),
+            nameFilter: '',
+            sortCol: 'pim',
+            sortDir: -1,
+            visibleCount: 25,
+            filteredRows() {
+              let q = this.nameFilter.trim().toLowerCase();
+              let r = this.allRows.filter(x => !q || x.player_name.toLowerCase().includes(q));
+              let col = this.sortCol, dir = this.sortDir;
+              r.sort((a, b) => dir * (typeof a[col] === 'string' ? a[col].localeCompare(b[col]) : a[col] - b[col]));
+              return r;
+            },
+            rows() {
+              let r = this.filteredRows();
+              return this.nameFilter ? r : r.slice(0, this.visibleCount);
+            },
+            sort(col) {
+              if (this.sortCol === col) { this.sortDir *= -1; } else { this.sortCol = col; this.sortDir = -1; }
+            },
+            arrow(col) {
+              if (this.sortCol !== col) return '↕';
+              return this.sortDir === -1 ? '↓' : '↑';
+            }
+          }));
+        });
+      </script>
       {% else %}
       <div style="text-align:center;padding:3rem;color:var(--gray-500);">
-        <p style="font-size:2rem">📅</p>
-        <p>No completed games available yet.</p>
+        <p style="font-size:2rem">🟥</p>
+        <p>No penalty statistics available yet.</p>
       </div>
       {% endif %}
     </div>
 
+    <!-- RESULTS -->
+    <div x-show="tab==='results'">
+      <div x-data="resultsTable()">
+        <!-- filter bar -->
+        <div style="margin-bottom:.75rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;">
+          <div style="position:relative;flex:1;min-width:160px;" x-data="{ open: false }" @click.outside="open=false">
+            <button @click="open=!open" type="button"
+              style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:.45rem .75rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;font-size:.875rem;background:var(--card-bg,white);color:inherit;cursor:pointer;text-align:left;">
+              <span x-text="teamFilter.length === 0 ? 'All teams' : teamFilter.length === 1 ? teamFilter[0] : teamFilter.length + ' teams selected'"></span>
+              <span style="font-size:.7rem;margin-left:.4rem;" x-text="open ? '▲' : '▼'"></span>
+            </button>
+            <div x-show="open" x-transition
+              style="position:absolute;z-index:50;top:calc(100% + 2px);left:0;right:0;background:var(--card-bg,white);border:1px solid var(--gray-200,#e5e7eb);border-radius:.375rem;box-shadow:0 4px 12px rgba(0,0,0,.1);max-height:220px;overflow-y:auto;">
+              <div style="display:flex;justify-content:space-between;padding:.35rem .65rem;border-bottom:1px solid var(--gray-100);font-size:.8rem;">
+                <span @click="teamFilter=[]" style="cursor:pointer;color:var(--gray-500);">Clear all</span>
+                <span @click="teamFilter=teams.slice()" style="cursor:pointer;color:var(--gray-500);">Select all</span>
+              </div>
+              <template x-for="team in teams" :key="team">
+                <label style="display:flex;align-items:center;gap:.5rem;padding:.35rem .65rem;font-size:.875rem;cursor:pointer;"
+                  onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+                  <input type="checkbox" :value="team" x-model="teamFilter" style="cursor:pointer;">
+                  <span x-text="team"></span>
+                </label>
+              </template>
+            </div>
+          </div>
+          <span style="font-size:.8rem;color:var(--gray-400);white-space:nowrap;" x-text="filtered().length + ' / ' + allGames.length + ' results'"></span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.5rem;">
+          <template x-for="g in visible()" :key="g.game_id">
+            <a :href="'/{{ locale }}/game/' + g.game_id" style="text-decoration:none;color:inherit;">
+              <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;"
+                   onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
+                <span style="width:90px;font-size:.8rem;color:var(--gray-500);" x-text="g.date"></span>
+                <span style="flex:1;font-weight:500;text-align:right;padding-right:.75rem;" x-text="g.home_team"></span>
+                <span style="width:70px;text-align:center;font-weight:700;font-size:1.1rem;" x-text="g.home_score + ' : ' + g.away_score"></span>
+                <span style="flex:1;font-weight:500;padding-left:.75rem;" x-text="g.away_team"></span>
+              </div>
+            </a>
+          </template>
+        </div>
+        <div x-show="pageSize < filtered().length" style="text-align:center;margin-top:1rem;">
+          <button @click="pageSize += 20" type="button"
+            style="padding:.45rem 1.5rem;border:1.5px solid var(--gray-300,#d1d5db);border-radius:9999px;background:transparent;cursor:pointer;font-size:.875rem;color:var(--gray-600);">
+            Load more <span x-text="'(' + (filtered().length - pageSize) + ' remaining)'"></span>
+          </button>
+        </div>
+      </div>
+      <script>
+        document.addEventListener('alpine:init', () => {
+          Alpine.data('resultsTable', () => ({
+            allGames: _allGames,
+            teamFilter: [],
+            pageSize: 20,
+            get teams() {
+              const ag = Alpine.store('leagueFilter').group;
+              const gms = ag === 'all' ? this.allGames : this.allGames.filter(g => g.group_name === ag);
+              const s = new Set();
+              gms.forEach(g => { s.add(g.home_team); s.add(g.away_team); });
+              return [...s].sort();
+            },
+            filtered() {
+              const ag = Alpine.store('leagueFilter').group;
+              let r = ag === 'all' ? this.allGames : this.allGames.filter(g => g.group_name === ag);
+              const tf = this.teamFilter;
+              if (tf.length) r = r.filter(g => tf.includes(g.home_team) || tf.includes(g.away_team));
+              return r;
+            },
+            visible() {
+              return this.filtered().slice(0, this.pageSize);
+            }
+          }));
+        });
+      </script>
+    </div>
+
     <!-- UPCOMING -->
     <div x-show="tab==='upcoming'">
-      {% if upcoming_games %}
-      <div style="display:flex;flex-direction:column;gap:.5rem;">
-        {% for g in upcoming_games %}
-        <a href="/{{ locale }}/game/{{ g.game_id }}" style="text-decoration:none;color:inherit;">
-          <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;"
-               onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
-            <span style="width:110px;font-size:.8rem;color:var(--gray-500);">{{ g.weekday }} {{ g.date }}{% if g.time %} {{ g.time }}{% endif %}</span>
-            <span style="flex:1;font-weight:500;text-align:right;padding-right:.75rem;">{{ g.home_team }}</span>
-            <span style="width:50px;text-align:center;font-weight:400;font-size:.85rem;color:var(--gray-400);">vs</span>
-            <span style="flex:1;font-weight:500;padding-left:.75rem;">{{ g.away_team }}</span>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
-        <p style="font-size:2rem">📅</p>
-        <p>No upcoming games scheduled.</p>
-      </div>
-      {% endif %}
+      <template x-if="shownUpcoming.length > 0">
+        <div style="display:flex;flex-direction:column;gap:.5rem;">
+          <template x-for="g in shownUpcoming" :key="g.game_id">
+            <a :href="'/{{ locale }}/game/' + g.game_id" style="text-decoration:none;color:inherit;">
+              <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;"
+                   onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
+                <span style="width:110px;font-size:.8rem;color:var(--gray-500);" x-text="g.weekday + ' ' + g.date + (g.time ? ' ' + g.time : '')"></span>
+                <span style="flex:1;font-weight:500;text-align:right;padding-right:.75rem;" x-text="g.home_team"></span>
+                <span style="width:50px;text-align:center;font-weight:400;font-size:.85rem;color:var(--gray-400);">vs</span>
+                <span style="flex:1;font-weight:500;padding-left:.75rem;" x-text="g.away_team"></span>
+              </div>
+            </a>
+          </template>
+        </div>
+      </template>
+      <template x-if="shownUpcoming.length === 0">
+        <div style="text-align:center;padding:3rem;color:var(--gray-500);">
+          <p style="font-size:2rem">📅</p>
+          <p>No upcoming games scheduled.</p>
+        </div>
+      </template>
     </div>
 
   </div>

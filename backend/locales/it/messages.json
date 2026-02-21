@@ -32,7 +32,26 @@
   },
   "leagues": {
     "title": "Campionati",
-    "subtitle": "Tutti i campionati di unihockey svizzeri"
+    "subtitle": "Tutti i campionati di unihockey svizzeri",
+    "filter_sex": "Sesso",
+    "filter_age": "Categoria",
+    "filter_field": "Campo",
+    "filter_all": "Tutti",
+    "filter_men": "Uomini",
+    "filter_women": "Donne",
+    "filter_mixed": "Misto",
+    "filter_senior": "Attivi",
+    "filter_senioren": "Veterani",
+    "big_field": "Campo grande",
+    "small_field": "Campo piccolo",
+    "gender_men": "Uomini",
+    "gender_women": "Donne",
+    "gender_mixed": "Misto",
+    "gender_other": "Altro",
+    "count_one": "campionato mostrato",
+    "count_many": "campionati mostrati",
+    "no_match": "Nessun campionato corrisponde ai filtri attuali.",
+    "clear_filters": "Azzera i filtri"
   },
   "teams": {
     "title": "Squadre",

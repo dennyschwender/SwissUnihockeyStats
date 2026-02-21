@@ -1394,7 +1394,6 @@ async def leagues_page(request: Request, locale: str, season: Optional[int] = No
     """Leagues listing page — DB-backed, ordered by admin tier categorization"""
     from app.services.stats_service import get_leagues_from_db, get_all_seasons
     from app.services.data_indexer import LEAGUE_TIERS, _DEFAULT_TIER
-    from collections import defaultdict
 
     all_seasons = get_all_seasons()
     # Resolve selected season: use query param, else fall back to current
@@ -1415,27 +1414,63 @@ async def leagues_page(request: Request, locale: str, season: Optional[int] = No
         7: "Youth & Regional",
     }
 
-    # Gender from game_class
-    gender_map = {11: "men", 12: "men", 21: "women", 22: "women", 31: "mixed"}
+    # Age-group mapping for youth/junior/senior leagues (non-senior competitions).
+    # User rule: U21=U21, U18=U18+A, U16=U16+B, U14=U14+C, U12=D
+    _AGE_GROUP_MAP = {
+        19: "U21", 26: "U21",
+        18: "U18", 31: "U18", 41: "U18",
+        16: "U16", 28: "U16", 32: "U16", 42: "U16",
+        14: "U14", 33: "U14", 43: "U14", 49: "U14",
+        34: "U12", 36: "U12", 44: "U12",
+        35: "U10",
+        51: "Senioren",
+    }
 
-    # Build: gender → tier → [leagues]
-    by_gender_tier: dict[str, dict[int, list]] = defaultdict(lambda: defaultdict(list))
+    # Build flat list with annotated gender / field / tier for client-side filtering
+    _EXCLUDED_LEAGUE_NAMES = {"Herren Test"}
+    leagues_flat = []
     for lg in leagues_list:
-        gender = gender_map.get(lg["game_class"], "other")
-        tier = LEAGUE_TIERS.get(lg["league_id"], _DEFAULT_TIER)
-        by_gender_tier[gender][tier].append(lg)
-
-    # Sort leagues within each tier by name
-    gender_order = ["men", "women", "mixed", "other"]
-    ordered = {}
-    for g in gender_order:
-        if g not in by_gender_tier:
+        if lg["name"] in _EXCLUDED_LEAGUE_NAMES:
             continue
-        tier_dict = by_gender_tier[g]
-        ordered[g] = [
-            {"tier": t, "label": TIER_DISPLAY.get(t, f"Tier {t}"), "leagues": sorted(tier_dict[t], key=lambda x: x["name"])}
-            for t in sorted(tier_dict.keys())
-        ]
+        gc = lg["game_class"]
+        if gc in (11, 12):
+            gender = "men"
+        elif gc in (21, 22):
+            gender = "women"
+        else:
+            # Youth/age-group leagues: use age group as the gender key so the
+            # template can group them by age rather than a generic "youth" bucket.
+            gender = _AGE_GROUP_MAP.get(gc, "Other")
+        # Big field: senior (11/21) + all U* juniors (14,16,18,19,26,28,49)
+        # Small field: 12/22, letter-based Regional (31-36, 41-44), Senioren (51)
+        if gc in (11, 21, 14, 16, 18, 19, 26, 28, 49):
+            field = "big"
+        else:
+            field = "small"
+        # sex: biological sex for sub-grouping within a tier (independent of age group)
+        if gc in (21, 22, 26, 28, 41, 42, 43, 44):
+            sex = "women"
+        elif gc == 49:
+            sex = "mixed"
+        else:
+            sex = "men"
+        # Senior leagues get meaningful tier labels; youth groups are flat (no sub-tiers).
+        if gender in ("men", "women"):
+            tier = LEAGUE_TIERS.get(lg["league_id"], _DEFAULT_TIER)
+            tier_label = TIER_DISPLAY.get(tier, f"Tier {tier}")
+        else:
+            tier = 0
+            tier_label = None
+        leagues_flat.append({
+            "id": lg["id"],
+            "name": lg["name"],
+            "gender": gender,
+            "sex": sex,
+            "field": field,
+            "tier": tier,
+            "tier_label": tier_label,
+            "group_count": lg["group_count"],
+        })
 
     # Resolve display name for selected season
     selected_season_name = next((s["name"] for s in all_seasons if s["id"] == season), str(season))
@@ -1446,12 +1481,57 @@ async def leagues_page(request: Request, locale: str, season: Optional[int] = No
         {
             "locale": locale,
             "t": get_translations(locale),
-            "gender_tiers": ordered,
+            "leagues_flat": leagues_flat,
             "seasons": all_seasons,
             "selected_season": season,
             "selected_season_name": selected_season_name,
         },
     )
+
+
+def _zone_cutoffs(league_name: str) -> tuple[int, int]:
+    """Return (playoff_spots, playout_spots) for a league.
+    Returns (0, 0) when unknown — the template will fall back to a size heuristic.
+    Based on Modus 2025-26 document.
+    """
+    _ZONE_TABLE: dict[str, tuple[int, int]] = {
+        # ── Men senior ────────────────────────────────────────────────────────
+        "herren nla": (8, 4), "herren prime league": (8, 4),
+        "herren nlb": (8, 4),
+        "herren l-upl": (8, 4),
+        "herren 1. liga": (8, 4),
+        "herren 2. liga": (2, 2),
+        "herren 3. liga": (1, 1),
+        "herren 4. liga": (1, 0),
+        "herren 5. liga": (1, 0),
+        # ── Women senior ──────────────────────────────────────────────────────
+        "damen nla": (8, 2), "damen prime league": (8, 2),
+        "damen nlb": (8, 2),
+        "damen l-upl": (8, 2),
+        "damen 1. liga": (1, 1),
+        "damen 2. liga": (1, 0),
+        "damen 3. liga": (1, 1),
+        # ── Men youth ─────────────────────────────────────────────────────────
+        "junioren u21 a": (8, 4),
+        "junioren u21 b": (2, 2),
+        "junioren u21 c": (1, 1),
+        "junioren u21 d": (1, 0),
+        "junioren u18 a": (8, 4),
+        "junioren u18 b": (1, 1),
+        "junioren u18 c": (1, 0),
+        "junioren u16 a": (8, 4),
+        "junioren u16 b": (2, 2),
+        "junioren u16 c": (1, 0),
+        "junioren u14 a": (2, 2),
+        "junioren u14 b": (1, 0),
+        # ── Women youth ───────────────────────────────────────────────────────
+        "juniorinnen u21 a": (8, 2),
+        "juniorinnen u21 b": (1, 0),
+        "juniorinnen u17 a": (8, 2),
+        "juniorinnen u17 b": (1, 0),
+    }
+    name = (league_name or "").lower().strip()
+    return _ZONE_TABLE.get(name, (0, 0))  # (0, 0) → JS heuristic fallback
 
 
 @app.get("/{locale}/league/{league_id}", response_class=HTMLResponse)
@@ -1462,9 +1542,10 @@ async def league_detail(request: Request, locale: str, league_id: int):
         get_league_standings,
         get_league_top_scorers,
         get_recent_games,
+        get_all_seasons,
     )
     from app.services.database import get_database_service
-    from app.models.db_models import Game, LeagueGroup
+    from app.models.db_models import Game, LeagueGroup, League as _LeagueModel
 
     league_data = get_league_by_id(league_id)
     error_message = None
@@ -1478,42 +1559,81 @@ async def league_detail(request: Request, locale: str, league_id: int):
                 "locale": locale,
                 "t": get_translations(locale),
                 "league": {},
+                "groups": [],
                 "standings": [],
+                "standings_by_group": {},
                 "topscorers": [],
                 "games": [],
                 "upcoming_games": [],
+                "available_seasons": [],
+                "selected_season_name": "",
+                "playoff_spots": 0,
+                "playout_spots": 0,
                 "error_message": error_message,
             },
         )
 
     standings = get_league_standings(league_id)
-    topscorers = get_league_top_scorers(league_id, limit=25)
 
+    # --- Season switcher: find the same league (by API id) across all seasons ---
+    _all_seasons = get_all_seasons()
+    _api_league_id = league_data.get("league_id")  # API-level id, stable across seasons
     db = get_database_service()
+    with db.session_scope() as _s:
+        _siblings = (
+            _s.query(_LeagueModel.id, _LeagueModel.season_id)
+            .filter(_LeagueModel.league_id == _api_league_id)
+            .order_by(_LeagueModel.season_id.desc())
+            .all()
+        )
+    _season_to_db = {r.season_id: r.id for r in _siblings}
+    available_seasons = [
+        {"id": sz["id"], "name": sz["name"], "league_db_id": _season_to_db[sz["id"]]}
+        for sz in _all_seasons if sz["id"] in _season_to_db
+    ]
+    selected_season_name = next(
+        (sz["name"] for sz in _all_seasons if sz["id"] == league_data.get("season_id")),
+        str(league_data.get("season_id", "")),
+    )
+    # -------------------------------------------------------------------------
+
+    groups = league_data.get("groups", [])  # [{name, ids: [int]}]
+    standings_by_group = {
+        grp["name"]: get_league_standings(league_id, only_group_ids=grp["ids"])
+        for grp in groups
+    }
+    # flat lookup: DB group_id → display name (for annotating game records)
+    _group_id_to_name: dict[int, str] = {
+        gid: grp["name"]
+        for grp in groups
+        for gid in grp["ids"]
+    }
+    topscorers = get_league_top_scorers(league_id, limit=100)
 
     # Upcoming (unscored) games for this league
     from app.services.stats_service import get_upcoming_games
-    group_ids_for_league = [g["id"] for g in league_data.get("groups", [])]
+    group_ids_for_league = [gid for grp in league_data.get("groups", []) for gid in grp["ids"]]
     upcoming_games: list[dict] = []
     if group_ids_for_league:
         with db.session_scope() as sess:
             from app.models.db_models import LeagueGroup as LG
             from datetime import date as _date
+            from app.models.db_models import Team as TM
+            today = _date.today()
             uq = (
                 sess.query(Game)
                 .filter(
                     Game.group_id.in_(group_ids_for_league),
                     Game.home_score.is_(None),
                     Game.game_date.isnot(None),
-                    Game.game_date >= _date.today(),
+                    Game.game_date >= today,
                 )
                 .order_by(Game.game_date.asc())
-                .limit(15)
+                .limit(30)
                 .all()
             )
             u_team_ids = {g.home_team_id for g in uq} | {g.away_team_id for g in uq}
             u_names: dict = {}
-            from app.models.db_models import Team as TM
             for t in sess.query(TM).filter(TM.id.in_(u_team_ids), TM.season_id == league_data["season_id"]).all():
                 u_names[t.id] = t.name or t.text or f"Team {t.id}"
             missing = u_team_ids - u_names.keys()
@@ -1523,6 +1643,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             for g in uq:
                 upcoming_games.append({
                     "game_id": g.id,
+                    "group_name": _group_id_to_name.get(g.group_id, ""),
                     "date": g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
                     "weekday": g.game_date.strftime("%a") if g.game_date else "",
                     "time": g.game_time or "",
@@ -1536,7 +1657,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
     recent_games = []
     with db.session_scope() as session:
         from app.models.db_models import Team
-        group_ids = [g["id"] for g in league_data.get("groups", [])]
+        group_ids = [gid for grp in league_data.get("groups", []) for gid in grp["ids"]]
         if group_ids:
             games_raw = (
                 session.query(Game)
@@ -1545,7 +1666,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
                     Game.home_score.isnot(None),
                 )
                 .order_by(Game.game_date.desc())
-                .limit(20)
+                .limit(100)
                 .all()
             )
             team_ids = set()
@@ -1562,6 +1683,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             for g in games_raw:
                 recent_games.append({
                     "game_id": g.id,
+                    "group_name": _group_id_to_name.get(g.group_id, ""),
                     "date": g.game_date.strftime("%Y-%m-%d") if g.game_date else "",
                     "home_team": team_names.get(g.home_team_id, f"Team {g.home_team_id}"),
                     "away_team": team_names.get(g.away_team_id, f"Team {g.away_team_id}"),
@@ -1571,6 +1693,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
                     "away_score": g.away_score,
                 })
 
+    _playoff_spots, _playout_spots = _zone_cutoffs(league_data.get("name", ""))
     return templates.TemplateResponse(
         request,
         "league_detail.html",
@@ -1578,10 +1701,16 @@ async def league_detail(request: Request, locale: str, league_id: int):
             "locale": locale,
             "t": get_translations(locale),
             "league": league_data,
+            "groups": groups,
             "standings": standings,
+            "standings_by_group": standings_by_group,
             "topscorers": topscorers,
             "games": recent_games,
             "upcoming_games": upcoming_games,
+            "available_seasons": available_seasons,
+            "selected_season_name": selected_season_name,
+            "playoff_spots": _playoff_spots,
+            "playout_spots": _playout_spots,
             "error_message": error_message,
         },
     )

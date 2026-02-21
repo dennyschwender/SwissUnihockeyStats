@@ -101,7 +101,7 @@ def get_leagues_from_db(season_id: Optional[int] = None) -> list[dict]:
                     "name": lg.name or lg.text or f"League {lg.league_id}",
                     "text": lg.text or lg.name or f"League {lg.league_id}",
                     "mode": lg.mode,
-                    "group_count": len(lg.groups),
+                    "group_count": len({g.name or g.text for g in lg.groups} - {None, ""}),
                 }
             )
         return result
@@ -233,10 +233,13 @@ def get_league_by_id(db_league_id: int) -> Optional[dict]:
         lg = session.query(League).filter(League.id == db_league_id).first()
         if lg is None:
             return None
-        groups = [
-            {"id": g.id, "group_id": g.group_id, "name": g.name or g.text}
-            for g in lg.groups
-        ]
+        # Deduplicate groups by display name so identically-named groups
+        # (e.g. multiple "Gruppe 1" rows from re-indexing) merge into one.
+        seen: dict[str, list[int]] = {}
+        for g in lg.groups:
+            name = g.name or g.text or f"Group {g.id}"
+            seen.setdefault(name, []).append(g.id)
+        groups = [{"name": name, "ids": ids} for name, ids in seen.items()]
         return {
             "id": lg.id,
             "league_id": lg.league_id,
@@ -253,7 +256,105 @@ def get_league_by_id(db_league_id: int) -> Optional[dict]:
 # 2. League standings  (computed from games table)
 # ---------------------------------------------------------------------------
 
-def get_league_standings(db_league_id: int) -> list[dict]:
+def _get_standings_from_api(session, league, only_group_ids: list[int] | None) -> list[dict]:
+    """Fallback: fetch official standings from the Swiss Unihockey rankings API.
+
+    Used when no finished games exist in the DB (e.g. the league admin never
+    submitted individual game scores into the system — common in lower leagues).
+    Returns the same dict structure as the DB-computed path so callers are
+    transparent to the source.
+    """
+    try:
+        from app.services.swissunihockey import get_swissunihockey_client
+        client = get_swissunihockey_client()
+
+        # Resolve group name(s) so we can filter the API call correctly.
+        # When only_group_ids is given, find the distinct group names for those ids.
+        group_names: list[str | None] = [None]  # None = no group filter (all teams)
+        if only_group_ids:
+            grp_rows = session.query(LeagueGroup).filter(
+                LeagueGroup.id.in_(only_group_ids)
+            ).all()
+            names = list({(g.name or g.text or None) for g in grp_rows} - {None})
+            if names:
+                group_names = names  # typically a single name like "Gruppe 2"
+
+        all_rows: list[dict] = []
+        import re as _re
+
+        for grp_name in group_names:
+            kwargs = dict(
+                season=league.season_id,
+                league=league.league_id,
+                game_class=league.game_class,
+            )
+            if grp_name:
+                kwargs["group"] = grp_name
+
+            data = client.get_rankings(**kwargs)
+            regions = data.get("data", {}).get("regions", [])
+            for region in regions:
+                for row in region.get("rows", []):
+                    cells = row.get("cells", [])
+                    if len(cells) < 10:
+                        continue
+                    # [0] rank  [1] logo  [2] team  [3] GP  [4] forfeits?
+                    # [5] W  [6] OT-W  [7] OT-L  [8] L  [9] GF:GA  [10] GD  [12] pts
+                    rank_t = cells[0].get("text", [])
+                    rank_val = int(rank_t[0]) if isinstance(rank_t, list) and rank_t else 0
+
+                    team_link = cells[2].get("link", {})
+                    team_id = (team_link.get("ids") or [None])[0]
+                    tn = cells[2].get("text", [])
+                    team_name = (tn[0] if isinstance(tn, list) else tn) or f"Team {team_id}"
+
+                    def _int(cell_idx: int) -> int:
+                        t = cells[cell_idx].get("text", [0])
+                        v = t[0] if isinstance(t, list) else t
+                        try:
+                            return int(v)
+                        except (ValueError, TypeError):
+                            return 0
+
+                    gp = _int(3)
+                    w  = _int(5)
+                    otw = _int(6)
+                    otl = _int(7)
+                    l  = _int(8)
+                    pts = _int(12) if len(cells) > 12 else (_int(10))
+
+                    gfga = cells[9].get("text", []) if len(cells) > 9 else []
+                    gfga_str = (gfga[0] if isinstance(gfga, list) else gfga) or "0:0"
+                    m = _re.match(r"(\d+):(\d+)", gfga_str)
+                    gf = int(m.group(1)) if m else 0
+                    ga = int(m.group(2)) if m else 0
+
+                    all_rows.append({
+                        "rank":      rank_val,
+                        "team_id":   team_id,
+                        "team_name": team_name,
+                        "gp":  gp,
+                        "w":   w + otw,   # total wins (reg + OT/SO)
+                        "l":   l + otl,   # total losses (reg + OT/SO)
+                        "gf":  gf,
+                        "ga":  ga,
+                        "gd":  gf - ga,
+                        "pts": pts,
+                    })
+
+        # Sort by pts desc, then gd desc, then gf desc (same as DB path)
+        all_rows.sort(key=lambda x: (-x["pts"], -x["gd"], -x["gf"]))
+        for i, row in enumerate(all_rows, 1):
+            row["rank"] = i
+        return all_rows
+
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(f"API standings fallback failed: {exc}")
+        return []
+
+
+def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = None) -> list[dict]:
     """
     Compute standings from finished games in a league (all its groups).
 
@@ -261,6 +362,9 @@ def get_league_standings(db_league_id: int) -> list[dict]:
     We detect OT/SO by presence of "overtime" / "penalty" in home_score comment
     – since we do not have that info, we simply use W=3, L=0 (two-point system
     is fine as a first pass; refine later if OT flag is available).
+
+    Args:
+        only_group_ids: when given, restrict to these group DB-IDs (for per-group standings).
 
     Returns list of dicts sorted by pts DESC, gd DESC, gf DESC.
     """
@@ -272,10 +376,18 @@ def get_league_standings(db_league_id: int) -> list[dict]:
             return []
 
         group_ids = [g.id for g in league.groups]
+        if only_group_ids is not None:
+            allowed = set(only_group_ids)
+            group_ids = [gid for gid in group_ids if gid in allowed]
         if not group_ids:
             return []
 
         # All games that have a score
+        total_games = (
+            session.query(Game)
+            .filter(Game.group_id.in_(group_ids))
+            .count()
+        )
         games = (
             session.query(Game)
             .filter(
@@ -286,8 +398,16 @@ def get_league_standings(db_league_id: int) -> list[dict]:
             .all()
         )
 
-        if not games:
-            return []
+        # Fall back to the official API rankings when:
+        # - no scored games at all, OR
+        # - very sparse scores (<10% of total games) suggesting only partial
+        #   re-indexing happened (e.g. a few playoff results but a full regular season)
+        scored_count = len(games)
+        use_api_fallback = scored_count == 0 or (
+            total_games > 20 and scored_count / total_games < 0.10
+        )
+        if use_api_fallback:
+            return _get_standings_from_api(session, league, only_group_ids)
 
         # team_id → {name, gp, w, l, gf, ga, pts}
         table: dict[int, dict] = {}
@@ -370,14 +490,21 @@ def get_league_standings(db_league_id: int) -> list[dict]:
             a["gf"] += as_
             a["ga"] += hs
 
+            # OT/SO: winner gets 2 pts, loser gets 1 pt; regulation: winner 3, loser 0
+            is_extra = g.period in ("OT", "SO")
+
             if hs > as_:
                 h["w"] += 1
-                h["pts"] += 3
+                h["pts"] += 2 if is_extra else 3
                 a["l"] += 1
+                if is_extra:
+                    a["pts"] += 1
             elif as_ > hs:
                 a["w"] += 1
-                a["pts"] += 3
+                a["pts"] += 2 if is_extra else 3
                 h["l"] += 1
+                if is_extra:
+                    h["pts"] += 1
             else:
                 # Tie – shouldn't happen in unihockey but handle it
                 h["pts"] += 1
@@ -404,59 +531,91 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
     """
     Top scorers for a league.
 
-    Strategy: collect player IDs from TeamPlayer rows for teams that played in
-    this league, then join PlayerStatistics + Player by player_id — avoids any
-    fragile team-name string matching.
+    Strategy (in order of preference):
+    1. Primary: collect player_ids from GamePlayer rows for games in this
+       league's groups — this is gender-exact because it keys off actual game
+       participation, not just team name.
+    2. Fallback: if GamePlayer has no rows for these games (i.e. game events
+       were never indexed), use team_name IN (names from Team table) to filter
+       PlayerStatistics.  This can produce false positives when a club fields
+       both a men's and women's team with the same name (e.g. "Zug United"),
+       but is better than returning nothing.
+
+    league_abbrev is derived by stripping the gender prefix ("Herren "/"Damen ")
+    from the DB league name so it matches what the API returns (e.g. "L-UPL").
     """
+    import re as _re
     db = get_database_service()
     with db.session_scope() as session:
         league = session.query(League).filter(League.id == db_league_id).first()
         if league is None:
             return []
 
-        # Teams that participate in any group of this league
         group_ids = [g.id for g in league.groups]
         if not group_ids:
             return []
 
-        # Get team IDs that played in this league (from games)
-        home_ids = {r[0] for r in session.query(Game.home_team_id).filter(Game.group_id.in_(group_ids)).all()}
-        away_ids = {r[0] for r in session.query(Game.away_team_id).filter(Game.group_id.in_(group_ids)).all()}
-        all_team_ids = list((home_ids | away_ids) - {None})
-
-        if not all_team_ids:
-            return []
-
-        # Collect player IDs for those teams (from TeamPlayer roster entries)
-        player_ids = [
+        # All game IDs in this league
+        game_ids = [
             r[0] for r in
-            session.query(TeamPlayer.player_id)
-            .filter(TeamPlayer.team_id.in_(all_team_ids))
-            .distinct()
-            .all()
+            session.query(Game.id).filter(Game.group_id.in_(group_ids)).all()
         ]
 
-        if not player_ids:
-            return []
+        # Derive league_abbrev from the DB name by stripping the gender prefix.
+        league_abbrev = _re.sub(r'^(Herren|Damen)\s+', '', league.name or "").strip()
 
-        # Query PlayerStatistics + Player — restrict to team_id in this league so
-        # players who also played in other leagues only show their stats for
-        # the teams that actually participated here (one stat row per team).
-        stats = (
-            session.query(PlayerStatistics, Player)
-            .join(Player, PlayerStatistics.player_id == Player.person_id)
-            .filter(
-                PlayerStatistics.player_id.in_(player_ids),
-                PlayerStatistics.season_id == league.season_id,
-                PlayerStatistics.team_id.in_(all_team_ids),
+        # ── Primary path: GamePlayer ──────────────────────────────────────────
+        player_ids = []
+        if game_ids:
+            player_ids = [
+                r[0] for r in
+                session.query(GamePlayer.player_id)
+                .filter(GamePlayer.game_id.in_(game_ids))
+                .distinct()
+                .all()
+            ]
+
+        if player_ids:
+            stats = (
+                session.query(PlayerStatistics, Player)
+                .join(Player, PlayerStatistics.player_id == Player.person_id)
+                .filter(
+                    PlayerStatistics.player_id.in_(player_ids),
+                    PlayerStatistics.season_id == league.season_id,
+                    PlayerStatistics.league_abbrev == league_abbrev,
+                )
+                .order_by(PlayerStatistics.points.desc(), PlayerStatistics.goals.desc())
+                .limit(limit)
+                .all()
             )
-            .order_by(
-                PlayerStatistics.points.desc(),
-                PlayerStatistics.goals.desc(),
+        else:
+            # ── Fallback path: team name ──────────────────────────────────────
+            home_ids = {r[0] for r in session.query(Game.home_team_id).filter(Game.group_id.in_(group_ids)).all()}
+            away_ids = {r[0] for r in session.query(Game.away_team_id).filter(Game.group_id.in_(group_ids)).all()}
+            all_team_ids = list((home_ids | away_ids) - {None})
+            if not all_team_ids:
+                return []
+            team_names = [
+                r[0] for r in
+                session.query(Team.name)
+                .filter(Team.id.in_(all_team_ids), Team.name.isnot(None))
+                .distinct()
+                .all()
+            ]
+            if not team_names:
+                return []
+            stats = (
+                session.query(PlayerStatistics, Player)
+                .join(Player, PlayerStatistics.player_id == Player.person_id)
+                .filter(
+                    PlayerStatistics.season_id == league.season_id,
+                    PlayerStatistics.league_abbrev == league_abbrev,
+                    PlayerStatistics.team_name.in_(team_names),
+                )
+                .order_by(PlayerStatistics.points.desc(), PlayerStatistics.goals.desc())
+                .limit(limit)
+                .all()
             )
-            .limit(limit)
-            .all()
-        )
 
         result = []
         for i, (ps, pl) in enumerate(stats, 1):
@@ -472,6 +631,10 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
                     "a": ps.assists,
                     "pts": ps.points,
                     "pim": ps.penalty_minutes,
+                    "pen_2": getattr(ps, 'pen_2min', 0) or 0,
+                    "pen_5": getattr(ps, 'pen_5min', 0) or 0,
+                    "pen_10": getattr(ps, 'pen_10min', 0) or 0,
+                    "pen_match": getattr(ps, 'pen_match', 0) or 0,
                 }
             )
         return result
@@ -1031,21 +1194,93 @@ def get_player_detail(person_id: int) -> dict:
             .all()
         )
 
+        # Build (season_id, league_abbrev) → league DB id lookup
+        # Strip gender/age prefix from League.name to match ps.league_abbrev.
+        # Where multiple leagues match (different game_class), keep the one
+        # with the smallest game_class (highest tier).
+        all_leagues = session.query(
+            League.id, League.name, League.season_id, League.game_class, League.league_id
+        ).all()
+        _league_lookup: dict[tuple, tuple] = {}  # key → (db_id, game_class, api_league_id)
+        for ldb_id, lname, lsid, lgc, lapi_id in all_leagues:
+            if not lname:
+                continue
+            short = lname
+            for pfx in _STRIP_PREFIXES:
+                if short.lower().startswith(pfx):
+                    short = short[len(pfx):]
+                    break
+            key = (lsid, short)
+            # keep lowest game_class (most senior/first match)
+            if key not in _league_lookup:
+                _league_lookup[key] = (ldb_id, lgc or 999, lapi_id)
+            elif (lgc or 999) < _league_lookup[key][1]:
+                _league_lookup[key] = (ldb_id, lgc or 999, lapi_id)
+        league_id_lookup = {k: v[0] for k, v in _league_lookup.items()}
+        # Also: db_league_id → game_class (for gender-exact team disambiguation)
+        db_league_to_gc: dict[int, int] = {v[0]: v[1] for v in _league_lookup.values() if v[1] != 999}
+
+        # Build (league_db_id, team_name) → team_db_id from actual game participation.
+        # This is authoritative: a team named "Zug United" in Herren L-UPL games
+        # is unambiguously the men's team, regardless of whether game_class is
+        # stored on the team row.
+        team_by_league_name: dict[tuple, int] = {}
+        for _lg_dbid, _t_id, _t_name in (
+            session.query(LeagueGroup.league_id, Team.id, Team.name)
+            .join(Game, Game.group_id == LeagueGroup.id)
+            .join(Team, or_(
+                (Team.id == Game.home_team_id) & (Team.season_id == Game.season_id),
+                (Team.id == Game.away_team_id) & (Team.season_id == Game.season_id),
+            ))
+            .filter(Team.name.isnot(None))
+            .distinct()
+            .all()
+        ):
+            team_by_league_name[(_lg_dbid, _t_name)] = _t_id
+
+        # Fallback: (season_id, team_name, game_class) and plain (season_id, team_name)
+        _all_teams = (
+            session.query(Team.id, Team.season_id, Team.name, Team.game_class)
+            .filter(Team.name.isnot(None))
+            .all()
+        )
+        team_id_by_gc: dict[tuple, int] = {}    # (season_id, team_name, game_class) → team_db_id
+        team_id_fallback: dict[tuple, int] = {}  # (season_id, team_name) → team_db_id
+        for t_id, t_sid, t_name, t_gc in _all_teams:
+            if t_gc:
+                team_id_by_gc[(t_sid, t_name, t_gc)] = t_id
+            team_id_fallback[(t_sid, t_name)] = t_id
+
         career: list[dict] = []
         for ps, season in stats_rows:
+            _abbrev = ps.league_abbrev or ""
+            _team_name = ps.team_name or "—"
+            _league_db_id = league_id_lookup.get((season.id, _abbrev))
+            # Resolve team in priority order:
+            # 1. game-participation lookup (league_db_id, team_name) — unambiguous by league
+            # 2. (season, name, game_class) — gender-exact when game_class is indexed on Team
+            # 3. (season, name) fallback
+            _gc = db_league_to_gc.get(_league_db_id) if _league_db_id else None
+            _team_db_id = (
+                (_league_db_id and team_by_league_name.get((_league_db_id, _team_name)))
+                or (_gc and team_id_by_gc.get((season.id, _team_name, _gc)))
+                or team_id_fallback.get((season.id, _team_name))
+            )
             career.append(
                 {
                     "season_text": season.text or str(season.id),
                     "season_id": season.id,
-                    "team_name": ps.team_name or "—",
-                    "league": ps.league_abbrev or "",
+                    "team_name": _team_name,
+                    "league": _abbrev,
                     "team_id": ps.team_id,
+                    "team_db_id": _team_db_id,
+                    "league_db_id": _league_db_id,
                     "gp": ps.games_played,
                     "g": ps.goals,
                     "a": ps.assists,
                     "pts": ps.points,
                     "pim": ps.penalty_minutes,
-                    "_tier": abbrev_tier.get(ps.league_abbrev or "", _DEFAULT_TIER),
+                    "_tier": abbrev_tier.get(_abbrev, _DEFAULT_TIER),
                 }
             )
 

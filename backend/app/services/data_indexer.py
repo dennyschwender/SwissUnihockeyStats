@@ -542,7 +542,11 @@ class DataIndexer:
                 goals           = _int(4)
                 assists         = _int(5)
                 points          = _int(6)
-                penalty_minutes = _int(7) * 2 + _int(8) * 5 + _int(9) * 10
+                pen_2min        = _int(7)
+                pen_5min        = _int(8)
+                pen_10min       = _int(9)
+                pen_match       = _int(10)
+                penalty_minutes = pen_2min * 2 + pen_5min * 5 + pen_10min * 10
                 now             = datetime.now(timezone.utc)
                 key             = (person_id, season_id, league_abbrev)
 
@@ -554,6 +558,10 @@ class DataIndexer:
                     obj.assists         = assists
                     obj.points          = points
                     obj.penalty_minutes = penalty_minutes
+                    obj.pen_2min        = pen_2min
+                    obj.pen_5min        = pen_5min
+                    obj.pen_10min       = pen_10min
+                    obj.pen_match       = pen_match
                     obj.last_updated    = now
 
                 if key in staged:
@@ -585,6 +593,10 @@ class DataIndexer:
                         assists         = assists,
                         points          = points,
                         penalty_minutes = penalty_minutes,
+                        pen_2min        = pen_2min,
+                        pen_5min        = pen_5min,
+                        pen_10min       = pen_10min,
+                        pen_match       = pen_match,
                         last_updated    = now,
                     )
                     session.add(obj)
@@ -793,10 +805,12 @@ class DataIndexer:
           0 – date/time  (link → game_id)
           1 – venue
           2 – home team name  (link → home_team_id)
-          3 – home team logo
-          4 – score  (text: "3:2", "-" if not played)
-          5 – away team logo
+          3 – home team logo  (empty text, link → home_team_id)
+          4 – separator  (text: "-")
+          5 – away team logo  (empty text, link → away_team_id)
           6 – away team name  (link → away_team_id)
+          7 – score/result  (text: "3:2" or "3:2 n.V.", "-" / empty if not played)
+          8 – broadcast icon
 
         Args:
             group_name: The group text string (e.g. "Gruppe 1") used as the
@@ -825,12 +839,13 @@ class DataIndexer:
                 if group_name:
                     base_kwargs["group"] = group_name
 
-                # Walk slider pages backwards (latest → first) to collect all rounds.
-                # The API only shows the current stage by default; each page has a
-                # slider.prev.set_in_context.round that points to the previous round.
+                # Walk slider pages in both directions to collect all rounds:
+                # - backwards (latest → first) via slider.prev
+                # - forwards  (latest → last)  via slider.next (captures future rounds)
                 count = 0
                 visited_rounds: set = set()
                 round_id = None  # None = start from the latest (current) round
+                forward_start_round = None  # will be set from first response's next link
 
                 while True:
                     call_kwargs = {**base_kwargs}
@@ -840,6 +855,10 @@ class DataIndexer:
                     games_data = self.client.get_games(**call_kwargs)
                     d = games_data.get("data", {})
                     slider = d.get("slider", {})
+
+                    # On the very first call, capture the forward starting point
+                    if round_id is None and forward_start_round is None:
+                        forward_start_round = (slider.get("next") or {}).get("set_in_context", {}).get("round")
                     regions = d.get("regions", [])
 
                     for region in regions:
@@ -911,18 +930,22 @@ class DataIndexer:
                             home_score = None
                             away_score = None
                             status = "scheduled"
-                            if len(cells) > 4:
-                                score_text = cells[4].get("text", ["-"])
+                            period = None
+                            # Score is at cell[7] ("Resultat" column);
+                            # cell[4] is just the "-" separator between logos.
+                            if len(cells) > 7:
+                                score_text = cells[7].get("text", ["-"])
                                 score_text = score_text[0] if isinstance(score_text, list) else score_text
-                                if score_text and score_text != "-":
-                                    parts = score_text.split(":")
-                                    if len(parts) == 2:
-                                        try:
-                                            home_score = int(parts[0].strip())
-                                            away_score = int(parts[1].strip())
-                                            status = "finished"
-                                        except ValueError:
-                                            pass
+                                if score_text and score_text not in ("-", ""):
+                                    import re as _re
+                                    # Handles "3:2", "3:2 n.V." (OT), "3:2 n.P." (SO)
+                                    _m = _re.match(r'(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?', score_text.strip(), _re.I)
+                                    if _m:
+                                        home_score = int(_m.group(1))
+                                        away_score = int(_m.group(2))
+                                        _sfx = (_m.group(3) or "").upper()
+                                        period = "SO" if "P" in _sfx else ("OT" if "V" in _sfx else None)
+                                        status = "finished"
 
                             # Ensure teams exist (create stubs if not in our DB)
                             # and update names when available from the game row
@@ -968,9 +991,17 @@ class DataIndexer:
                             game.game_date = game_date
                             game.game_time = game_time_str
                             game.venue = venue
-                            game.status = status
-                            game.home_score = home_score
-                            game.away_score = away_score
+                            # Only overwrite score/status when the API returned a real
+                            # result; never clobber an existing stored score with None
+                            # (this prevents re-indexing from wiping completed games).
+                            if home_score is not None:
+                                game.home_score = home_score
+                                game.away_score = away_score
+                                game.status = status
+                                if period:
+                                    game.period = period
+                            elif game.status != "finished":
+                                game.status = status
                             game.last_updated = datetime.now(timezone.utc)
                             count += 1
 
@@ -980,6 +1011,124 @@ class DataIndexer:
                     if prev_round is None or prev_round in visited_rounds:
                         break  # reached the first round (no more prev)
                     round_id = prev_round
+
+                # Now walk forward from the initial "next" to pick up future rounds
+                round_id = forward_start_round
+                while round_id and round_id not in visited_rounds:
+                    call_kwargs = {**base_kwargs, "round": round_id}
+                    games_data = self.client.get_games(**call_kwargs)
+                    d = games_data.get("data", {})
+                    slider = d.get("slider", {})
+                    regions = d.get("regions", [])
+
+                    for region in regions:
+                        for row in region.get("rows", []):
+                            cells = row.get("cells", [])
+                            if not cells:
+                                continue
+
+                            game_id = None
+                            date_cell = cells[0] if len(cells) > 0 else {}
+                            link = date_cell.get("link", {})
+                            if link.get("ids"):
+                                game_id = link["ids"][0]
+                            if not game_id:
+                                continue
+
+                            # Parse date/time, venue, teams, score — reuse same logic
+                            # For future games score will be None (scheduled)
+                            game_date, game_time_str, venue = None, None, None
+                            date_texts = date_cell.get("text", [])
+                            date_text = date_texts[0] if isinstance(date_texts, list) else date_texts
+                            if date_text:
+                                from datetime import datetime as _dt
+                                for fmt in ("%d.%m.%Y %H:%M", "%d.%m.%y %H:%M"):
+                                    try:
+                                        parsed = _dt.strptime(date_text.strip(), fmt)
+                                        game_date = parsed
+                                        game_time_str = parsed.strftime("%H:%M")
+                                        break
+                                    except ValueError:
+                                        pass
+
+                            if len(cells) > 1:
+                                v = cells[1].get("text", "")
+                                venue = (v[0] if isinstance(v, list) else v) or None
+
+                            home_team_id, away_team_id = None, None
+                            home_team_name, away_team_name = None, None
+                            if len(cells) > 2:
+                                hl = cells[2].get("link", {})
+                                if hl.get("ids"):
+                                    home_team_id = hl["ids"][0]
+                                t = cells[2].get("text", [])
+                                home_team_name = (t[0] if isinstance(t, list) else t) or None
+                            if len(cells) > 6:
+                                al = cells[6].get("link", {})
+                                if al.get("ids"):
+                                    away_team_id = al["ids"][0]
+                                t = cells[6].get("text", [])
+                                away_team_name = (t[0] if isinstance(t, list) else t) or None
+
+                            if not home_team_id or not away_team_id:
+                                continue
+
+                            home_score, away_score, status, period = None, None, "scheduled", None
+                            if len(cells) > 7:
+                                score_text = cells[7].get("text", ["-"])
+                                score_text = score_text[0] if isinstance(score_text, list) else score_text
+                                if score_text and score_text != "-":
+                                    import re as _re
+                                    # Handles "3:2", "3:2 n.V." (OT), "3:2 n.P." (SO)
+                                    _m = _re.match(r'(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?', score_text.strip(), _re.I)
+                                    if _m:
+                                        home_score = int(_m.group(1))
+                                        away_score = int(_m.group(2))
+                                        _sfx = (_m.group(3) or "").upper()
+                                        period = "SO" if "P" in _sfx else ("OT" if "V" in _sfx else None)
+                                        status = "finished"
+
+                            for tid in (home_team_id, away_team_id):
+                                from app.models.db_models import Team
+                                tname = {home_team_id: home_team_name, away_team_id: away_team_name}.get(tid)
+                                existing = session.get(Team, (tid, season_id))
+                                if not existing:
+                                    stub = Team(id=tid, season_id=season_id, league_id=league_id,
+                                                game_class=game_class, name=tname, text=tname)
+                                    session.add(stub)
+                                    try:
+                                        session.flush()
+                                    except Exception:
+                                        session.rollback()
+                                elif tname and not existing.name:
+                                    existing.name = tname
+                                    existing.text = tname
+
+                            game = session.get(Game, game_id)
+                            if not game:
+                                game = Game(id=game_id, season_id=season_id, group_id=group_db_id,
+                                            home_team_id=home_team_id, away_team_id=away_team_id)
+                                session.add(game)
+
+                            game.game_date = game_date
+                            game.game_time = game_time_str
+                            game.venue = venue
+                            if home_score is not None:
+                                game.home_score = home_score
+                                game.away_score = away_score
+                                game.status = status
+                                if period:
+                                    game.period = period
+                            elif game.status != "finished":
+                                game.status = status
+                            game.last_updated = datetime.now(timezone.utc)
+                            count += 1
+
+                    visited_rounds.add(round_id)
+                    next_round = (slider.get("next") or {}).get("set_in_context", {}).get("round")
+                    if not next_round or next_round in visited_rounds:
+                        break
+                    round_id = next_round
 
                 session.commit()
                 self._mark_sync_complete(session, "games", entity_id, count)

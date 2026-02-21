@@ -109,6 +109,20 @@ class DatabaseService:
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_stats_unique
                 ON player_statistics (player_id, season_id, league_abbrev)
             """))
+
+            # ── Add penalty breakdown columns (idempotent) ──────────────────
+            existing_cols = {
+                row[1] for row in conn.execute(text("PRAGMA table_info(player_statistics)"))
+            }
+            for col_def in [
+                ("pen_2min",  "INTEGER DEFAULT 0"),
+                ("pen_5min",  "INTEGER DEFAULT 0"),
+                ("pen_10min", "INTEGER DEFAULT 0"),
+                ("pen_match", "INTEGER DEFAULT 0"),
+            ]:
+                if col_def[0] not in existing_cols:
+                    conn.execute(text(f"ALTER TABLE player_statistics ADD COLUMN {col_def[0]} {col_def[1]}"))
+
             conn.commit()
             logger.debug("SQLite migrations applied")
     

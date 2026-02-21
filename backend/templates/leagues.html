@@ -3,76 +3,238 @@
 {% block title %}Leagues – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top:2rem;padding-bottom:3rem;">
+<script type="application/json" id="leagues-data">{{ leagues_flat | tojson }}</script>
+<script>
+document.addEventListener('alpine:init', () => {
+  Alpine.data('leaguesFilter', () => {
+    const leagues = JSON.parse(document.getElementById('leagues-data').textContent);
+    const locale = {{ locale | tojson }};
+    const T = {
+      big_field:    {{ t.leagues.big_field    | tojson }},
+      small_field:  {{ t.leagues.small_field  | tojson }},
+      gender_men:   {{ t.leagues.gender_men   | tojson }},
+      gender_women: {{ t.leagues.gender_women | tojson }},
+      gender_mixed: {{ t.leagues.gender_mixed | tojson }},
+      gender_other: {{ t.leagues.gender_other | tojson }},
+      count_one:    {{ t.leagues.count_one    | tojson }},
+      count_many:   {{ t.leagues.count_many   | tojson }},
+      filter_senior:   {{ t.leagues.filter_senior   | tojson }},
+      filter_senioren: {{ t.leagues.filter_senioren | tojson }},
+    };
+
+    const GENDER_LABEL = { men: T.gender_men, women: T.gender_women };
+    // Age-group sort order after senior tiers (1–6)
+    const AGE_SORT = { U21: 7, U18: 8, U16: 9, U14: 10, U12: 11, U10: 12, Senioren: 13 };
+    const SEX_SORT  = { men: 0, women: 1, mixed: 2 };
+
+    function buildTierSections(filtered) {
+      const map = {};
+      for (const l of filtered) {
+        const isSenior = l.gender === 'men' || l.gender === 'women';
+        const key   = isSenior ? 'tier_' + l.tier : 'age_' + l.gender;
+        const label = isSenior ? l.tier_label     : l.gender;
+        const sort  = isSenior ? l.tier            : (AGE_SORT[l.gender] ?? 99);
+        if (!map[key]) map[key] = { key, label, sort, subMap: {} };
+        // Split every tier by sex (men / women / mixed)
+        const sg = l.sex;
+        if (!map[key].subMap[sg]) map[key].subMap[sg] = { sex: sg, leagues: [] };
+        map[key].subMap[sg].leagues.push(l);
+      }
+      return Object.values(map)
+        .sort((a, b) => a.sort - b.sort)
+        .map(s => {
+          const subgroups = Object.values(s.subMap)
+            .sort((a, b) => (SEX_SORT[a.sex] ?? 99) - (SEX_SORT[b.sex] ?? 99))
+            .map(sg => ({ ...sg, leagues: sg.leagues.slice().sort((a, b) => a.name.localeCompare(b.name)) }));
+          const leagues = subgroups.length === 1 ? subgroups[0].leagues : [];
+          return { key: s.key, label: s.label, sort: s.sort, subgroups, leagues };
+        });
+    }
+
+    return {
+      leagues,
+      locale,
+      activeSex:   'all',
+      activeAge:   'all',
+      activeField: 'all',
+
+      get filtered() {
+        return this.leagues.filter(l => {
+          const isSenior = l.gender === 'men' || l.gender === 'women';
+          const sOk = this.activeSex === 'all' || l.sex === this.activeSex;
+          const aOk = this.activeAge === 'all'
+            || (this.activeAge === 'senior'   ? isSenior
+            : (this.activeAge === 'senioren'  ? l.gender === 'Senioren'
+            : l.gender === this.activeAge));
+          const fOk = this.activeField === 'all' || l.field === this.activeField;
+          return sOk && aOk && fOk;
+        });
+      },
+
+      get tierSections() { return buildTierSections(this.filtered); },
+
+      get filteredCount() { return this.filtered.length; },
+      get countLabel() { return this.filteredCount + ' ' + (this.filteredCount === 1 ? T.count_one : T.count_many); },
+
+      // sex label shown in sub-headers
+      sexLabel(s) { return s === 'men' ? T.gender_men : s === 'women' ? T.gender_women : T.gender_mixed; },
+      fieldLabel(f) { return f === 'big' ? T.big_field : T.small_field; },
+
+      btnClass(active) {
+        return active
+          ? 'padding:.35rem .9rem;border:1px solid var(--primary,#2563eb);border-radius:999px;font-size:.82rem;font-weight:600;background:var(--primary,#2563eb);color:white;cursor:pointer;'
+          : 'padding:.35rem .9rem;border:1px solid var(--gray-300,#d1d5db);border-radius:999px;font-size:.82rem;font-weight:500;background:transparent;color:inherit;cursor:pointer;';
+      },
+    };
+  });
+});
+</script>
+
+<div class="container" style="padding-top:2rem;padding-bottom:3rem;" x-data="leaguesFilter()">
   <!-- Header row -->
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
     <h1 style="margin:0;font-size:2rem;font-weight:700;">🏆 Leagues</h1>
     {% if seasons %}
     <form method="get" style="display:flex;align-items:center;gap:.5rem;">
-      <label for="season-select" style="font-size:.85rem;font-weight:600;color:var(--gray-500,#6b7280);">
-        Season
-      </label>
-      <select id="season-select" name="season"
-              onchange="this.form.submit()"
-              style="padding:.35rem .75rem;border:1px solid var(--gray-300,#d1d5db);
-                     border-radius:.375rem;font-size:.9rem;background:var(--card-bg,white);
-                     color:inherit;cursor:pointer;">
+      <label for="season-select" style="font-size:.85rem;font-weight:600;color:var(--gray-500,#6b7280);">Season</label>
+      <select id="season-select" name="season" onchange="this.form.submit()"
+              style="padding:.35rem .75rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;
+                     font-size:.9rem;background:var(--card-bg,white);color:inherit;cursor:pointer;">
         {% for s in seasons %}
-        <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>
-          {{ s.name }}
-        </option>
+        <option value="{{ s.id }}" {% if s.id == selected_season %}selected{% endif %}>{{ s.name }}</option>
         {% endfor %}
       </select>
     </form>
     {% endif %}
   </div>
 
-  {% if gender_tiers %}
-    {% for gender, tier_groups in gender_tiers.items() %}
-    <div style="margin-bottom:3rem;">
-      <!-- Gender heading -->
-      <h2 style="font-size:1.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
-                 color:var(--primary,#2563eb);border-bottom:2px solid var(--primary,#2563eb);
-                 padding-bottom:.4rem;margin-bottom:1.25rem;">
-        {% if gender == 'men' %}Men{% elif gender == 'women' %}Women{% elif gender == 'mixed' %}Mixed{% else %}Other{% endif %}
-      </h2>
-
-      {% for tier_group in tier_groups %}
-      <div style="margin-bottom:1.75rem;">
-        <!-- Tier sub-heading -->
-        <h3 style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;
-                   color:var(--gray-400,#9ca3af);margin-bottom:.6rem;display:flex;align-items:center;gap:.5rem;">
-          <span style="flex:1;height:1px;background:var(--gray-200,#e5e7eb);display:inline-block;"></span>
-          {{ tier_group.label }}
-          <span style="flex:1;height:1px;background:var(--gray-200,#e5e7eb);display:inline-block;"></span>
-        </h3>
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.65rem;">
-          {% for league in tier_group.leagues %}
-          <a href="/{{ locale }}/league/{{ league.id }}" style="text-decoration:none;color:inherit;">
-            <div style="background:var(--card-bg,white);border:1px solid var(--gray-200,#e5e7eb);
-                        border-radius:.5rem;padding:.9rem 1.1rem;transition:box-shadow .15s,transform .15s;"
-                 onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.1)';this.style.transform='translateY(-1px)'"
-                 onmouseout="this.style.boxShadow='';this.style.transform=''">
-              <div style="font-weight:600;font-size:.95rem;margin-bottom:.2rem;">{{ league.name }}</div>
-              {% if league.group_count %}
-              <div style="font-size:.75rem;color:var(--gray-500,#6b7280);">
-                {{ league.group_count }} group{{ "s" if league.group_count != 1 else "" }}
-              </div>
-              {% endif %}
-            </div>
-          </a>
-          {% endfor %}
-        </div>
-      </div>
-      {% endfor %}
+  <!-- Filter bar -->
+  <div style="background:var(--card-bg,white);border:1px solid var(--gray-200,#e5e7eb);
+              border-radius:.6rem;padding:.9rem 1.1rem;margin-bottom:1.75rem;
+              display:flex;flex-direction:column;gap:.6rem;">
+    <!-- Sex filter -->
+    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+      <span style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+                   color:var(--gray-500,#6b7280);width:5rem;flex-shrink:0;">{{ t.leagues.filter_sex }}</span>
+      <button :style="btnClass(activeSex==='all')"    @click="activeSex='all'">{{ t.leagues.filter_all }}</button>
+      <button :style="btnClass(activeSex==='men')"    @click="activeSex='men'">{{ t.leagues.filter_men }}</button>
+      <button :style="btnClass(activeSex==='women')"  @click="activeSex='women'">{{ t.leagues.filter_women }}</button>
+      <button :style="btnClass(activeSex==='mixed')"  @click="activeSex='mixed'">{{ t.leagues.filter_mixed }}</button>
     </div>
-    {% endfor %}
-  {% else %}
-  <div style="text-align:center;padding:3rem;color:var(--gray-500,#6b7280);">
-    <p style="font-size:2rem">🏆</p>
-    <p>No leagues available in the database.</p>
+    <!-- Age/category filter -->
+    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+      <span style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+                   color:var(--gray-500,#6b7280);width:5rem;flex-shrink:0;">{{ t.leagues.filter_age }}</span>
+      <button :style="btnClass(activeAge==='all')"       @click="activeAge='all'">{{ t.leagues.filter_all }}</button>
+      <button :style="btnClass(activeAge==='senior')"    @click="activeAge='senior'">{{ t.leagues.filter_senior }}</button>
+      <button :style="btnClass(activeAge==='U21')"       @click="activeAge='U21'">U21</button>
+      <button :style="btnClass(activeAge==='U18')"       @click="activeAge='U18'">U18</button>
+      <button :style="btnClass(activeAge==='U16')"       @click="activeAge='U16'">U16</button>
+      <button :style="btnClass(activeAge==='U14')"       @click="activeAge='U14'">U14</button>
+      <button :style="btnClass(activeAge==='U12')"       @click="activeAge='U12'">U12</button>
+      <button :style="btnClass(activeAge==='U10')"       @click="activeAge='U10'">U10</button>
+      <button :style="btnClass(activeAge==='senioren')" @click="activeAge='senioren'">{{ t.leagues.filter_senioren }}</button>
+    </div>
+    <!-- Field filter -->
+    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+      <span style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+                   color:var(--gray-500,#6b7280);width:5rem;flex-shrink:0;">{{ t.leagues.filter_field }}</span>
+      <button :style="btnClass(activeField==='all')"   @click="activeField='all'">{{ t.leagues.filter_all }}</button>
+      <button :style="btnClass(activeField==='big')"   @click="activeField='big'">{{ t.leagues.big_field }}</button>
+      <button :style="btnClass(activeField==='small')" @click="activeField='small'">{{ t.leagues.small_field }}</button>
+    </div>
+    <!-- Count -->
+    <div style="font-size:.8rem;color:var(--gray-500,#6b7280);" x-text="countLabel"></div>
   </div>
-  {% endif %}
+
+  <!-- Sections -->
+  <template x-if="tierSections.length > 0">
+    <div>
+      <template x-for="section in tierSections" :key="section.key">
+        <div style="margin-bottom:1.75rem;">
+          <!-- Tier / age-group heading -->
+          <h3 style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;
+                     color:var(--gray-400,#9ca3af);margin-bottom:.6rem;display:flex;align-items:center;gap:.5rem;">
+            <span style="flex:1;height:1px;background:var(--gray-200,#e5e7eb);display:inline-block;"></span>
+            <span x-text="section.label"></span>
+            <span style="flex:1;height:1px;background:var(--gray-200,#e5e7eb);display:inline-block;"></span>
+          </h3>
+          <!-- Cards: split into men/women/mixed subgroups when multiple, flat grid when single -->
+          <template x-if="section.subgroups.length > 1">
+            <div style="display:flex;flex-direction:row;flex-wrap:wrap;gap:.75rem;align-items:flex-start;">
+              <template x-for="sg in section.subgroups" :key="sg.sex">
+                <div :style="'flex:1;min-width:240px;border-left:3px solid ' + (sg.sex === 'men' ? '#93c5fd' : sg.sex === 'women' ? '#f9a8d4' : '#86efac') + ';padding-left:.75rem;'">
+                  <div :style="'font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;' + (sg.sex === 'men' ? 'color:#1d4ed8;' : sg.sex === 'women' ? 'color:#9d174d;' : 'color:#065f46;')"
+                       x-text="sexLabel(sg.sex)"></div>
+                  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.55rem;">
+                    <template x-for="league in sg.leagues" :key="league.id">
+                      <a :href="`/${locale}/league/${league.id}`" style="text-decoration:none;color:inherit;">
+                        <div style="background:var(--card-bg,white);border:1px solid var(--gray-200,#e5e7eb);
+                                    border-radius:.5rem;padding:.75rem 1rem;
+                                    transition:box-shadow .15s,transform .15s;"
+                             @mouseenter="$el.style.boxShadow='0 4px 12px rgba(0,0,0,.08)';$el.style.transform='translateY(-1px)'"
+                             @mouseleave="$el.style.boxShadow='';$el.style.transform=''">
+                          <div style="font-weight:600;font-size:.92rem;margin-bottom:.3rem;" x-text="league.name"></div>
+                          <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
+                            <span x-show="league.group_count > 1"
+                                  style="font-size:.75rem;color:var(--gray-500,#6b7280);"
+                                  x-text="league.group_count + ' groups'"></span>
+                            <span style="font-size:.7rem;padding:.1rem .45rem;border-radius:999px;font-weight:500;
+                                         background:var(--gray-100,#f3f4f6);color:var(--gray-500,#6b7280);"
+                                  x-text="fieldLabel(league.field)"></span>
+                          </div>
+                        </div>
+                      </a>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+          <!-- Single sex: flat grid, no sub-header -->
+          <template x-if="section.subgroups.length <= 1">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.65rem;">
+              <template x-for="league in section.leagues" :key="league.id">
+                <a :href="`/${locale}/league/${league.id}`" style="text-decoration:none;color:inherit;">
+                  <div style="background:var(--card-bg,white);border:1px solid var(--gray-200,#e5e7eb);
+                              border-radius:.5rem;padding:.9rem 1.1rem;
+                              transition:box-shadow .15s,transform .15s;"
+                       @mouseenter="$el.style.boxShadow='0 4px 12px rgba(0,0,0,.1)';$el.style.transform='translateY(-1px)'"
+                       @mouseleave="$el.style.boxShadow='';$el.style.transform=''">
+                    <div style="font-weight:600;font-size:.95rem;margin-bottom:.3rem;" x-text="league.name"></div>
+                    <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
+                      <span x-show="league.group_count > 1"
+                            style="font-size:.75rem;color:var(--gray-500,#6b7280);"
+                            x-text="league.group_count + ' groups'"></span>
+                    <span :style="'font-size:.7rem;padding:.1rem .45rem;border-radius:999px;font-weight:500;' + (league.sex === 'men' ? 'background:#dbeafe;color:#1d4ed8;' : league.sex === 'women' ? 'background:#fce7f3;color:#9d174d;' : 'background:#d1fae5;color:#065f46;')"
+                          x-text="sexLabel(league.sex)"></span>
+                      <span style="font-size:.7rem;padding:.1rem .45rem;border-radius:999px;font-weight:500;
+                                   background:var(--gray-100,#f3f4f6);color:var(--gray-500,#6b7280);"
+                            x-text="fieldLabel(league.field)"></span>
+                    </div>
+                  </div>
+                </a>
+              </template>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+  </template>
+
+  <!-- Empty state -->
+  <template x-if="tierSections.length === 0">
+    <div style="text-align:center;padding:3rem;color:var(--gray-500,#6b7280);">
+      <p style="font-size:2rem">🏆</p>
+      <p>{{ t.leagues.no_match }}</p>
+      <button @click="clearAll()"
+              style="margin-top:.5rem;padding:.4rem 1rem;border:1px solid var(--primary,#2563eb);
+                     border-radius:.375rem;color:var(--primary,#2563eb);background:transparent;
+                     cursor:pointer;font-size:.9rem;">
+        {{ t.leagues.clear_filters }}
+      </button>
+    </div>
+  </template>
+
 </div>
 {% endblock %}
