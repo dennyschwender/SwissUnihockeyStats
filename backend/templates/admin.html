@@ -910,7 +910,9 @@ function renderScheduler(d) {
     7: 'T7 \u2014 All (incl. youth)',
   };
   const tiersBodyEl = document.getElementById('sched-tiers-tbody');
-  if (tiersBodyEl && d.policy_tiers) {
+  const tiersPanel  = document.getElementById('sched-tiers');
+  // Don't overwrite the tier table while the panel is open — user may be editing
+  if (tiersBodyEl && d.policy_tiers && !(tiersPanel && tiersPanel.classList.contains('open'))) {
     tiersBodyEl.innerHTML = Object.entries(d.policy_tiers).map(([name, tier]) => {
       const opts = Object.entries(TIER_LABELS).map(([v, lbl]) =>
         `<option value="${v}"${+v === tier ? ' selected' : ''}>${lbl}</option>`
