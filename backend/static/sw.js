@@ -107,7 +107,7 @@ function syncFavorites() {
 // Push notifications (for future use)
 self.addEventListener('push', (event) => {
     const data = event.data ? event.data.json() : {};
-    const title = data.title || 'SwissUnihockey';
+    const title = data.title || 'Unihockey Stats';
     const options = {
         body: data.body || 'New update available',
         icon: '/static/images/icon-192x192.png',

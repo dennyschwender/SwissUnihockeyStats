@@ -1,6 +1,6 @@
 {
-  "name": "SwissUnihockey Statistics",
-  "short_name": "SwissUnihockey",
+  "name": "Unihockey Stats",
+  "short_name": "Unihockey Stats",
   "description": "Comprehensive statistics for Swiss floorball leagues, teams, games, and rankings",
   "start_url": "/de/",
   "display": "standalone",
