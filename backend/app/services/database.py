@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from typing import Generator
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool
 
 from app.models.db_models import Base
 from app.config import settings
@@ -45,11 +45,15 @@ class DatabaseService:
         
         # Create engine
         if self.database_url.startswith("sqlite"):
-            # SQLite-specific configuration
+            # SQLite-specific configuration.
+            # NullPool: each session_scope() gets its own connection so
+            # concurrent threads (asyncio.to_thread jobs) never share a
+            # connection.  WAL mode + busy_timeout serialise writes at the
+            # file level, so this is safe.
             self.engine = create_engine(
                 self.database_url,
                 connect_args={"check_same_thread": False},
-                poolclass=StaticPool,
+                poolclass=NullPool,
                 echo=False  # Set to True for SQL debugging
             )
             

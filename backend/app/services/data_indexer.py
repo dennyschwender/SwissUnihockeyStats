@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from app.models.db_models import (
     Season, Club, Team, Player, TeamPlayer, League, LeagueGroup,
@@ -988,6 +989,14 @@ class DataIndexer:
                                     away_team_id=away_team_id,
                                 )
                                 session.add(game)
+                                try:
+                                    session.flush()
+                                except IntegrityError:
+                                    # Another concurrent job beat us to this game_id
+                                    session.rollback()
+                                    game = session.get(Game, game_id)
+                                    if not game:
+                                        continue  # can't proceed without the row
 
                             game.game_date = game_date
                             game.game_time = game_time_str
@@ -1110,6 +1119,13 @@ class DataIndexer:
                                 game = Game(id=game_id, season_id=season_id, group_id=group_db_id,
                                             home_team_id=home_team_id, away_team_id=away_team_id)
                                 session.add(game)
+                                try:
+                                    session.flush()
+                                except IntegrityError:
+                                    session.rollback()
+                                    game = session.get(Game, game_id)
+                                    if not game:
+                                        continue
 
                             game.game_date = game_date
                             game.game_time = game_time_str
@@ -1380,21 +1396,25 @@ class DataIndexer:
                                     )
                                     continue
 
-                                gp = GamePlayer(
-                                    game_id=game_id,
-                                    player_id=player_id,
-                                    team_id=team_id,
-                                    season_id=season_id,
-                                    is_home_team=not bool(is_home_flag),  # flag=0→home, flag=1→away
-                                    jersey_number=jersey,
-                                    position=str(position)[:50] if position else None,
-                                    goals=0,
-                                    assists=0,
-                                    penalty_minutes=0,
-                                    last_updated=datetime.now(timezone.utc),
-                                )
-                                session.add(gp)
-                                count += 1
+                                existing_gp = session.query(GamePlayer).filter_by(
+                                    game_id=game_id, player_id=player_id
+                                ).first()
+                                if not existing_gp:
+                                    gp = GamePlayer(
+                                        game_id=game_id,
+                                        player_id=player_id,
+                                        team_id=team_id,
+                                        season_id=season_id,
+                                        is_home_team=not bool(is_home_flag),  # flag=0→home, flag=1→away
+                                        jersey_number=jersey,
+                                        position=str(position)[:50] if position else None,
+                                        goals=0,
+                                        assists=0,
+                                        penalty_minutes=0,
+                                        last_updated=datetime.now(timezone.utc),
+                                    )
+                                    session.add(gp)
+                                    count += 1
 
                 session.commit()
                 self._mark_sync_complete(session, "game_lineup", entity_id, count)
