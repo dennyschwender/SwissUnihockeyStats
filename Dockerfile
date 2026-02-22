@@ -1,83 +1,69 @@
-# SwissUnihockey API Client - Docker Image
-# Multi-stage build for optimized image size
+# SwissUnihockey Stats - Docker Image
+# Multi-stage build: builder installs deps into a venv, runtime copies it in.
 
-# Stage 1: Builder
+# ---------------------------------------------------------------------------
+# Stage 1: Builder — install Python dependencies into a clean virtualenv
+# ---------------------------------------------------------------------------
 FROM python:3.12-slim AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libc-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Install build tools, upgrade pip, create venv — all in one cached layer
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --upgrade pip \
+    && python -m venv /app/venv
 
-# Copy requirements from backend directory
+# Copy requirements and install into the venv (cached unless requirements change)
 COPY backend/requirements.txt .
+RUN /app/venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --user -r requirements.txt
-
-# Stage 2: Runtime
+# ---------------------------------------------------------------------------
+# Stage 2: Runtime — lean image, no build tools
+# ---------------------------------------------------------------------------
 FROM python:3.12-slim
 
-# Set maintainer label
 LABEL maintainer="your.email@example.com"
-LABEL description="SwissUnihockey API Client with intelligent caching"
+LABEL description="SwissUnihockey Stats with intelligent caching"
 LABEL version="1.0.0"
 
-# Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    # venv is on PATH for all users — no --user / .local tricks needed
+    PATH="/app/venv/bin:$PATH"
 
-# Install gosu for step-down from root
-RUN apt-get update && apt-get install -y --no-install-recommends gosu && \
-    rm -rf /var/lib/apt/lists/* && \
-    gosu nobody true
+# Install gosu for privilege drop
+RUN apt-get update && apt-get install -y --no-install-recommends gosu \
+    && rm -rf /var/lib/apt/lists/* \
+    && gosu nobody true
 
-# Create non-root user
-RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/data/cache && \
-    chown -R appuser:appuser /app
+# Non-root user
+RUN useradd -m -u 1000 appuser
 
-# Set working directory
 WORKDIR /app
 
-# Copy Python dependencies from builder
-COPY --from=builder /root/.local /home/appuser/.local
+# Copy venv from builder (owns nothing sensitive, safe for any user)
+COPY --from=builder /app/venv /app/venv
 
-# Copy application code from backend directory
-COPY --chown=appuser:appuser backend/app/ ./app/
-COPY --chown=appuser:appuser backend/manage.py ./
-COPY --chown=appuser:appuser backend/.env.example ./
-COPY --chown=appuser:appuser backend/locales/ ./locales/
-COPY --chown=appuser:appuser backend/static/ ./static/
+# Copy application code
+COPY --chown=appuser:appuser backend/app/       ./app/
+COPY --chown=appuser:appuser backend/manage.py  ./
+COPY --chown=appuser:appuser backend/locales/   ./locales/
+COPY --chown=appuser:appuser backend/static/    ./static/
 COPY --chown=appuser:appuser backend/templates/ ./templates/
-COPY --chown=appuser:appuser scripts/ ./scripts/
+COPY --chown=appuser:appuser scripts/           ./scripts/
 
-# Copy entrypoint script
+# Entrypoint (runs as root → fixes /app/data ownership → drops to appuser)
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Create cache directory with proper permissions
-RUN mkdir -p /app/data/cache && \
-    chown -R appuser:appuser /app/data
+# Data directory (entrypoint will chown at runtime so mounted volumes work too)
+RUN mkdir -p /app/data/cache && chown -R appuser:appuser /app/data
 
-# Update PATH for appuser
-ENV PATH=/home/appuser/.local/bin:$PATH
-
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5)" || exit 1
 
-# Expose port
 EXPOSE 8000
 
-# Entrypoint handles permission fixes and user switching
 ENTRYPOINT ["docker-entrypoint.sh"]
-
-# Default command: Run FastAPI server
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
