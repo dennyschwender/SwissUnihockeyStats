@@ -1520,12 +1520,20 @@ def get_upcoming_games(
         grp_league: dict = {}
         grp_league_category: dict = {}  # For filtering: league_id_game_class
         grp_name: dict = {}  # Group name/number
+        grp_label: dict = {}  # Combined "M NLB · Gruppe 1" label
         for grp in session.query(LeagueGroup).filter(LeagueGroup.id.in_(group_ids)).all():
             lg = session.query(League).filter(League.id == grp.league_id).first()
             grp_league[grp.id] = lg.name if lg else ""
             grp_name[grp.id] = grp.name or grp.text or ""
             if lg:
                 grp_league_category[grp.id] = f"{lg.league_id}_{lg.game_class}"
+            # Build short label: "M" / "W" + league name stripped of Herren/Damen + group
+            gc = lg.game_class if lg else None
+            mw = "M" if gc == 11 else ("W" if gc == 21 else "")
+            lg_short = (lg.name or lg.text or "").replace("Herren ", "").replace("Damen ", "").strip() if lg else ""
+            grp_text = grp.name or grp.text or ""
+            parts = [p for p in [mw, lg_short, grp_text] if p]
+            grp_label[grp.id] = " · ".join(parts)
 
         return [
             {
@@ -1539,6 +1547,7 @@ def get_upcoming_games(
                 "away_team_id": g.away_team_id,
                 "league": grp_league.get(g.group_id, ""),
                 "group_name": grp_name.get(g.group_id, ""),
+                "league_label": grp_label.get(g.group_id, ""),
                 "league_category": grp_league_category.get(g.group_id, ""),
             }
             for g in games_raw
@@ -1617,12 +1626,20 @@ def get_latest_results(
         grp_league: dict = {}
         grp_league_category: dict = {}  # For filtering: league_id_game_class
         grp_name: dict = {}  # Group name/number
+        grp_label: dict = {}  # Combined "M NLB · Gruppe 1" label
         for grp in session.query(LeagueGroup).filter(LeagueGroup.id.in_(group_ids)).all():
             lg = session.query(League).filter(League.id == grp.league_id).first()
             grp_league[grp.id] = lg.name if lg else ""
             grp_name[grp.id] = grp.name or grp.text or ""
             if lg:
                 grp_league_category[grp.id] = f"{lg.league_id}_{lg.game_class}"
+            # Build short label: "M" / "W" + league name stripped of Herren/Damen + group
+            gc = lg.game_class if lg else None
+            mw = "M" if gc == 11 else ("W" if gc == 21 else "")
+            lg_short = (lg.name or lg.text or "").replace("Herren ", "").replace("Damen ", "").strip() if lg else ""
+            grp_text = grp.name or grp.text or ""
+            parts = [p for p in [mw, lg_short, grp_text] if p]
+            grp_label[grp.id] = " · ".join(parts)
 
         return [
             {
@@ -1638,6 +1655,7 @@ def get_latest_results(
                 "away_team_id": g.away_team_id,
                 "league": grp_league.get(g.group_id, ""),
                 "group_name": grp_name.get(g.group_id, ""),
+                "league_label": grp_label.get(g.group_id, ""),
                 "league_category": grp_league_category.get(g.group_id, ""),
             }
             for g in games_raw
