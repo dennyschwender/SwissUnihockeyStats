@@ -1640,13 +1640,16 @@ async def club_detail(request: Request, locale: str, club_id: int):
                         ).fetchall()
                         group_by_team = {r[0]: r[1] for r in grp_rows}
 
-                        # Count groups per league so single-group leagues don't show a label
+                        # Count groups per league — same logic as leagues page:
+                        # distinct non-empty group names (len({g.name or g.text for g in lg.groups} - {None, ""}))
                         league_db_ids = list({lg.id for _, lg in rows if lg is not None})
                         if league_db_ids:
                             lg_id_list = ",".join(str(i) for i in league_db_ids)
                             cnt_rows = session.execute(
                                 sa_text(f"""
-                                    SELECT league_id, COUNT(*)
+                                    SELECT league_id,
+                                           COUNT(DISTINCT CASE WHEN COALESCE(NULLIF(name,''), text, '') != ''
+                                                               THEN COALESCE(NULLIF(name,''), text) END)
                                     FROM league_groups
                                     WHERE league_id IN ({lg_id_list})
                                     GROUP BY league_id
