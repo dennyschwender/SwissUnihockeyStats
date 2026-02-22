@@ -3,9 +3,9 @@ Database models for Swiss Unihockey Stats
 Implements hierarchical data structure matching API structure
 """
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, ForeignKeyConstraint, Boolean, JSON, Float, Text, Index
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -17,11 +17,11 @@ class Season(Base):
     """Season entity - top level of hierarchy"""
     __tablename__ = "seasons"
     
-    id = Column(Integer, primary_key=True)  # API season ID (e.g., 2025)
-    text = Column(String(50))  # Display name (e.g., "2025/26")
-    highlighted = Column(Boolean, default=False)
-    last_updated = Column(DateTime, default=datetime.utcnow)
-    last_full_sync = Column(DateTime, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)  # API season ID (e.g., 2025)
+    text: Mapped[Optional[str]] = mapped_column(String(50))  # Display name (e.g., "2025/26")
+    highlighted: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    last_full_sync: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
     # Relationships
     clubs = relationship("Club", back_populates="season", cascade="all, delete-orphan")
@@ -36,13 +36,13 @@ class Club(Base):
     """Club entity - belongs to season"""
     __tablename__ = "clubs"
     
-    id = Column(Integer, primary_key=True)  # API club ID
-    season_id = Column(Integer, ForeignKey("seasons.id"), primary_key=True, nullable=False)
-    name = Column(String(200))
-    text = Column(String(200))
-    region = Column(String(100), nullable=True)
-    logo_url = Column(String(500), nullable=True)
-    last_updated = Column(DateTime, default=datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)  # API club ID
+    season_id: Mapped[int] = mapped_column(Integer, ForeignKey("seasons.id"), primary_key=True, nullable=False)
+    name: Mapped[Optional[str]] = mapped_column(String(200))
+    text: Mapped[Optional[str]] = mapped_column(String(200))
+    region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     
     # Relationships
     season = relationship("Season", back_populates="clubs")
@@ -57,14 +57,14 @@ class League(Base):
     """League entity - belongs to season"""
     __tablename__ = "leagues"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    season_id = Column(Integer, ForeignKey("seasons.id"), nullable=False)
-    league_id = Column(Integer, nullable=False)  # API league ID (e.g., 2 for NLB)
-    game_class = Column(Integer, nullable=False)  # 11=Men, 21=Women
-    name = Column(String(200))
-    text = Column(String(200))
-    mode = Column(String(50), nullable=True)
-    last_updated = Column(DateTime, default=datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_id: Mapped[int] = mapped_column(Integer, ForeignKey("seasons.id"), nullable=False)
+    league_id: Mapped[int] = mapped_column(Integer, nullable=False)  # API league ID (e.g., 2 for NLB)
+    game_class: Mapped[Optional[int]] = mapped_column(Integer, nullable=False)  # 11=Men, 21=Women
+    name: Mapped[Optional[str]] = mapped_column(String(200))
+    text: Mapped[Optional[str]] = mapped_column(String(200))
+    mode: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     
     # Relationships
     season = relationship("Season", back_populates="leagues")
@@ -80,12 +80,12 @@ class LeagueGroup(Base):
     """League group entity - subdivision within a league"""
     __tablename__ = "league_groups"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    league_id = Column(Integer, ForeignKey("leagues.id"), nullable=False)
-    group_id = Column(Integer, nullable=False)  # API group ID
-    name = Column(String(200))
-    text = Column(String(200))
-    last_updated = Column(DateTime, default=datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    league_id: Mapped[int] = mapped_column(Integer, ForeignKey("leagues.id"), nullable=False)
+    group_id: Mapped[int] = mapped_column(Integer, nullable=False)  # API group ID
+    name: Mapped[Optional[str]] = mapped_column(String(200))
+    text: Mapped[Optional[str]] = mapped_column(String(200))
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     
     # Relationships
     league = relationship("League", back_populates="groups")
@@ -100,16 +100,16 @@ class Team(Base):
     """Team entity - belongs to club and participates in leagues"""
     __tablename__ = "teams"
     
-    id = Column(Integer, primary_key=True)  # API team ID
-    club_id = Column(Integer, nullable=True)  # Removed ForeignKey - using composite FK below
-    season_id = Column(Integer, ForeignKey("seasons.id"), primary_key=True, nullable=False)  # Composite PK with id
-    league_id = Column(Integer, nullable=True)  # API league ID
-    game_class = Column(Integer, nullable=True)  # 11=Men, 21=Women
-    name = Column(String(200))
-    text = Column(String(200))
-    logo_url = Column(String(500), nullable=True)
-    last_updated = Column(DateTime, default=datetime.utcnow)
-    last_stats_update = Column(DateTime, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)  # API team ID
+    club_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Removed ForeignKey - using composite FK below
+    season_id: Mapped[int] = mapped_column(Integer, ForeignKey("seasons.id"), primary_key=True, nullable=False)  # Composite PK with id
+    league_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # API league ID
+    game_class: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 11=Men, 21=Women
+    name: Mapped[Optional[str]] = mapped_column(String(200))
+    text: Mapped[Optional[str]] = mapped_column(String(200))
+    logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    last_stats_update: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
     # Relationships
     club = relationship("Club", back_populates="teams", foreign_keys="[Team.club_id, Team.season_id]")
@@ -131,15 +131,15 @@ class Player(Base):
     """Player entity - unique person across seasons"""
     __tablename__ = "players"
     
-    person_id = Column(Integer, primary_key=True)  # API person_id
-    first_name = Column(String(100), nullable=True)
-    last_name = Column(String(100), nullable=True)
-    full_name = Column(String(200))
-    year_of_birth = Column(Integer, nullable=True)
-    last_updated = Column(DateTime, default=datetime.utcnow)
+    person_id: Mapped[int] = mapped_column(Integer, primary_key=True)  # API person_id
+    first_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    last_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    full_name: Mapped[Optional[str]] = mapped_column(String(200))
+    year_of_birth: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     
     # For search optimization
-    name_normalized = Column(String(200))  # Lowercase for case-insensitive search
+    name_normalized: Mapped[Optional[str]] = mapped_column(String(200))  # Lowercase for case-insensitive search
     
     # Relationships
     team_memberships = relationship("TeamPlayer", back_populates="player", cascade="all, delete-orphan")
@@ -157,13 +157,13 @@ class TeamPlayer(Base):
     """Association between players and teams (roster)"""
     __tablename__ = "team_players"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    team_id = Column(Integer, nullable=False)  # Part of composite FK
-    player_id = Column(Integer, ForeignKey("players.person_id"), nullable=False)
-    jersey_number = Column(Integer, nullable=True)
-    position = Column(String(50), nullable=True)  # Forward, Defense, Goalie
-    season_id = Column(Integer, ForeignKey("seasons.id"), nullable=False)
-    last_updated = Column(DateTime, default=datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    team_id: Mapped[int] = mapped_column(Integer, nullable=False)  # Part of composite FK
+    player_id: Mapped[int] = mapped_column(Integer, ForeignKey("players.person_id"), nullable=False)
+    jersey_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    position: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Forward, Defense, Goalie
+    season_id: Mapped[int] = mapped_column(Integer, ForeignKey("seasons.id"), nullable=False)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     
     # Relationships
     team = relationship("Team", back_populates="players", foreign_keys="[TeamPlayer.team_id, TeamPlayer.season_id]")
@@ -182,20 +182,20 @@ class Game(Base):
     """Game entity - belongs to group/league"""
     __tablename__ = "games"
     
-    id = Column(Integer, primary_key=True)  # API game ID
-    group_id = Column(Integer, ForeignKey("league_groups.id"), nullable=True)
-    season_id = Column(Integer, ForeignKey("seasons.id"), nullable=False)
-    home_team_id = Column(Integer, nullable=False)  # Part of composite FK
-    away_team_id = Column(Integer, nullable=False)  # Part of composite FK
-    game_date = Column(DateTime, nullable=True)
-    game_time = Column(String(20), nullable=True)
-    venue = Column(String(200), nullable=True)
-    status = Column(String(50), nullable=True)  # scheduled, live, finished
-    home_score = Column(Integer, nullable=True)
-    away_score = Column(Integer, nullable=True)
-    period = Column(String(20), nullable=True)
-    last_updated = Column(DateTime, default=datetime.utcnow)
-    last_events_update = Column(DateTime, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)  # API game ID
+    group_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("league_groups.id"), nullable=True)
+    season_id: Mapped[int] = mapped_column(Integer, ForeignKey("seasons.id"), nullable=False)
+    home_team_id: Mapped[int] = mapped_column(Integer, nullable=False)  # Part of composite FK
+    away_team_id: Mapped[int] = mapped_column(Integer, nullable=False)  # Part of composite FK
+    game_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    game_time: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    venue: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # scheduled, live, finished
+    home_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    away_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    period: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    last_events_update: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
     # Relationships
     group = relationship("LeagueGroup", back_populates="games")
@@ -219,18 +219,18 @@ class GamePlayer(Base):
     """Association between games and players (lineup)"""
     __tablename__ = "game_players"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    game_id = Column(Integer, ForeignKey("games.id"), nullable=False)
-    player_id = Column(Integer, ForeignKey("players.person_id"), nullable=False)
-    team_id = Column(Integer, nullable=False)  # Part of composite FK
-    season_id = Column(Integer, ForeignKey("seasons.id"), nullable=False)  # For composite FK to team
-    is_home_team = Column(Boolean, nullable=False)
-    jersey_number = Column(Integer, nullable=True)
-    position = Column(String(50), nullable=True)
-    goals = Column(Integer, default=0)
-    assists = Column(Integer, default=0)
-    penalty_minutes = Column(Integer, default=0)
-    last_updated = Column(DateTime, default=datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    game_id: Mapped[int] = mapped_column(Integer, ForeignKey("games.id"), nullable=False)
+    player_id: Mapped[int] = mapped_column(Integer, ForeignKey("players.person_id"), nullable=False)
+    team_id: Mapped[int] = mapped_column(Integer, nullable=False)  # Part of composite FK
+    season_id: Mapped[int] = mapped_column(Integer, ForeignKey("seasons.id"), nullable=False)  # For composite FK to team
+    is_home_team: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    jersey_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    position: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    goals: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    assists: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    penalty_minutes: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     
     # Relationships
     game = relationship("Game", back_populates="players")
@@ -250,17 +250,17 @@ class GameEvent(Base):
     """Game event entity (goals, penalties, etc.)"""
     __tablename__ = "game_events"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    game_id = Column(Integer, ForeignKey("games.id"), nullable=False)
-    event_type = Column(String(50), nullable=False)  # goal, penalty, timeout, etc.
-    period = Column(Integer, nullable=True)
-    time = Column(String(20), nullable=True)  # Game time (e.g., "12:34")
-    team_id = Column(Integer, nullable=True)  # Part of composite FK (will get season from game)
-    season_id = Column(Integer, ForeignKey("seasons.id"), nullable=True)  # For composite FK to team
-    player_id = Column(Integer, ForeignKey("players.person_id"), nullable=True)
-    description = Column(Text, nullable=True)
-    raw_data = Column(JSON, nullable=True)
-    last_updated = Column(DateTime, default=datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    game_id: Mapped[int] = mapped_column(Integer, ForeignKey("games.id"), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)  # goal, penalty, timeout, etc.
+    period: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    time: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # Game time (e.g., "12:34")
+    team_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Part of composite FK
+    season_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("seasons.id"), nullable=True)  # For composite FK to team
+    player_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("players.person_id"), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    raw_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     
     # Relationships
     game = relationship("Game", back_populates="events")
@@ -279,23 +279,23 @@ class PlayerStatistics(Base):
     """Aggregated player statistics"""
     __tablename__ = "player_statistics"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    player_id = Column(Integer, ForeignKey("players.person_id"), nullable=False)
-    season_id = Column(Integer, ForeignKey("seasons.id"), nullable=False)
-    team_id = Column(Integer, nullable=True)  # Part of composite FK
-    team_name = Column(String, nullable=True)     # Club/team name text from API
-    league_abbrev = Column(String, nullable=True)  # League abbreviation from API (e.g. "NLB", "NLA")
-    games_played = Column(Integer, default=0)
-    goals = Column(Integer, default=0)
-    assists = Column(Integer, default=0)
-    points = Column(Integer, default=0)
-    penalty_minutes = Column(Integer, default=0)
-    pen_2min  = Column(Integer, default=0)   # count of 2-minute penalties
-    pen_5min  = Column(Integer, default=0)   # count of 5-minute penalties
-    pen_10min = Column(Integer, default=0)   # count of 10-minute penalties
-    pen_match = Column(Integer, default=0)   # count of match penalties
-    plus_minus = Column(Integer, default=0)
-    last_updated = Column(DateTime, default=datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    player_id: Mapped[int] = mapped_column(Integer, ForeignKey("players.person_id"), nullable=False)
+    season_id: Mapped[int] = mapped_column(Integer, ForeignKey("seasons.id"), nullable=False)
+    team_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Part of composite FK
+    team_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)     # Club/team name text from API
+    league_abbrev: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # League abbreviation from API
+    games_played: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    goals: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    assists: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    points: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    penalty_minutes: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    pen_2min: Mapped[Optional[int]] = mapped_column(Integer, default=0)   # count of 2-minute penalties
+    pen_5min: Mapped[Optional[int]] = mapped_column(Integer, default=0)   # count of 5-minute penalties
+    pen_10min: Mapped[Optional[int]] = mapped_column(Integer, default=0)  # count of 10-minute penalties
+    pen_match: Mapped[Optional[int]] = mapped_column(Integer, default=0)  # count of match penalties
+    plus_minus: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     
     # Relationships
     player = relationship("Player", back_populates="statistics")
@@ -316,13 +316,13 @@ class SyncStatus(Base):
     """Track sync status for different data types"""
     __tablename__ = "sync_status"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    entity_type = Column(String(50), nullable=False)  # seasons, clubs, leagues, players, games
-    entity_id = Column(String(100), nullable=True)  # e.g., "season:2025", "club:463820"
-    last_sync = Column(DateTime, nullable=False, default=datetime.utcnow)
-    sync_status = Column(String(50), default="pending")  # pending, in_progress, completed, failed
-    error_message = Column(Text, nullable=True)
-    records_synced = Column(Integer, default=0)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    entity_type: Mapped[str] = mapped_column(String(50), nullable=False)  # seasons, clubs, leagues, players, games
+    entity_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # e.g., "season:2025"
+    last_sync: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    sync_status: Mapped[Optional[str]] = mapped_column(String(50), default="pending")  # pending, in_progress, completed, failed
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    records_synced: Mapped[Optional[int]] = mapped_column(Integer, default=0)
     
     __table_args__ = (
         Index('idx_sync_entity', 'entity_type', 'entity_id'),

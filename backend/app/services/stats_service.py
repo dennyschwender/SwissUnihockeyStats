@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import case, func, or_
 
@@ -215,12 +215,12 @@ def get_teams_list(
 
         if sort == "league":
             # Sort by tier level first, then season desc, then league name, then team name
-            order = [_tier_order_expr(), func.coalesce(League.name, "~~~~"), Team.name]
+            order: list[Any] = [_tier_order_expr(), func.coalesce(League.name, "~~~~"), Team.name]
             if all_seasons:
                 order.insert(1, Season.id.desc())
             query = query.order_by(*order)
         else:
-            order = [Team.name]
+            order: list[Any] = [Team.name]
             if all_seasons:
                 order.insert(0, Season.id.desc())
             query = query.order_by(*order)
@@ -453,8 +453,8 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
             Team.id.in_(team_ids),
             Team.season_id == league.season_id,
         ).all():
-            if t.name or t.text:
-                team_names[t.id] = t.name or t.text
+            if t.name is not None or t.text is not None:
+                team_names[int(t.id)] = str(t.name or t.text)
 
         # 2) any season (for stubs that were created without a name)
         missing = team_ids - set(team_names)
@@ -463,7 +463,7 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
                 Team.id.in_(missing),
                 Team.name.isnot(None),
             ).all():
-                team_names[t.id] = t.name
+                team_names[int(t.id)] = str(t.name)
 
         # 3) live rankings API for anything still unresolved
         still_missing = team_ids - set(team_names)
@@ -485,7 +485,7 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
                             team_names[tid] = tname
                             # Persist so we don't hit the API again
                             stub = session.get(Team, (tid, league.season_id))
-                            if stub and not stub.name:
+                            if stub and stub.name is None:
                                 stub.name = tname
                                 stub.text = tname
                 session.commit()
@@ -493,10 +493,12 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
                 pass
 
         for g in games:
-            hs = g.home_score
-            as_ = g.away_score
-            h = _entry(g.home_team_id, team_names.get(g.home_team_id, f"Team {g.home_team_id}"))
-            a = _entry(g.away_team_id, team_names.get(g.away_team_id, f"Team {g.away_team_id}"))
+            hs = int(g.home_score or 0)
+            as_ = int(g.away_score or 0)
+            _hid = int(g.home_team_id)
+            _aid = int(g.away_team_id)
+            h = _entry(_hid, team_names.get(_hid, f"Team {_hid}"))
+            a = _entry(_aid, team_names.get(_aid, f"Team {_aid}"))
 
             h["gp"] += 1
             a["gp"] += 1
@@ -577,7 +579,7 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
         ]
 
         # Derive league_abbrev from the DB name by stripping the gender prefix.
-        league_abbrev = _re.sub(r'^(Herren|Damen)\s+', '', league.name or "").strip()
+        league_abbrev = _re.sub(r'^(Herren|Damen)\s+', '', str(league.name or "")).strip()
 
         # ── Primary path: GamePlayer ──────────────────────────────────────────
         player_ids = []
@@ -912,7 +914,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
         season_name = season_row.text if season_row else str(season_id)
         league_row = (
             session.query(League).filter(League.id == team.league_id).first()
-            if team.league_id else None
+            if team.league_id is not None else None
         )
         league_name = (
             (league_row.name or league_row.text if league_row else None)
@@ -1020,7 +1022,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
 
             player_stat_map: dict[int, dict] = {}
             for ps in session.query(PlayerStatistics).filter(*ps_filter).all():
-                pid = ps.player_id
+                pid = int(ps.player_id)
                 if pid not in player_stat_map:
                     player_stat_map[pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0}
                 player_stat_map[pid]["gp"]  += ps.games_played or 0
@@ -1074,7 +1076,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                         PlayerStatistics.league_abbrev == team_league_abbrev
                     )
                 for ps in session.query(PlayerStatistics).filter(*ps_filter_extras).all():
-                    pid = ps.player_id
+                    pid = int(ps.player_id)
                     if pid not in extras_stat_map:
                         extras_stat_map[pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0}
                     extras_stat_map[pid]["gp"]  += ps.games_played or 0
@@ -1137,28 +1139,28 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
         # Preload opponent names
         opp_ids = set()
         for g in recent_games_raw:
-            opp_ids.add(g.home_team_id if g.away_team_id == team_id else g.away_team_id)
+            opp_ids.add(int(g.home_team_id) if int(g.away_team_id) == team_id else int(g.away_team_id))
 
         opp_names: dict[int, str] = {}
         for t in session.query(Team).filter(
             Team.id.in_(opp_ids), Team.season_id == season_id
         ).all():
-            if t.name or t.text:
-                opp_names[t.id] = t.name or t.text
+            if t.name is not None or t.text is not None:
+                opp_names[int(t.id)] = str(t.name or t.text)
         # Cross-season fallback for nameless stubs
         missing_opp = {tid for tid in opp_ids if tid not in opp_names}
         if missing_opp:
             for t in session.query(Team).filter(
                 Team.id.in_(missing_opp), Team.name.isnot(None)
             ).all():
-                opp_names[t.id] = t.name
+                opp_names[int(t.id)] = str(t.name)
 
         recent_games = []
         for g in recent_games_raw:
-            is_home = g.home_team_id == team_id
-            opp_id = g.away_team_id if is_home else g.home_team_id
-            my_score = g.home_score if is_home else g.away_score
-            opp_score = g.away_score if is_home else g.home_score
+            is_home = int(g.home_team_id) == team_id
+            opp_id = int(g.away_team_id) if is_home else int(g.home_team_id)
+            my_score = int(g.home_score or 0) if is_home else int(g.away_score or 0)
+            opp_score = int(g.away_score or 0) if is_home else int(g.home_score or 0)
             result_label = "W" if my_score > opp_score else ("L" if my_score < opp_score else "T")
             recent_games.append(
                 {
@@ -1184,7 +1186,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             "roster": roster,
             "roster_source": roster_source,
             "recent_games": recent_games,
-            "upcoming_games": _get_team_upcoming(session, team_id, season_id),
+            "upcoming_games": _get_team_upcoming(session, team_id, season_id or 0),
         }
 
 
@@ -1544,8 +1546,8 @@ def get_upcoming_games(
                 grp_league_category[grp.id] = f"{lg.league_id}_{lg.game_class}"
             # Build short label line 1: "M - U16A" / "W - NLA" etc.
             # Strip common prefixes and collapse spaces ("U16 A" → "U16A")
-            gc = lg.game_class if lg else None
-            lg_raw = (lg.name or lg.text or "") if lg else ""
+            gc = int(lg.game_class) if lg and lg.game_class is not None else None
+            lg_raw = str(lg.name or lg.text or "") if lg else ""
             mw = _mw_from_league(gc, lg_raw)
             for pfx in ("Herren ", "Damen ", "Junioren ", "Juniorinnen "):
                 lg_raw = lg_raw.replace(pfx, "")
@@ -1654,8 +1656,8 @@ def get_latest_results(
                 grp_league_category[grp.id] = f"{lg.league_id}_{lg.game_class}"
             # Build short label line 1: "M - U16A" / "W - NLA" etc.
             # Strip common prefixes and collapse spaces ("U16 A" → "U16A")
-            gc = lg.game_class if lg else None
-            lg_raw = (lg.name or lg.text or "") if lg else ""
+            gc = int(lg.game_class) if lg and lg.game_class is not None else None
+            lg_raw = str(lg.name or lg.text or "") if lg else ""
             mw = _mw_from_league(gc, lg_raw)
             for pfx in ("Herren ", "Damen ", "Junioren ", "Juniorinnen "):
                 lg_raw = lg_raw.replace(pfx, "")
