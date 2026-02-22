@@ -1601,7 +1601,11 @@ async def club_detail(request: Request, locale: str, club_id: int):
                         session.query(Team, League)
                         .outerjoin(
                             League,
-                            and_(League.id == Team.league_id, League.season_id == Team.season_id)
+                            and_(
+                                League.league_id == Team.league_id,
+                                League.season_id == Team.season_id,
+                                League.game_class == Team.game_class,
+                            )
                         )
                         .filter(
                             Team.name.like(f"%{club_name}%"),
