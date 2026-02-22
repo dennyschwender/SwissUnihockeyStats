@@ -375,6 +375,9 @@ def purge_season(season: int, mode: str, dry_run: bool, yes: bool):
     constraints are never violated. Orphaned players (no team memberships
     left after the purge) are removed automatically.
 
+    SQLite's 999-variable limit is handled transparently by batching large
+    IN (...) clauses into chunks of 500.
+
     Examples:\n
       # delete only season 2022\n
       python manage.py purge-season --season 2022\n\n
@@ -388,7 +391,32 @@ def purge_season(season: int, mode: str, dry_run: bool, yes: bool):
         Season, Club, League, LeagueGroup, Team, Player,
         TeamPlayer, Game, GamePlayer, GameEvent, PlayerStatistics, SyncStatus,
     )
-    from sqlalchemy import func
+    from sqlalchemy import func, or_ as sa_or
+
+    # SQLite bind-variable limit; stay well below 999
+    CHUNK = 500
+
+    def batched_count(session, model, col, ids: list) -> int:
+        """Count rows where col IN ids, chunked to avoid SQLite variable limit."""
+        if not ids:
+            return 0
+        total = 0
+        for i in range(0, len(ids), CHUNK):
+            total += session.query(func.count(model.id)).filter(
+                col.in_(ids[i : i + CHUNK])
+            ).scalar() or 0
+        return total
+
+    def batched_delete(session, model, col, ids: list) -> int:
+        """Delete rows where col IN ids, chunked to avoid SQLite variable limit."""
+        if not ids:
+            return 0
+        total = 0
+        for i in range(0, len(ids), CHUNK):
+            total += session.query(model).filter(
+                col.in_(ids[i : i + CHUNK])
+            ).delete(synchronize_session=False)
+        return total
 
     op_map = {
         "exact":          lambda col: col == season,
@@ -402,7 +430,6 @@ def purge_season(season: int, mode: str, dry_run: bool, yes: bool):
     db = get_database_service()
 
     with db.session_scope() as session:
-        # Resolve the actual season IDs that will be affected
         target_season_ids = [
             r[0] for r in
             session.query(Season.id).filter(season_filter(Season.id)).all()
@@ -415,15 +442,17 @@ def purge_season(season: int, mode: str, dry_run: bool, yes: bool):
     click.echo(f"\nSeasons to purge ({len(target_season_ids)}): {sorted(target_season_ids)}")
 
     with db.session_scope() as session:
-        from sqlalchemy import or_ as sa_or
-
         game_ids = [
             r[0] for r in
-            session.query(Game.id).filter(Game.season_id.in_(target_season_ids)).all()
+            session.query(Game.id).filter(
+                Game.season_id.in_(target_season_ids)
+            ).all()
         ]
         league_ids = [
             r[0] for r in
-            session.query(League.id).filter(League.season_id.in_(target_season_ids)).all()
+            session.query(League.id).filter(
+                League.season_id.in_(target_season_ids)
+            ).all()
         ]
         sync_filters = sa_or(*[
             SyncStatus.entity_id.like(f"%:{s}:%") | SyncStatus.entity_id.like(f"%:{s}")
@@ -431,14 +460,14 @@ def purge_season(season: int, mode: str, dry_run: bool, yes: bool):
         ]) if target_season_ids else (SyncStatus.id == -1)
 
         counts = {
-            "GameEvent":        session.query(func.count(GameEvent.id)).filter(GameEvent.game_id.in_(game_ids)).scalar() or 0 if game_ids else 0,
-            "GamePlayer":       session.query(func.count(GamePlayer.id)).filter(GamePlayer.game_id.in_(game_ids)).scalar() or 0 if game_ids else 0,
-            "PlayerStatistics": session.query(func.count(PlayerStatistics.id)).filter(PlayerStatistics.season_id.in_(target_season_ids)).scalar() or 0,
-            "TeamPlayer":       session.query(func.count(TeamPlayer.id)).filter(TeamPlayer.season_id.in_(target_season_ids)).scalar() or 0,
+            "GameEvent":        batched_count(session, GameEvent,        GameEvent.game_id,            game_ids),
+            "GamePlayer":       batched_count(session, GamePlayer,       GamePlayer.game_id,           game_ids),
+            "PlayerStatistics": batched_count(session, PlayerStatistics, PlayerStatistics.season_id,   target_season_ids),
+            "TeamPlayer":       batched_count(session, TeamPlayer,       TeamPlayer.season_id,         target_season_ids),
             "Game":             len(game_ids),
-            "LeagueGroup":      session.query(func.count(LeagueGroup.id)).filter(LeagueGroup.league_id.in_(league_ids)).scalar() or 0 if league_ids else 0,
-            "Team":             session.query(func.count(Team.id)).filter(Team.season_id.in_(target_season_ids)).scalar() or 0,
-            "Club":             session.query(func.count(Club.id)).filter(Club.season_id.in_(target_season_ids)).scalar() or 0,
+            "LeagueGroup":      batched_count(session, LeagueGroup,      LeagueGroup.league_id,        league_ids),
+            "Team":             batched_count(session, Team,             Team.season_id,               target_season_ids),
+            "Club":             batched_count(session, Club,             Club.season_id,               target_season_ids),
             "League":           len(league_ids),
             "SyncStatus":       session.query(func.count(SyncStatus.id)).filter(sync_filters).scalar() or 0,
             "Season":           len(target_season_ids),
@@ -460,46 +489,46 @@ def purge_season(season: int, mode: str, dry_run: bool, yes: bool):
 
     click.echo("\nDeleting...")
     with db.session_scope() as session:
-        from sqlalchemy import or_ as sa_or
-
         game_ids = [
             r[0] for r in
-            session.query(Game.id).filter(Game.season_id.in_(target_season_ids)).all()
+            session.query(Game.id).filter(
+                Game.season_id.in_(target_season_ids)
+            ).all()
         ]
         league_ids = [
             r[0] for r in
-            session.query(League.id).filter(League.season_id.in_(target_season_ids)).all()
+            session.query(League.id).filter(
+                League.season_id.in_(target_season_ids)
+            ).all()
         ]
 
-        if game_ids:
-            n = session.query(GameEvent).filter(GameEvent.game_id.in_(game_ids)).delete(synchronize_session=False)
-            click.echo(f"  Deleted {n:,} GameEvent rows")
-            n = session.query(GamePlayer).filter(GamePlayer.game_id.in_(game_ids)).delete(synchronize_session=False)
-            click.echo(f"  Deleted {n:,} GamePlayer rows")
+        n = batched_delete(session, GameEvent,        GameEvent.game_id,            game_ids)
+        click.echo(f"  Deleted {n:,} GameEvent rows")
 
-        n = session.query(PlayerStatistics).filter(PlayerStatistics.season_id.in_(target_season_ids)).delete(synchronize_session=False)
+        n = batched_delete(session, GamePlayer,       GamePlayer.game_id,           game_ids)
+        click.echo(f"  Deleted {n:,} GamePlayer rows")
+
+        n = batched_delete(session, PlayerStatistics, PlayerStatistics.season_id,   target_season_ids)
         click.echo(f"  Deleted {n:,} PlayerStatistics rows")
 
-        n = session.query(TeamPlayer).filter(TeamPlayer.season_id.in_(target_season_ids)).delete(synchronize_session=False)
+        n = batched_delete(session, TeamPlayer,       TeamPlayer.season_id,         target_season_ids)
         click.echo(f"  Deleted {n:,} TeamPlayer rows")
 
-        n = session.query(Game).filter(Game.season_id.in_(target_season_ids)).delete(synchronize_session=False)
+        n = batched_delete(session, Game,             Game.season_id,               target_season_ids)
         click.echo(f"  Deleted {n:,} Game rows")
 
-        if league_ids:
-            n = session.query(LeagueGroup).filter(LeagueGroup.league_id.in_(league_ids)).delete(synchronize_session=False)
-            click.echo(f"  Deleted {n:,} LeagueGroup rows")
+        n = batched_delete(session, LeagueGroup,      LeagueGroup.league_id,        league_ids)
+        click.echo(f"  Deleted {n:,} LeagueGroup rows")
 
-        n = session.query(Team).filter(Team.season_id.in_(target_season_ids)).delete(synchronize_session=False)
+        n = batched_delete(session, Team,             Team.season_id,               target_season_ids)
         click.echo(f"  Deleted {n:,} Team rows")
 
-        n = session.query(Club).filter(Club.season_id.in_(target_season_ids)).delete(synchronize_session=False)
+        n = batched_delete(session, Club,             Club.season_id,               target_season_ids)
         click.echo(f"  Deleted {n:,} Club rows")
 
-        n = session.query(League).filter(League.season_id.in_(target_season_ids)).delete(synchronize_session=False)
+        n = batched_delete(session, League,           League.season_id,             target_season_ids)
         click.echo(f"  Deleted {n:,} League rows")
 
-        # SyncStatus: remove entries whose entity_id references a purged season
         sync_filters = sa_or(*[
             SyncStatus.entity_id.like(f"%:{s}:%") | SyncStatus.entity_id.like(f"%:{s}")
             for s in target_season_ids
@@ -507,7 +536,7 @@ def purge_season(season: int, mode: str, dry_run: bool, yes: bool):
         n = session.query(SyncStatus).filter(sync_filters).delete(synchronize_session=False)
         click.echo(f"  Deleted {n:,} SyncStatus rows")
 
-        n = session.query(Season).filter(Season.id.in_(target_season_ids)).delete(synchronize_session=False)
+        n = batched_delete(session, Season, Season.id, target_season_ids)
         click.echo(f"  Deleted {n:,} Season rows")
 
         # Remove orphaned players (no TeamPlayer rows remaining anywhere)
@@ -519,7 +548,7 @@ def purge_season(season: int, mode: str, dry_run: bool, yes: bool):
             .all()
         ]
         if orphan_ids:
-            n = session.query(Player).filter(Player.person_id.in_(orphan_ids)).delete(synchronize_session=False)
+            n = batched_delete(session, Player, Player.person_id, orphan_ids)
             click.echo(f"  Deleted {n:,} orphaned Player rows")
 
     click.echo("\n✓ Purge complete.")
