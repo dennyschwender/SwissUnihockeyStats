@@ -261,6 +261,31 @@
             <button class="btn btn-sm" onclick="schedClearFilter()" style="white-space:nowrap;color:#f85149">✕ Clear</button>
           </div>
 
+          <!-- policy tier limits -->
+          <div style="margin-top:.6rem">
+            <div class="task-group-label" style="cursor:pointer;user-select:none;display:flex;align-items:center"
+                 onclick="toggleEl('sched-tiers','sched-tiers-chv')">
+              Policy Tier Limits
+              <span id="sched-tiers-chv" style="font-size:.65rem;margin-left:.4rem">&#9654;</span>
+            </div>
+            <div id="sched-tiers" style="display:none;margin-top:.4rem">
+              <div style="font-size:.7rem;color:#6e7681;margin-bottom:.4rem;line-height:1.5">
+                Restrict heavy tasks to top-tier leagues only.
+                Lower tier = fewer leagues = faster &amp; lighter indexing.
+              </div>
+              <table style="font-size:.75rem;width:100%;border-collapse:collapse">
+                <thead><tr>
+                  <th style="text-align:left;padding:2px 8px;color:#8b949e;font-weight:normal">Policy</th>
+                  <th style="text-align:left;padding:2px 8px;color:#8b949e;font-weight:normal">Max Tier</th>
+                </tr></thead>
+                <tbody id="sched-tiers-tbody"></tbody>
+              </table>
+              <div style="margin-top:.5rem">
+                <button class="btn btn-sm" onclick="schedSaveTiers()">💾 Save tier limits</button>
+              </div>
+            </div>
+          </div>
+
           <!-- upcoming queue -->
           <div class="task-group-label">Upcoming Queue</div>
           <div id="sched-queue">
@@ -874,6 +899,30 @@ function renderScheduler(d) {
   if (maxEl && document.activeElement !== maxEl)
     maxEl.value = sf.max_concurrent ?? 2;
 
+  // Policy tier selects
+  const TIER_LABELS = {
+    1: 'T1 \u2014 NLA/L-UPL only',
+    2: 'T2 \u2014 + NLB',
+    3: 'T3 \u2014 + 1. Liga',
+    4: 'T4 \u2014 + 2. Liga',
+    5: 'T5 \u2014 + 3. Liga',
+    6: 'T6 \u2014 + 4./5. Liga',
+    7: 'T7 \u2014 All (incl. youth)',
+  };
+  const tiersBodyEl = document.getElementById('sched-tiers-tbody');
+  if (tiersBodyEl && d.policy_tiers) {
+    tiersBodyEl.innerHTML = Object.entries(d.policy_tiers).map(([name, tier]) => {
+      const opts = Object.entries(TIER_LABELS).map(([v, lbl]) =>
+        `<option value="${v}"${+v === tier ? ' selected' : ''}>${lbl}</option>`
+      ).join('');
+      return `<tr>
+        <td style="padding:2px 8px;color:#e6edf3">${name}</td>
+        <td style="padding:2px 8px"><select id="tier-${name}"
+          style="background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 4px;font-size:.75rem">${opts}</select></td>
+      </tr>`;
+    }).join('');
+  }
+
   // Queue
   const queueEl = document.getElementById('sched-queue');
   if (!d.queue.length) {
@@ -960,6 +1009,26 @@ async function schedClearFilter() {
   });
   log('info', '✓ Scheduler settings cleared (max concurrent reset to 2)');
   await loadScheduler();
+}
+
+async function schedSaveTiers() {
+  const tiersBodyEl = document.getElementById('sched-tiers-tbody');
+  if (!tiersBodyEl) return;
+  const tiers = {};
+  tiersBodyEl.querySelectorAll('select').forEach(sel => {
+    const name = sel.id.replace('tier-', '');
+    tiers[name] = parseInt(sel.value, 10);
+  });
+  const r = await fetch('/admin/api/scheduler', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({action: 'policy_tiers', tiers}),
+  });
+  if (r.ok) {
+    log('info', '✓ Policy tier limits saved');
+    await loadScheduler();
+  } else {
+    log('error', 'Failed to save tier limits');
+  }
 }
 
 async function schedTrigger(policy, season) {

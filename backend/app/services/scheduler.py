@@ -220,11 +220,13 @@ class Scheduler:
                 self._min_season: int | None = data.get("min_season", None)
                 self._excluded_seasons: list[int] = data.get("excluded_seasons", [])
                 self._max_concurrent: int = max(1, int(data.get("max_concurrent", 2)))
+                self._policy_tiers: dict[str, int] = data.get("policy_tiers", {})
                 return bool(data.get("enabled", True))
         except (FileNotFoundError, json.JSONDecodeError):
             self._min_season = None
             self._excluded_seasons = []
             self._max_concurrent = 2
+            self._policy_tiers = {}
             return True
 
     def _save_state(self):
@@ -238,6 +240,7 @@ class Scheduler:
                     "min_season": self._min_season,
                     "excluded_seasons": self._excluded_seasons,
                     "max_concurrent": self._max_concurrent,
+                    "policy_tiers": self._policy_tiers,
                 }, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())
@@ -256,6 +259,23 @@ class Scheduler:
             "excluded_seasons": sorted(self._excluded_seasons),
             "max_concurrent": self._max_concurrent,
         }
+
+    def get_policy_tiers(self) -> dict:
+        """Return the effective max_tier for every season-scoped policy."""
+        return {
+            p["name"]: self._policy_tiers.get(p["name"], p.get("max_tier", 7))
+            for p in POLICIES if p["scope"] == "season"
+        }
+
+    def set_policy_tiers(self, tiers: dict[str, int]):
+        """Override max_tier for the given policies and persist to disk."""
+        valid_names = {p["name"] for p in POLICIES}
+        for name, tier in tiers.items():
+            if name not in valid_names:
+                continue
+            self._policy_tiers[name] = max(1, min(7, int(tier)))
+        self._save_state()
+        logger.info("[scheduler] policy_tiers updated: %s", self._policy_tiers)
 
     def set_max_concurrent(self, n: int):
         """Set maximum number of jobs that may run simultaneously."""
@@ -525,7 +545,7 @@ class Scheduler:
             task=policy["task"],
             season=season,
             label=f"{policy['label']}{season_label}",
-            max_tier=policy.get("max_tier", 7),
+            max_tier=self._policy_tiers.get(policy["name"], policy.get("max_tier", 7)),
         )
         self._queue.append(job)
         logger.debug(

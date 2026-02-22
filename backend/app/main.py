@@ -729,6 +729,7 @@ async def admin_scheduler_status(_: None = Depends(require_admin)):
         "queue":   sched.get_schedule(),
         "history": sched.get_history(200),
         "season_filter": sched.get_season_filter(),
+        "policy_tiers": sched.get_policy_tiers(),
         "running": sched._count_running(),
     }
 
@@ -769,6 +770,17 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
             raise HTTPException(status_code=400, detail="value must be a positive integer")
         sched.set_max_concurrent(n)
         return {"ok": True, "max_concurrent": sched._max_concurrent}
+    if action == "policy_tiers":
+        tiers_raw = payload.get("tiers", {})
+        if not isinstance(tiers_raw, dict):
+            raise HTTPException(status_code=400, detail="tiers must be a dict mapping policy name to tier (1-7)")
+        tiers: dict[str, int] = {}
+        for k, v in tiers_raw.items():
+            if not isinstance(v, int) or not 1 <= v <= 7:
+                raise HTTPException(status_code=400, detail=f"tier for '{k}' must be an integer 1–7")
+            tiers[k] = v
+        sched.set_policy_tiers(tiers)
+        return {"ok": True, "policy_tiers": sched.get_policy_tiers()}
     if action == "clear_done":
         removed = sched.clear_done()
         # Also purge manual jobs that are finished
