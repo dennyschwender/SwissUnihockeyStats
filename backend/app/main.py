@@ -315,14 +315,7 @@ async def debug_test_games_fetch(_: None = Depends(require_admin)):
 @app.get("/", response_class=HTMLResponse)
 async def root_redirect(request: Request):
     """Redirect root to default locale"""
-    return templates.TemplateResponse(
-        request,
-        "home.html",
-        {
-            "locale": DEFAULT_LOCALE,
-            "t": get_translations(DEFAULT_LOCALE)
-        }
-    )
+    return RedirectResponse(f"/{DEFAULT_LOCALE}", status_code=302)
 
 
 # ============================================================================
