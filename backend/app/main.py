@@ -1594,6 +1594,7 @@ async def club_detail(request: Request, locale: str, club_id: int):
             try:
                 from app.models.db_models import Team, League, LeagueGroup, Game, GamePlayer
                 from app.services.database import get_database_service
+                from app.services.data_indexer import league_tier as _league_tier
                 from sqlalchemy import and_, text as sa_text
                 _db = get_database_service()
                 with _db.session_scope() as session:
@@ -1611,13 +1612,20 @@ async def club_detail(request: Request, locale: str, club_id: int):
                             Team.name.like(f"%{club_name}%"),
                             Team.season_id == current_season,
                         )
-                        .order_by(League.name, Team.name)
                         .all()
                     )
+
+                    # Sort by tier (same ordering as the teams page), then league name, then team name
+                    rows.sort(key=lambda r: (
+                        _league_tier(r[0].league_id or 0),
+                        (r[1].name or "~~~~") if r[1] else "~~~~",
+                        r[0].name,
+                    ))
 
                     # Fetch group names per team via games → league_groups
                     team_ids = [t.id for t, _lg in rows]
                     group_by_team: dict[int, str] = {}
+                    groups_per_league: dict[int, int] = {}
                     if team_ids:
                         id_list = ",".join(str(i) for i in team_ids)
                         grp_rows = session.execute(
@@ -1632,6 +1640,20 @@ async def club_detail(request: Request, locale: str, club_id: int):
                         ).fetchall()
                         group_by_team = {r[0]: r[1] for r in grp_rows}
 
+                        # Count groups per league so single-group leagues don't show a label
+                        league_db_ids = list({lg.id for _, lg in rows if lg is not None})
+                        if league_db_ids:
+                            lg_id_list = ",".join(str(i) for i in league_db_ids)
+                            cnt_rows = session.execute(
+                                sa_text(f"""
+                                    SELECT league_id, COUNT(*)
+                                    FROM league_groups
+                                    WHERE league_id IN ({lg_id_list})
+                                    GROUP BY league_id
+                                """)
+                            ).fetchall()
+                            groups_per_league = {r[0]: r[1] for r in cnt_rows}
+
                     teams = [
                         {
                             "id": t.id,
@@ -1641,7 +1663,12 @@ async def club_detail(request: Request, locale: str, club_id: int):
                             "league_name": lg.name if lg else "",
                             "league_id": t.league_id,
                             "logo_url": t.logo_url or "",
-                            "group_name": group_by_team.get(t.id, ""),
+                            # Only show group if the league has more than one group
+                            "group_name": (
+                                group_by_team.get(t.id, "")
+                                if (lg and groups_per_league.get(lg.id, 0) > 1)
+                                else ""
+                            ),
                         }
                         for t, lg in rows
                     ]
