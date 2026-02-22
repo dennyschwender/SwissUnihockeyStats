@@ -1860,7 +1860,7 @@ def get_game_box_score(game_id: int) -> dict:
                         a_score += 1
                     else:
                         h_score += 1
-                elif emb_h is not None:
+                elif emb_h is not None and emb_a is not None:
                     # Team unknown: detect direction from which doubled-counter incremented
                     delta_a = emb_a - dc_a
                     delta_h = emb_h - dc_h
@@ -1874,7 +1874,7 @@ def get_game_box_score(game_id: int) -> dict:
             else:
                 a_score += 1
 
-            if emb_h is not None:
+            if emb_h is not None and emb_a is not None:
                 dc_h, dc_a = emb_h, emb_a
             g["score"] = f"{h_score}:{a_score}"
         for g in deduped_goals:
@@ -1971,14 +1971,14 @@ def get_recent_games(
             Team.id.in_(team_ids), Team.season_id == season_id
         ).all():
             if t.name or t.text:
-                t_names[t.id] = t.name or t.text
+                t_names[t.id] = str(t.name or t.text or "")
         # Cross-season fallback for nameless stubs
         missing = {tid for tid in team_ids if tid not in t_names}
         if missing:
             for t in session.query(Team).filter(
                 Team.id.in_(missing), Team.name.isnot(None)
             ).all():
-                t_names[t.id] = t.name
+                t_names[t.id] = str(t.name or "")
 
         result = []
         for g in games_raw:
