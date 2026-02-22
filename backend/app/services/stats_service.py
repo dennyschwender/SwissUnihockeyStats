@@ -236,6 +236,8 @@ def get_teams_list(
                     "category": category,
                     "league_name": (league.name or league.text) if league else None,
                     "season_name": (season_row.text or str(season_row.id)) if season_row else None,
+                    "game_class": gc,
+                    "league_id": team.league_id,
                 }
             )
         return results

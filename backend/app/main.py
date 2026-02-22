@@ -2034,21 +2034,72 @@ async def league_detail(request: Request, locale: str, league_id: int):
 async def teams_page(request: Request, locale: str, season: Optional[int] = None, club: str = ""):
     """Teams listing page. Optional ?club=name pre-filters by club name."""
     from app.services.stats_service import get_teams_list, get_seasons_with_teams
+    from app.services.data_indexer import LEAGUE_TIERS, _DEFAULT_TIER
     try:
         seasons = get_seasons_with_teams()
         if season is None:
             season = next((s["id"] for s in seasons if s["current"]), seasons[0]["id"] if seasons else None)
 
-        teams_list = get_teams_list(season_id=season, sort="league", limit=200, q=club)
-        error_message = None
+        limit = 50 if club else 500
+        teams_list = get_teams_list(season_id=season, sort="league", limit=limit, q=club)
 
         if not teams_list and not club:
             # DB is empty (fresh install) — fall back to API cache
             cached = await get_cached_teams()
             teams_list = [
-                {"id": t.get("id"), "text": t.get("text", ""), "category": None, "league_name": None}
+                {"id": t.get("id"), "text": t.get("text", ""), "game_class": None, "league_id": None, "league_name": None}
                 for t in cached[:200]
             ]
+
+        # Enrich teams with the same gender/sex/field/tier fields as the leagues page
+        _AGE_GROUP_MAP: dict[int, str] = {
+            19: "U21", 26: "U21",
+            18: "U18", 31: "U18", 41: "U18",
+            16: "U16", 28: "U16", 32: "U16", 42: "U16",
+            14: "U14", 33: "U14", 43: "U14", 49: "U14",
+            34: "U12", 36: "U12", 44: "U12",
+            35: "U10",
+            51: "Senioren",
+        }
+        TIER_DISPLAY: dict[int, str] = {
+            1: "NLA / L-UPL", 2: "NLB", 3: "1. Liga",
+            4: "2. Liga", 5: "3. Liga", 6: "4. / 5. Liga & Cups",
+        }
+        teams_flat: list[dict] = []
+        for t in teams_list:
+            ln = t.get("league_name") or ""
+            if ln == "Herren Test":
+                continue
+            gc = t.get("game_class") or 0
+            if gc in (11, 12):
+                gender = "men"
+            elif gc in (21, 22):
+                gender = "women"
+            else:
+                gender = _AGE_GROUP_MAP.get(gc, "Other")
+            field = "big" if gc in (11, 21, 14, 16, 18, 19, 26, 28, 49) else "small"
+            if gc in (21, 22, 26, 28, 41, 42, 43, 44):
+                sex = "women"
+            elif gc == 49:
+                sex = "mixed"
+            else:
+                sex = "men"
+            if gender in ("men", "women"):
+                tier = LEAGUE_TIERS.get(t.get("league_id") or 0, _DEFAULT_TIER)
+                tier_label = TIER_DISPLAY.get(tier, f"Tier {tier}")
+            else:
+                tier = 0
+                tier_label = None
+            teams_flat.append({
+                "id": t["id"],
+                "text": t["text"],
+                "league_name": ln,
+                "gender": gender,
+                "sex": sex,
+                "field": field,
+                "tier": tier,
+                "tier_label": tier_label,
+            })
 
         return templates.TemplateResponse(
             request,
@@ -2056,10 +2107,9 @@ async def teams_page(request: Request, locale: str, season: Optional[int] = None
             {
                 "locale": locale,
                 "t": get_translations(locale),
-                "teams": teams_list,
+                "teams_flat": teams_flat,
                 "seasons": seasons,
                 "current_season_id": season,
-                "error_message": error_message,
                 "club": club,
             }
         )

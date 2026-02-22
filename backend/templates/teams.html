@@ -1,237 +1,255 @@
 {% extends "base.html" %}
 
-{% block title %}{{ t.teams.title }} - {{ t.common.app_name }}{% endblock %}
-{% block description %}Search and filter Swiss floorball teams by competition mode. Find teams across men's, women's, and mixed categories.{% endblock %}
-{% block og_title %}{{ t.teams.title }} - SwissUnihockey{% endblock %}
-{% block og_description %}Complete directory of Swiss floorball teams with advanced search and filtering by competition mode.{% endblock %}
+{% block title %}{% if club %}{{ club }}{% else %}{{ t.teams.title }}{% endif %} – {{ t.common.app_name }}{% endblock %}
+{% block description %}Search and browse Swiss floorball teams by tier, sex and field type.{% endblock %}
+{% block og_title %}{{ t.teams.title }} – SwissUnihockey{% endblock %}
+{% block og_description %}Complete directory of Swiss floorball teams with filtering by tier, sex and field type.{% endblock %}
 
 {% block content %}
-{% if club %}
-<div style="max-width:1000px; margin:1.5rem auto 0;">
-    <a href="/{{ locale }}/clubs" style="color:var(--swiss-red); text-decoration:none; font-size:0.9rem;">← All Clubs</a>
-</div>
-{% endif %}
-<div class="hero fade-in">
-    <h1>{% if club %}{{ club }}{% else %}{{ t.teams.title }}{% endif %}</h1>
-    <p>{{ t.teams.subtitle }}</p>
-</div>
+<script type="application/json" id="teams-data">{{ teams_flat | tojson }}</script>
+<script>
+document.addEventListener('alpine:init', () => {
+  Alpine.data('teamsFilter', () => {
+    const teams  = JSON.parse(document.getElementById('teams-data').textContent);
+    const locale = {{ locale | tojson }};
+    const club   = {{ club | tojson }};
 
-<!-- Error Message (if teams data failed to load) -->
-{% if error_message %}
-<div style="max-width: 800px; margin: 2rem auto;">
-    <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 0.5rem;">
-        <p style="color: #92400e; margin: 0; font-weight: 600;">⚠️ Unable to load teams data</p>
-        <p style="color: #78350f; margin: 0.5rem 0 0 0; font-size: 0.875rem;">
-            {{ error_message }}
-            Try searching on the <a href="/{{ locale }}/clubs" style="color: var(--swiss-red); text-decoration: underline;">Clubs page</a> instead.
-        </p>
-    </div>
-</div>
-{% endif %}
+    const AGE_SORT = { U21:7, U18:8, U16:9, U14:10, U12:11, U10:12, Senioren:13 };
+    const SEX_SORT = { men:0, women:1, mixed:2 };
 
-<!-- Search and Filters -->
-<div style="max-width: 1000px; margin: 2rem auto;"
-     x-data="{
-       q: '{{ club | replace("'", "\\'") }}',
-       leagues: [],
-       activeTier: 'all',
-       sort: 'league',
-       season: {{ current_season_id }},
-       _t: null,
-       _herren:      ['Herren NLB','Herren L-UPL','Herren 1. Liga','Herren 2. Liga','Herren 3. Liga','Herren 4. Liga','Herren 5. Liga'],
-       _damen:       ['Damen NLB','Damen L-UPL','Damen 1. Liga','Damen 2. Liga','Damen 3. Liga'],
-       _juniorenAll: ['Junioren U21','Junioren U18','Junioren U16','Junioren U14','Junioren A','Junioren B','Junioren C','Junioren D','Junioren E'],
-       _juniorinnenAll: ['Juniorinnen U21','Juniorinnen U17','Juniorinnen A','Juniorinnen B','Juniorinnen C','Juniorinnen D'],
-       get _presets() {
-         return {
-           all:      [],
-           national: ['Herren NLB','Herren L-UPL','Damen NLB','Damen L-UPL'],
-           liga:     ['Herren 1. Liga','Herren 2. Liga','Herren 3. Liga','Herren 4. Liga','Herren 5. Liga',
-                      'Damen 1. Liga','Damen 2. Liga','Damen 3. Liga'],
-           senior:   [...this._herren, ...this._damen],
-           youth:    [...this._juniorenAll, ...this._juniorinnenAll]
-         };
-       },
-       selectTier(t) {
-         this.activeTier = t;
-         this.leagues = [...(this._presets[t] || [])];
-         this.fetch();
-       },
-       toggleLeague(v) {
-         this.activeTier = 'all';
-         this.leagues = this.leagues.includes(v)
-           ? this.leagues.filter(x => x !== v)
-           : [...this.leagues, v];
-         this.fetch();
-       },
-       fetch(delay) {
-         clearTimeout(this._t);
-         const url = '/{{ locale }}/teams/search'
-           + '?q='       + encodeURIComponent(this.q)
-           + '&leagues=' + encodeURIComponent(this.leagues.join(','))
-           + '&sort='    + this.sort
-           + '&season='  + this.season;
-         this._t = setTimeout(() => htmx.ajax('GET', url, {target:'#teams-list', swap:'innerHTML'}), delay || 0);
-       },
-       get anyActive() {
-         return this.q !== '' || this.leagues.length > 0 || this.sort !== 'league' || this.season !== {{ current_season_id }};
-       }
-     }">
+    function buildSections(list) {
+      const map = {};
+      for (const t of list) {
+        const isSenior = t.gender === 'men' || t.gender === 'women';
+        const key   = isSenior ? 'tier_' + t.tier : 'age_' + t.gender;
+        const label = isSenior ? t.tier_label      : t.gender;
+        const sort  = isSenior ? t.tier            : (AGE_SORT[t.gender] ?? 99);
+        if (!map[key]) map[key] = { key, label, sort, subMap: {} };
+        const sg = t.sex;
+        if (!map[key].subMap[sg]) map[key].subMap[sg] = { sex: sg, teams: [] };
+        map[key].subMap[sg].teams.push(t);
+      }
+      return Object.values(map)
+        .sort((a, b) => a.sort - b.sort)
+        .map(s => {
+          const subgroups = Object.values(s.subMap)
+            .sort((a, b) => (SEX_SORT[a.sex] ?? 99) - (SEX_SORT[b.sex] ?? 99))
+            .map(sg => ({ ...sg, teams: sg.teams.slice().sort((a, b) => a.text.localeCompare(b.text)) }));
+          const flat = subgroups.length === 1 ? subgroups[0].teams : [];
+          return { key: s.key, label: s.label, sort: s.sort, subgroups, teams: flat };
+        });
+    }
 
-    <!-- Search Bar -->
-    <div style="position:relative; margin-bottom:1rem;">
-        <span style="position:absolute; left:.9rem; top:50%; transform:translateY(-50%); color:var(--gray-400); font-size:1.1rem; pointer-events:none;">🔍</span>
-        <input
-            type="text"
-            x-model="q"
-            @input="fetch(400)"
-            placeholder="Search by team name or league…"
-            style="width:100%; padding:.75rem 1rem .75rem 2.5rem; border:2px solid var(--gray-300); border-radius:.625rem; font-size:1rem; background:var(--bg-primary); color:var(--text-primary); outline:none;"
-            @focus="$el.style.borderColor='var(--swiss-red)'"
-            @blur="$el.style.borderColor='var(--gray-300)'"
-        >
-    </div>
+    return {
+      teams, locale, club,
+      q:           club || '',
+      activeSex:   'all',
+      activeAge:   'all',
+      activeField: 'all',
 
-    <!-- Chip filter box: level presets + category chips -->
-    <div style="display:flex; flex-direction:column; gap:.5rem; padding:.75rem 1rem; background:var(--bg-secondary); border:1px solid var(--gray-200); border-radius:.625rem; margin-bottom:.75rem;">
+      get filtered() {
+        const ql = this.q.toLowerCase();
+        return this.teams.filter(t => {
+          const isSenior = t.gender === 'men' || t.gender === 'women';
+          const sOk = this.activeSex   === 'all' || t.sex === this.activeSex;
+          const aOk = this.activeAge   === 'all'
+            || (this.activeAge === 'senior'   ? isSenior
+            : (this.activeAge === 'senioren'  ? t.gender === 'Senioren'
+            : t.gender === this.activeAge));
+          const fOk = this.activeField === 'all' || t.field === this.activeField;
+          const qOk = !ql || t.text.toLowerCase().includes(ql) || t.league_name.toLowerCase().includes(ql);
+          return sOk && aOk && fOk && qOk;
+        });
+      },
 
-        <!-- Level presets row + Clear on far right -->
-        <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
-            <span class="filter-label">Quick</span>
-            <template x-for="opt in [
-                {v:'all',      l:'All'},
-                {v:'national', l:'National'},
-                {v:'liga',     l:'Liga'},
-                {v:'senior',   l:'Senior'},
-                {v:'youth',    l:'Youth'}
-            ]" :key="opt.v">
-                <button
-                    @click="selectTier(opt.v)"
-                    :class="activeTier===opt.v ? 'chip chip-active' : 'chip'"
-                    x-text="opt.l">
-                </button>
-            </template>
-            <button
-                x-show="anyActive"
-                x-transition
-                @click="q=''; leagues=[]; activeTier='all'; sort='league'; season={{ current_season_id }}; fetch()"
-                class="chip"
-                style="margin-left:auto; border-color:var(--swiss-red); color:var(--swiss-red);"
-            >✕ Clear filters</button>
-        </div>
+      get sections() { return buildSections(this.filtered); },
+      get count()    { return this.filtered.length; },
 
-        <!-- Divider -->
-        <div style="border-top:1px solid var(--gray-200);"></div>
+      sexLabel(s)     { return s === 'men' ? 'Men' : s === 'women' ? 'Women' : 'Mixed'; },
+      fieldLabel(f)   { return f === 'big' ? 'Big field' : 'Small field'; },
+      sexColor(s)     { return s === 'men' ? '#93c5fd' : s === 'women' ? '#f9a8d4' : '#86efac'; },
+      sexTextColor(s) { return s === 'men' ? '#1d4ed8' : s === 'women' ? '#9d174d' : '#065f46'; },
+      sexBgColor(s)   { return s === 'men' ? '#dbeafe' : s === 'women' ? '#fce7f3' : '#d1fae5'; },
 
-        <!-- Herren -->
-        <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
-            <span class="filter-label">Herren</span>
-            <template x-for="v in ['Herren NLB','Herren L-UPL','Herren 1. Liga','Herren 2. Liga','Herren 3. Liga','Herren 4. Liga','Herren 5. Liga']" :key="v">
-                <button @click="toggleLeague(v)" :class="leagues.includes(v) ? 'chip chip-active' : 'chip'" x-text="v.replace('Herren ','')"></button>
-            </template>
-        </div>
+      btnClass(active) {
+        return active
+          ? 'padding:.35rem .9rem;border:1px solid var(--primary,#2563eb);border-radius:999px;font-size:.82rem;font-weight:600;background:var(--primary,#2563eb);color:white;cursor:pointer;'
+          : 'padding:.35rem .9rem;border:1px solid var(--gray-300,#d1d5db);border-radius:999px;font-size:.82rem;font-weight:500;background:transparent;color:inherit;cursor:pointer;';
+      },
+    };
+  });
+});
+</script>
 
-        <!-- Damen -->
-        <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
-            <span class="filter-label">Damen</span>
-            <template x-for="v in ['Damen NLB','Damen L-UPL','Damen 1. Liga','Damen 2. Liga','Damen 3. Liga']" :key="v">
-                <button @click="toggleLeague(v)" :class="leagues.includes(v) ? 'chip chip-active' : 'chip'" x-text="v.replace('Damen ','')"></button>
-            </template>
-        </div>
+<div class="container" style="padding-top:2rem;padding-bottom:3rem;" x-data="teamsFilter()">
 
-        <!-- Junioren -->
-        <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
-            <span class="filter-label">Junioren</span>
-            <template x-for="opt in [
-                {v:'Junioren U21',l:'U21'},{v:'Junioren U18',l:'U18'},{v:'Junioren U16',l:'U16'},
-                {v:'Junioren U14',l:'U14'},{v:'Junioren A',l:'A Reg.'},{v:'Junioren B',l:'B Reg.'},
-                {v:'Junioren C',l:'C Reg.'},{v:'Junioren D',l:'D Reg.'},{v:'Junioren E',l:'E Reg.'}
-            ]" :key="opt.v">
-                <button @click="toggleLeague(opt.v)" :class="leagues.includes(opt.v) ? 'chip chip-active' : 'chip'" x-text="opt.l"></button>
-            </template>
-        </div>
+  {% if club %}
+  <div style="margin-bottom:1rem;">
+    <a href="/{{ locale }}/clubs" style="color:var(--swiss-red,#e63946);text-decoration:none;font-size:.9rem;">← All Clubs</a>
+  </div>
+  {% endif %}
 
-        <!-- Juniorinnen -->
-        <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
-            <span class="filter-label">Juniorinnen</span>
-            <template x-for="opt in [
-                {v:'Juniorinnen U21',l:'U21'},{v:'Juniorinnen U17',l:'U17'},
-                {v:'Juniorinnen A',l:'A Reg.'},{v:'Juniorinnen B',l:'B Reg.'},
-                {v:'Juniorinnen C',l:'C Reg.'},{v:'Juniorinnen D',l:'D Reg.'}
-            ]" :key="opt.v">
-                <button @click="toggleLeague(opt.v)" :class="leagues.includes(opt.v) ? 'chip chip-active' : 'chip'" x-text="opt.l"></button>
-            </template>
-        </div>
-
-    </div>
-
-    <!-- Sort + Season -->
-    <div style="display:flex; align-items:center; gap:1.25rem; flex-wrap:wrap;">
-        <div style="display:flex; align-items:center; gap:.5rem;">
-            <span class="filter-label">Sort</span>
-            <template x-for="opt in [
-                {v:'league', l:'By League'},
-                {v:'name',   l:'Name A\u2013Z'}
-            ]" :key="opt.v">
-                <button
-                    @click="sort=opt.v; fetch()"
-                    :class="sort===opt.v ? 'chip chip-active' : 'chip'"
-                    x-text="opt.l">
-                </button>
-            </template>
-        </div>
-        {% if seasons | length > 1 %}
-        <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
-            <span class="filter-label">Season</span>
-            <button
-                @click="season=0; leagues=[]; activeTier='all'; fetch()"
-                :class="season===0 ? 'chip chip-active' : 'chip'"
-            >All Seasons</button>
-            {% for s in seasons %}
-            <button
-                @click="season={{ s.id }}; leagues=[]; activeTier='all'; fetch()"
-                :class="season==={{ s.id }} ? 'chip chip-active' : 'chip'"
-            >{{ s.name }}</button>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
-
-</div>
-
-<!-- Teams List -->
-<div id="teams-list" style="max-width: 1000px; margin: 2rem auto 0;">
-    {% if teams %}
-    <div class="teams-list-meta">{{ teams | length }} teams</div>
-    <div class="teams-list">
-        {% for team in teams %}
-        {% set cat_color = '#3b82f6' if team.category == 'Men' else ('#ec4899' if team.category == 'Women' else '#8b5cf6') %}
-        <a href="/{{ locale }}/team/{{ team.id }}" class="teams-list-row">
-            <span class="teams-list-badge" style="color:{{ cat_color }}">{{ team.category or '—' }}</span>
-            <span class="teams-list-name">{{ team.text }}</span>
-            <span class="teams-list-league">{{ team.league_name or '' }}</span>
-            <span class="teams-list-arrow">›</span>
-        </a>
+  <!-- Header row -->
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
+    <h1 style="margin:0;font-size:2rem;font-weight:700;">
+      👥 <span x-text="club || {{ t.teams.title | tojson }}"></span>
+    </h1>
+    {% if seasons %}
+    <form method="get" style="display:flex;align-items:center;gap:.5rem;">
+      {% if club %}<input type="hidden" name="club" value="{{ club }}">{% endif %}
+      <label for="season-select" style="font-size:.85rem;font-weight:600;color:var(--gray-500,#6b7280);">Season</label>
+      <select id="season-select" name="season" onchange="this.form.submit()"
+              style="padding:.35rem .75rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;
+                     font-size:.9rem;background:var(--card-bg,white);color:inherit;cursor:pointer;">
+        {% for s in seasons %}
+        <option value="{{ s.id }}" {% if s.id == current_season_id %}selected{% endif %}>{{ s.name }}</option>
         {% endfor %}
-    </div>
-    {% else %}
-    <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
-        <div class="loading"></div>
-        <p style="margin-top: 1rem;">{{ t.common.loading }}</p>
-    </div>
+      </select>
+    </form>
     {% endif %}
-</div>
+  </div>
 
-<!-- Loading skeleton template for htmx -->
-<template id="teams-loading-skeleton">
-    <div class="teams-list">
-        {% for _ in range(8) %}
-        <div class="teams-list-row" style="pointer-events:none">
-            <span class="skeleton" style="width:3rem;height:.9rem;border-radius:.25rem;"></span>
-            <span class="skeleton" style="width:40%;height:.9rem;border-radius:.25rem;"></span>
-            <span class="skeleton" style="width:30%;height:.9rem;border-radius:.25rem;"></span>
-        </div>
-        {% endfor %}
+  <!-- Filter bar -->
+  <div style="background:var(--card-bg,white);border:1px solid var(--gray-200,#e5e7eb);
+              border-radius:.6rem;padding:.9rem 1.1rem;margin-bottom:1.75rem;
+              display:flex;flex-direction:column;gap:.6rem;">
+
+    <!-- Search -->
+    <div style="position:relative;">
+      <span style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:var(--gray-400);pointer-events:none;">🔍</span>
+      <input type="text" x-model="q"
+             placeholder="Search team or league name…"
+             style="width:100%;padding:.5rem 1rem .5rem 2.2rem;border:1px solid var(--gray-300,#d1d5db);
+                    border-radius:.5rem;font-size:.9rem;background:var(--bg-primary,white);color:inherit;outline:none;box-sizing:border-box;"
+             @focus="$el.style.borderColor='var(--primary,#2563eb)'"
+             @blur="$el.style.borderColor='var(--gray-300,#d1d5db)'">
     </div>
-</template>
+
+    <!-- Sex -->
+    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+      <span style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+                   color:var(--gray-500,#6b7280);width:5rem;flex-shrink:0;">Sex</span>
+      <button :style="btnClass(activeSex==='all')"   @click="activeSex='all'">All</button>
+      <button :style="btnClass(activeSex==='men')"   @click="activeSex='men'">Men</button>
+      <button :style="btnClass(activeSex==='women')" @click="activeSex='women'">Women</button>
+      <button :style="btnClass(activeSex==='mixed')" @click="activeSex='mixed'">Mixed</button>
+    </div>
+
+    <!-- Age -->
+    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+      <span style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+                   color:var(--gray-500,#6b7280);width:5rem;flex-shrink:0;">Age</span>
+      <button :style="btnClass(activeAge==='all')"      @click="activeAge='all'">All</button>
+      <button :style="btnClass(activeAge==='senior')"   @click="activeAge='senior'">Senior</button>
+      <button :style="btnClass(activeAge==='U21')"      @click="activeAge='U21'">U21</button>
+      <button :style="btnClass(activeAge==='U18')"      @click="activeAge='U18'">U18</button>
+      <button :style="btnClass(activeAge==='U16')"      @click="activeAge='U16'">U16</button>
+      <button :style="btnClass(activeAge==='U14')"      @click="activeAge='U14'">U14</button>
+      <button :style="btnClass(activeAge==='U12')"      @click="activeAge='U12'">U12</button>
+      <button :style="btnClass(activeAge==='U10')"      @click="activeAge='U10'">U10</button>
+      <button :style="btnClass(activeAge==='senioren')" @click="activeAge='senioren'">Senioren</button>
+    </div>
+
+    <!-- Field -->
+    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+      <span style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+                   color:var(--gray-500,#6b7280);width:5rem;flex-shrink:0;">Field</span>
+      <button :style="btnClass(activeField==='all')"   @click="activeField='all'">All</button>
+      <button :style="btnClass(activeField==='big')"   @click="activeField='big'">Big field</button>
+      <button :style="btnClass(activeField==='small')" @click="activeField='small'">Small field</button>
+    </div>
+
+    <!-- Count + clear -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+      <span style="font-size:.8rem;color:var(--gray-500,#6b7280);" x-text="count + ' team' + (count !== 1 ? 's' : '')"></span>
+      <button x-show="q || activeSex !== 'all' || activeAge !== 'all' || activeField !== 'all'"
+              @click="q=''; activeSex='all'; activeAge='all'; activeField='all';"
+              style="padding:.3rem .8rem;border:1px solid var(--gray-300,#d1d5db);border-radius:999px;
+                     font-size:.78rem;background:transparent;color:inherit;cursor:pointer;">
+        ✕ Clear filters
+      </button>
+    </div>
+  </div>
+
+  <!-- Sections -->
+  <template x-if="sections.length > 0">
+    <div>
+      <template x-for="section in sections" :key="section.key">
+        <div style="margin-bottom:1.75rem;">
+          <!-- Tier / age-group heading -->
+          <h3 style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;
+                     color:var(--gray-400,#9ca3af);margin-bottom:.6rem;display:flex;align-items:center;gap:.5rem;">
+            <span style="flex:1;height:1px;background:var(--gray-200,#e5e7eb);display:inline-block;"></span>
+            <span x-text="section.label"></span>
+            <span style="flex:1;height:1px;background:var(--gray-200,#e5e7eb);display:inline-block;"></span>
+          </h3>
+
+          <!-- Multiple sex sub-groups: side-by-side columns -->
+          <template x-if="section.subgroups.length > 1">
+            <div style="display:flex;flex-direction:row;flex-wrap:wrap;gap:.75rem;align-items:flex-start;">
+              <template x-for="sg in section.subgroups" :key="sg.sex">
+                <div :style="'flex:1;min-width:240px;border-left:3px solid ' + sexColor(sg.sex) + ';padding-left:.75rem;'">
+                  <div :style="'font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;color:' + sexTextColor(sg.sex)"
+                       x-text="sexLabel(sg.sex)"></div>
+                  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.55rem;">
+                    <template x-for="team in sg.teams" :key="team.id">
+                      <a :href="`/${locale}/team/${team.id}`" style="text-decoration:none;color:inherit;">
+                        <div style="background:var(--card-bg,white);border:1px solid var(--gray-200,#e5e7eb);
+                                    border-radius:.5rem;padding:.75rem 1rem;
+                                    transition:box-shadow .15s,transform .15s;"
+                             @mouseenter="$el.style.boxShadow='0 4px 12px rgba(0,0,0,.08)';$el.style.transform='translateY(-1px)'"
+                             @mouseleave="$el.style.boxShadow='';$el.style.transform=''">
+                          <div style="font-weight:600;font-size:.92rem;margin-bottom:.3rem;" x-text="team.text"></div>
+                          <span x-show="team.league_name"
+                                :style="'display:inline-block;font-size:.7rem;padding:.1rem .45rem;border-radius:999px;font-weight:500;background:' + sexBgColor(team.sex) + ';color:' + sexTextColor(team.sex)"
+                                x-text="team.league_name"></span>
+                        </div>
+                      </a>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- Single sex: flat grid -->
+          <template x-if="section.subgroups.length <= 1">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.65rem;">
+              <template x-for="team in section.teams" :key="team.id">
+                <a :href="`/${locale}/team/${team.id}`" style="text-decoration:none;color:inherit;">
+                  <div style="background:var(--card-bg,white);border:1px solid var(--gray-200,#e5e7eb);
+                              border-radius:.5rem;padding:.9rem 1.1rem;
+                              transition:box-shadow .15s,transform .15s;"
+                       @mouseenter="$el.style.boxShadow='0 4px 12px rgba(0,0,0,.1)';$el.style.transform='translateY(-1px)'"
+                       @mouseleave="$el.style.boxShadow='';$el.style.transform=''">
+                    <div style="font-weight:600;font-size:.95rem;margin-bottom:.3rem;" x-text="team.text"></div>
+                    <span x-show="team.league_name"
+                          :style="'font-size:.7rem;padding:.1rem .45rem;border-radius:999px;font-weight:500;background:' + sexBgColor(team.sex) + ';color:' + sexTextColor(team.sex)"
+                          x-text="team.league_name"></span>
+                  </div>
+                </a>
+              </template>
+            </div>
+          </template>
+
+        </div>
+      </template>
+    </div>
+  </template>
+
+  <!-- Empty state -->
+  <template x-if="sections.length === 0">
+    <div style="text-align:center;padding:3rem;color:var(--gray-500,#6b7280);">
+      <p style="font-size:2rem">👥</p>
+      <p>No teams match the selected filters.</p>
+      <button @click="q=''; activeSex='all'; activeAge='all'; activeField='all';"
+              style="margin-top:.5rem;padding:.4rem 1rem;border:1px solid var(--primary,#2563eb);
+                     border-radius:.375rem;color:var(--primary,#2563eb);background:transparent;
+                     cursor:pointer;font-size:.9rem;">
+        Clear filters
+      </button>
+    </div>
+  </template>
+
+</div>
 {% endblock %}
