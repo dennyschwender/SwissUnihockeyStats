@@ -130,13 +130,18 @@ POLICIES: list[dict] = [
 # How often the scheduler wakes up (seconds)
 TICK_SECONDS = 300  # 5 minutes
 
-# Where to persist scheduler config (enabled flag)
-# Resolved relative to this file: ../../data/scheduler_config.json
-_CONFIG_PATH = os.path.join(
-    os.path.dirname(__file__),   # .../backend/app/services
-    "..", "..", "..",            # up to SwissUnihockeyStats/
-    "data", "scheduler_config.json",
-)
+# Where to persist scheduler config.
+# Use DATA_DIR env var if set (Docker: /app/data), else resolve relative to this
+# file (local dev: backend/app/services/../../../data).
+_DATA_DIR_ENV = os.environ.get("DATA_DIR")
+if _DATA_DIR_ENV:
+    _CONFIG_PATH = os.path.join(_DATA_DIR_ENV, "scheduler_config.json")
+else:
+    _CONFIG_PATH = os.path.join(
+        os.path.dirname(__file__),   # .../backend/app/services
+        "..", "..", "..",            # up to SwissUnihockeyStats/
+        "data", "scheduler_config.json",
+    )
 _CONFIG_PATH = os.path.normpath(_CONFIG_PATH)
 
 

@@ -14,6 +14,7 @@ services:
       - PORT=8000
       - TZ=Europe/Zurich
       # Data paths in container (override config.py __file__-based resolution)
+      - DATA_DIR=/app/data
       - DATABASE_PATH=/app/data/swissunihockey.db
       - SWISSUNIHOCKEY_CACHE_DIR=/app/data/cache
     
