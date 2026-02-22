@@ -11,8 +11,9 @@ WORKDIR /app
 # Install build tools, upgrade pip, create venv — all in one cached layer
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libc-dev \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install --upgrade pip \
-    && python -m venv /app/venv
+    && pip install --upgrade pip --root-user-action=ignore \
+    && python -m venv /app/venv \
+    && /app/venv/bin/pip install --upgrade pip
 
 # Copy requirements and install into the venv (cached unless requirements change)
 COPY backend/requirements.txt .
@@ -32,8 +33,8 @@ ENV PYTHONUNBUFFERED=1 \
     # venv is on PATH for all users — no --user / .local tricks needed
     PATH="/app/venv/bin:$PATH"
 
-# Install gosu for privilege drop
-RUN apt-get update && apt-get install -y --no-install-recommends gosu \
+# Install gosu for privilege drop and curl for healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends gosu curl \
     && rm -rf /var/lib/apt/lists/* \
     && gosu nobody true
 
@@ -61,7 +62,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 RUN mkdir -p /app/data/cache && chown -R appuser:appuser /app/data
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5)" || exit 1
+    CMD curl -fs http://localhost:8000/health || exit 1
 
 EXPOSE 8000
 
