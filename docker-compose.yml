@@ -37,6 +37,14 @@ services:
           cpus: '0.5'
           memory: 256M
     
+    # Healthcheck (override Dockerfile default to avoid IPv6-first delay)
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
     # Restart policy
     restart: unless-stopped
     
