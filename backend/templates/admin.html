@@ -640,6 +640,7 @@ function registerJob(data) {
 }
 
 const _pollErrors = {};  // job_id → consecutive error count
+const _seenJobHistory = new Set(); // job_ids whose history has been shown in the log
 const POLL_MAX_ERRORS = 4;
 
 async function pollJob(job_id) {
@@ -659,10 +660,18 @@ async function pollJob(job_id) {
     _pollErrors[job_id] = 0;  // reset error counter on success
     const d = await r.json();
 
+    // On first encounter of a job (e.g. after page refresh), replay the
+    // full output history so the log isn't blank for an already-running job.
+    if (!_seenJobHistory.has(job_id)) {
+      _seenJobHistory.add(job_id);
+      (d.log_history || []).forEach(l =>
+        log(l.level || 'info', `[${job_id.slice(-6)}] ${l.msg}`)
+      );
+    }
     (d.log_lines || []).forEach(l =>
       log(l.level || 'info', `[${job_id.slice(-6)}] ${l.msg}`)
     );
-    jobs[job_id] = { ...d, log_lines: [] };
+    jobs[job_id] = { ...d, log_lines: [], log_history: [] };
     renderJobs();
 
     if (d.status === 'running') {
@@ -671,13 +680,13 @@ async function pollJob(job_id) {
       const stats = Object.entries(d.stats || {}).map(([k,v]) => `${k}:${fmt(v)}`).join(' ');
       log('ok', `✓ Job ${job_id.slice(-6)} done  ${stats}`);
       setTimeout(loadStats, 600);
-      setTimeout(() => { delete jobs[job_id]; renderJobs(); }, 60000); // auto-remove after 60s
+      setTimeout(() => { delete jobs[job_id]; _seenJobHistory.delete(job_id); renderJobs(); }, 60000); // auto-remove after 60s
     } else if (d.status === 'stopped') {
       log('warn', `■ Job ${job_id.slice(-6)} stopped`);
-      setTimeout(() => { delete jobs[job_id]; renderJobs(); }, 60000); // auto-remove after 60s
+      setTimeout(() => { delete jobs[job_id]; _seenJobHistory.delete(job_id); renderJobs(); }, 60000); // auto-remove after 60s
     } else if (d.status === 'error') {
       log('error', `✗ Job ${job_id.slice(-6)} failed: ${d.error}`);
-      setTimeout(() => { delete jobs[job_id]; renderJobs(); }, 60000); // auto-remove after 60s
+      setTimeout(() => { delete jobs[job_id]; _seenJobHistory.delete(job_id); renderJobs(); }, 60000); // auto-remove after 60s
     }
   } catch(e) {
     _handlePollError(job_id, e.message);
@@ -762,7 +771,7 @@ async function clearDoneJobs() {
     body: JSON.stringify({action: 'clear_done'})
   });
   // Also clear locally from the active jobs panel
-  for (const id in jobs) if (jobs[id].status !== 'running') delete jobs[id];
+  for (const id in jobs) if (jobs[id].status !== 'running') { delete jobs[id]; _seenJobHistory.delete(id); }
   renderJobs();
 }
 

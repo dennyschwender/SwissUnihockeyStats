@@ -588,13 +588,26 @@ def _purge_expired_jobs():
 
 @app.get("/admin/api/jobs/{job_id}")
 async def admin_job_status(job_id: str, _: None = Depends(require_admin)):
-    """Return current status and buffered log lines for a running job."""
+    """Return current status and buffered log lines for a running job.
+
+    log_lines   – lines accumulated since the last GET (drained on read)
+    log_history – all lines from previous drains (persistent, not drained)
+                  Clients should display this on first encounter of a job
+                  so that a page refresh restores the output context.
+    """
     job = _admin_jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     log_lines = job.pop("log_lines", [])
     job["log_lines"] = []
-    return {**job, "log_lines": log_lines}
+    # Return a snapshot of history *before* extending it with this batch,
+    # so clients can show history + current lines without duplicates.
+    history_snapshot = list(job.get("log_history", []))
+    history = job.setdefault("log_history", [])
+    history.extend(log_lines)
+    if len(history) > 400:
+        del history[:len(history) - 400]
+    return {**job, "log_lines": log_lines, "log_history": history_snapshot}
 
 
 @app.delete("/admin/api/jobs/{job_id}")
