@@ -1630,12 +1630,16 @@ async def club_detail(request: Request, locale: str, club_id: int):
                         id_list = ",".join(str(i) for i in team_ids)
                         grp_rows = session.execute(
                             sa_text(f"""
-                                SELECT gp.team_id, lg.name
-                                FROM game_players gp
-                                JOIN games g ON g.id = gp.game_id
+                                SELECT t_id, lg.name
+                                FROM (
+                                    SELECT home_team_id AS t_id, group_id
+                                    FROM games WHERE home_team_id IN ({id_list})
+                                    UNION ALL
+                                    SELECT away_team_id AS t_id, group_id
+                                    FROM games WHERE away_team_id IN ({id_list})
+                                ) g
                                 JOIN league_groups lg ON lg.id = g.group_id
-                                WHERE gp.team_id IN ({id_list})
-                                GROUP BY gp.team_id
+                                GROUP BY t_id
                             """)
                         ).fetchall()
                         group_by_team = {r[0]: r[1] for r in grp_rows}
