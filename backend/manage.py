@@ -539,12 +539,14 @@ def purge_season(season: int, mode: str, dry_run: bool, yes: bool):
         n = batched_delete(session, Season, Season.id, target_season_ids)
         click.echo(f"  Deleted {n:,} Season rows")
 
-        # Remove orphaned players (no TeamPlayer rows remaining anywhere)
+        # Remove orphaned players (no TeamPlayer AND no GamePlayer rows remaining anywhere)
         orphan_ids = [
             r[0] for r in
             session.query(Player.person_id)
             .outerjoin(TeamPlayer, TeamPlayer.player_id == Player.person_id)
+            .outerjoin(GamePlayer, GamePlayer.player_id == Player.person_id)
             .filter(TeamPlayer.player_id.is_(None))
+            .filter(GamePlayer.player_id.is_(None))
             .all()
         ]
         if orphan_ids:

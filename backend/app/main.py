@@ -984,12 +984,14 @@ async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
             deleted["Season"] = n
             push("ok", f"  Deleted {n:,} Season rows")
 
-            # Orphaned players
+            # Orphaned players: no TeamPlayer AND no GamePlayer rows anywhere
             orphan_ids = [
                 r[0] for r in
                 session.query(Player.person_id)
                 .outerjoin(TeamPlayer, TeamPlayer.player_id == Player.person_id)
+                .outerjoin(GamePlayer, GamePlayer.player_id == Player.person_id)
                 .filter(TeamPlayer.player_id.is_(None))
+                .filter(GamePlayer.player_id.is_(None))
                 .all()
             ]
             if orphan_ids:
