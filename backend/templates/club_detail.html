@@ -48,7 +48,11 @@
     <div class="cards-grid">
         {% for team in teams %}
         <div class="card" onclick="window.location='/{{ locale }}/team/{{ team.id if team.id else team.set_in_context.team_id }}'">
+            {% if team.logo_url %}
+            <img src="{{ team.logo_url }}" alt="{{ team.text }} logo" style="width:48px;height:48px;object-fit:contain;margin-bottom:0.5rem;">
+            {% else %}
             <div class="card-icon">👥</div>
+            {% endif %}
             <h3>{{ team.text if team.text else 'Team' }}</h3>
             {% if team.set_in_context and team.set_in_context.league_name %}
             <p style="color: var(--gray-600); font-size: 0.875rem;">

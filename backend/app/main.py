@@ -1577,20 +1577,25 @@ async def club_detail(request: Request, locale: str, club_id: int):
         if matching_clubs:
             club_data = matching_clubs[0]
             current_season = get_current_season()
-            
+
             # Fetch teams for this club
             try:
                 teams_data = client.get_teams(club=club_id, season=current_season)
-                teams = teams_data.get("entries", [])[:30] if isinstance(teams_data, dict) else []
+                # API returns nested structure: data.regions[0].rows
+                raw_rows: list = []
+                if isinstance(teams_data, dict) and "data" in teams_data:
+                    d = teams_data["data"]
+                    if isinstance(d, dict) and d.get("regions"):
+                        raw_rows = d["regions"][0].get("rows", [])
+                for row in raw_rows[:30]:
+                    cells = row.get("cells", [])
+                    name = cells[0]["text"][0] if cells and isinstance(cells[0].get("text"), list) and cells[0]["text"] else "Unknown"
+                    logo_url = ""
+                    if len(cells) > 1 and isinstance(cells[1].get("image"), dict):
+                        logo_url = cells[1]["image"].get("url", "")
+                    teams.append({"id": row.get("id"), "text": name, "logo_url": logo_url})
             except Exception as team_error:
                 logger.warning(f"Could not load teams for club {club_id}: {team_error}")
-            
-            # Fetch players for this club
-            try:
-                players_data = client.get_players(club=club_id, season=current_season)
-                players = players_data.get("entries", [])[:50] if isinstance(players_data, dict) else []
-            except Exception as player_error:
-                logger.warning(f"Could not load players for club {club_id}: {player_error}")
         else:
             error_message = f"Club with ID {club_id} not found"
             logger.warning(error_message)
