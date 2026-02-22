@@ -1592,9 +1592,9 @@ async def club_detail(request: Request, locale: str, club_id: int):
             # Fetch teams from DB: the API /api/teams?club= parameter is ignored by the server,
             # so we match by team name (teams are indexed from rankings and carry the club name).
             try:
-                from app.models.db_models import Team, League
+                from app.models.db_models import Team, League, LeagueGroup, Game, GamePlayer
                 from app.services.database import get_database_service
-                from sqlalchemy import and_
+                from sqlalchemy import and_, text as sa_text
                 _db = get_database_service()
                 with _db.session_scope() as session:
                     rows = (
@@ -1611,16 +1611,37 @@ async def club_detail(request: Request, locale: str, club_id: int):
                             Team.name.like(f"%{club_name}%"),
                             Team.season_id == current_season,
                         )
-                        .order_by(Team.name)
+                        .order_by(League.name, Team.name)
                         .all()
                     )
+
+                    # Fetch group names per team via games → league_groups
+                    team_ids = [t.id for t, _lg in rows]
+                    group_by_team: dict[int, str] = {}
+                    if team_ids:
+                        id_list = ",".join(str(i) for i in team_ids)
+                        grp_rows = session.execute(
+                            sa_text(f"""
+                                SELECT gp.team_id, lg.name
+                                FROM game_players gp
+                                JOIN games g ON g.id = gp.game_id
+                                JOIN league_groups lg ON lg.id = g.group_id
+                                WHERE gp.team_id IN ({id_list})
+                                GROUP BY gp.team_id
+                            """)
+                        ).fetchall()
+                        group_by_team = {r[0]: r[1] for r in grp_rows}
+
                     teams = [
                         {
                             "id": t.id,
                             "text": t.name,
+                            # Strip the club name prefix so only suffix remains (I, II, III, …)
+                            "suffix": t.name.replace(club_name, "").strip(),
                             "league_name": lg.name if lg else "",
                             "league_id": t.league_id,
                             "logo_url": t.logo_url or "",
+                            "group_name": group_by_team.get(t.id, ""),
                         }
                         for t, lg in rows
                     ]

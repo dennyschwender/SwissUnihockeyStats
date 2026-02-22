@@ -47,17 +47,14 @@
     {% if teams %}
     <div class="cards-grid">
         {% for team in teams %}
-        <div class="card" onclick="window.location='/{{ locale }}/team/{{ team.id }}'">
-            {% if team.logo_url %}
-            <img src="{{ team.logo_url }}" alt="{{ team.text }} logo" style="width:48px;height:48px;object-fit:contain;margin-bottom:0.5rem;">
-            {% else %}
+        <div class="card" onclick="window.location='/{{ locale }}/team/{{ team.id }}'" style="cursor: pointer;">
             <div class="card-icon">👥</div>
+            <h3 style="margin: 0 0 0.25rem 0;">{{ team.league_name if team.league_name else team.text }}</h3>
+            {% if team.suffix %}
+            <p style="margin: 0 0 0.25rem 0; font-size: 0.8rem; color: var(--gray-500);">{{ team.suffix }}</p>
             {% endif %}
-            <h3>{{ team.text if team.text else 'Team' }}</h3>
-            {% if team.league_name %}
-            <p style="color: var(--gray-600); font-size: 0.875rem;">
-                🏆 {{ team.league_name }}
-            </p>
+            {% if team.group_name %}
+            <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">📍 {{ team.group_name }}</p>
             {% endif %}
         </div>
         {% endfor %}
