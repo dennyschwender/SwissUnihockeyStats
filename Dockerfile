@@ -2,7 +2,7 @@
 # Multi-stage build for optimized image size
 
 # Stage 1: Builder
-FROM python:3.11-slim AS builder
+FROM python:3.12-slim AS builder
 
 # Set working directory
 WORKDIR /app
@@ -20,7 +20,7 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Stage 2: Runtime
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Set maintainer label
 LABEL maintainer="your.email@example.com"

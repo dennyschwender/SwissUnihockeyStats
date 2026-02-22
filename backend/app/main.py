@@ -1790,10 +1790,11 @@ async def teams_search(request: Request, locale: str, q: str = "", sort: str = "
         league    = team.get("league_name") or ""
         season_nm = team.get("season_name") or ""
         cat_color = cat_colors.get(category, "var(--gray-400)")
+        cat_label = category or "\u2014"
         season_span = f'<span class="teams-list-season">{season_nm}</span>' if all_seasons else ""
         html += (
             f'<a href="/{locale}/team/{team_id}" class="teams-list-row">'
-            f'<span class="teams-list-badge" style="color:{cat_color}">{category or "\u2014"}</span>'
+            f'<span class="teams-list-badge" style="color:{cat_color}">{cat_label}</span>'
             f'<span class="teams-list-name">{name}</span>'
             f'<span class="teams-list-league">{league}</span>'
             f'{season_span}'
