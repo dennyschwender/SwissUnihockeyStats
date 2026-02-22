@@ -922,7 +922,6 @@ async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
 
         push("info", f"Seasons to purge ({len(target_ids)}): {sorted(target_ids)}")
         job["progress"] = 5
-        await asyncio.sleep(0)
 
         with db.session_scope() as session:
             game_ids = [r[0] for r in session.query(Game.id).filter(Game.season_id.in_(target_ids)).all()]
@@ -951,7 +950,6 @@ async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
             push("info", f"  {name:20s}: {n:>8,}")
         push("info", f"  {'TOTAL':20s}: {total_rows:>8,}")
         job["progress"] = 15
-        await asyncio.sleep(0)
 
         if dry_run:
             push("warn", "[dry-run] Nothing deleted.")
@@ -1069,7 +1067,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         # ── SEASONS ────────────────────────────────────────────────────────
         if task == "seasons":
             push("info", "Fetching seasons list from API...")
-            n = indexer.index_seasons(force=True)
+            n = await asyncio.to_thread(indexer.index_seasons, force=True)
             stats["seasons"] = n
             push("ok", f"Seasons: {n}")
             set_progress(100)
@@ -1077,7 +1075,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         # ── CLUBS ──────────────────────────────────────────────────────────
         if task in ("clubs", "clubs_path", "full"):
             push("info", f"Indexing clubs for season {season}...")
-            n = indexer.index_clubs(season, force=force)
+            n = await asyncio.to_thread(indexer.index_clubs, season, force=force)
             stats["clubs"] = n
             push("ok", f"Clubs: {n}")
             set_progress(10)
@@ -1092,11 +1090,10 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             teams_n = 0
             team_id_list = []
             for i, (cid, cname) in enumerate(club_list, 1):
-                cnt, tids = indexer.index_teams_for_club(cid, season, force=force)
+                cnt, tids = await asyncio.to_thread(indexer.index_teams_for_club, cid, season, force=force)
                 teams_n += cnt
                 team_id_list.extend(tids)
                 set_progress(10 + int(i / total * 25))
-                await asyncio.sleep(0)
             stats["teams"] = teams_n
             push("ok", f"Teams: {teams_n}")
 
@@ -1120,16 +1117,15 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             push("info", f"Indexing players for {total} teams (tier ≤ {effective_tier_p}{auto_lbl_p})...")
             players_n = 0
             for i, tid in enumerate(team_id_list, 1):
-                players_n += indexer.index_players_for_team(tid, season, force=force)
+                players_n += await asyncio.to_thread(indexer.index_players_for_team, tid, season, force=force)
                 set_progress(35 + int(i / total * 25) if total else 60)
-                await asyncio.sleep(0)
             stats["players"] = players_n
             push("ok", f"Players: {players_n}")
 
         # ── PLAYER STATS ───────────────────────────────────────────────────
         if task in ("player_stats", "clubs_path", "full"):
             push("info", f"Indexing player statistics for season {season}...")
-            stats_n = indexer.index_player_stats_for_season(season, force=force)
+            stats_n = await asyncio.to_thread(indexer.index_player_stats_for_season, season, force=force)
             stats["player_stats"] = stats_n
             push("ok", f"Player stats: {stats_n}")
             set_progress(60)
@@ -1153,23 +1149,22 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             push("info", f"Indexing lineups for {total_gl} games (tier ≤ {effective_tier_gl})...")
             lineup_n2 = 0
             for i, gid in enumerate(game_ids_gl, 1):
-                lineup_n2 += max(0, indexer.index_game_lineup(gid, season, force=force))
+                lineup_n2 += max(0, await asyncio.to_thread(indexer.index_game_lineup, gid, season, force=force))
                 set_progress(int(i / total_gl * 95) if total_gl else 99)
-                await asyncio.sleep(0)
             stats["game_lineups"] = lineup_n2
             push("ok", f"Game lineups: {lineup_n2}")
 
         # ── PLAYER GAME STATS (standalone or as part of full) ──────────────
         if task in ("player_game_stats", "full"):
             push("info", f"Updating per-game G/A/PIM for season {season}...")
-            pgstats_n = indexer.index_player_game_stats_for_season(season_id=season, force=force)
+            pgstats_n = await asyncio.to_thread(indexer.index_player_game_stats_for_season, season_id=season, force=force)
             stats["player_game_stats"] = pgstats_n
             push("ok", f"Player game stats: {pgstats_n}")
 
         # ── LEAGUES ────────────────────────────────────────────────────────
         if task in ("leagues", "groups", "games", "leagues_path", "full"):
             push("info", f"Indexing leagues for season {season}...")
-            n = indexer.index_leagues(season, force=force)
+            n = await asyncio.to_thread(indexer.index_leagues, season, force=force)
             stats["leagues"] = n
             push("ok", f"Leagues: {n}")
             set_progress(62)
@@ -1183,9 +1178,8 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             groups_n = 0
             push("info", f"Indexing groups for {total} leagues...")
             for i, (ldb, lid, gc) in enumerate(lg_list, 1):
-                groups_n += indexer.index_groups_for_league(ldb, season, lid, gc, force=force)
+                groups_n += await asyncio.to_thread(indexer.index_groups_for_league, ldb, season, lid, gc, force=force)
                 set_progress(62 + int(i / total * 13))
-                await asyncio.sleep(0)
             stats["league_groups"] = groups_n
             push("ok", f"Groups: {groups_n}")
 
@@ -1210,20 +1204,20 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             games_n = 0
             push("info", f"Indexing games for {total} groups across {len(lg_list)} leagues...")
             for i, (ldb, lid, gc, grp_db_id, grp_name) in enumerate(work, 1):
-                games_n += indexer.index_games_for_league(
+                games_n += await asyncio.to_thread(
+                    indexer.index_games_for_league,
                     ldb, season, lid, gc,
                     group_name=grp_name, group_db_id=grp_db_id,
                     force=force,
                 )
                 set_progress(75 + int(i / total * 20))
-                await asyncio.sleep(0)
             stats["games"] = games_n
             push("ok", f"Games: {games_n}")
 
         # ── BACKFILL TEAM NAMES ────────────────────────────────────────────
         if task in ("team_names", "games", "leagues_path", "full"):
             push("info", "Backfilling team names from rankings API...")
-            n = indexer.backfill_team_names(season, force=force)
+            n = await asyncio.to_thread(indexer.backfill_team_names, season, force=force)
             stats["team_names"] = n
             push("ok", f"Team names backfilled: {n}")
 
@@ -1270,10 +1264,9 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             events_n = 0
             lineup_n = 0
             for i, (gid, sid_) in enumerate(finished, 1):
-                events_n += indexer.index_game_events(gid, sid_, force=force)
-                lineup_n += indexer.index_game_lineup(gid, sid_, force=force)
+                events_n += await asyncio.to_thread(indexer.index_game_events, gid, sid_, force=force)
+                lineup_n += await asyncio.to_thread(indexer.index_game_lineup, gid, sid_, force=force)
                 set_progress(int(i / total * 95) if total else 99)
-                await asyncio.sleep(0)
             stats["game_events"] = events_n
             stats["lineups"] = lineup_n
             push("ok", f"Game events: {events_n}  Lineups: {lineup_n}")
