@@ -1527,13 +1527,17 @@ def get_upcoming_games(
             grp_name[grp.id] = grp.name or grp.text or ""
             if lg:
                 grp_league_category[grp.id] = f"{lg.league_id}_{lg.game_class}"
-            # Build short label: "M" / "W" + league name stripped of Herren/Damen + group
+            # Build short label line 1: "M - U16A" / "W - NLA" etc.
+            # Strip common prefixes and collapse spaces ("U16 A" → "U16A")
             gc = lg.game_class if lg else None
             mw = "M" if gc == 11 else ("W" if gc == 21 else "")
-            lg_short = (lg.name or lg.text or "").replace("Herren ", "").replace("Damen ", "").strip() if lg else ""
+            lg_raw = (lg.name or lg.text or "") if lg else ""
+            for pfx in ("Herren ", "Damen ", "Junioren ", "Juniorinnen "):
+                lg_raw = lg_raw.replace(pfx, "")
+            lg_short = lg_raw.replace(" ", "").strip()  # "U16 A" → "U16A"
             grp_text = grp.name or grp.text or ""
-            parts = [p for p in [mw, lg_short, grp_text] if p]
-            grp_label[grp.id] = " · ".join(parts)
+            label_parts = [p for p in [mw, lg_short] if p]
+            grp_label[grp.id] = " - ".join(label_parts)
 
         return [
             {
@@ -1633,13 +1637,17 @@ def get_latest_results(
             grp_name[grp.id] = grp.name or grp.text or ""
             if lg:
                 grp_league_category[grp.id] = f"{lg.league_id}_{lg.game_class}"
-            # Build short label: "M" / "W" + league name stripped of Herren/Damen + group
+            # Build short label line 1: "M - U16A" / "W - NLA" etc.
+            # Strip common prefixes and collapse spaces ("U16 A" → "U16A")
             gc = lg.game_class if lg else None
             mw = "M" if gc == 11 else ("W" if gc == 21 else "")
-            lg_short = (lg.name or lg.text or "").replace("Herren ", "").replace("Damen ", "").strip() if lg else ""
+            lg_raw = (lg.name or lg.text or "") if lg else ""
+            for pfx in ("Herren ", "Damen ", "Junioren ", "Juniorinnen "):
+                lg_raw = lg_raw.replace(pfx, "")
+            lg_short = lg_raw.replace(" ", "").strip()  # "U16 A" → "U16A"
             grp_text = grp.name or grp.text or ""
-            parts = [p for p in [mw, lg_short, grp_text] if p]
-            grp_label[grp.id] = " · ".join(parts)
+            label_parts = [p for p in [mw, lg_short] if p]
+            grp_label[grp.id] = " - ".join(label_parts)
 
         return [
             {
