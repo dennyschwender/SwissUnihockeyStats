@@ -210,6 +210,7 @@ class Scheduler:
         self._running = False
         self._queue: list[ScheduledJob] = []
         self._history: list[JobRecord] = []
+        self._cold_start = True   # run all jobs immediately on first enable
         self._enabled = self._load_state()
 
     # ── persistence ───────────────────────────────────────────────────────────
@@ -322,9 +323,10 @@ class Scheduler:
         self._enabled = v
         self._save_state()
         if v:
-            # Drop any stale overdue jobs that accumulated while paused so
-            # they don't all fire at once when the scheduler resumes.
+            # Drop any stale queued jobs so re-enable triggers a fresh
+            # cold-start run for all policies (don't wait for max_age).
             self._purge_overdue()
+            self._cold_start = True
         logger.info("[scheduler] %s", "enabled" if v else "disabled")
 
     @property
@@ -508,6 +510,9 @@ class Scheduler:
                             if self._season_filtered(sid):
                                 continue
                             self._maybe_schedule(session, policy, season=sid)
+
+                # Cold start complete – subsequent ticks use normal max_age scheduling
+                self._cold_start = False
         except Exception as exc:
             logger.error("[scheduler] refresh_queue error: %s", exc, exc_info=True)
 
@@ -530,8 +535,9 @@ class Scheduler:
         last_sync = _last_sync_for(session, policy["entity_type"], season)
         now = _utcnow()
 
-        if last_sync is None:
-            # Never synced – run soon (stagger by priority to avoid thundering herd)
+        if last_sync is None or self._cold_start:
+            # Never synced or cold-start (first run after enable) –
+            # run soon, staggered by priority to avoid thundering herd.
             run_at = now + timedelta(seconds=policy["priority"])
         else:
             run_at = last_sync + policy["max_age"]
