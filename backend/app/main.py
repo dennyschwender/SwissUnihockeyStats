@@ -1558,7 +1558,6 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
 @app.get("/{locale}/club/{club_id}", response_class=HTMLResponse)
 async def club_detail(request: Request, locale: str, club_id: int):
     """Club detail page with teams and players"""
-    client = get_swissunihockey_client()
     error_message = None
     club_data = {}
     teams = []
@@ -1576,26 +1575,42 @@ async def club_detail(request: Request, locale: str, club_id: int):
         
         if matching_clubs:
             club_data = matching_clubs[0]
+            club_name = club_data.get("text", "")
             current_season = get_current_season()
 
-            # Fetch teams for this club
+            # Fetch teams from DB: the API /api/teams?club= parameter is ignored by the server,
+            # so we match by team name (teams are indexed from rankings and carry the club name).
             try:
-                teams_data = client.get_teams(club=club_id, season=current_season)
-                # API returns nested structure: data.regions[0].rows
-                raw_rows: list = []
-                if isinstance(teams_data, dict) and "data" in teams_data:
-                    d = teams_data["data"]
-                    if isinstance(d, dict) and d.get("regions"):
-                        raw_rows = d["regions"][0].get("rows", [])
-                for row in raw_rows[:30]:
-                    cells = row.get("cells", [])
-                    name = cells[0]["text"][0] if cells and isinstance(cells[0].get("text"), list) and cells[0]["text"] else "Unknown"
-                    logo_url = ""
-                    if len(cells) > 1 and isinstance(cells[1].get("image"), dict):
-                        logo_url = cells[1]["image"].get("url", "")
-                    teams.append({"id": row.get("id"), "text": name, "logo_url": logo_url})
+                from app.models.db_models import Team, League
+                from app.services.database import get_database_service
+                from sqlalchemy import and_
+                _db = get_database_service()
+                with _db.session_scope() as session:
+                    rows = (
+                        session.query(Team, League)
+                        .outerjoin(
+                            League,
+                            and_(League.id == Team.league_id, League.season_id == Team.season_id)
+                        )
+                        .filter(
+                            Team.name.like(f"%{club_name}%"),
+                            Team.season_id == current_season,
+                        )
+                        .order_by(Team.name)
+                        .all()
+                    )
+                    teams = [
+                        {
+                            "id": t.id,
+                            "text": t.name,
+                            "league_name": lg.name if lg else "",
+                            "league_id": t.league_id,
+                            "logo_url": t.logo_url or "",
+                        }
+                        for t, lg in rows
+                    ]
             except Exception as team_error:
-                logger.warning(f"Could not load teams for club {club_id}: {team_error}")
+                logger.warning(f"Could not load teams for club {club_id} ({club_name}): {team_error}")
         else:
             error_message = f"Club with ID {club_id} not found"
             logger.warning(error_message)
