@@ -115,6 +115,7 @@ POLICIES: list[dict] = [
         "scope":       "season",
         "label":       "Game events refresh",
         "priority":    80,
+        "max_tier":    2,   # NLA + NLB + A-level youth only — 2 API calls/game, runs hourly
     },
     {
         "name":        "player_stats",
@@ -124,6 +125,7 @@ POLICIES: list[dict] = [
         "scope":       "season",
         "label":       "Player stats refresh",
         "priority":    85,
+        "max_tier":    3,   # up to 1.Liga + B-level youth — 1 API call/player, runs every 4h
     },
 ]
 
