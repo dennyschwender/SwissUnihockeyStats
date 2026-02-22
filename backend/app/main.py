@@ -796,6 +796,210 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
     raise HTTPException(status_code=400, detail=f"Unknown action '{action}'")
 
 
+@app.post("/admin/api/purge")
+async def admin_purge_seasons(payload: dict, _: None = Depends(require_admin)):
+    """Purge data for one or more seasons as a background job.
+
+    payload:
+      { "season": 2022, "mode": "exact|older|older-or-equal|newer|newer-or-equal", "dry_run": false }
+    """
+    season  = payload.get("season")
+    mode    = payload.get("mode", "exact")
+    dry_run = bool(payload.get("dry_run", False))
+
+    VALID_MODES = {"exact", "older", "older-or-equal", "newer", "newer-or-equal"}
+    if not isinstance(season, int):
+        raise HTTPException(status_code=400, detail="season must be an integer")
+    if mode not in VALID_MODES:
+        raise HTTPException(status_code=400, detail=f"mode must be one of {VALID_MODES}")
+
+    job_id = str(uuid.uuid4())[:8]
+    label  = f"purge season {season} [{mode}]" + (" (dry-run)" if dry_run else "")
+    _admin_jobs[job_id] = {
+        "job_id":    job_id,
+        "season":    season,
+        "task":      "purge",
+        "label":     label,
+        "status":    "running",
+        "progress":  0,
+        "stats":     {},
+        "log_lines": [],
+        "error":     None,
+    }
+    task = asyncio.create_task(
+        _run_purge(job_id, season, mode, dry_run),
+        name=f"purge-{job_id}",
+    )
+    _admin_tasks[job_id] = task
+    logger.info("Admin purge job %s started — season=%s mode=%s dry_run=%s", job_id, season, mode, dry_run)
+    return {"ok": True, "job_id": job_id, "label": label}
+
+
+async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
+    """Background coroutine for multi-season purge."""
+    job = _admin_jobs[job_id]
+
+    def push(level: str, msg: str):
+        job["log_lines"].append({"level": level, "msg": msg})
+        logger.info("[admin %s] %s", job_id, msg)
+
+    try:
+        from app.services.database import get_database_service
+        from app.models.db_models import (
+            Season, Club, League, LeagueGroup, Team, Player,
+            TeamPlayer, Game, GamePlayer, GameEvent, PlayerStatistics, SyncStatus,
+        )
+        from sqlalchemy import func, or_ as sa_or
+
+        CHUNK = 500
+
+        def batched_count(session, model, col, ids: list) -> int:
+            if not ids:
+                return 0
+            total = 0
+            for i in range(0, len(ids), CHUNK):
+                total += session.query(func.count(model.id)).filter(
+                    col.in_(ids[i: i + CHUNK])
+                ).scalar() or 0
+            return total
+
+        def batched_delete(session, model, col, ids: list) -> int:
+            if not ids:
+                return 0
+            total = 0
+            for i in range(0, len(ids), CHUNK):
+                total += session.query(model).filter(
+                    col.in_(ids[i: i + CHUNK])
+                ).delete(synchronize_session=False)
+            return total
+
+        op_map = {
+            "exact":          lambda col: col == season,
+            "older":          lambda col: col < season,
+            "older-or-equal": lambda col: col <= season,
+            "newer":          lambda col: col > season,
+            "newer-or-equal": lambda col: col >= season,
+        }
+        season_filter = op_map[mode]
+
+        db = get_database_service()
+
+        with db.session_scope() as session:
+            target_ids = [
+                r[0] for r in session.query(Season.id).filter(season_filter(Season.id)).all()
+            ]
+
+        if not target_ids:
+            push("warn", f"No seasons found matching mode='{mode}' season={season}.")
+            job["status"] = "done"
+            job["progress"] = 100
+            return
+
+        push("info", f"Seasons to purge ({len(target_ids)}): {sorted(target_ids)}")
+        job["progress"] = 5
+        await asyncio.sleep(0)
+
+        with db.session_scope() as session:
+            game_ids = [r[0] for r in session.query(Game.id).filter(Game.season_id.in_(target_ids)).all()]
+            league_ids = [r[0] for r in session.query(League.id).filter(League.season_id.in_(target_ids)).all()]
+            sync_filters = sa_or(*[
+                SyncStatus.entity_id.like(f"%:{s}:%") | SyncStatus.entity_id.like(f"%:{s}")
+                for s in target_ids
+            ]) if target_ids else (SyncStatus.id == -1)
+
+            counts = {
+                "GameEvent":        batched_count(session, GameEvent,        GameEvent.game_id,           game_ids),
+                "GamePlayer":       batched_count(session, GamePlayer,       GamePlayer.game_id,          game_ids),
+                "PlayerStatistics": batched_count(session, PlayerStatistics, PlayerStatistics.season_id,  target_ids),
+                "TeamPlayer":       batched_count(session, TeamPlayer,       TeamPlayer.season_id,        target_ids),
+                "Game":             len(game_ids),
+                "LeagueGroup":      batched_count(session, LeagueGroup,      LeagueGroup.league_id,       league_ids),
+                "Team":             batched_count(session, Team,             Team.season_id,              target_ids),
+                "Club":             batched_count(session, Club,             Club.season_id,              target_ids),
+                "League":           len(league_ids),
+                "SyncStatus":       session.query(func.count(SyncStatus.id)).filter(sync_filters).scalar() or 0,
+                "Season":           len(target_ids),
+            }
+
+        total_rows = sum(counts.values())
+        for name, n in counts.items():
+            push("info", f"  {name:20s}: {n:>8,}")
+        push("info", f"  {'TOTAL':20s}: {total_rows:>8,}")
+        job["progress"] = 15
+        await asyncio.sleep(0)
+
+        if dry_run:
+            push("warn", "[dry-run] Nothing deleted.")
+            job["status"]   = "done"
+            job["progress"] = 100
+            job["stats"]    = counts
+            return
+
+        push("info", "Deleting...")
+
+        with db.session_scope() as session:
+            game_ids = [r[0] for r in session.query(Game.id).filter(Game.season_id.in_(target_ids)).all()]
+            league_ids = [r[0] for r in session.query(League.id).filter(League.season_id.in_(target_ids)).all()]
+
+            steps = [
+                ("GameEvent",        lambda s: batched_delete(s, GameEvent,        GameEvent.game_id,           game_ids)),
+                ("GamePlayer",       lambda s: batched_delete(s, GamePlayer,       GamePlayer.game_id,          game_ids)),
+                ("PlayerStatistics", lambda s: batched_delete(s, PlayerStatistics, PlayerStatistics.season_id,  target_ids)),
+                ("TeamPlayer",       lambda s: batched_delete(s, TeamPlayer,       TeamPlayer.season_id,        target_ids)),
+                ("Game",             lambda s: batched_delete(s, Game,             Game.season_id,              target_ids)),
+                ("LeagueGroup",      lambda s: batched_delete(s, LeagueGroup,      LeagueGroup.league_id,       league_ids)),
+                ("Team",             lambda s: batched_delete(s, Team,             Team.season_id,              target_ids)),
+                ("Club",             lambda s: batched_delete(s, Club,             Club.season_id,              target_ids)),
+                ("League",           lambda s: batched_delete(s, League,           League.season_id,            target_ids)),
+            ]
+            deleted: dict[str, int] = {}
+            for i, (name, fn) in enumerate(steps, 1):
+                n = fn(session)
+                deleted[name] = n
+                push("ok", f"  Deleted {n:,} {name} rows")
+                job["progress"] = 15 + int(i / (len(steps) + 2) * 75)
+
+            # SyncStatus
+            sync_filters = sa_or(*[
+                SyncStatus.entity_id.like(f"%:{s}:%") | SyncStatus.entity_id.like(f"%:{s}")
+                for s in target_ids
+            ]) if target_ids else (SyncStatus.id == -1)
+            n = session.query(SyncStatus).filter(sync_filters).delete(synchronize_session=False)
+            deleted["SyncStatus"] = n
+            push("ok", f"  Deleted {n:,} SyncStatus rows")
+
+            n = batched_delete(session, Season, Season.id, target_ids)
+            deleted["Season"] = n
+            push("ok", f"  Deleted {n:,} Season rows")
+
+            # Orphaned players
+            orphan_ids = [
+                r[0] for r in
+                session.query(Player.person_id)
+                .outerjoin(TeamPlayer, TeamPlayer.player_id == Player.person_id)
+                .filter(TeamPlayer.player_id.is_(None))
+                .all()
+            ]
+            if orphan_ids:
+                n = batched_delete(session, Player, Player.person_id, orphan_ids)
+                deleted["Player (orphaned)"] = n
+                push("ok", f"  Deleted {n:,} orphaned Player rows")
+
+        total_deleted = sum(deleted.values())
+        push("ok", f"✓ Purge complete — {total_deleted:,} rows deleted across {len(target_ids)} season(s).")
+        logger.info("Admin purge %s complete — %s rows", job_id, total_deleted)
+        job["status"]   = "done"
+        job["progress"] = 100
+        job["stats"]    = deleted
+
+    except Exception as exc:
+        push("error", f"Purge failed: {exc}")
+        logger.exception("Purge job %s failed", job_id)
+        job["status"] = "error"
+        job["error"]  = str(exc)
+        job["progress"] = 100
+
+
 # ==================== END ADMIN ROUTES ====================
 
 

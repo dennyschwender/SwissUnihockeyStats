@@ -281,6 +281,50 @@
         </div>
       </div>
     </div>
+
+    <!-- danger zone: purge seasons -->
+    <div style="margin-top:1.25rem">
+      <p class="section-title" style="color:#f85149">&#9888; Danger Zone</p>
+      <div class="season-card" style="border-color:#3d1f1f">
+        <div class="season-header" onclick="toggleEl('purge-body','purge-chv')" style="background:#1a1010">
+          <span class="season-year" style="font-size:.85rem;color:#f85149">Purge Seasons</span>
+          <span style="font-size:.72rem;color:#8b949e;margin-left:.5rem">Permanently delete all data for a season range</span>
+          <span class="chevron" id="purge-chv" style="margin-left:auto">▶</span>
+        </div>
+        <div class="season-body" id="purge-body">
+          <div class="quick-row" style="gap:.75rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
+            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap">Season ID:</label>
+            <input id="purge-season" type="number" min="1996" max="2100" placeholder="e.g. 2022"
+              style="width:80px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+
+            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Mode:</label>
+            <select id="purge-mode"
+              style="background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+              <option value="exact">exact — only that season</option>
+              <option value="older">older — seasons &lt; ID</option>
+              <option value="older-or-equal">older-or-equal — seasons ≤ ID</option>
+              <option value="newer">newer — seasons &gt; ID</option>
+              <option value="newer-or-equal">newer-or-equal — seasons ≥ ID</option>
+            </select>
+
+            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">
+              <input type="checkbox" id="purge-dry-run" style="margin-right:3px">
+              Dry run (preview only)
+            </label>
+          </div>
+
+          <div class="quick-row" style="gap:.5rem">
+            <button class="btn btn-sm" onclick="runPurge(true)" style="background:#1e3a1e;border-color:#238636;color:#3fb950">&#128269; Preview</button>
+            <button class="btn btn-sm btn-red" onclick="runPurge(false)">&#128465; Purge</button>
+          </div>
+
+          <div style="font-size:.7rem;color:#6e7681;margin-top:.5rem;line-height:1.5">
+            Deletes all data (games, players, leagues, clubs, stats) for the selected season(s). This cannot be undone.<br>
+            Use <strong>Preview</strong> or check <strong>Dry run</strong> first to see what would be deleted.
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ══════ RIGHT: sidebar ══════ -->
@@ -934,6 +978,48 @@ async function schedTrigger(policy, season) {
     setTimeout(loadScheduler, 800);
   } else {
     log('error', d.detail || 'Trigger failed');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Purge seasons
+═══════════════════════════════════════════════════════ */
+async function runPurge(forcePreview) {
+  const seasonVal = document.getElementById('purge-season').value.trim();
+  const mode      = document.getElementById('purge-mode').value;
+  const dryRun    = forcePreview || document.getElementById('purge-dry-run').checked;
+
+  if (!seasonVal || isNaN(parseInt(seasonVal, 10))) {
+    log('error', 'Purge: please enter a valid season ID.');
+    return;
+  }
+  const season = parseInt(seasonVal, 10);
+  const modeLabels = {
+    'exact': `only ${season}`,
+    'older': `all seasons < ${season}`,
+    'older-or-equal': `all seasons ≤ ${season}`,
+    'newer': `all seasons > ${season}`,
+    'newer-or-equal': `all seasons ≥ ${season}`,
+  };
+
+  if (!dryRun) {
+    if (!confirm(`⚠ PERMANENTLY DELETE all data for ${modeLabels[mode]}?\n\nThis cannot be undone. Consider running Preview first.`)) return;
+  }
+
+  log(dryRun ? 'info' : 'warn', `${dryRun ? '🔍 Previewing' : '🗑 Purging'} ${modeLabels[mode]}…`);
+
+  try {
+    const r = await fetch('/admin/api/purge', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ season, mode, dry_run: dryRun }),
+    });
+    const d = await r.json();
+    if (!r.ok) { log('error', 'Purge rejected: ' + (d.detail || JSON.stringify(d))); return; }
+    log('info', `Job ${d.job_id} queued — ${d.label}`);
+    registerJob(d);
+  } catch(e) {
+    log('error', 'Purge request error: ' + e.message);
   }
 }
 
