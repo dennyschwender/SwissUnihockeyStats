@@ -1544,12 +1544,12 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
     filtered_clubs = filtered_clubs[:50]  # Limit results
     
     # Return partial HTML for htmx — same card structure as the full clubs listing
+    from urllib.parse import quote_plus
     cards = ""
     for club in filtered_clubs:
         club_name = club.get("text", "Unknown")
-        club_id = club.get("set_in_context", {}).get("club_id", "")
         region = club.get("region") or club.get("set_in_context", {}).get("region", "")
-        href = f"/{locale}/club/{club_id}" if club_id else "#"
+        href = f"/{locale}/teams?club={quote_plus(club_name)}"
         region_html = f'<p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">📍 {region}</p>' if region else ""
         cards += (
             f'<div class="card" onclick="window.location=\'{href}\'" style="cursor: pointer;">'
@@ -2031,18 +2031,18 @@ async def league_detail(request: Request, locale: str, league_id: int):
 
 
 @app.get("/{locale}/teams", response_class=HTMLResponse)
-async def teams_page(request: Request, locale: str, season: Optional[int] = None):
-    """Teams listing page"""
+async def teams_page(request: Request, locale: str, season: Optional[int] = None, club: str = ""):
+    """Teams listing page. Optional ?club=name pre-filters by club name."""
     from app.services.stats_service import get_teams_list, get_seasons_with_teams
     try:
         seasons = get_seasons_with_teams()
         if season is None:
             season = next((s["id"] for s in seasons if s["current"]), seasons[0]["id"] if seasons else None)
 
-        teams_list = get_teams_list(season_id=season, sort="league", limit=200)
+        teams_list = get_teams_list(season_id=season, sort="league", limit=200, q=club)
         error_message = None
 
-        if not teams_list:
+        if not teams_list and not club:
             # DB is empty (fresh install) — fall back to API cache
             cached = await get_cached_teams()
             teams_list = [
@@ -2060,6 +2060,7 @@ async def teams_page(request: Request, locale: str, season: Optional[int] = None
                 "seasons": seasons,
                 "current_season_id": season,
                 "error_message": error_message,
+                "club": club,
             }
         )
     except Exception as e:

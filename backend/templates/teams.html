@@ -6,8 +6,13 @@
 {% block og_description %}Complete directory of Swiss floorball teams with advanced search and filtering by competition mode.{% endblock %}
 
 {% block content %}
+{% if club %}
+<div style="max-width:1000px; margin:1.5rem auto 0;">
+    <a href="/{{ locale }}/clubs" style="color:var(--swiss-red); text-decoration:none; font-size:0.9rem;">← All Clubs</a>
+</div>
+{% endif %}
 <div class="hero fade-in">
-    <h1>{{ t.teams.title }}</h1>
+    <h1>{% if club %}{{ club }}{% else %}{{ t.teams.title }}{% endif %}</h1>
     <p>{{ t.teams.subtitle }}</p>
 </div>
 
@@ -27,7 +32,7 @@
 <!-- Search and Filters -->
 <div style="max-width: 1000px; margin: 2rem auto;"
      x-data="{
-       q: '',
+       q: '{{ club | replace("'", "\\'") }}',
        leagues: [],
        activeTier: 'all',
        sort: 'league',

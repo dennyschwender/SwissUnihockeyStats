@@ -28,8 +28,8 @@
 <div id="clubs-list" style="max-width: 1200px; margin: 2rem auto;">
     <div class="cards-grid">
         {% for club in clubs %}
-        <div class="card" data-club-id="{{ club.id }}" 
-             onclick="window.location='/{{ locale }}/club/{{ club.set_in_context.club_id if club.set_in_context and club.set_in_context.club_id else club.id }}'"
+        <div class="card" data-club-id="{{ club.id }}"
+             onclick="window.location='/{{ locale }}/teams?club='+encodeURIComponent('{{ club.text | replace("'", "\\'") }}')"
              style="cursor: pointer;">
             <div style="display: flex; justify-content: space-between; align-items: start;">
                 <h3 style="margin: 0;">{{ club.text }}</h3>
