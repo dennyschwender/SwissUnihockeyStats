@@ -1543,14 +1543,25 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
     
     filtered_clubs = filtered_clubs[:50]  # Limit results
     
-    # Return partial HTML for htmx
-    html = ""
+    # Return partial HTML for htmx — same card structure as the full clubs listing
+    cards = ""
     for club in filtered_clubs:
         club_name = club.get("text", "Unknown")
-        html += f'<div class="club-card"><h3>{club_name}</h3></div>'
-    
-    if not filtered_clubs:
-        html = f'<div style="text-align: center; padding: 3rem; color: var(--text-muted);">{get_translations(locale).common.get("no_results", "No results found")}</div>'
+        club_id = club.get("set_in_context", {}).get("club_id", "")
+        region = club.get("region") or club.get("set_in_context", {}).get("region", "")
+        href = f"/{locale}/club/{club_id}" if club_id else "#"
+        region_html = f'<p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">📍 {region}</p>' if region else ""
+        cards += (
+            f'<div class="card" onclick="window.location=\'{href}\'" style="cursor: pointer;">'
+            f'<h3 style="margin: 0;">{club_name}</h3>'
+            f'{region_html}'
+            f'</div>'
+        )
+
+    if filtered_clubs:
+        html = f'<div class="cards-grid">{cards}</div>'
+    else:
+        html = '<div style="text-align: center; padding: 3rem; color: var(--text-muted); grid-column: 1/-1;">No clubs found.</div>'
     
     return HTMLResponse(content=html)
 
