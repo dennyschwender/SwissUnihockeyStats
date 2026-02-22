@@ -773,11 +773,11 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
     if action == "policy_tiers":
         tiers_raw = payload.get("tiers", {})
         if not isinstance(tiers_raw, dict):
-            raise HTTPException(status_code=400, detail="tiers must be a dict mapping policy name to tier (1-7)")
+            raise HTTPException(status_code=400, detail="tiers must be a dict mapping policy name to tier (1-6)")
         tiers: dict[str, int] = {}
         for k, v in tiers_raw.items():
-            if not isinstance(v, int) or not 1 <= v <= 7:
-                raise HTTPException(status_code=400, detail=f"tier for '{k}' must be an integer 1–7")
+            if not isinstance(v, int) or not 1 <= v <= 6:
+                raise HTTPException(status_code=400, detail=f"tier for '{k}' must be an integer 1–6")
             tiers[k] = v
         sched.set_policy_tiers(tiers)
         return {"ok": True, "policy_tiers": sched.get_policy_tiers()}

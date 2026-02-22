@@ -902,12 +902,11 @@ function renderScheduler(d) {
   // Policy tier selects
   const TIER_LABELS = {
     1: 'T1 \u2014 NLA/L-UPL only',
-    2: 'T2 \u2014 + NLB',
-    3: 'T3 \u2014 + 1. Liga',
-    4: 'T4 \u2014 + 2. Liga',
-    5: 'T5 \u2014 + 3. Liga',
-    6: 'T6 \u2014 + 4./5. Liga',
-    7: 'T7 \u2014 All (incl. youth)',
+    2: 'T2 \u2014 + NLB, U21A/U18A/U16A',
+    3: 'T3 \u2014 + 1. Liga, U21B/U18B/U16B',
+    4: 'T4 \u2014 + 2. Liga, U21C/U18C/U16C',
+    5: 'T5 \u2014 + 3. Liga, U21D',
+    6: 'T6 \u2014 All (+ 4./5. Liga, Regional, Cups)',
   };
   const tiersBodyEl = document.getElementById('sched-tiers-tbody');
   const tiersPanel  = document.getElementById('sched-tiers');

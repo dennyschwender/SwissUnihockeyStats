@@ -21,43 +21,44 @@ logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # League tier mapping  (lower number = higher competitive level)
-#   1 = L-UPL / NLA  (league_id 24)
-#   2 = NLB          (league_id 2)
-#   3 = 1. Liga      (league_id 3)
-#   4 = 2. Liga      (league_id 4)
-#   5 = 3. Liga      (league_id 5)
-#   6 = 4./5. Liga, Supercup, Cups    (league_id 6,7,23,25)
-#   7 = Youth / Junior / Regional     (league_id 12,13,14,15,16)
+# Note: the API groups all A-level youth under league_id 13 (U14A/U16A/U18A/U21A),
+# all B-level under 14, all C-level under 15 — sub-categories cannot be split further.
+#
+#   Tier 1 — NLA / L-UPL                         (league_id 1, 10, 24)
+#   Tier 2 — + NLB, all A-level youth            (league_id 2, 13)
+#   Tier 3 — + 1. Liga, all B-level youth        (league_id 3, 14)
+#   Tier 4 — + 2. Liga, all C-level youth        (league_id 4, 15)
+#   Tier 5 — + 3. Liga, U21 D                    (league_id 5, 16)
+#   Tier 6 — + 4./5. Liga, Supercup, Test, Regional  (league_id 6, 7, 12, 23, 25)
 # ---------------------------------------------------------------------------
 LEAGUE_TIERS: dict[int, int] = {
-    1:  1,   # Herren/Damen NLA (oldest name, league_id 1)
+    1:  1,   # Herren/Damen NLA (legacy name)
     10: 1,   # Herren/Damen SML (NLA, intermediate name)
     24: 1,   # Herren/Damen L-UPL (NLA, current name)
     2:  2,   # Herren/Damen NLB
-    3:  3,   # 1. Liga
-    4:  4,   # 2. Liga
-    5:  5,   # 3. Liga
+    13: 2,   # A-level youth: U14A, U16A, U18A, U21A, Juniorinnen U21A/U17A
+    3:  3,   # 1. Liga (Herren/Damen)
+    14: 3,   # B-level youth: U14B, U16B, U18B, U21B, Juniorinnen U21B/U17B
+    4:  4,   # 2. Liga (Herren/Damen)
+    15: 4,   # C-level youth: U16C, U18C, U21C
+    5:  5,   # 3. Liga (Herren/Damen)
+    16: 5,   # U21 D
     6:  6,   # 4. Liga
     7:  6,   # 5. Liga
+    12: 6,   # Regional (Junioren A–E, Juniorinnen A–D, Senioren)
     23: 6,   # Supercup
     25: 6,   # Test / Cup
-    12: 7,   # Junioren/Juniorinnen Regional
-    13: 7,   # Junioren U14–U21 A
-    14: 7,   # Junioren U14–U21 B
-    15: 7,   # Junioren U16/U18/U21 C
-    16: 7,   # Junioren U21 D
 }
 # Default tier for unknown league_ids
-_DEFAULT_TIER = 7
+_DEFAULT_TIER = 6
 
 TIER_LABELS: dict[int, str] = {
-    1: "Tier 1 — NLA/SML/L-UPL only",
-    2: "Tier 2 — + NLB",
-    3: "Tier 3 — + 1. Liga",
-    4: "Tier 4 — + 2. Liga",
-    5: "Tier 5 — + 3. Liga",
-    6: "Tier 6 — + 4./5. Liga",
-    7: "All leagues (incl. youth/regional)",
+    1: "Tier 1 — NLA/L-UPL only",
+    2: "Tier 2 — + NLB, U21A/U18A/U16A",
+    3: "Tier 3 — + 1. Liga, U21B/U18B/U16B",
+    4: "Tier 4 — + 2. Liga, U21C/U18C/U16C",
+    5: "Tier 5 — + 3. Liga, U21D",
+    6: "All (+ 4./5. Liga, Regional, Cups)",
 }
 
 

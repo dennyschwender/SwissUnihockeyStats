@@ -273,7 +273,7 @@ class Scheduler:
         for name, tier in tiers.items():
             if name not in valid_names:
                 continue
-            self._policy_tiers[name] = max(1, min(7, int(tier)))
+            self._policy_tiers[name] = max(1, min(6, int(tier)))
         self._save_state()
         logger.info("[scheduler] policy_tiers updated: %s", self._policy_tiers)
 
