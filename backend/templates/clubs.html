@@ -33,6 +33,7 @@
              style="cursor: pointer;">
             <div style="display: flex; justify-content: space-between; align-items: start;">
                 <h3 style="margin: 0;">{{ club.text }}</h3>
+                {# Favorite button — hidden until feature is fully implemented
                 <button 
                     class="favorite-btn" 
                     data-type="club" 
@@ -44,6 +45,7 @@
                 >
                     ⭐
                 </button>
+                #}
             </div>
             {% if club.region %}
             <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">📍 {{ club.region }}</p>
