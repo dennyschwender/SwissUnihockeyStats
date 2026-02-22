@@ -111,6 +111,21 @@ def get_leagues_from_db(season_id: Optional[int] = None) -> list[dict]:
 _GAME_CLASS_LABEL = {11: "Men", 21: "Women"}
 
 
+def _mw_from_league(game_class: int | None, league_name: str) -> str:
+    """Return 'M' or 'W' for a league, falling back to name keywords when
+    game_class is None or an unexpected value."""
+    if game_class == 11:
+        return "M"
+    if game_class == 21:
+        return "W"
+    name_upper = (league_name or "").upper()
+    if any(k in name_upper for k in ("HERREN", "JUNIOREN")):
+        return "M"
+    if any(k in name_upper for k in ("DAMEN", "JUNIORINNEN")):
+        return "W"
+    return ""
+
+
 def _tier_order_expr():
     """Return a SQLAlchemy CASE expression that maps league names to a sort order (lower = higher tier)."""
     return case(
@@ -1530,8 +1545,8 @@ def get_upcoming_games(
             # Build short label line 1: "M - U16A" / "W - NLA" etc.
             # Strip common prefixes and collapse spaces ("U16 A" → "U16A")
             gc = lg.game_class if lg else None
-            mw = "M" if gc == 11 else ("W" if gc == 21 else "")
             lg_raw = (lg.name or lg.text or "") if lg else ""
+            mw = _mw_from_league(gc, lg_raw)
             for pfx in ("Herren ", "Damen ", "Junioren ", "Juniorinnen "):
                 lg_raw = lg_raw.replace(pfx, "")
             lg_short = lg_raw.replace(" ", "").strip()  # "U16 A" → "U16A"
@@ -1640,8 +1655,8 @@ def get_latest_results(
             # Build short label line 1: "M - U16A" / "W - NLA" etc.
             # Strip common prefixes and collapse spaces ("U16 A" → "U16A")
             gc = lg.game_class if lg else None
-            mw = "M" if gc == 11 else ("W" if gc == 21 else "")
             lg_raw = (lg.name or lg.text or "") if lg else ""
+            mw = _mw_from_league(gc, lg_raw)
             for pfx in ("Herren ", "Damen ", "Junioren ", "Juniorinnen "):
                 lg_raw = lg_raw.replace(pfx, "")
             lg_short = lg_raw.replace(" ", "").strip()  # "U16 A" → "U16A"
