@@ -986,7 +986,19 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             .all()
         )
 
-        if tp_rows:
+        # Detect API/indexer mismatch: some teams' official-roster endpoint
+        # returns a completely different set of player IDs than those who actually
+        # appear in game lineups (e.g. the roster API reflects NLA registrations
+        # while the games use NLB-B/cup player IDs).  When there is zero overlap
+        # between the two sets, the official roster carries no useful information
+        # and we must build entirely from game data.
+        official_pids: set[int] = {pl.person_id for _, pl in tp_rows}
+        use_official_roster = bool(tp_rows) and bool(official_pids & set(gp_agg.keys()))
+        # Flag used in the else-branch: when tp_rows existed but had no game
+        # overlap we skip the other_team_pids filter (game lineups are ground truth).
+        skip_other_team_filter = bool(tp_rows) and not use_official_roster
+
+        if use_official_roster:
             pids = [pl.person_id for _, pl in tp_rows]
 
             # Determine which league_abbrev in PlayerStatistics corresponds to
@@ -1060,7 +1072,6 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             # Add players seen in game lineups but absent from the official roster.
             # Exclude players who are officially registered on a DIFFERENT team this
             # season — they are guests/loan players and don't belong here.
-            official_pids = {pl.person_id for _, pl in tp_rows}
             extras_pids = [
                 pid for pid in gp_agg
                 if pid not in official_pids and pid not in other_team_pids
@@ -1104,11 +1115,16 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                     }
                 )
         else:
-            # Roster not indexed — build entirely from game lineups,
-            # but still skip players officially on other teams.
+            # Roster not indexed, OR official roster had zero overlap with game
+            # data (API mismatch) — build entirely from game lineups.
+            # When there is a mismatch (skip_other_team_filter=True), ALL game
+            # participants are shown regardless of other-team registrations,
+            # because the official-roster data is unreliable for this team.
+            # When there is simply no official roster at all, we still skip
+            # players whose primary registration is elsewhere (guest filter).
             roster_source = "games"
             for pid, info in gp_agg.items():
-                if pid in other_team_pids:
+                if not skip_other_team_filter and pid in other_team_pids:
                     continue
                 roster.append(
                     {
