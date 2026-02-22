@@ -136,7 +136,7 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
-    lifespan=lifespan,
+    lifespan=lifespan,  # type: ignore[arg-type]
 )
 
 # Mount static files
@@ -149,7 +149,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET, session_cookie="admin_session")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=[str(o) for o in settings.BACKEND_CORS_ORIGINS],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -426,22 +426,22 @@ def _admin_stats_sync():
         pstats_by_s  = safe_group_by(PlayerStatistics.id, PlayerStatistics.season_id)
 
         try:
-            groups_by_s = dict(
+            groups_by_s = {r[0]: r[1] for r in
                 session.query(League.season_id, func.count(LeagueGroup.id))
                 .join(LeagueGroup, LeagueGroup.league_id == League.id)
                 .group_by(League.season_id)
                 .all()
-            )
+            }
         except Exception:
             groups_by_s = {}
 
         try:
-            events_by_s = dict(
+            events_by_s = {r[0]: r[1] for r in
                 session.query(Game.season_id, func.count(GameEvent.id))
                 .join(GameEvent, GameEvent.game_id == Game.id)
                 .group_by(Game.season_id)
                 .all()
-            )
+            }
         except Exception:
             events_by_s = {}
 
@@ -798,6 +798,8 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
     if action == "trigger":
         policy = payload.get("policy")
         season = payload.get("season")
+        if not isinstance(policy, str):
+            raise HTTPException(status_code=400, detail="Missing or invalid 'policy'")
         job_id = await sched.trigger_now(policy, season)
         if job_id is None:
             raise HTTPException(status_code=400, detail=f"Unknown policy '{policy}'")
@@ -1047,6 +1049,10 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
 
         stats: dict = {}
 
+        # Resolve None season: use current season as default for all non-season tasks
+        if season is None:
+            season = get_current_season()
+
         # ── GUARD: skip future seasons ─────────────────────────────────────
         if task != "seasons" and season is not None:
             current = get_current_season()
@@ -1163,6 +1169,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             set_progress(62)
 
         # ── GROUPS ─────────────────────────────────────────────────────────
+        lg_list: list[tuple] = []
         if task in ("groups", "games", "leagues_path", "full"):
             with db_service.session_scope() as s:
                 lg_list = [(lg.id, lg.league_id, lg.game_class) for lg in
@@ -1179,7 +1186,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         # ── GAMES ──────────────────────────────────────────────────────────
         if task in ("games", "leagues_path", "full"):
             from app.models.db_models import LeagueGroup
-            if "lg_list" not in dir():
+            if not lg_list:
                 with db_service.session_scope() as s:
                     lg_list = [(lg.id, lg.league_id, lg.game_class) for lg in
                                s.query(League).filter(League.season_id == season).all()]
@@ -1820,7 +1827,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
         for grp in groups
     }
     # flat lookup: DB group_id → display name (for annotating game records)
-    _group_id_to_name: dict[int, str] = {
+    _group_id_to_name: dict[int | None, str] = {
         gid: grp["name"]
         for grp in groups
         for gid in grp["ids"]
@@ -1934,7 +1941,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
 
 
 @app.get("/{locale}/teams", response_class=HTMLResponse)
-async def teams_page(request: Request, locale: str, season: int = None):
+async def teams_page(request: Request, locale: str, season: Optional[int] = None):
     """Teams listing page"""
     from app.services.stats_service import get_teams_list, get_seasons_with_teams
     try:
@@ -1971,7 +1978,7 @@ async def teams_page(request: Request, locale: str, season: int = None):
 
 
 @app.get("/{locale}/teams/search", response_class=HTMLResponse)
-async def teams_search(request: Request, locale: str, q: str = "", sort: str = "league", leagues: str = "", season: int = None):
+async def teams_search(request: Request, locale: str, q: str = "", sort: str = "league", leagues: str = "", season: Optional[int] = None):
     """HTMX endpoint for team search"""
     from app.services.stats_service import get_teams_list
 
@@ -2026,7 +2033,7 @@ async def teams_search(request: Request, locale: str, q: str = "", sort: str = "
 # ==================== Detail Pages ====================
 
 @app.get("/{locale}/team/{team_id}", response_class=HTMLResponse)
-async def team_detail(request: Request, locale: str, team_id: int, season: int = None):
+async def team_detail(request: Request, locale: str, team_id: int, season: Optional[int] = None):
     """Team detail page — roster + stats + recent results from DB"""
     from app.services.stats_service import get_team_detail
 
