@@ -46,7 +46,7 @@ POLICIES: list[dict] = [
     {
         "name":        "seasons",
         "entity_type": "seasons",
-        "max_age":     timedelta(days=30),
+        "max_age":     timedelta(days=1),
         "task":        "seasons",       # special: calls index_seasons directly
         "scope":       "global",
         "label":       "Seasons refresh",
