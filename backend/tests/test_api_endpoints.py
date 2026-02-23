@@ -206,6 +206,11 @@ class TestUIPages:
         response = client.get("/de/games")
         assert response.status_code == 200
     
+    def test_schedule_page(self):
+        """Test upcoming schedule page"""
+        response = client.get("/de/schedule")
+        assert response.status_code == 200
+    
     def test_rankings_page(self):
         """Test rankings page"""
         response = client.get("/de/rankings")

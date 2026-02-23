@@ -76,6 +76,25 @@ def get_seasons_with_teams() -> list[dict]:
         ]
 
 
+def get_seasons_with_player_stats() -> list[dict]:
+    """Return only seasons that have at least one PlayerStatistics row, ordered descending."""
+    db = get_database_service()
+    with db.session_scope() as session:
+        current_id = _get_current_season_id(session)
+        rows = (
+            session.query(Season.id, Season.text, func.count(PlayerStatistics.id).label("cnt"))
+            .outerjoin(PlayerStatistics, PlayerStatistics.season_id == Season.id)
+            .group_by(Season.id)
+            .having(func.count(PlayerStatistics.id) > 0)
+            .order_by(Season.id.desc())
+            .all()
+        )
+        return [
+            {"id": r.id, "name": r.text or str(r.id), "current": r.id == current_id}
+            for r in rows
+        ]
+
+
 def get_leagues_from_db(season_id: Optional[int] = None) -> list[dict]:
     """Return all leagues for a season, grouped metadata for template use."""
     db = get_database_service()
@@ -762,13 +781,14 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
 def get_player_leaderboard(
     season_id: Optional[int] = None,
     team_id: Optional[int] = None,
+    game_class: Optional[int] = None,
     limit: int = 50,
     offset: int = 0,
     order_by: str = "points",
 ) -> dict:
     """
-    Global player stats leaderboard for a season, optionally filtered by team.
-    Aggregates across all leagues/teams a player appeared in that season.
+    Global player stats leaderboard for a season, optionally filtered by team or game_class.
+    game_class: 11 = men (Herren) only, 21 = women (Damen) only; None = all
     order_by: 'points' | 'goals' | 'assists' | 'pim'
     """
     from sqlalchemy import func as _func
@@ -794,6 +814,18 @@ def get_player_leaderboard(
             base_filter.append(PlayerStatistics.team_name.in_(
                 session.query(Team.name).filter(Team.id == team_id)
             ))
+        if game_class is not None:
+            gc_team_names = (
+                session.query(Team.name)
+                .filter(
+                    Team.season_id == season_id,
+                    Team.game_class == game_class,
+                    Team.name.isnot(None),
+                )
+                .distinct()
+                .subquery()
+            )
+            base_filter.append(PlayerStatistics.team_name.in_(gc_team_names))
 
         total = (
             session.query(_func.count(_func.distinct(PlayerStatistics.player_id)))
@@ -1582,6 +1614,112 @@ def get_upcoming_games(
             }
             for g in games_raw
         ]
+
+
+def get_schedule(
+    season_id: Optional[int] = None,
+    league_category: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    """Paginated upcoming games (no score yet) ordered by date, for the schedule page."""
+    from datetime import date as _date
+    db = get_database_service()
+    with db.session_scope() as session:
+        if season_id is None:
+            season_id = _get_current_season_id(session)
+
+        today = _date.today()
+        base_q = (
+            session.query(Game)
+            .filter(
+                Game.season_id == season_id,
+                Game.home_score.is_(None),
+                Game.game_date.isnot(None),
+                Game.game_date >= today,
+            )
+        )
+
+        if league_category and league_category != "all":
+            parts = league_category.split("_")
+            if len(parts) == 2:
+                try:
+                    lid, gc = int(parts[0]), int(parts[1])
+                    base_q = (
+                        base_q
+                        .join(LeagueGroup, Game.group_id == LeagueGroup.id)
+                        .join(League, LeagueGroup.league_id == League.id)
+                        .filter(League.league_id == lid, League.game_class == gc)
+                    )
+                except ValueError:
+                    pass
+
+        total = base_q.count()
+        games_raw = (
+            base_q
+            .order_by(Game.game_date.asc(), Game.game_time.asc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+        if not games_raw:
+            return {"games": [], "total": total}
+
+        team_ids = {g.home_team_id for g in games_raw} | {g.away_team_id for g in games_raw}
+        t_names: dict = {}
+        for t in session.query(Team).filter(
+            Team.id.in_(team_ids), Team.season_id == season_id
+        ).all():
+            t_names[t.id] = t.name or t.text or f"Team {t.id}"
+        missing = team_ids - t_names.keys()
+        if missing:
+            for t in session.query(Team).filter(
+                Team.id.in_(missing), Team.name.isnot(None)
+            ).all():
+                t_names.setdefault(t.id, t.name)
+
+        group_ids = {g.group_id for g in games_raw}
+        grp_league: dict = {}
+        grp_label: dict = {}
+        grp_league_category: dict = {}
+        for grp, lg in (
+            session.query(LeagueGroup, League)
+            .outerjoin(League, League.id == LeagueGroup.league_id)
+            .filter(LeagueGroup.id.in_(group_ids))
+            .all()
+        ):
+            grp_league[grp.id] = lg.name if lg else ""
+            if lg:
+                grp_league_category[grp.id] = f"{lg.league_id}_{lg.game_class}"
+            gc = int(lg.game_class) if lg and lg.game_class is not None else None
+            lg_raw = str(lg.name or lg.text or "") if lg else ""
+            mw = _mw_from_league(gc, lg_raw)
+            for pfx in ("Herren ", "Damen ", "Junioren ", "Juniorinnen "):
+                lg_raw = lg_raw.replace(pfx, "")
+            lg_short = lg_raw.replace(" ", "").strip()
+            label_parts = [p for p in [mw, lg_short] if p]
+            grp_label[grp.id] = " - ".join(label_parts)
+
+        return {
+            "games": [
+                {
+                    "game_id": g.id,
+                    "date": g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
+                    "weekday": g.game_date.strftime("%a") if g.game_date else "",
+                    "time": g.game_time or "",
+                    "home_team": t_names.get(g.home_team_id, f"Team {g.home_team_id}"),
+                    "away_team": t_names.get(g.away_team_id, f"Team {g.away_team_id}"),
+                    "home_team_id": g.home_team_id,
+                    "away_team_id": g.away_team_id,
+                    "league": grp_league.get(g.group_id, ""),
+                    "league_label": grp_label.get(g.group_id, ""),
+                    "league_category": grp_league_category.get(g.group_id, ""),
+                }
+                for g in games_raw
+            ],
+            "total": total,
+        }
 
 
 def get_latest_results(

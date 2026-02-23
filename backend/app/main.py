@@ -2195,10 +2195,83 @@ async def team_detail(request: Request, locale: str, team_id: int, season: Optio
     )
 
 
+@app.get("/{locale}/schedule", response_class=HTMLResponse)
+async def schedule_page(request: Request, locale: str, league_category: str = "all", page: int = 1):
+    """Upcoming games schedule page with pagination and league filter"""
+    from app.services.stats_service import get_schedule
+    from app.services.database import get_database_service
+    from app.models.db_models import PlayerStatistics as _PS, League as _League
+    from app.services.data_indexer import league_tier as _lt
+    from sqlalchemy import func as _func
+
+    per_page = 50
+    db = get_database_service()
+    with db.session_scope() as session:
+        active_season_row = (
+            session.query(_PS.season_id, _func.count(_PS.id).label("count"))
+            .group_by(_PS.season_id)
+            .order_by(_func.count(_PS.id).desc())
+            .first()
+        )
+        active_season = active_season_row[0] if active_season_row else get_current_season()
+
+    offset = (page - 1) * per_page
+    data = get_schedule(
+        season_id=active_season,
+        league_category=league_category if league_category != "all" else None,
+        limit=per_page,
+        offset=offset,
+    )
+    total_pages = max(1, (data["total"] + per_page - 1) // per_page)
+
+    with db.session_scope() as session:
+        league_rows = (
+            session.query(_League.league_id, _League.game_class, _League.name)
+            .filter(_League.season_id == active_season)
+            .distinct()
+            .order_by(_League.league_id, _League.game_class)
+            .all()
+        )
+        leagues_grouped: dict = {}
+        for league_id, game_class, name in league_rows:
+            key = f"{league_id}_{game_class}"
+            if league_id not in leagues_grouped:
+                base_name = name.split()[-1] if name else f"League {league_id}"
+                leagues_grouped[league_id] = {
+                    "name": base_name,
+                    "classes": [],
+                    "tier": _lt(league_id),
+                }
+            leagues_grouped[league_id]["classes"].append({
+                "id": key,
+                "game_class": game_class,
+                "full_name": name,
+            })
+        league_filters = [
+            {"id": lid, "name": ldata["name"], "classes": ldata["classes"], "tier": ldata["tier"]}
+            for lid, ldata in sorted(leagues_grouped.items(), key=lambda x: (x[1]["tier"], x[0]))
+        ]
+
+    return templates.TemplateResponse(
+        request,
+        "schedule.html",
+        {
+            "locale": locale,
+            "t": get_translations(locale),
+            "games": data["games"],
+            "page": page,
+            "total_pages": total_pages,
+            "total": data["total"],
+            "league_category": league_category,
+            "league_filters": league_filters,
+        },
+    )
+
+
 @app.get("/{locale}/players", response_class=HTMLResponse)
-async def players_page(request: Request, locale: str, order_by: str = "points", page: int = 1):
-    """Players leaderboard page — DB-backed with pagination"""
-    from app.services.stats_service import get_player_leaderboard
+async def players_page(request: Request, locale: str, order_by: str = "points", page: int = 1, season: Optional[int] = None, gender: str = "all"):
+    """Players leaderboard page — DB-backed with pagination, season and gender filters"""
+    from app.services.stats_service import get_player_leaderboard, get_seasons_with_player_stats
     from app.services.database import get_database_service
     from app.models.db_models import PlayerStatistics as _PS
     from sqlalchemy import func as _func
@@ -2207,21 +2280,37 @@ async def players_page(request: Request, locale: str, order_by: str = "points", 
     valid_order = {"points", "goals", "assists", "pim"}
     if order_by not in valid_order:
         order_by = "points"
+    valid_gender = {"all", "men", "women"}
+    if gender not in valid_gender:
+        gender = "all"
 
-    # Use the same active-season logic as the home page:
-    # the season with the most PlayerStatistics rows in the DB.
-    db = get_database_service()
-    with db.session_scope() as session:
-        row = (
-            session.query(_PS.season_id, _func.count(_PS.id).label('cnt'))
-            .group_by(_PS.season_id)
-            .order_by(_func.count(_PS.id).desc())
-            .first()
-        )
-        active_season = row[0] if row else None
+    seasons = get_seasons_with_player_stats()
+
+    # Resolve active season: use query param if provided, else season with most PS rows
+    if season is not None:
+        active_season = season
+    else:
+        db = get_database_service()
+        with db.session_scope() as session:
+            row = (
+                session.query(_PS.season_id, _func.count(_PS.id).label('cnt'))
+                .group_by(_PS.season_id)
+                .order_by(_func.count(_PS.id).desc())
+                .first()
+            )
+            active_season = row[0] if row else None
+
+    # Map gender string to game_class integer (11=men/Herren, 21=women/Damen)
+    gc_filter = {"men": 11, "women": 21}.get(gender)
 
     offset = (page - 1) * per_page
-    data = get_player_leaderboard(season_id=active_season, limit=per_page, offset=offset, order_by=order_by)
+    data = get_player_leaderboard(
+        season_id=active_season,
+        game_class=gc_filter,
+        limit=per_page,
+        offset=offset,
+        order_by=order_by,
+    )
     total_pages = max(1, (data["total"] + per_page - 1) // per_page)
     return templates.TemplateResponse(
         request,
@@ -2234,6 +2323,9 @@ async def players_page(request: Request, locale: str, order_by: str = "points", 
             "page": page,
             "total_pages": total_pages,
             "total": data["total"],
+            "seasons": seasons,
+            "active_season": active_season,
+            "gender": gender,
         },
     )
 
