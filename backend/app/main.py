@@ -99,9 +99,24 @@ async def lifespan(app: FastAPI):
         )
         logger.info("✓ Scheduler started")
 
+        # Pre-compute admin PIN hash (pbkdf2_hmac 100k rounds, ~1-2 s on Pi ARM)
+        # in an executor so it doesn’t block the event loop.  Awaited here to
+        # ensure it finishes BEFORE the stats-cache task starts, avoiding a
+        # concurrent thread-pool race (Python 3.14 + SQLite segfault).
+        # Guard against a second lifespan startup (e.g. nested TestClient in tests)
+        # to avoid concurrent pbkdf2 + SQLite threads that segfault in Python 3.14.
+        global _ADMIN_PIN_HASH
+        if not _ADMIN_PIN_HASH:
+            _ADMIN_PIN_HASH = await asyncio.get_running_loop().run_in_executor(
+                None, _pin_hash, settings.ADMIN_PIN
+            )
+            logger.info("✓ Admin PIN hash pre-computed")
+
         # Pre-warm admin stats cache so the first admin page load is instant.
-        asyncio.create_task(_refresh_stats_cache(), name="stats-prewarm")
-        logger.info("✓ Admin stats pre-warm scheduled")
+        # Guard prevents duplicate tasks if lifespan starts more than once.
+        if _stats_cache is None and not _stats_is_refreshing:
+            asyncio.create_task(_refresh_stats_cache(), name="stats-prewarm")
+            logger.info("✓ Admin stats pre-warm scheduled")
 
     except Exception as e:
         logger.error(f"❌ Failed to initialize application: {e}")
@@ -182,11 +197,16 @@ def _pin_hash(pin: str) -> str:
         100_000,
     ).hex()
 
+# Pre-computed at lifespan startup via run_in_executor (see lifespan() below).
+# Empty string is safe: the server won't accept requests until lifespan
+# completes, and `require_admin` compares against this value instantly.
+_ADMIN_PIN_HASH: str = ""
+
 _ADMIN_TOKEN_KEY = "admin_authed"
 
 def require_admin(request: Request):
     """FastAPI dependency — raises exception caught by handler below if not logged in."""
-    if request.session.get(_ADMIN_TOKEN_KEY) != _pin_hash(settings.ADMIN_PIN):
+    if request.session.get(_ADMIN_TOKEN_KEY) != _ADMIN_PIN_HASH:
         raise _AdminNotAuthenticated()
 
 
@@ -329,7 +349,7 @@ async def root_redirect(request: Request):
 
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
-    if request.session.get(_ADMIN_TOKEN_KEY) == _pin_hash(settings.ADMIN_PIN):
+    if request.session.get(_ADMIN_TOKEN_KEY) == _ADMIN_PIN_HASH:
         return RedirectResponse("/admin", status_code=302)
     return templates.TemplateResponse(request, "admin_login.html", {"error": None})
 
@@ -338,8 +358,8 @@ async def admin_login_page(request: Request):
 async def admin_login_submit(request: Request):
     form = await request.form()
     pin  = str(form.get("pin", "")).strip()
-    if hmac.compare_digest(_pin_hash(pin), _pin_hash(settings.ADMIN_PIN)):
-        request.session[_ADMIN_TOKEN_KEY] = _pin_hash(settings.ADMIN_PIN)
+    if hmac.compare_digest(_pin_hash(pin), _ADMIN_PIN_HASH):
+        request.session[_ADMIN_TOKEN_KEY] = _ADMIN_PIN_HASH
         return RedirectResponse("/admin", status_code=302)
     return templates.TemplateResponse(
         request,
