@@ -223,10 +223,12 @@ class DataIndexer:
                     
                     if not season:
                         season = Season(id=season_id)
+                        # Only honour the API's highlight flag for brand-new seasons;
+                        # existing seasons keep whatever the admin manually selected.
+                        season.highlighted = entry.get("highlight", False)
                         session.add(season)
                     
                     season.text = entry.get("text", f"{season_id}/{season_id+1}")
-                    season.highlighted = entry.get("highlight", False)
                     season.last_updated = datetime.now(timezone.utc)
                     count += 1
                 
