@@ -17,20 +17,22 @@
     margin-bottom: 2rem;
     text-align: center;
   }
-  .gd-meta { font-size:.8rem; color:var(--gray-500); margin-bottom:.75rem; }
-  .gd-teams { display:flex; align-items:center; justify-content:center; gap:2rem; flex-wrap:wrap; }
-  .gd-team { flex:1; min-width:140px; }
-  .gd-team--home { text-align:right; }
-  .gd-team--away { text-align:left; }
-  .gd-team a { font-size:1.35rem; font-weight:700; text-decoration:none; color:inherit; }
-  .gd-team a:hover { color:var(--swiss-red); }
-  .gd-team-record { font-size:.78rem; color:var(--gray-400); margin-top:.25rem; }
+  .gd-meta-date { font-size:.8rem; color:var(--gray-500); margin-bottom:.2rem; }
+  .gd-meta-venue { font-size:.8rem; color:var(--gray-500); margin-bottom:1.25rem; }
+  .gd-meta-venue a { color:inherit; text-decoration:none; }
+  .gd-meta-venue a:hover { color:var(--swiss-red); }
+  .gd-matchup { display:flex; flex-direction:column; align-items:center; width:100%; }
+  .gd-team-row { text-align:center; padding:.35rem 1rem; width:100%; }
+  .gd-team-name { font-size:1.25rem; font-weight:700; text-decoration:none; color:inherit; display:block; }
+  .gd-team-name:hover { color:var(--swiss-red); }
+  .gd-team-record { font-size:.78rem; color:var(--gray-400); margin-top:.15rem; }
   .gd-score {
-    font-size:3rem; font-weight:900;
+    font-size:2.75rem; font-weight:900;
     font-variant-numeric: tabular-nums;
-    min-width:130px; text-align:center;
+    text-align:center;
     letter-spacing:.05em;
-    padding: 0 1rem;
+    padding: .4rem 2rem;
+    display:block;
   }
   .gd-status { margin-top:.6rem; font-size:.8rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:.04em; }
 
@@ -178,7 +180,7 @@
   .gd-roster { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
   @media (max-width:640px) { .gd-roster { grid-template-columns:1fr; } }
   @media (max-width:768px) { .gd-tabpanel { padding: 1rem; } }
-  @media (max-width:480px) { .gd-tabpanel { padding: .75rem .5rem; } .gd-teams { gap: 1rem; } .gd-scorebox { padding: 1rem .75rem; } }
+  @media (max-width:480px) { .gd-tabpanel { padding: .75rem .5rem; } .gd-scorebox { padding: 1rem .75rem; } }
   .gd-roster-header {
     font-size:.8rem; font-weight:700; text-transform:uppercase;
     letter-spacing:.05em; color:var(--gray-500);
@@ -309,14 +311,14 @@ function eventsTable(goals, penalties) {
   {% if game %}
   <!-- Score Header -->
   <div class="gd-scorebox">
-    <div class="gd-meta">
-      {{ game.date }}{% if game.time %} · {{ game.time }}{% endif %}
-      {% if game.venue %} · <a href="https://www.google.com/maps/search/?api=1&query={{ game.venue | urlencode }}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;">📍 {{ game.venue }}</a>{% endif %}
-    </div>
+    <div class="gd-meta-date">{{ game.date }}{% if game.time %} · {{ game.time }}{% endif %}</div>
+    {% if game.venue %}
+    <div class="gd-meta-venue"><a href="https://www.google.com/maps/search/?api=1&query={{ game.venue | urlencode }}" target="_blank" rel="noopener">📍 {{ game.venue }}</a></div>
+    {% endif %}
 
-    <div class="gd-teams">
-      <div class="gd-team gd-team--home">
-        <a href="/{{ locale }}/team/{{ game.home_team_id }}">{{ game.home_team }}</a>
+    <div class="gd-matchup">
+      <div class="gd-team-row">
+        <a class="gd-team-name" href="/{{ locale }}/team/{{ game.home_team_id }}">{{ game.home_team }}</a>
         {% if game.home_record %}
         <div class="gd-team-record">{{ game.home_record.w }}W·{{ game.home_record.d }}D·{{ game.home_record.l }}L</div>
         {% endif %}
@@ -328,8 +330,8 @@ function eventsTable(goals, penalties) {
           – : –
         {% endif %}
       </div>
-      <div class="gd-team gd-team--away">
-        <a href="/{{ locale }}/team/{{ game.away_team_id }}">{{ game.away_team }}</a>
+      <div class="gd-team-row">
+        <a class="gd-team-name" href="/{{ locale }}/team/{{ game.away_team_id }}">{{ game.away_team }}</a>
         {% if game.away_record %}
         <div class="gd-team-record">{{ game.away_record.w }}W·{{ game.away_record.d }}D·{{ game.away_record.l }}L</div>
         {% endif %}
