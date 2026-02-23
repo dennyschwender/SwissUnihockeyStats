@@ -226,7 +226,7 @@ function eventsTable(goals, penalties) {
   {% endif %}
 
   <div style="margin-bottom:1.5rem;">
-    <a href="javascript:history.back()" class="gd-back">← Back</a>
+    <a href="javascript:history.back()" class="gd-back">← {{ t.common.back }}</a>
   </div>
 
   {% if game %}
@@ -259,14 +259,14 @@ function eventsTable(goals, penalties) {
       {% set away_best = game.best_players | selectattr('team', 'equalto', game.away_team) | first | default(none) %}
       <div class="gd-best-side gd-best-side--home">
         {% if home_best %}
-        <span class="gd-best-player-label">⭐ Best Player</span>
+        <span class="gd-best-player-label">⭐ {{ t.game.best_player }}</span>
         <span class="gd-best-player-name">{{ home_best.player or '—' }}</span>
         {% endif %}
       </div>
-      <div class="gd-best-center">Best Players</div>
+      <div class="gd-best-center">{{ t.game.best_players }}</div>
       <div class="gd-best-side gd-best-side--away">
         {% if away_best %}
-        <span class="gd-best-player-label">⭐ Best Player</span>
+        <span class="gd-best-player-label">⭐ {{ t.game.best_player }}</span>
         <span class="gd-best-player-name">{{ away_best.player or '—' }}</span>
         {% endif %}
       </div>
@@ -277,7 +277,7 @@ function eventsTable(goals, penalties) {
   <!-- Tabs -->
   <div class="gd-tabs" x-data="{ tab: 'events' }" x-cloak>
     <div class="gd-tabbar" role="tablist">
-      {% for tid, tlabel, icon in [('events','Events','📋'),('roster','Roster','👥')] %}
+      {% for tid, tlabel, icon in [('events', t.game.tab_events, '📋'),('roster', t.game.tab_roster, '👥')] %}
       <button class="gd-tab" :class="tab === '{{ tid }}' ? 'active' : ''"
               @click="tab = '{{ tid }}'" role="tab">
         {{ icon }} {{ tlabel }}
@@ -290,18 +290,18 @@ function eventsTable(goals, penalties) {
       {% if game.goals or game.penalties %}
       <div x-data='eventsTable({{ game.goals | tojson }}, {{ game.penalties | tojson }})'>
         <div class="gd-filter-bar">
-          <button class="gd-filter-btn" :class="filter === 'all' ? 'active' : ''" @click="filter = 'all'">All</button>
-          <button class="gd-filter-btn" :class="filter === 'goal' ? 'active' : ''" @click="filter = 'goal'">🥅 Goals</button>
-          <button class="gd-filter-btn" :class="filter === 'penalty' ? 'active' : ''" @click="filter = 'penalty'">🟨 Penalties</button>
+          <button class="gd-filter-btn" :class="filter === 'all' ? 'active' : ''" @click="filter = 'all'">{{ t.game.event_all }}</button>
+          <button class="gd-filter-btn" :class="filter === 'goal' ? 'active' : ''" @click="filter = 'goal'">{{ t.game.event_goals }}</button>
+          <button class="gd-filter-btn" :class="filter === 'penalty' ? 'active' : ''" @click="filter = 'penalty'">{{ t.game.event_penalties }}</button>
         </div>
         <table class="gd-table">
           <thead><tr>
-            <th :class="cls('period')"     @click="sortBy('period')"    >Period<span class="sort-icon" x-text="icon('period')"></span></th>
-            <th :class="cls('time')"       @click="sortBy('time')"      >Time<span class="sort-icon" x-text="icon('time')"></span></th>
-            <th :class="cls('type')"       @click="sortBy('type')"      >Type<span class="sort-icon" x-text="icon('type')"></span></th>
-            <th :class="cls('team')"       @click="sortBy('team')"      >Team<span class="sort-icon" x-text="icon('team')"></span></th>
-            <th :class="cls('player')"     @click="sortBy('player')"    >Player<span class="sort-icon" x-text="icon('player')"></span></th>
-            <th :class="cls('score')"      @click="sortBy('score')"     >Score / Penalty<span class="sort-icon" x-text="icon('score')"></span></th>
+            <th :class="cls('period')"     @click="sortBy('period')"    >{{ t.table.period }}<span class="sort-icon" x-text="icon('period')"></span></th>
+            <th :class="cls('time')"       @click="sortBy('time')"      >{{ t.table.time }}<span class="sort-icon" x-text="icon('time')"></span></th>
+            <th :class="cls('type')"       @click="sortBy('type')"      >{{ t.table.type }}<span class="sort-icon" x-text="icon('type')"></span></th>
+            <th :class="cls('team')"       @click="sortBy('team')"      >{{ t.table.team }}<span class="sort-icon" x-text="icon('team')"></span></th>
+            <th :class="cls('player')"     @click="sortBy('player')"    >{{ t.table.player }}<span class="sort-icon" x-text="icon('player')"></span></th>
+            <th :class="cls('score')"      @click="sortBy('score')"     >{{ t.table.score_penalty }}<span class="sort-icon" x-text="icon('score')"></span></th>
           </tr></thead>
           <tbody>
             <template x-for="(e, i) in sorted" :key="e.type + e.time + e.team + (e.player || '')">
@@ -327,7 +327,7 @@ function eventsTable(goals, penalties) {
       {% else %}
       <div class="gd-empty">
         <div class="gd-empty-icon">📋</div>
-        <p>No event data available for this game.</p>
+        <p>{{ t.game.no_events }}</p>
       </div>
       {% endif %}
     </div>
@@ -341,8 +341,8 @@ function eventsTable(goals, penalties) {
           <table class="gd-table">
             <thead><tr>
               <th :class="cls('jersey')"   @click="sortBy('jersey')"  >#<span class="sort-icon" x-text="icon('jersey')"></span></th>
-              <th :class="cls('position')" @click="sortBy('position')">Pos<span class="sort-icon" x-text="icon('position')"></span></th>
-              <th :class="cls('player')"   @click="sortBy('player')"  >Player<span class="sort-icon" x-text="icon('player')"></span></th>
+              <th :class="cls('position')" @click="sortBy('position')">{{ t.table.pos }}<span class="sort-icon" x-text="icon('position')"></span></th>
+              <th :class="cls('player')"   @click="sortBy('player')"  >{{ t.table.player }}<span class="sort-icon" x-text="icon('player')"></span></th>
             </tr></thead>
             <tbody>
               <template x-for="p in sorted" :key="p.player_id || p.player">
@@ -360,8 +360,8 @@ function eventsTable(goals, penalties) {
           <table class="gd-table">
             <thead><tr>
               <th :class="cls('jersey')"   @click="sortBy('jersey')"  >#<span class="sort-icon" x-text="icon('jersey')"></span></th>
-              <th :class="cls('position')" @click="sortBy('position')">Pos<span class="sort-icon" x-text="icon('position')"></span></th>
-              <th :class="cls('player')"   @click="sortBy('player')"  >Player<span class="sort-icon" x-text="icon('player')"></span></th>
+              <th :class="cls('position')" @click="sortBy('position')">{{ t.table.pos }}<span class="sort-icon" x-text="icon('position')"></span></th>
+              <th :class="cls('player')"   @click="sortBy('player')"  >{{ t.table.player }}<span class="sort-icon" x-text="icon('player')"></span></th>
             </tr></thead>
             <tbody>
               <template x-for="p in sorted" :key="p.player_id || p.player">
@@ -378,7 +378,7 @@ function eventsTable(goals, penalties) {
       {% else %}
       <div class="gd-empty">
         <div class="gd-empty-icon">👥</div>
-        <p>No roster data available. Run an <em>events</em> index job to fetch lineups.</p>
+        <p>{{ t.game.no_roster }}</p>
       </div>
       {% endif %}
     </div>

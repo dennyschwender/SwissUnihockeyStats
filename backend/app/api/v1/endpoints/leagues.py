@@ -64,7 +64,7 @@ async def get_league(league_id: int):
         
         # Find league by ID
         league = next(
-            (l for l in leagues_data["entries"] if l.get("id") == league_id),
+            (lg for lg in leagues_data["entries"] if lg.get("id") == league_id),
             None
         )
         

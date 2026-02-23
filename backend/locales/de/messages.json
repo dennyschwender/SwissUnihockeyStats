@@ -14,7 +14,7 @@
     "home": "Startseite",
     "clubs": "Vereine",
     "leagues": "Ligen",
-    "teams": "Teams", 
+    "teams": "Teams",
     "games": "Spiele",
     "rankings": "Ranglisten",
     "players": "Spieler",
@@ -24,7 +24,13 @@
   "home": {
     "title": "SwissUnihockey",
     "subtitle": "Schweizer Unihockey Statistiken",
-    "description": "Entdecken Sie Ligen, Teams, Spiele und Statistiken des Schweizer Unihockey"
+    "description": "Entdecken Sie Ligen, Teams, Spiele und Statistiken des Schweizer Unihockey",
+    "recent_games": "Letzte Spiele",
+    "upcoming_games": "Bevorstehende Spiele",
+    "top_scorers": "Beste Torschützen",
+    "view_all_players": "Alle Spieler anzeigen →",
+    "all_leagues": "Alle Ligen",
+    "search_placeholder": "Vereine, Ligen, Teams suchen..."
   },
   "clubs": {
     "title": "Vereine",
@@ -72,12 +78,77 @@
   },
   "players": {
     "title": "Spieler",
-    "subtitle": "Spielersuche und Statistiken"
+    "subtitle": "Spielersuche und Statistiken",
+    "leaderboard": "Spieler-Rangliste",
+    "order_points": "Punkte",
+    "order_goals": "Tore",
+    "order_assists": "Assists",
+    "search_placeholder": "Nach Name suchen…"
   },
   "footer": {
     "copyright": "© 2026 SwissUnihockey",
     "about": "Über uns",
     "contact": "Kontakt",
     "privacy": "Datenschutz"
+  },
+  "errors": {
+    "not_found_title": "Seite nicht gefunden",
+    "not_found_desc": "Die gesuchte Seite existiert leider nicht. Vielleicht wurde sie verschoben oder gelöscht.",
+    "server_error_title": "Interner Serverfehler",
+    "server_error_desc": "Entschuldigung! Etwas ist schiefgelaufen. Unser Team wurde automatisch benachrichtigt.",
+    "notify_team": "Falls das Problem weiterhin besteht, bitte kontaktieren Sie uns mit dieser Fehler-ID.",
+    "go_home": "Zur Startseite",
+    "reload_page": "Seite neu laden",
+    "popular_pages": "Beliebte Seiten",
+    "error_id_label": "Fehler-ID:",
+    "error_time_label": "Zeitpunkt:"
+  },
+  "table": {
+    "player": "Spieler",
+    "team": "Team",
+    "league": "Liga",
+    "season": "Saison",
+    "position": "Position",
+    "pos": "Pos",
+    "period": "Abschnitt",
+    "time": "Zeit",
+    "type": "Typ",
+    "score": "Stand",
+    "score_penalty": "Stand / Strafe"
+  },
+  "player": {
+    "born": "Geboren:",
+    "season_history": "Saisonverlauf",
+    "career_totals": "Karriere gesamt",
+    "show_less": "Weniger anzeigen ▲",
+    "show_all": "Alle anzeigen"
+  },
+  "team_tabs": {
+    "tab_roster": "Kader & Statistiken",
+    "tab_results": "Letzte Spiele",
+    "tab_upcoming": "Bevorstehend"
+  },
+  "game": {
+    "best_player": "Bester Spieler",
+    "best_players": "Beste Spieler",
+    "event_all": "Alle",
+    "event_goals": "🥅 Tore",
+    "event_penalties": "🟨 Strafen",
+    "no_events": "Keine Ereignisdaten für dieses Spiel verfügbar.",
+    "no_roster": "Keine Kaderdaten verfügbar. Führen Sie einen Ereignis-Indexjob durch.",
+    "tab_events": "Ereignisse",
+    "tab_roster": "Kader"
+  },
+  "league_detail": {
+    "tab_standings": "Tabelle",
+    "tab_topscorers": "Topscorer",
+    "tab_penalties": "Strafen",
+    "tab_results": "Ergebnisse",
+    "tab_upcoming": "Bevorstehend"
+  },
+  "pwa": {
+    "install_title": "📱 Unihockey Stats installieren",
+    "install_desc": "Offline-Zugriff, schnelleres Laden",
+    "install_btn": "Installieren"
   }
 }

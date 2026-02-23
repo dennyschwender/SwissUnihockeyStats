@@ -13,10 +13,10 @@
 
   <div style="margin-bottom:2rem;display:flex;align-items:flex-start;gap:1.5rem;flex-wrap:wrap;">
     <div style="flex:1;min-width:0;">
-      <a href="javascript:history.back()" style="color:var(--gray-500);font-size:.875rem;text-decoration:none;">← Back</a>
+      <a href="javascript:history.back()" style="color:var(--gray-500);font-size:.875rem;text-decoration:none;">← {{ t.common.back }}</a>
       <h1 style="margin:.5rem 0 0;font-size:2rem;font-weight:700;">{{ player.name if player else "Player" }}</h1>
       {% if player and player.year_of_birth %}
-      <p style="color:var(--gray-500);margin:.25rem 0 0;">Born: {{ player.year_of_birth }}</p>
+      <p style="color:var(--gray-500);margin:.25rem 0 0;">{{ t.player.born }} {{ player.year_of_birth }}</p>
       {% endif %}
     </div>
     {% if player and player.photo_url %}
@@ -51,20 +51,20 @@
   {% if player.career %}
   <div x-data="{ expanded: false }" style="margin-bottom:2rem;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
-      <h2 style="font-size:1.25rem;font-weight:600;margin:0;">Season History</h2>
+      <h2 style="font-size:1.25rem;font-weight:600;margin:0;">{{ t.player.season_history }}</h2>
       {% if player.career | length > 5 %}
       <button @click="expanded = !expanded"
         style="background:none;border:1px solid var(--gray-300);border-radius:.375rem;padding:.25rem .75rem;font-size:.8rem;cursor:pointer;color:var(--gray-600);"
-        x-text="expanded ? 'Show less ▲' : 'Show all ({{ player.career | length }}) ▼'"></button>
+        x-text="expanded ? '{{ t.player.show_less }}' : '{{ t.player.show_all }} ({{ player.career | length }}) ▼'"></button>
       {% endif %}
     </div>
     <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
         <thead>
           <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
-            <th style="padding:.6rem .75rem;text-align:left;">Season</th>
-            <th style="padding:.6rem .75rem;text-align:left;">League</th>
-            <th style="padding:.6rem .75rem;text-align:left;">Team</th>
+            <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.season }}</th>
+            <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.league }}</th>
+            <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.team }}</th>
             <th style="padding:.6rem .5rem;text-align:center;">GP</th>
             <th style="padding:.6rem .5rem;text-align:center;">G</th>
             <th style="padding:.6rem .5rem;text-align:center;">A</th>
@@ -95,7 +95,7 @@
           {% endfor %}
           <!-- Totals row (always visible) -->
           <tr style="background:var(--gray-50);border-top:2px solid var(--gray-200);font-weight:700;">
-            <td style="padding:.6rem .75rem;" colspan="3">Career Totals</td>
+            <td style="padding:.6rem .75rem;" colspan="3">{{ t.player.career_totals }}</td>
             <td style="padding:.6rem .5rem;text-align:center;">{{ player.totals.gp }}</td>
             <td style="padding:.6rem .5rem;text-align:center;">{{ player.totals.g }}</td>
             <td style="padding:.6rem .5rem;text-align:center;">{{ player.totals.a }}</td>

@@ -174,7 +174,7 @@ def _pin_hash(pin: str) -> str:
         'sha256',
         pin.encode(),
         settings.SESSION_SECRET.encode(),
-        1,
+        100_000,
     ).hex()
 
 _ADMIN_TOKEN_KEY = "admin_authed"
@@ -362,7 +362,7 @@ async def admin_page(request: Request, _: None = Depends(require_admin)):
 @app.get("/admin/api/stats")
 async def admin_stats(_: None = Depends(require_admin)):
     """Per-entity DB counts, per-season breakdown, and last 100 sync records."""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     try:
         return await loop.run_in_executor(None, _admin_stats_sync)
     except Exception as exc:

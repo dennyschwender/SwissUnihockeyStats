@@ -2,10 +2,15 @@
 Database models for Swiss Unihockey Stats
 Implements hierarchical data structure matching API structure
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, ForeignKeyConstraint, Boolean, JSON, Float, Text, Index
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+def _utcnow() -> datetime:
+    """Return the current UTC datetime (timezone-aware). Used as column default."""
+    return datetime.now(timezone.utc)
 
 
 class Base(DeclarativeBase):
@@ -20,7 +25,7 @@ class Season(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)  # API season ID (e.g., 2025)
     text: Mapped[Optional[str]] = mapped_column(String(50))  # Display name (e.g., "2025/26")
     highlighted: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
-    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     last_full_sync: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
     # Relationships
@@ -42,7 +47,7 @@ class Club(Base):
     text: Mapped[Optional[str]] = mapped_column(String(200))
     region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     
     # Relationships
     season = relationship("Season", back_populates="clubs")
@@ -64,7 +69,7 @@ class League(Base):
     name: Mapped[Optional[str]] = mapped_column(String(200))
     text: Mapped[Optional[str]] = mapped_column(String(200))
     mode: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     
     # Relationships
     season = relationship("Season", back_populates="leagues")
@@ -85,7 +90,7 @@ class LeagueGroup(Base):
     group_id: Mapped[int] = mapped_column(Integer, nullable=False)  # API group ID
     name: Mapped[Optional[str]] = mapped_column(String(200))
     text: Mapped[Optional[str]] = mapped_column(String(200))
-    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     
     # Relationships
     league = relationship("League", back_populates="groups")
@@ -108,7 +113,7 @@ class Team(Base):
     name: Mapped[Optional[str]] = mapped_column(String(200))
     text: Mapped[Optional[str]] = mapped_column(String(200))
     logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     last_stats_update: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
     # Relationships
@@ -140,7 +145,8 @@ class Player(Base):
     
     # For search optimization
     name_normalized: Mapped[Optional[str]] = mapped_column(String(200))  # Lowercase for case-insensitive search
-    
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
+
     # Relationships
     team_memberships = relationship("TeamPlayer", back_populates="player", cascade="all, delete-orphan")
     game_participations = relationship("GamePlayer", back_populates="player", cascade="all, delete-orphan")
@@ -163,7 +169,7 @@ class TeamPlayer(Base):
     jersey_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     position: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Forward, Defense, Goalie
     season_id: Mapped[int] = mapped_column(Integer, ForeignKey("seasons.id"), nullable=False)
-    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     
     # Relationships
     team = relationship("Team", back_populates="players", foreign_keys="[TeamPlayer.team_id, TeamPlayer.season_id]")
@@ -194,7 +200,7 @@ class Game(Base):
     home_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     away_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     period: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     last_events_update: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
     # Relationships
@@ -230,7 +236,7 @@ class GamePlayer(Base):
     goals: Mapped[Optional[int]] = mapped_column(Integer, default=0)
     assists: Mapped[Optional[int]] = mapped_column(Integer, default=0)
     penalty_minutes: Mapped[Optional[int]] = mapped_column(Integer, default=0)
-    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     
     # Relationships
     game = relationship("Game", back_populates="players")
@@ -260,7 +266,7 @@ class GameEvent(Base):
     player_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("players.person_id"), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     raw_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
-    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     
     # Relationships
     game = relationship("Game", back_populates="events")
@@ -295,7 +301,7 @@ class PlayerStatistics(Base):
     pen_10min: Mapped[Optional[int]] = mapped_column(Integer, default=0)  # count of 10-minute penalties
     pen_match: Mapped[Optional[int]] = mapped_column(Integer, default=0)  # count of match penalties
     plus_minus: Mapped[Optional[int]] = mapped_column(Integer, default=0)
-    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     
     # Relationships
     player = relationship("Player", back_populates="statistics")
@@ -319,7 +325,7 @@ class SyncStatus(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     entity_type: Mapped[str] = mapped_column(String(50), nullable=False)  # seasons, clubs, leagues, players, games
     entity_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # e.g., "season:2025"
-    last_sync: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    last_sync: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
     sync_status: Mapped[Optional[str]] = mapped_column(String(50), default="pending")  # pending, in_progress, completed, failed
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     records_synced: Mapped[Optional[int]] = mapped_column(Integer, default=0)

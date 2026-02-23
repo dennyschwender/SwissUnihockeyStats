@@ -24,7 +24,13 @@
   "home": {
     "title": "SwissUnihockey",
     "subtitle": "Swiss Unihockey Statistics",
-    "description": "Explore leagues, teams, games and statistics of Swiss Unihockey"
+    "description": "Explore leagues, teams, games and statistics of Swiss Unihockey",
+    "recent_games": "Recent Games",
+    "upcoming_games": "Upcoming Games",
+    "top_scorers": "Overall Top Scorers",
+    "view_all_players": "View all players →",
+    "all_leagues": "All Leagues",
+    "search_placeholder": "Search clubs, leagues, teams..."
   },
   "clubs": {
     "title": "Clubs",
@@ -72,12 +78,77 @@
   },
   "players": {
     "title": "Players",
-    "subtitle": "Player Search and Statistics"
+    "subtitle": "Player Search and Statistics",
+    "leaderboard": "Player Leaderboard",
+    "order_points": "Points",
+    "order_goals": "Goals",
+    "order_assists": "Assists",
+    "search_placeholder": "Search by name…"
   },
   "footer": {
     "copyright": "© 2026 SwissUnihockey",
     "about": "About Us",
     "contact": "Contact",
     "privacy": "Privacy"
+  },
+  "errors": {
+    "not_found_title": "Page Not Found",
+    "not_found_desc": "The page you're looking for doesn't exist. It may have been moved or deleted.",
+    "server_error_title": "Internal Server Error",
+    "server_error_desc": "Sorry! Something went wrong. Our team has been notified and is working on a fix.",
+    "notify_team": "If the problem persists, please contact us with this error ID.",
+    "go_home": "Go Home",
+    "reload_page": "Reload Page",
+    "popular_pages": "Popular Pages",
+    "error_id_label": "Error ID:",
+    "error_time_label": "Time:"
+  },
+  "table": {
+    "player": "Player",
+    "team": "Team",
+    "league": "League",
+    "season": "Season",
+    "position": "Position",
+    "pos": "Pos",
+    "period": "Period",
+    "time": "Time",
+    "type": "Type",
+    "score": "Score",
+    "score_penalty": "Score / Penalty"
+  },
+  "player": {
+    "born": "Born:",
+    "season_history": "Season History",
+    "career_totals": "Career Totals",
+    "show_less": "Show less ▲",
+    "show_all": "Show all"
+  },
+  "team_tabs": {
+    "tab_roster": "Roster & Stats",
+    "tab_results": "Recent Results",
+    "tab_upcoming": "Upcoming"
+  },
+  "game": {
+    "best_player": "Best Player",
+    "best_players": "Best Players",
+    "event_all": "All",
+    "event_goals": "🥅 Goals",
+    "event_penalties": "🟨 Penalties",
+    "no_events": "No event data available for this game.",
+    "no_roster": "No roster data available. Run an events index job to fetch lineups.",
+    "tab_events": "Events",
+    "tab_roster": "Roster"
+  },
+  "league_detail": {
+    "tab_standings": "Standings",
+    "tab_topscorers": "Top Scorers",
+    "tab_penalties": "Penalties",
+    "tab_results": "Results",
+    "tab_upcoming": "Upcoming"
+  },
+  "pwa": {
+    "install_title": "📱 Install Unihockey Stats",
+    "install_desc": "Access stats offline, faster loading",
+    "install_btn": "Install"
   }
 }

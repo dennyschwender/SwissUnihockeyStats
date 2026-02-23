@@ -614,6 +614,19 @@ html.dark-mode .universal-search-results {
 .hamburger-btn.active span:nth-child(2) { opacity: 0; }
 .hamburger-btn.active span:nth-child(3) { transform: translateY(-9px) rotate(-45deg); }
 
+/* Home page responsive 2-column games grid */
+.home-games-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+/* Mobile language switcher (hidden on desktop, shown inside hamburger nav) */
+.mobile-lang-switcher {
+  display: none;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .hamburger-btn {
@@ -675,6 +688,49 @@ html.dark-mode .universal-search-results {
 
   .language-switcher {
     display: none;
+  }
+
+  /* Mobile language switcher becomes visible inside hamburger menu */
+  .mobile-lang-switcher {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem 1rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .mobile-lang-switcher button {
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.3s;
+  }
+
+  .mobile-lang-switcher button.active {
+    background: var(--swiss-red);
+    color: var(--swiss-white);
+    border-color: var(--swiss-red);
+  }
+
+  /* 2-col games grid collapses on mobile */
+  .home-games-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* PWA prompt spans full width from bottom on mobile */
+  .pwa-install {
+    bottom: 0;
+    right: 0;
+    left: 0;
+    border-radius: 0.75rem 0.75rem 0 0;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
   }
 }
 
@@ -1038,4 +1094,74 @@ html.dark-mode .image-skeleton {
 
 .fade-in-image {
   animation: fadeIn 0.3s ease-in;
+}
+
+/* ============================================
+   RESPONSIVE — TABLET (≤ 1024px)
+   ============================================ */
+@media (max-width: 1024px) {
+  nav ul {
+    gap: 1.25rem;
+  }
+
+  .cards-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+
+  .universal-search-container {
+    max-width: 100%;
+  }
+}
+
+/* ============================================
+   RESPONSIVE — SMALL PHONES (≤ 480px)
+   ============================================ */
+@media (max-width: 480px) {
+  .hero h1 {
+    font-size: 1.75rem;
+  }
+
+  .hero p {
+    font-size: 1rem;
+  }
+
+  .cards-grid {
+    gap: 1rem;
+  }
+
+  .universal-search-input {
+    font-size: 1rem;
+    padding: 1rem 0.75rem;
+  }
+
+  /* Game detail score display shrinks on small screens */
+  .gd-scorebox {
+    padding: 1rem;
+  }
+
+  .gd-score {
+    font-size: 2.25rem;
+    min-width: 90px;
+    padding: 0 0.5rem;
+  }
+
+  .gd-team {
+    min-width: 90px;
+  }
+
+  /* Tab bar scrolls horizontally on very small screens */
+  .gd-tabbar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .gd-tab {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .filter-select {
+    min-width: auto;
+    width: 100%;
+  }
 }

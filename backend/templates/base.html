@@ -48,7 +48,7 @@
     <link rel="apple-touch-icon" href="/static/images/icon-192x192.svg">
     
     <!-- CSS -->
-    <link rel="stylesheet" href="/static/css/main.css?v=7">
+    <link rel="stylesheet" href="/static/css/main.css?v=8">
     
     <!-- htmx for dynamic interactions (local, defer) -->
     <script defer src="/static/js/vendor/htmx.min.js"></script>
@@ -101,6 +101,17 @@
                         <li><a href="/{{ locale }}/players" {% if '/players' in request.url.path or '/player/' in request.url.path %}class="active"{% endif %}>{{ t.nav.players }}</a></li>
                         <li><a href="/{{ locale }}/games" {% if '/games' in request.url.path %}class="active"{% endif %}>{{ t.nav.games }}</a></li>
                     </ul>
+                    <!-- Mobile language switcher (visible inside hamburger menu only) -->
+                    <div class="mobile-lang-switcher" x-data="{ locale: '{{ locale }}' }">
+                        <button @click="window.location.href = '/de' + window.location.pathname.substring(3)"
+                                :class="{ 'active': locale === 'de' }">DE</button>
+                        <button @click="window.location.href = '/en' + window.location.pathname.substring(3)"
+                                :class="{ 'active': locale === 'en' }">EN</button>
+                        <button @click="window.location.href = '/fr' + window.location.pathname.substring(3)"
+                                :class="{ 'active': locale === 'fr' }">FR</button>
+                        <button @click="window.location.href = '/it' + window.location.pathname.substring(3)"
+                                :class="{ 'active': locale === 'it' }">IT</button>
+                    </div>
                 </nav>
 
                 <!-- Theme Toggle -->
@@ -141,13 +152,24 @@
         <div class="container">
             <div class="footer-content">
                 <div>{{ t.footer.copyright }}</div>
+                <div class="footer-links">
+                    <a href="/{{ locale }}/about">{{ t.footer.about }}</a>
+                    <a href="/{{ locale }}/contact">{{ t.footer.contact }}</a>
+                    <a href="/{{ locale }}/privacy">{{ t.footer.privacy }}</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+
     <!-- PWA Install Prompt -->
     <div class="pwa-install" id="pwa-install-prompt">
         <div>
-            <strong>📱 Install Unihockey Stats</strong>
-            <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem;">Access stats offline, faster loading</p>
+            <strong>{{ t.pwa.install_title }}</strong>
+            <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem;">{{ t.pwa.install_desc }}</p>
         </div>
-        <button id="pwa-install-btn">Install</button>
+        <button id="pwa-install-btn">{{ t.pwa.install_btn }}</button>
         <button class="close" onclick="document.getElementById('pwa-install-prompt').classList.remove('show')">×</button>
     </div>
 
@@ -160,38 +182,18 @@
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            
             // Show install prompt after 5 seconds
-            setTimeout(() => {
-                installPrompt.classList.add('show');
-            }, 5000);
+            setTimeout(() => { installPrompt.classList.add('show'); }, 5000);
         });
 
         installBtn.addEventListener('click', async () => {
             if (!deferredPrompt) return;
-            
             deferredPrompt.prompt();
             const { outcome } = await deferredPrompt.userChoice;
-            
-            if (outcome === 'accepted') {
-                installPrompt.classList.remove('show');
-            }
-            
+            if (outcome === 'accepted') { installPrompt.classList.remove('show'); }
             deferredPrompt = null;
         });
     </script>
-
-                <div class="footer-links">
-                    <a href="/{{ locale }}/about">{{ t.footer.about }}</a>
-                    <a href="/{{ locale }}/contact">{{ t.footer.contact }}</a>
-                    <a href="/{{ locale }}/privacy">{{ t.footer.privacy }}</a>
-                </div>
-                <div>🌐 DE | EN | FR | IT</div>
-            </div>
-        </div>
-    </footer>
-
-    {% block scripts %}{% endblock %}
 
     <script>
     function toggleMobileNav() {

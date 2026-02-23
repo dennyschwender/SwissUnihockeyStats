@@ -24,7 +24,13 @@
   "home": {
     "title": "SwissUnihockey",
     "subtitle": "Statistiques de Unihockey Suisse",
-    "description": "Découvrez les ligues, équipes, matchs et statistiques du unihockey suisse"
+    "description": "Découvrez les ligues, équipes, matchs et statistiques du unihockey suisse",
+    "recent_games": "Matchs récents",
+    "upcoming_games": "Prochains matchs",
+    "top_scorers": "Meilleurs buteurs globaux",
+    "view_all_players": "Voir tous les joueurs →",
+    "all_leagues": "Toutes les ligues",
+    "search_placeholder": "Rechercher clubs, ligues, équipes..."
   },
   "clubs": {
     "title": "Clubs",
@@ -34,14 +40,14 @@
     "title": "Ligues",
     "subtitle": "Toutes les ligues de unihockey suisses",
     "filter_sex": "Genre",
-    "filter_age": "Cat\u00e9gorie",
+    "filter_age": "Catégorie",
     "filter_field": "Terrain",
     "filter_all": "Tous",
     "filter_men": "Hommes",
     "filter_women": "Femmes",
     "filter_mixed": "Mixte",
     "filter_senior": "Actifs",
-    "filter_senioren": "V\u00e9t\u00e9rans",
+    "filter_senioren": "Vétérans",
     "big_field": "Grand terrain",
     "small_field": "Petit terrain",
     "gender_men": "Hommes",
@@ -72,12 +78,77 @@
   },
   "players": {
     "title": "Joueurs",
-    "subtitle": "Recherche de joueurs et statistiques"
+    "subtitle": "Recherche de joueurs et statistiques",
+    "leaderboard": "Classement des joueurs",
+    "order_points": "Points",
+    "order_goals": "Buts",
+    "order_assists": "Passes décisives",
+    "search_placeholder": "Rechercher par nom…"
   },
   "footer": {
     "copyright": "© 2026 SwissUnihockey",
     "about": "À propos",
     "contact": "Contact",
     "privacy": "Confidentialité"
+  },
+  "errors": {
+    "not_found_title": "Page introuvable",
+    "not_found_desc": "La page que vous cherchez n'existe pas. Elle a peut-être été déplacée ou supprimée.",
+    "server_error_title": "Erreur interne du serveur",
+    "server_error_desc": "Désolé ! Quelque chose s'est mal passé. Notre équipe a été notifiée.",
+    "notify_team": "Si le problème persiste, veuillez nous contacter avec cet identifiant d'erreur.",
+    "go_home": "Accueil",
+    "reload_page": "Recharger la page",
+    "popular_pages": "Pages populaires",
+    "error_id_label": "ID d'erreur :",
+    "error_time_label": "Heure :"
+  },
+  "table": {
+    "player": "Joueur",
+    "team": "Équipe",
+    "league": "Ligue",
+    "season": "Saison",
+    "position": "Position",
+    "pos": "Pos",
+    "period": "Période",
+    "time": "Temps",
+    "type": "Type",
+    "score": "Score",
+    "score_penalty": "Score / Pénalité"
+  },
+  "player": {
+    "born": "Né(e) :",
+    "season_history": "Historique des saisons",
+    "career_totals": "Total carrière",
+    "show_less": "Voir moins ▲",
+    "show_all": "Voir tout"
+  },
+  "team_tabs": {
+    "tab_roster": "Effectif & Statistiques",
+    "tab_results": "Résultats récents",
+    "tab_upcoming": "À venir"
+  },
+  "game": {
+    "best_player": "Meilleur joueur",
+    "best_players": "Meilleurs joueurs",
+    "event_all": "Tous",
+    "event_goals": "🥅 Buts",
+    "event_penalties": "🟨 Pénalités",
+    "no_events": "Aucune donnée disponible pour ce match.",
+    "no_roster": "Aucune donnée d'effectif disponible.",
+    "tab_events": "Événements",
+    "tab_roster": "Effectif"
+  },
+  "league_detail": {
+    "tab_standings": "Classement",
+    "tab_topscorers": "Meilleurs buteurs",
+    "tab_penalties": "Pénalités",
+    "tab_results": "Résultats",
+    "tab_upcoming": "À venir"
+  },
+  "pwa": {
+    "install_title": "📱 Installer Unihockey Stats",
+    "install_desc": "Accès hors ligne, chargement plus rapide",
+    "install_btn": "Installer"
   }
 }

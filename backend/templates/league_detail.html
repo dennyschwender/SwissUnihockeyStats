@@ -88,19 +88,19 @@
   }" x-cloak>
     <div class="league-tabs">
       <button @click="tab='standings'" :class="tab==='standings' ? 'league-tab active' : 'league-tab'">
-        <span>📊</span> Standings
+        <span>📊</span> {{ t.league_detail.tab_standings }}
       </button>
       <button @click="tab='topscorers'" :class="tab==='topscorers' ? 'league-tab active' : 'league-tab'">
-        <span>⭐</span> Top Scorers
+        <span>⭐</span> {{ t.league_detail.tab_topscorers }}
       </button>
       <button @click="tab='penalties'" :class="tab==='penalties' ? 'league-tab active' : 'league-tab'">
-        <span>🟥</span> Penalties
+        <span>🟥</span> {{ t.league_detail.tab_penalties }}
       </button>
       <button @click="tab='results'" :class="tab==='results' ? 'league-tab active' : 'league-tab'">
-        <span>🏒</span> Results
+        <span>🏂</span> {{ t.league_detail.tab_results }}
       </button>
       <button @click="tab='upcoming'" :class="tab==='upcoming' ? 'league-tab active' : 'league-tab'">
-        <span>📅</span> Upcoming
+        <span>📅</span> {{ t.league_detail.tab_upcoming }}
       </button>
     </div>
 
@@ -127,7 +127,7 @@
             <thead>
               <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
                 <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
-                <th style="padding:.6rem .75rem;text-align:left;">Team</th>
+                <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.team }}</th>
                 <th style="padding:.6rem .5rem;text-align:center;" title="Games Played">GP</th>
                 <th style="padding:.6rem .5rem;text-align:center;" title="Wins">W</th>
                 <th style="padding:.6rem .5rem;text-align:center;" title="Losses">L</th>
@@ -230,8 +230,8 @@
             <thead>
               <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
                 <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
-                <th style="padding:.6rem .75rem;text-align:left;">Player</th>
-                <th style="padding:.6rem .75rem;text-align:left;">Team</th>
+                <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.player }}</th>
+                <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.team }}</th>
                 <th style="padding:.6rem .5rem;text-align:center;">GP</th>
                 <th @click="sort('g')" style="padding:.6rem .5rem;text-align:center;cursor:pointer;user-select:none;white-space:nowrap;">
                   G <span x-text="arrow('g')" style="font-size:.7rem;opacity:.6;"></span></th>
@@ -365,8 +365,8 @@
             <thead>
               <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
                 <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
-                <th style="padding:.6rem .75rem;text-align:left;">Player</th>
-                <th style="padding:.6rem .75rem;text-align:left;">Team</th>
+                <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.player }}</th>
+                <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.team }}</th>
                 <th style="padding:.6rem .5rem;text-align:center;">GP</th>
                 <th @click="sort('pim')" style="padding:.6rem .75rem;text-align:center;font-weight:700;cursor:pointer;user-select:none;white-space:nowrap;">
                   PIM <span x-text="arrow('pim')" style="font-size:.7rem;opacity:.6;"></span></th>

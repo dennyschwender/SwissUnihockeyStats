@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Players Leaderboard – {{ t.common.app_name }}{% endblock %}
+{% block title %}{{ t.players.leaderboard }} – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
 <div class="container" style="padding-top:2rem;padding-bottom:3rem;">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
-    <h1 style="margin:0;font-size:2rem;font-weight:700;">🏒 Player Leaderboard</h1>
+    <h1 style="margin:0;font-size:2rem;font-weight:700;">🏂 {{ t.players.leaderboard }}</h1>
     <div style="display:flex;gap:.5rem;">
-      {% for o, label in [('points','Points'),('goals','Goals'),('assists','Assists'),('pim','PIM')] %}
+      {% for o, label in [('points', t.players.order_points),('goals', t.players.order_goals),('assists', t.players.order_assists),('pim','PIM')] %}
       <a href="/{{ locale }}/players?order_by={{ o }}"
          style="padding:.4rem .9rem;border-radius:.375rem;text-decoration:none;font-size:.875rem;
          {% if order_by == o %}background:var(--swiss-red,#e11d48);color:white;{% else %}background:var(--gray-100);color:var(--gray-700);{% endif %}">
@@ -19,7 +19,7 @@
 
   <!-- Search bar -->
   <div style="margin-bottom:1.25rem;">
-    <input type="text" placeholder="Search by name…"
+    <input type="text" placeholder="{{ t.players.search_placeholder }}"
       hx-get="/{{ locale }}/players/search"
       hx-trigger="keyup changed delay:400ms"
       hx-target="#search-results"
@@ -37,9 +37,9 @@
       <thead>
         <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
           <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
-          <th style="padding:.6rem .75rem;text-align:left;">Player</th>
-          <th style="padding:.6rem .75rem;text-align:left;">Team</th>
-          <th style="padding:.6rem .75rem;text-align:left;">League</th>
+          <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.player }}</th>
+          <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.team }}</th>
+          <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.league }}</th>
           <th style="padding:.6rem .5rem;text-align:center;">GP</th>
           <th style="padding:.6rem .5rem;text-align:center;">G</th>
           <th style="padding:.6rem .5rem;text-align:center;">A</th>

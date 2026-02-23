@@ -50,8 +50,8 @@ LEAGUE_TIERS: dict[int, int] = {
     23: 6,   # Supercup
     25: 6,   # Test / Cup
 }
-# Default tier for unknown league_ids
-_DEFAULT_TIER = 6
+# Default tier for unknown league_ids (7 = no filter / include everything)
+_DEFAULT_TIER = 7
 
 TIER_LABELS: dict[int, str] = {
     1: "Tier 1 — NLA/L-UPL only",
@@ -59,7 +59,8 @@ TIER_LABELS: dict[int, str] = {
     3: "Tier 3 — + 1. Liga, U21B/U18B/U16B",
     4: "Tier 4 — + 2. Liga, U21C/U18C/U16C",
     5: "Tier 5 — + 3. Liga, U21D",
-    6: "All (+ 4./5. Liga, Regional, Cups)",
+    6: "Tier 6 — + 4./5. Liga, Regional, Cups",
+    7: "All leagues (no tier filter)",
 }
 
 

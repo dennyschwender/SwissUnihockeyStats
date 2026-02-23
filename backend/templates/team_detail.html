@@ -12,7 +12,7 @@
   {% endif %}
 
   <div style="margin-bottom:1.5rem;">
-    <a href="javascript:history.back()" style="color:var(--gray-500);font-size:.875rem;text-decoration:none;">← Back</a>
+      <a href="javascript:history.back()" style="color:var(--gray-500);font-size:.875rem;text-decoration:none;">← {{ t.common.back }}</a>
     <h1 style="margin:.5rem 0 .2rem;font-size:2rem;font-weight:700;">👥 {{ team.name if team else "Team" }}</h1>
     {% if team and (team.league_name or team.season_name) %}
     <div style="font-size:.9rem;color:var(--gray-500);display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
@@ -35,7 +35,7 @@
   {% if team %}
   <div x-data="{ tab: 'roster' }">
     <div style="display:flex;gap:.25rem;border-bottom:2px solid var(--gray-200);margin-bottom:1.5rem;">
-      {% for tid, tlabel in [('roster','Roster & Stats'),('results','Recent Results'),('upcoming','Upcoming')] %}
+      {% for tid, tlabel in [('roster', t.team_tabs.tab_roster),('results', t.team_tabs.tab_results),('upcoming', t.team_tabs.tab_upcoming)] %}
       <button @click="tab='{{ tid }}'"
         :style="{ padding:'.6rem 1.25rem', border:'none', background:'none', cursor:'pointer', 'font-size':'.9rem', 'font-weight':'500', 'margin-bottom':'-2px', 'border-bottom': tab==='{{ tid }}' ? '2px solid var(--swiss-red,#e11d48)' : '2px solid transparent', color: tab==='{{ tid }}' ? 'var(--swiss-red,#e11d48)' : 'var(--gray-600)' }">
         {{ tlabel }}{% if tid == 'upcoming' and team.upcoming_games %} <span style="background:var(--swiss-red,#e11d48);color:white;border-radius:9999px;font-size:.7rem;padding:.1rem .45rem;margin-left:.3rem;">{{ team.upcoming_games|length }}</span>{% endif %}
@@ -94,8 +94,8 @@
               {% set th_ctr  = "padding:.5rem .5rem;text-align:center;white-space:nowrap;" %}
               {% set btn = "background:none;border:none;cursor:pointer;font-weight:600;color:inherit;font-size:.875rem;padding:0;display:inline-flex;align-items:center;gap:.1rem;" %}
               <th style="{{ th_num }}"><button @click="sort('number')" style="{{ btn }}">#<span style="font-size:.7rem;opacity:.55;" x-text="icon('number')"></span></button></th>
-              <th style="{{ th_left }}"><button @click="sort('name')" style="{{ btn }}">Player<span style="font-size:.7rem;opacity:.55;" x-text="icon('name')"></span></button></th>
-              <th style="{{ th_left }}"><button @click="sort('position')" style="{{ btn }}">Position<span style="font-size:.7rem;opacity:.55;" x-text="icon('position')"></span></button></th>
+              <th style="{{ th_left }}"><button @click="sort('name')" style="{{ btn }}">{{ t.table.player }}<span style="font-size:.7rem;opacity:.55;" x-text="icon('name')"></span></button></th>
+              <th style="{{ th_left }}"><button @click="sort('position')" style="{{ btn }}">{{ t.table.position }}<span style="font-size:.7rem;opacity:.55;" x-text="icon('position')"></span></button></th>
               <th style="{{ th_ctr }}"><button @click="sort('gp')" style="{{ btn }}">GP<span style="font-size:.7rem;opacity:.55;" x-text="icon('gp')"></span></button></th>
               <th style="{{ th_ctr }}"><button @click="sort('g')" style="{{ btn }}">G<span style="font-size:.7rem;opacity:.55;" x-text="icon('g')"></span></button></th>
               <th style="{{ th_ctr }}"><button @click="sort('a')" style="{{ btn }}">A<span style="font-size:.7rem;opacity:.55;" x-text="icon('a')"></span></button></th>

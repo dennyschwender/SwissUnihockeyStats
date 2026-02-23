@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Leagues – {{ t.common.app_name }}{% endblock %}
+{% block title %}{{ t.nav.leagues }} – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
 <script type="application/json" id="leagues-data">{{ leagues_flat | tojson }}</script>

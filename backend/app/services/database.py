@@ -3,10 +3,10 @@ Database service for managing connections and sessions
 """
 import logging
 from contextlib import contextmanager
-from typing import Generator
+from typing import Generator, Optional
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, StaticPool
 
 from app.models.db_models import Base
 from app.config import settings
@@ -45,15 +45,16 @@ class DatabaseService:
         
         # Create engine
         if self.database_url.startswith("sqlite"):
-            # SQLite-specific configuration.
-            # NullPool: each session_scope() gets its own connection so
-            # concurrent threads (asyncio.to_thread jobs) never share a
-            # connection.  WAL mode + busy_timeout serialise writes at the
-            # file level, so this is safe.
+            # For :memory: databases (tests) use StaticPool so all connections
+            # share the same in-memory database.  For file-based SQLite use
+            # NullPool so concurrent asyncio.to_thread workers each get their
+            # own connection; WAL + busy_timeout serialise writes at the
+            # file level, which is safe.
+            is_memory = ":memory:" in self.database_url
             self.engine = create_engine(
                 self.database_url,
                 connect_args={"check_same_thread": False},
-                poolclass=NullPool,
+                poolclass=StaticPool if is_memory else NullPool,
                 echo=False  # Set to True for SQL debugging
             )
             
@@ -184,7 +185,7 @@ class DatabaseService:
 
 
 # Global database service instance
-_db_service: DatabaseService = None
+_db_service: Optional[DatabaseService] = None
 
 
 def get_database_service() -> DatabaseService:

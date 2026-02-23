@@ -12,6 +12,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import requests
+import requests.exceptions
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,9 +48,14 @@ class CacheManager:
         return {}
 
     def _save_metadata(self):
+        """Atomically persist metadata to disk using a temp file + rename."""
         try:
-            with open(self.metadata_file, "w", encoding="utf-8") as f:
+            tmp = self.metadata_file.with_suffix(".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(self.metadata, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            tmp.replace(self.metadata_file)  # atomic on POSIX
         except Exception as e:
             logger.error(f"Failed to save cache metadata: {e}")
 
@@ -151,7 +159,6 @@ class SwissUnihockeyClient:
         use_cache: bool = True,
         cache_dir: str = "data/cache",
     ):
-        import requests
         self.base_url = base_url.rstrip("/")
         self.locale = locale
         self.timeout = timeout
@@ -162,7 +169,6 @@ class SwissUnihockeyClient:
         self.cache = CacheManager(cache_dir) if use_cache else None
 
     def _make_request(self, endpoint: str, params: Optional[Dict[str, Any]] = None, category: str = "general", force_refresh: bool = False) -> Dict[str, Any]:
-        import requests as _requests
         if params is None:
             params = {}
         params["locale"] = self.locale
@@ -182,7 +188,7 @@ class SwissUnihockeyClient:
                 if self.use_cache:
                     self.cache.set(endpoint, params, data, category)
                 return data
-            except _requests.exceptions.RequestException as e:
+            except requests.exceptions.RequestException as e:
                 last_exc = e
                 logger.warning(f"Request failed (attempt {attempt+1}/{self.retry_attempts}): {e}")
                 if attempt < self.retry_attempts - 1:
