@@ -388,14 +388,16 @@ function eventsTable(goals, penalties) {
   </div>
 
   <!-- Tabs -->
-  <div class="gd-tabs" x-data="{ tab: '{% if game.home_score is not none %}events{% else %}h2h{% endif %}' }" x-cloak>
+  <div class="gd-tabs" x-data="{ tab: '{% if game.home_score is not none and (game.goals or game.penalties) %}events{% else %}h2h{% endif %}' }" x-cloak>
     <div class="gd-tabbar" role="tablist">
-      {% for tid, tlabel, icon in [('events', t.game.tab_events, '📋'),('roster', t.game.tab_roster, '👥'),('h2h', t.game.tab_h2h, '📊'),('table', t.game.tab_table, '🏆')] %}
-      <button class="gd-tab" :class="tab === '{{ tid }}' ? 'active' : ''"
-              @click="tab = '{{ tid }}'" role="tab">
-        {{ icon }} {{ tlabel }}
-      </button>
-      {% endfor %}
+      {% if game.goals or game.penalties %}
+      <button class="gd-tab" :class="tab === 'events' ? 'active' : ''" @click="tab = 'events'" role="tab">📋 {{ t.game.tab_events }}</button>
+      {% endif %}
+      {% if game.roster_home or game.roster_away %}
+      <button class="gd-tab" :class="tab === 'roster' ? 'active' : ''" @click="tab = 'roster'" role="tab">👥 {{ t.game.tab_roster }}</button>
+      {% endif %}
+      <button class="gd-tab" :class="tab === 'h2h' ? 'active' : ''" @click="tab = 'h2h'" role="tab">📊 {{ t.game.tab_h2h }}</button>
+      <button class="gd-tab" :class="tab === 'table' ? 'active' : ''" @click="tab = 'table'" role="tab">🏆 {{ t.game.tab_table }}</button>
     </div>
 
     <!-- EVENTS tab -->
