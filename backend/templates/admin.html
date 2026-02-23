@@ -1234,7 +1234,6 @@ async function loadDbInfo() {
       ['Usage',       `${pagesUsed}%`],
       ['Journal mode', pragma.journal_mode || '—'],
       ['WAL autocheckpoint', pragma.wal_checkpoint != null ? `${pragma.wal_checkpoint} pages` : '—'],
-      ['Integrity',   pragma.integrity_ok == null ? '—' : (pragma.integrity_ok ? '✓ ok' : '✗ error')],
     ].map(([k, v]) => `<tr>
       <td style="padding:3px 6px 3px 0;color:#8b949e;white-space:nowrap">${k}</td>
       <td style="padding:3px 0;font-variant-numeric:tabular-nums">${v}</td>
@@ -1273,7 +1272,8 @@ async function runVacuum() {
 ═══════════════════════════════════════════════════════ */
 loadStats();
 loadScheduler();
-loadDbInfo();
+// Stagger DB info so it doesn't contend with stats at boot
+setTimeout(loadDbInfo, 2000);
 setInterval(loadStats, 30000);
 setInterval(loadScheduler, 3000);
 setInterval(loadDbInfo, 30000);

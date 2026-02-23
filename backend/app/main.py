@@ -412,7 +412,8 @@ async def admin_db_info(_: None = Depends(require_admin)):
                         "freelist_count": pg("freelist_count"),
                         "journal_mode":  pg("journal_mode"),
                         "wal_checkpoint": pg("wal_autocheckpoint"),
-                        "integrity_ok":  pg("quick_check") == "ok",
+                        # integrity_ok intentionally omitted — quick_check is
+                        # slow and can block other requests on a Pi
                     }
             pragma_info = await loop.run_in_executor(None, _read_pragma)
         except Exception as e:
@@ -1284,27 +1285,26 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                         work.append((ldb, lid, gc, None, None))
             total  = len(work)
             games_n = 0
-            push("info", f"Indexing games for {total} groups across {len(lg_list)} leagues (concurrency=3)...")
+            push("info", f"Indexing games for {total} groups across {len(lg_list)} leagues (batch concurrency=2)...")
 
-            _games_sem = asyncio.Semaphore(3)
-
-            async def _index_group(args: tuple) -> int:
-                ldb, lid, gc, grp_db_id, grp_name = args
-                async with _games_sem:
-                    return await asyncio.to_thread(
+            # Process in small batches so the event loop stays responsive
+            _GAMES_BATCH = 2
+            for batch_start in range(0, max(total, 1), _GAMES_BATCH):
+                batch = work[batch_start:batch_start + _GAMES_BATCH]
+                batch_results = await asyncio.gather(
+                    *(asyncio.to_thread(
                         indexer.index_games_for_league,
                         ldb, season, lid, gc,
                         group_name=grp_name, group_db_id=grp_db_id,
                         force=force,
-                    )
-
-            group_results = await asyncio.gather(
-                *(_index_group(w) for w in work), return_exceptions=True
-            )
-            for i, r in enumerate(group_results, 1):
-                if isinstance(r, int):
-                    games_n += r
-                set_progress(75 + int(i / total * 20) if total else 95)
+                    ) for ldb, lid, gc, grp_db_id, grp_name in batch),
+                    return_exceptions=True,
+                )
+                for r in batch_results:
+                    if isinstance(r, int):
+                        games_n += r
+                done = min(batch_start + _GAMES_BATCH, total)
+                set_progress(75 + int(done / total * 20) if total else 95)
             stats["games"] = games_n
             push("ok", f"Games: {games_n}")
 
@@ -1372,29 +1372,28 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                     push("info", f"  Skipping {skipped} already-indexed game(s).")
 
             total    = len(finished)
-            push("info", f"Indexing events + lineups for {total} past games ({tier_lbl}, concurrency=4)...")
+            push("info", f"Indexing events + lineups for {total} past games ({tier_lbl}, batch concurrency=2)...")
             events_n = 0
             lineup_n = 0
 
-            # Run up to 4 games concurrently.  API fetches now happen *outside*
-            # the DB session so the write lock is held only briefly for inserts.
-            _events_sem = asyncio.Semaphore(4)
-
-            async def _process_game(gid: int, sid_: int) -> tuple[int, int]:
-                async with _events_sem:
-                    ev = await asyncio.to_thread(indexer.index_game_events, gid, sid_, force=force)
-                    ln = await asyncio.to_thread(indexer.index_game_lineup, gid, sid_, force=force)
-                    return ev, ln
-
-            game_results = await asyncio.gather(
-                *(_process_game(gid, sid_) for gid, sid_ in finished),
-                return_exceptions=True,
-            )
-            for i, r in enumerate(game_results, 1):
-                if not isinstance(r, Exception):
-                    events_n += r[0]
-                    lineup_n += r[1]
-                set_progress(int(i / total * 95) if total else 99)
+            # Process in small batches (2 games at a time) so the event loop
+            # stays responsive for admin API requests between batches.
+            _EV_BATCH = 2
+            for batch_start in range(0, max(total, 1), _EV_BATCH):
+                batch = finished[batch_start:batch_start + _EV_BATCH]
+                batch_results = await asyncio.gather(
+                    *(asyncio.gather(
+                        asyncio.to_thread(indexer.index_game_events, gid, sid_, force=force),
+                        asyncio.to_thread(indexer.index_game_lineup, gid, sid_, force=force),
+                    ) for gid, sid_ in batch),
+                    return_exceptions=True,
+                )
+                for r in batch_results:
+                    if not isinstance(r, Exception) and isinstance(r, (list, tuple)) and len(r) == 2:
+                        events_n += r[0]
+                        lineup_n += r[1]
+                done = min(batch_start + _EV_BATCH, total)
+                set_progress(int(done / total * 95) if total else 99)
             stats["game_events"] = events_n
             stats["lineups"] = lineup_n
             push("ok", f"Game events: {events_n}  Lineups: {lineup_n}")
