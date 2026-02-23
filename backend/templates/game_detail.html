@@ -177,6 +177,8 @@
   /* Roster */
   .gd-roster { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
   @media (max-width:640px) { .gd-roster { grid-template-columns:1fr; } }
+  @media (max-width:768px) { .gd-tabpanel { padding: 1rem; } }
+  @media (max-width:480px) { .gd-tabpanel { padding: .75rem .5rem; } .gd-teams { gap: 1rem; } .gd-scorebox { padding: 1rem .75rem; } }
   .gd-roster-header {
     font-size:.8rem; font-weight:700; text-transform:uppercase;
     letter-spacing:.05em; color:var(--gray-500);
@@ -409,7 +411,8 @@ function eventsTable(goals, penalties) {
           <button class="gd-filter-btn" :class="filter === 'goal' ? 'active' : ''" @click="filter = 'goal'">{{ t.game.event_goals }}</button>
           <button class="gd-filter-btn" :class="filter === 'penalty' ? 'active' : ''" @click="filter = 'penalty'">{{ t.game.event_penalties }}</button>
         </div>
-        <table class="gd-table">
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <table class="gd-table" style="min-width:380px;">
           <thead><tr>
             <th :class="cls('period')" @click="sortBy('period')">{{ t.table.period }}<span class="sort-icon" x-text="icon('period')"></span></th>
             <th :class="cls('time')" @click="sortBy('time')">{{ t.table.time }}<span class="sort-icon" x-text="icon('time')"></span></th>
@@ -438,6 +441,7 @@ function eventsTable(goals, penalties) {
             </template>
           </tbody>
         </table>
+        </div>
       </div>
       {% else %}
       <div class="gd-empty">
@@ -453,7 +457,8 @@ function eventsTable(goals, penalties) {
       <div class="gd-roster">
         <div x-data='sortTable({{ game.roster_home | tojson }}, "jersey", "asc")'>
           <div class="gd-roster-header">{{ game.home_team }}</div>
-          <table class="gd-table" style="font-size:.8rem;">
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+          <table class="gd-table" style="font-size:.8rem;min-width:420px;">
             <thead><tr>
               <th :class="cls('jersey')"     @click="sortBy('jersey')"     style="width:2rem;">#<span class="sort-icon" x-text="icon('jersey')"></span></th>
               <th :class="cls('position')"   @click="sortBy('position')"   style="width:3rem;">{{ t.table.pos }}<span class="sort-icon" x-text="icon('position')"></span></th>
@@ -483,10 +488,12 @@ function eventsTable(goals, penalties) {
               </template>
             </tbody>
           </table>
+          </div>
         </div>
         <div x-data='sortTable({{ game.roster_away | tojson }}, "jersey", "asc")'>
           <div class="gd-roster-header">{{ game.away_team }}</div>
-          <table class="gd-table" style="font-size:.8rem;">
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+          <table class="gd-table" style="font-size:.8rem;min-width:420px;">
             <thead><tr>
               <th :class="cls('jersey')"     @click="sortBy('jersey')"     style="width:2rem;">#<span class="sort-icon" x-text="icon('jersey')"></span></th>
               <th :class="cls('position')"   @click="sortBy('position')"   style="width:3rem;">{{ t.table.pos }}<span class="sort-icon" x-text="icon('position')"></span></th>
@@ -516,6 +523,7 @@ function eventsTable(goals, penalties) {
               </template>
             </tbody>
           </table>
+          </div>
         </div>
       </div>
       {% else %}
@@ -542,7 +550,8 @@ function eventsTable(goals, penalties) {
       </p>
 
       {% if game.h2h_games %}
-      <table class="gd-table" style="margin-bottom:1.75rem;table-layout:fixed;width:100%;">
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+      <table class="gd-table" style="margin-bottom:1.75rem;table-layout:fixed;width:100%;min-width:320px;">
         <thead><tr>
           <th style="width:5.5rem;">{{ t.table.date }}</th>
           <th style="text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.table.home }}</th>
@@ -560,6 +569,7 @@ function eventsTable(goals, penalties) {
           {% endfor %}
         </tbody>
       </table>
+      </div>
       {% else %}
       <p style="font-size:.82rem;color:var(--gray-400);margin-bottom:1.5rem;">{{ t.game.no_h2h }}</p>
       {% endif %}
@@ -684,7 +694,8 @@ function eventsTable(goals, penalties) {
       <h3 style="font-size:.85rem;font-weight:700;margin:0 0 1rem;color:var(--gray-600);text-transform:uppercase;letter-spacing:.05em;">
         🏆 {{ game.league_name }}{% if game.group_name %} – {{ game.group_name }}{% endif %}
       </h3>
-      <table class="gd-table">
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+      <table class="gd-table" style="min-width:420px;">
         <thead><tr>
           <th style="width:2rem;text-align:center;">#</th>
           <th>{{ t.table.team }}</th>
@@ -712,6 +723,7 @@ function eventsTable(goals, penalties) {
           {% endfor %}
         </tbody>
       </table>
+      </div>
       {% else %}
       <div class="gd-empty">
         <div class="gd-empty-icon">🏆</div>
