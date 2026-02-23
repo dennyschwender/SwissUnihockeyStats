@@ -1188,11 +1188,6 @@ function fmtBytes(n) {
   return v.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
 }
 
-function fmt(n) {
-  if (n == null) return '—';
-  return Number(n).toLocaleString();
-}
-
 async function loadDbInfo() {
   try {
     const r = await fetch('/admin/api/db-info');
