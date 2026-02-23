@@ -682,6 +682,7 @@ function registerJob(data) {
 const _pollErrors = {};  // job_id → consecutive error count
 const _seenJobHistory = new Set(); // job_ids whose history has been shown in the log
 const POLL_MAX_ERRORS = 4;
+const JOB_KEEP_MS = 5 * 60 * 1000;  // keep finished job cards visible for 5 minutes
 
 async function pollJob(job_id) {
   try {
@@ -720,13 +721,13 @@ async function pollJob(job_id) {
       const stats = Object.entries(d.stats || {}).map(([k,v]) => `${k}:${fmt(v)}`).join(' ');
       log('ok', `✓ Job ${job_id.slice(-6)} done  ${stats}`);
       setTimeout(loadStats, 600);
-      setTimeout(() => { delete jobs[job_id]; _seenJobHistory.delete(job_id); renderJobs(); }, 60000); // auto-remove after 60s
+      setTimeout(() => { delete jobs[job_id]; _seenJobHistory.delete(job_id); renderJobs(); }, JOB_KEEP_MS);
     } else if (d.status === 'stopped') {
       log('warn', `■ Job ${job_id.slice(-6)} stopped`);
-      setTimeout(() => { delete jobs[job_id]; _seenJobHistory.delete(job_id); renderJobs(); }, 60000); // auto-remove after 60s
+      setTimeout(() => { delete jobs[job_id]; _seenJobHistory.delete(job_id); renderJobs(); }, JOB_KEEP_MS);
     } else if (d.status === 'error') {
       log('error', `✗ Job ${job_id.slice(-6)} failed: ${d.error}`);
-      setTimeout(() => { delete jobs[job_id]; _seenJobHistory.delete(job_id); renderJobs(); }, 60000); // auto-remove after 60s
+      setTimeout(() => { delete jobs[job_id]; _seenJobHistory.delete(job_id); renderJobs(); }, JOB_KEEP_MS);
     }
   } catch(e) {
     _handlePollError(job_id, e.message);
