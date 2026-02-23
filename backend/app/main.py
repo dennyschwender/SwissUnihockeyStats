@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 import asyncio
 import hashlib
 import hmac
+import time
 import uuid
 import logging
 import traceback
@@ -97,6 +98,10 @@ async def lifespan(app: FastAPI):
             _sched_instance.run(), name="scheduler"
         )
         logger.info("✓ Scheduler started")
+
+        # Pre-warm admin stats cache so the first admin page load is instant.
+        asyncio.create_task(_refresh_stats_cache(), name="stats-prewarm")
+        logger.info("✓ Admin stats pre-warm scheduled")
 
     except Exception as e:
         logger.error(f"❌ Failed to initialize application: {e}")
@@ -361,13 +366,28 @@ async def admin_page(request: Request, _: None = Depends(require_admin)):
 
 @app.get("/admin/api/stats")
 async def admin_stats(_: None = Depends(require_admin)):
-    """Per-entity DB counts, per-season breakdown, and last 100 sync records."""
-    loop = asyncio.get_running_loop()
+    """Per-entity DB counts, per-season breakdown, and last 100 sync records.
+
+    Uses an in-memory cache (_stats_cache) so that repeated 30-second polls
+    return instantly.  A background task keeps the cache warm; the first call
+    after a server restart will await the initial computation.
+    """
+    global _stats_cache, _stats_cache_time
+    now = time.monotonic()
+    cache_age = now - _stats_cache_time
+
+    if _stats_cache is not None:
+        # Return cached data immediately and kick off a background refresh if stale.
+        if cache_age >= _STATS_CACHE_TTL:
+            asyncio.ensure_future(_refresh_stats_cache())
+        return _stats_cache
+
+    # No cache yet — await the first computation (only happens once after restart).
     try:
-        return await loop.run_in_executor(None, _admin_stats_sync)
+        await _refresh_stats_cache()
+        return _stats_cache or {"totals": {}, "by_season": [], "sync_status": []}
     except Exception as exc:
         logger.error("admin_stats failed: %s", exc, exc_info=True)
-        # Return a stub so the UI shows zeros instead of "Stats load failed"
         return {"totals": {}, "by_season": [], "sync_status": [], "error": str(exc)}
 
 
@@ -465,10 +485,10 @@ def _admin_stats_sync():
 
     db_service = get_database_service()
     with db_service.session_scope() as session:
-        # Increase busy timeout for this read-only stats query so it doesn't
-        # fail when a heavy write job (events indexing) holds the DB lock.
+        # Short busy timeout — WAL mode readers shouldn't block, but if they do
+        # we want to fail fast (3 s) rather than hang for 30 s.
         try:
-            session.execute(text("PRAGMA busy_timeout=30000"))
+            session.execute(text("PRAGMA busy_timeout=3000"))
         except Exception:
             pass
 
@@ -572,6 +592,34 @@ def _admin_stats_sync():
             sync_status = []
 
     return {"totals": totals, "by_season": by_season, "sync_status": sync_status}
+
+
+# ── Admin stats in-memory cache ───────────────────────────────────────────────
+# The stats query runs ~18 GROUP BY queries and can take 5-30 s on a Pi.
+# We cache the last result and serve it instantly; background refresh keeps it
+# fresh every _STATS_CACHE_TTL seconds (same as the JS poll interval).
+_stats_cache: dict | None = None
+_stats_cache_time: float = 0.0
+_stats_is_refreshing: bool = False
+_STATS_CACHE_TTL: float = 30.0  # seconds
+
+
+async def _refresh_stats_cache() -> None:
+    """Compute fresh admin stats in a thread and update the module-level cache."""
+    global _stats_cache, _stats_cache_time, _stats_is_refreshing
+    if _stats_is_refreshing:
+        return  # already running
+    _stats_is_refreshing = True
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, _admin_stats_sync)
+        _stats_cache = result
+        _stats_cache_time = time.monotonic()
+        logger.debug("Admin stats cache refreshed")
+    except Exception as exc:
+        logger.warning("Admin stats cache refresh failed: %s", exc)
+    finally:
+        _stats_is_refreshing = False
 
 
 # In-memory job registry for background indexing tasks
