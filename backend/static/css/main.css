@@ -1175,23 +1175,5 @@ html.dark-mode .image-skeleton {
     min-width: auto;
     width: 100%;
   }
-
-  /* ── Home page game rows: hide league label, tighten card ── */
-  .home-game-card {
-    padding: .6rem .625rem;
-  }
-
-  .game-row-league {
-    display: none;
-  }
-
-  /* ── Home top-scorers: hide GP/G/A, keep #, Player, PTS ── */
-  .home-scorers-table th:nth-child(3),
-  .home-scorers-table td:nth-child(3),
-  .home-scorers-table th:nth-child(4),
-  .home-scorers-table td:nth-child(4),
-  .home-scorers-table th:nth-child(5),
-  .home-scorers-table td:nth-child(5) {
-    display: none;
-  }
 }
+
