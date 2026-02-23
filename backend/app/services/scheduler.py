@@ -498,26 +498,47 @@ class Scheduler:
 
             with db_service.session_scope() as session:
                 # Seasons that have been at least partially indexed
-                indexed_seasons: list[int] = [
-                    r[0] for r in session.query(Season.id).order_by(Season.id.desc()).all()
-                ]
+                season_rows = (
+                    session.query(Season.id, Season.highlighted)
+                    .order_by(Season.id.desc())
+                    .all()
+                )
+                # Identify the current (highlighted) season — only it gets recurring updates
+                current_season_id: int | None = next(
+                    (r[0] for r in season_rows if r[1]), None
+                )
+                indexed_seasons: list[int] = [r[0] for r in season_rows]
 
                 for policy in POLICIES:
                     if policy["scope"] == "global":
-                        self._maybe_schedule(session, policy, season=None)
+                        self._maybe_schedule(session, policy, season=None, is_current_season=True)
                     else:
                         for sid in indexed_seasons:
                             if self._season_filtered(sid):
                                 continue
-                            self._maybe_schedule(session, policy, season=sid)
+                            self._maybe_schedule(
+                                session, policy, season=sid,
+                                is_current_season=(sid == current_season_id),
+                            )
 
                 # Cold start complete – subsequent ticks use normal max_age scheduling
                 self._cold_start = False
         except Exception as exc:
             logger.error("[scheduler] refresh_queue error: %s", exc, exc_info=True)
 
-    def _maybe_schedule(self, session, policy: dict, season: int | None):
-        """Schedule a job if none is already queued for this policy+season."""
+    def _maybe_schedule(
+        self,
+        session,
+        policy: dict,
+        season: int | None,
+        is_current_season: bool = True,
+    ):
+        """Schedule a job if none is already queued for this policy+season.
+
+        Past seasons (is_current_season=False) are indexed once and then frozen:
+        once a completed sync exists their data never changes, so we skip
+        rescheduling to avoid thousands of redundant API calls per day.
+        """
         key = (policy["name"], season)
 
         # Don't double-queue
@@ -534,6 +555,11 @@ class Scheduler:
 
         last_sync = _last_sync_for(session, policy["entity_type"], season)
         now = _utcnow()
+
+        # Past seasons are frozen once indexed — their data never changes after
+        # the season ends, so we index once and never reschedule again.
+        if not is_current_season and last_sync is not None:
+            return
 
         if last_sync is None or self._cold_start:
             # Never synced or cold-start (first run after enable) –
