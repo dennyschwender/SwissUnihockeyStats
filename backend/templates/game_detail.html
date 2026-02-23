@@ -24,6 +24,7 @@
   .gd-team--away { text-align:left; }
   .gd-team a { font-size:1.35rem; font-weight:700; text-decoration:none; color:inherit; }
   .gd-team a:hover { color:var(--swiss-red); }
+  .gd-team-record { font-size:.78rem; color:var(--gray-400); margin-top:.25rem; }
   .gd-score {
     font-size:3rem; font-weight:900;
     font-variant-numeric: tabular-nums;
@@ -33,7 +34,41 @@
   }
   .gd-status { margin-top:.6rem; font-size:.8rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:.04em; }
 
-  /* ── Tabs ── */
+  /* Period scores */
+  .gd-period-grid {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin: .75rem auto 0;
+    max-width: 360px;
+  }
+  .gd-period-cell {
+    flex: 1;
+    text-align: center;
+    padding: .3rem .4rem;
+    border: 1px solid var(--gray-200);
+    border-right: none;
+  }
+  .gd-period-cell:last-child { border-right: 1px solid var(--gray-200); }
+  .gd-period-label { font-size:.65rem; color:var(--gray-400); text-transform:uppercase; letter-spacing:.04em; }
+  .gd-period-score { font-size:.9rem; font-weight:700; font-variant-numeric:tabular-nums; }
+
+  /* Game summary bar */
+  .gd-summary {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: 1rem;
+    padding-top: .75rem;
+    border-top: 1px solid var(--gray-100);
+    font-size: .8rem;
+    flex-wrap: wrap;
+  }
+  .gd-summary-item { display:flex; flex-direction:column; align-items:center; gap:.1rem; }
+  .gd-summary-label { font-size:.68rem; color:var(--gray-400); text-transform:uppercase; letter-spacing:.04em; }
+  .gd-summary-val { font-weight:700; font-variant-numeric:tabular-nums; }
+
+  /* Tabs */
   .gd-tabs {
     background: var(--card-bg, white);
     border: 1px solid var(--gray-200);
@@ -44,6 +79,7 @@
     display: flex;
     border-bottom: 1px solid var(--gray-200);
     background: var(--gray-50, #f9fafb);
+    overflow-x: auto;
   }
   .gd-tab {
     padding: .75rem 1.5rem;
@@ -67,7 +103,7 @@
   }
   .gd-tabpanel { padding: 1.5rem; }
 
-  /* ── Tables ── */
+  /* Tables */
   .gd-table { width:100%; border-collapse:collapse; font-size:.875rem; }
   .gd-table thead tr { background:var(--gray-50,#f9fafb); }
   .gd-table th {
@@ -97,7 +133,7 @@
   .gd-min { text-align:center; }
   .gd-infraction { color:var(--gray-600); }
 
-  /* ── Best players (scorebox) ── */
+  /* Best players */
   .gd-best-row {
     display: flex;
     justify-content: space-between;
@@ -115,7 +151,7 @@
   .gd-best-player-label { color:var(--gray-400); font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; }
   .gd-best-player-name { font-weight:600; color:var(--gray-700); }
 
-  /* ── Events filter bar ── */
+  /* Events filter */
   .gd-filter-bar { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; align-items:center; }
   .gd-filter-btn {
     padding:.3rem .85rem;
@@ -138,7 +174,7 @@
   html.dark-mode .gd-row-penalty { background: rgba(245,158,11,.08) !important; }
   html.dark-mode .gd-row-penalty:hover { background: rgba(245,158,11,.14) !important; }
 
-  /* ── Roster ── */
+  /* Roster */
   .gd-roster { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
   @media (max-width:640px) { .gd-roster { grid-template-columns:1fr; } }
   .gd-roster-header {
@@ -149,7 +185,46 @@
     margin-bottom:.5rem;
   }
 
-  /* ── Empty state ── */
+  /* H2H grid */
+  .gd-h2h-grid { display:grid; grid-template-columns:1fr 1fr; gap:2rem; }
+  @media (max-width:640px) { .gd-h2h-grid { grid-template-columns:1fr; } }
+  .gd-h2h-section-title { font-size:.85rem; font-weight:700; margin-bottom:.6rem; color:var(--gray-700); }
+
+  /* Form strip */
+  .gd-form-strip { display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:.35rem; }
+  .gd-form-badge {
+    display:inline-flex; align-items:center; justify-content:center;
+    border-radius:.3rem; font-size:.72rem; font-weight:700;
+    text-decoration:none; color:white;
+  }
+  .gd-form-badge--W { background:#16a34a; }
+  .gd-form-badge--D { background:#9ca3af; }
+  .gd-form-badge--L { background:#dc2626; }
+
+  /* Averages grid */
+  .gd-avgs {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: .4rem .75rem;
+    align-items: center;
+    background: var(--gray-50,#f9fafb);
+    border: 1px solid var(--gray-200);
+    border-radius: .5rem;
+    padding: .75rem 1rem;
+    margin-bottom: 1.5rem;
+    font-size: .82rem;
+  }
+  .gd-avgs-home { text-align:right; font-variant-numeric:tabular-nums; }
+  .gd-avgs-away { text-align:left; font-variant-numeric:tabular-nums; }
+  .gd-avgs-label { text-align:center; color:var(--gray-400); font-size:.75rem; white-space:nowrap; }
+  .gd-avgs-header { font-weight:700; font-size:.78rem; color:var(--gray-600); }
+  .gd-avgs-dim { color:var(--gray-400); }
+
+  /* Standings */
+  .gd-standings-highlight { background:var(--primary-50,#fef2f2) !important; font-weight:600; }
+  html.dark-mode .gd-standings-highlight { background:var(--primary-100,#3d1a1a) !important; }
+
+  /* Empty state */
   .gd-empty { text-align:center; padding:3rem 1rem; color:var(--gray-400); }
   .gd-empty-icon { font-size:2.25rem; margin-bottom:.5rem; }
 </style>
@@ -233,11 +308,16 @@ function eventsTable(goals, penalties) {
   <!-- Score Header -->
   <div class="gd-scorebox">
     <div class="gd-meta">
-      {{ game.date }}{% if game.time %} · {{ game.time }}{% endif %}{% if game.venue %} · {{ game.venue }}{% endif %}
+      {{ game.date }}{% if game.time %} · {{ game.time }}{% endif %}
+      {% if game.venue %} · <a href="https://www.google.com/maps/search/?api=1&query={{ game.venue | urlencode }}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;">📍 {{ game.venue }}</a>{% endif %}
     </div>
+
     <div class="gd-teams">
       <div class="gd-team gd-team--home">
         <a href="/{{ locale }}/team/{{ game.home_team_id }}">{{ game.home_team }}</a>
+        {% if game.home_record %}
+        <div class="gd-team-record">{{ game.home_record.w }}W·{{ game.home_record.d }}D·{{ game.home_record.l }}L</div>
+        {% endif %}
       </div>
       <div class="gd-score">
         {% if game.home_score is not none %}
@@ -248,11 +328,44 @@ function eventsTable(goals, penalties) {
       </div>
       <div class="gd-team gd-team--away">
         <a href="/{{ locale }}/team/{{ game.away_team_id }}">{{ game.away_team }}</a>
+        {% if game.away_record %}
+        <div class="gd-team-record">{{ game.away_record.w }}W·{{ game.away_record.d }}D·{{ game.away_record.l }}L</div>
+        {% endif %}
       </div>
     </div>
+
     {% if game.status %}
     <div class="gd-status">{{ game.status }}</div>
     {% endif %}
+
+    {% if game.period_scores %}
+    <div class="gd-period-grid">
+      {% for ps in game.period_scores %}
+      <div class="gd-period-cell">
+        <div class="gd-period-label">{{ ps.period }}</div>
+        <div class="gd-period-score">{{ ps.home }}–{{ ps.away }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if game.game_summary %}
+    <div class="gd-summary">
+      <div class="gd-summary-item">
+        <span class="gd-summary-label">🥅 Goals</span>
+        <span class="gd-summary-val">{{ game.game_summary.home_goals }} – {{ game.game_summary.away_goals }}</span>
+      </div>
+      <div class="gd-summary-item">
+        <span class="gd-summary-label">🟨 Penalties</span>
+        <span class="gd-summary-val">{{ game.game_summary.home_penalties }} – {{ game.game_summary.away_penalties }}</span>
+      </div>
+      <div class="gd-summary-item">
+        <span class="gd-summary-label">⏱ PIM</span>
+        <span class="gd-summary-val">{{ game.game_summary.home_pim }}' – {{ game.game_summary.away_pim }}'</span>
+      </div>
+    </div>
+    {% endif %}
+
     {% if game.best_players %}
     <div class="gd-best-row">
       {% set home_best = game.best_players | selectattr('team', 'equalto', game.home_team) | first | default(none) %}
@@ -275,9 +388,9 @@ function eventsTable(goals, penalties) {
   </div>
 
   <!-- Tabs -->
-  <div class="gd-tabs" x-data="{ tab: 'events' }" x-cloak>
+  <div class="gd-tabs" x-data="{ tab: '{% if game.home_score is not none %}events{% else %}h2h{% endif %}' }" x-cloak>
     <div class="gd-tabbar" role="tablist">
-      {% for tid, tlabel, icon in [('events', t.game.tab_events, '📋'),('roster', t.game.tab_roster, '👥')] %}
+      {% for tid, tlabel, icon in [('events', t.game.tab_events, '📋'),('roster', t.game.tab_roster, '👥'),('h2h', t.game.tab_h2h, '📊'),('table', t.game.tab_table, '🏆')] %}
       <button class="gd-tab" :class="tab === '{{ tid }}' ? 'active' : ''"
               @click="tab = '{{ tid }}'" role="tab">
         {{ icon }} {{ tlabel }}
@@ -285,7 +398,7 @@ function eventsTable(goals, penalties) {
       {% endfor %}
     </div>
 
-    <!-- EVENTS (goals + penalties merged) -->
+    <!-- EVENTS tab -->
     <div class="gd-tabpanel" x-show="tab === 'events'">
       {% if game.goals or game.penalties %}
       <div x-data='eventsTable({{ game.goals | tojson }}, {{ game.penalties | tojson }})'>
@@ -294,15 +407,14 @@ function eventsTable(goals, penalties) {
           <button class="gd-filter-btn" :class="filter === 'goal' ? 'active' : ''" @click="filter = 'goal'">{{ t.game.event_goals }}</button>
           <button class="gd-filter-btn" :class="filter === 'penalty' ? 'active' : ''" @click="filter = 'penalty'">{{ t.game.event_penalties }}</button>
         </div>
-        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
         <table class="gd-table">
           <thead><tr>
-            <th :class="cls('period')"     @click="sortBy('period')"    >{{ t.table.period }}<span class="sort-icon" x-text="icon('period')"></span></th>
-            <th :class="cls('time')"       @click="sortBy('time')"      >{{ t.table.time }}<span class="sort-icon" x-text="icon('time')"></span></th>
-            <th :class="cls('type')"       @click="sortBy('type')"      >{{ t.table.type }}<span class="sort-icon" x-text="icon('type')"></span></th>
-            <th :class="cls('team')"       @click="sortBy('team')"      >{{ t.table.team }}<span class="sort-icon" x-text="icon('team')"></span></th>
-            <th :class="cls('player')"     @click="sortBy('player')"    >{{ t.table.player }}<span class="sort-icon" x-text="icon('player')"></span></th>
-            <th :class="cls('score')"      @click="sortBy('score')"     >{{ t.table.score_penalty }}<span class="sort-icon" x-text="icon('score')"></span></th>
+            <th :class="cls('period')" @click="sortBy('period')">{{ t.table.period }}<span class="sort-icon" x-text="icon('period')"></span></th>
+            <th :class="cls('time')" @click="sortBy('time')">{{ t.table.time }}<span class="sort-icon" x-text="icon('time')"></span></th>
+            <th :class="cls('type')" @click="sortBy('type')">{{ t.table.type }}<span class="sort-icon" x-text="icon('type')"></span></th>
+            <th :class="cls('team')" @click="sortBy('team')">{{ t.table.team }}<span class="sort-icon" x-text="icon('team')"></span></th>
+            <th :class="cls('player')" @click="sortBy('player')">{{ t.table.player }}<span class="sort-icon" x-text="icon('player')"></span></th>
+            <th :class="cls('score')" @click="sortBy('score')">{{ t.table.score_penalty }}<span class="sort-icon" x-text="icon('score')"></span></th>
           </tr></thead>
           <tbody>
             <template x-for="(e, i) in sorted" :key="e.type + e.time + e.team + (e.player || '')">
@@ -324,7 +436,6 @@ function eventsTable(goals, penalties) {
             </template>
           </tbody>
         </table>
-        </div>
       </div>
       {% else %}
       <div class="gd-empty">
@@ -334,24 +445,38 @@ function eventsTable(goals, penalties) {
       {% endif %}
     </div>
 
-    <!-- ROSTER -->
+    <!-- ROSTER tab -->
     <div class="gd-tabpanel" x-show="tab === 'roster'">
       {% if game.roster_home or game.roster_away %}
       <div class="gd-roster">
         <div x-data='sortTable({{ game.roster_home | tojson }}, "jersey", "asc")'>
           <div class="gd-roster-header">{{ game.home_team }}</div>
-          <table class="gd-table">
+          <table class="gd-table" style="font-size:.8rem;">
             <thead><tr>
-              <th :class="cls('jersey')"   @click="sortBy('jersey')"  >#<span class="sort-icon" x-text="icon('jersey')"></span></th>
-              <th :class="cls('position')" @click="sortBy('position')">{{ t.table.pos }}<span class="sort-icon" x-text="icon('position')"></span></th>
-              <th :class="cls('player')"   @click="sortBy('player')"  >{{ t.table.player }}<span class="sort-icon" x-text="icon('player')"></span></th>
+              <th :class="cls('jersey')"     @click="sortBy('jersey')"     style="width:2rem;">#<span class="sort-icon" x-text="icon('jersey')"></span></th>
+              <th :class="cls('position')"   @click="sortBy('position')"   style="width:3rem;">{{ t.table.pos }}<span class="sort-icon" x-text="icon('position')"></span></th>
+              <th :class="cls('player')"     @click="sortBy('player')"     >{{ t.table.player }}<span class="sort-icon" x-text="icon('player')"></span></th>
+              <th :class="cls('game_g')"     @click="sortBy('game_g')"     style="text-align:center;" title="Goals (game)">G&#9733;<span class="sort-icon" x-text="icon('game_g')"></span></th>
+              <th :class="cls('game_a')"     @click="sortBy('game_a')"     style="text-align:center;" title="Assists (game)">A&#9733;<span class="sort-icon" x-text="icon('game_a')"></span></th>
+              <th :class="cls('game_pim')"   @click="sortBy('game_pim')"   style="text-align:center;" title="PIM (game)">PIM&#9733;<span class="sort-icon" x-text="icon('game_pim')"></span></th>
+              <th :class="cls('season_gp')"  @click="sortBy('season_gp')"  style="text-align:center;color:var(--gray-400);" title="Games played (season)">GP<span class="sort-icon" x-text="icon('season_gp')"></span></th>
+              <th :class="cls('season_g')"   @click="sortBy('season_g')"   style="text-align:center;color:var(--gray-400);" title="Goals (season)">G<span class="sort-icon" x-text="icon('season_g')"></span></th>
+              <th :class="cls('season_a')"   @click="sortBy('season_a')"   style="text-align:center;color:var(--gray-400);" title="Assists (season)">A<span class="sort-icon" x-text="icon('season_a')"></span></th>
+              <th :class="cls('season_pts')" @click="sortBy('season_pts')" style="text-align:center;color:var(--gray-400);" title="Points (season)">PTS<span class="sort-icon" x-text="icon('season_pts')"></span></th>
             </tr></thead>
             <tbody>
               <template x-for="p in sorted" :key="p.player_id || p.player">
                 <tr>
-                  <td style="width:2.5rem;font-variant-numeric:tabular-nums;color:var(--gray-500);" x-text="p.jersey || '—'"></td>
-                  <td style="width:6rem;font-size:.8rem;color:var(--gray-500);" x-text="p.position || '—'"></td>
+                  <td style="font-variant-numeric:tabular-nums;color:var(--gray-500);" x-text="p.jersey || '—'"></td>
+                  <td style="font-size:.75rem;color:var(--gray-500);" x-text="p.position || '—'"></td>
                   <td><a :href="'/{{ locale }}/player/' + p.player_id" style="text-decoration:none;color:inherit;" x-text="p.player"></a></td>
+                  <td style="text-align:center;font-weight:700;" x-text="p.game_g ?? '—'"></td>
+                  <td style="text-align:center;font-weight:700;" x-text="p.game_a ?? '—'"></td>
+                  <td style="text-align:center;font-weight:700;" x-text="p.game_pim != null && p.game_pim > 0 ? p.game_pim + \"'\" : '—'"></td>
+                  <td style="text-align:center;color:var(--gray-400);" x-text="p.season_gp ?? '—'"></td>
+                  <td style="text-align:center;color:var(--gray-400);" x-text="p.season_g ?? '—'"></td>
+                  <td style="text-align:center;color:var(--gray-400);" x-text="p.season_a ?? '—'"></td>
+                  <td style="text-align:center;color:var(--gray-400);" x-text="p.season_pts ?? '—'"></td>
                 </tr>
               </template>
             </tbody>
@@ -359,18 +484,32 @@ function eventsTable(goals, penalties) {
         </div>
         <div x-data='sortTable({{ game.roster_away | tojson }}, "jersey", "asc")'>
           <div class="gd-roster-header">{{ game.away_team }}</div>
-          <table class="gd-table">
+          <table class="gd-table" style="font-size:.8rem;">
             <thead><tr>
-              <th :class="cls('jersey')"   @click="sortBy('jersey')"  >#<span class="sort-icon" x-text="icon('jersey')"></span></th>
-              <th :class="cls('position')" @click="sortBy('position')">{{ t.table.pos }}<span class="sort-icon" x-text="icon('position')"></span></th>
-              <th :class="cls('player')"   @click="sortBy('player')"  >{{ t.table.player }}<span class="sort-icon" x-text="icon('player')"></span></th>
+              <th :class="cls('jersey')"     @click="sortBy('jersey')"     style="width:2rem;">#<span class="sort-icon" x-text="icon('jersey')"></span></th>
+              <th :class="cls('position')"   @click="sortBy('position')"   style="width:3rem;">{{ t.table.pos }}<span class="sort-icon" x-text="icon('position')"></span></th>
+              <th :class="cls('player')"     @click="sortBy('player')"     >{{ t.table.player }}<span class="sort-icon" x-text="icon('player')"></span></th>
+              <th :class="cls('game_g')"     @click="sortBy('game_g')"     style="text-align:center;" title="Goals (game)">G&#9733;<span class="sort-icon" x-text="icon('game_g')"></span></th>
+              <th :class="cls('game_a')"     @click="sortBy('game_a')"     style="text-align:center;" title="Assists (game)">A&#9733;<span class="sort-icon" x-text="icon('game_a')"></span></th>
+              <th :class="cls('game_pim')"   @click="sortBy('game_pim')"   style="text-align:center;" title="PIM (game)">PIM&#9733;<span class="sort-icon" x-text="icon('game_pim')"></span></th>
+              <th :class="cls('season_gp')"  @click="sortBy('season_gp')"  style="text-align:center;color:var(--gray-400);" title="Games played (season)">GP<span class="sort-icon" x-text="icon('season_gp')"></span></th>
+              <th :class="cls('season_g')"   @click="sortBy('season_g')"   style="text-align:center;color:var(--gray-400);" title="Goals (season)">G<span class="sort-icon" x-text="icon('season_g')"></span></th>
+              <th :class="cls('season_a')"   @click="sortBy('season_a')"   style="text-align:center;color:var(--gray-400);" title="Assists (season)">A<span class="sort-icon" x-text="icon('season_a')"></span></th>
+              <th :class="cls('season_pts')" @click="sortBy('season_pts')" style="text-align:center;color:var(--gray-400);" title="Points (season)">PTS<span class="sort-icon" x-text="icon('season_pts')"></span></th>
             </tr></thead>
             <tbody>
               <template x-for="p in sorted" :key="p.player_id || p.player">
                 <tr>
-                  <td style="width:2.5rem;font-variant-numeric:tabular-nums;color:var(--gray-500);" x-text="p.jersey || '—'"></td>
-                  <td style="width:6rem;font-size:.8rem;color:var(--gray-500);" x-text="p.position || '—'"></td>
+                  <td style="font-variant-numeric:tabular-nums;color:var(--gray-500);" x-text="p.jersey || '—'"></td>
+                  <td style="font-size:.75rem;color:var(--gray-500);" x-text="p.position || '—'"></td>
                   <td><a :href="'/{{ locale }}/player/' + p.player_id" style="text-decoration:none;color:inherit;" x-text="p.player"></a></td>
+                  <td style="text-align:center;font-weight:700;" x-text="p.game_g ?? '—'"></td>
+                  <td style="text-align:center;font-weight:700;" x-text="p.game_a ?? '—'"></td>
+                  <td style="text-align:center;font-weight:700;" x-text="p.game_pim != null && p.game_pim > 0 ? p.game_pim + \"'\" : '—'"></td>
+                  <td style="text-align:center;color:var(--gray-400);" x-text="p.season_gp ?? '—'"></td>
+                  <td style="text-align:center;color:var(--gray-400);" x-text="p.season_g ?? '—'"></td>
+                  <td style="text-align:center;color:var(--gray-400);" x-text="p.season_a ?? '—'"></td>
+                  <td style="text-align:center;color:var(--gray-400);" x-text="p.season_pts ?? '—'"></td>
                 </tr>
               </template>
             </tbody>
@@ -381,6 +520,200 @@ function eventsTable(goals, penalties) {
       <div class="gd-empty">
         <div class="gd-empty-icon">👥</div>
         <p>{{ t.game.no_roster }}</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- H2H & FORM tab -->
+    <div class="gd-tabpanel" x-show="tab === 'h2h'">
+
+      <h3 style="font-size:.85rem;font-weight:700;margin:0 0 .5rem;color:var(--gray-600);text-transform:uppercase;letter-spacing:.05em;">📊 Head to Head</h3>
+
+      <p style="font-size:.82rem;margin:0 0 1rem;text-align:center;">
+        <a href="/{{ locale }}/team/{{ game.home_team_id }}" style="text-decoration:none;color:inherit;font-weight:600;">{{ game.home_team }}</a>
+        &nbsp;<span style="font-weight:700;">{{ game.h2h_record.w }}</span>
+        &nbsp;<span style="color:var(--gray-400);">–</span>&nbsp;
+        <span style="color:var(--gray-400);">{{ game.h2h_record.d }}D</span>
+        &nbsp;<span style="color:var(--gray-400);">–</span>&nbsp;
+        <span style="font-weight:700;">{{ game.h2h_record.l }}</span>&nbsp;
+        <a href="/{{ locale }}/team/{{ game.away_team_id }}" style="text-decoration:none;color:inherit;font-weight:600;">{{ game.away_team }}</a>
+      </p>
+
+      {% if game.h2h_games %}
+      <table class="gd-table" style="margin-bottom:1.75rem;table-layout:fixed;width:100%;">
+        <thead><tr>
+          <th style="width:5.5rem;">{{ t.table.date }}</th>
+          <th style="text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.table.home }}</th>
+          <th style="text-align:center !important;width:5rem;">{{ t.table.score }}</th>
+          <th style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.table.away }}</th>
+        </tr></thead>
+        <tbody>
+          {% for hg in game.h2h_games %}
+          <tr>
+            <td style="color:var(--gray-400);white-space:nowrap;">{{ hg.date }}</td>
+            <td style="text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:.5rem;"><a href="/{{ locale }}/team/{{ hg.home_team_id }}" style="text-decoration:none;color:inherit;{% if hg.home_team_id == game.home_team_id %}font-weight:700;{% endif %}">{{ hg.home_team }}</a></td>
+            <td style="text-align:center;font-weight:700;font-variant-numeric:tabular-nums;"><a href="/{{ locale }}/game/{{ hg.game_id }}" style="text-decoration:none;color:inherit;display:block;text-align:center;">{{ hg.home_score }}–{{ hg.away_score }}</a></td>
+            <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:.5rem;"><a href="/{{ locale }}/team/{{ hg.away_team_id }}" style="text-decoration:none;color:inherit;{% if hg.away_team_id == game.away_team_id %}font-weight:700;{% endif %}">{{ hg.away_team }}</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="font-size:.82rem;color:var(--gray-400);margin-bottom:1.5rem;">{{ t.game.no_h2h }}</p>
+      {% endif %}
+
+      {% if game.home_record and game.away_record %}
+      <div class="gd-avgs">
+        <div class="gd-avgs-home gd-avgs-header" style="text-align:right;">{{ game.home_team | truncate(12, true, '…') }}</div>
+        <div class="gd-avgs-label gd-avgs-header"></div>
+        <div class="gd-avgs-away gd-avgs-header" style="text-align:left;">{{ game.away_team | truncate(12, true, '…') }}</div>
+
+        <div class="gd-avgs-home">{{ game.home_record.avg_gf }}</div>
+        <div class="gd-avgs-label">🥅 Avg GF</div>
+        <div class="gd-avgs-away">{{ game.away_record.avg_gf }}</div>
+
+        <div class="gd-avgs-home">{{ game.home_record.avg_ga }}</div>
+        <div class="gd-avgs-label">🛑 Avg GA</div>
+        <div class="gd-avgs-away">{{ game.away_record.avg_ga }}</div>
+
+        <div class="gd-avgs-home">{{ game.home_record.avg_total }}</div>
+        <div class="gd-avgs-label">⇄ Avg Total</div>
+        <div class="gd-avgs-away">{{ game.away_record.avg_total }}</div>
+
+        <div class="gd-avgs-home">{{ game.home_record.avg_pim }}'</div>
+        <div class="gd-avgs-label">⏱ Avg PIM</div>
+        <div class="gd-avgs-away">{{ game.away_record.avg_pim }}'</div>
+
+        <div class="gd-avgs-home" style="font-size:.78rem;font-weight:700;">{{ game.home_record.home.w }}W·{{ game.home_record.home.d }}D·{{ game.home_record.home.l }}L</div>
+        <div class="gd-avgs-label">🏠 Home rec.</div>
+        <div class="gd-avgs-away gd-avgs-dim" style="font-size:.78rem;">{{ game.away_record.home.w }}W·{{ game.away_record.home.d }}D·{{ game.away_record.home.l }}L</div>
+
+        <div class="gd-avgs-home gd-avgs-dim" style="font-size:.78rem;">{{ game.home_record.away.w }}W·{{ game.home_record.away.d }}D·{{ game.home_record.away.l }}L</div>
+        <div class="gd-avgs-label">✈️ Away rec.</div>
+        <div class="gd-avgs-away" style="font-size:.78rem;font-weight:700;">{{ game.away_record.away.w }}W·{{ game.away_record.away.d }}D·{{ game.away_record.away.l }}L</div>
+      </div>
+      {% endif %}
+
+      <h3 style="font-size:.85rem;font-weight:700;margin:0 0 1rem;color:var(--gray-600);text-transform:uppercase;letter-spacing:.05em;">🏒 {{ t.game.form_title }}</h3>
+      <div class="gd-h2h-grid">
+
+        <div>
+          <div class="gd-h2h-section-title"><a href="/{{ locale }}/team/{{ game.home_team_id }}" style="text-decoration:none;color:inherit;">{{ game.home_team }}</a></div>
+          {% if game.home_form %}
+          <div class="gd-form-strip">
+            {% for fg in game.home_form %}
+            <a href="/{{ locale }}/game/{{ fg.game_id }}"
+               title="{{ fg.date }} · {{ fg.home_away }} vs {{ fg.opponent }} · {{ fg.score }}"
+               class="gd-form-badge gd-form-badge--{{ fg.result }}"
+               style="width:1.6rem;height:1.6rem;">{{ fg.result }}</a>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% set home_combined = ((game.home_h_form + game.home_a_form) | sort(attribute='date', reverse=true))[:8] %}
+          {% if home_combined %}
+          <div x-data="{ flt: 'all' }" style="margin-top:.5rem;">
+            <div class="gd-filter-bar" style="margin-bottom:.6rem;gap:.35rem;">
+              <button class="gd-filter-btn" :class="flt==='all'?'active':''" @click="flt='all'">All</button>
+              <button class="gd-filter-btn" :class="flt==='H'?'active':''" @click="flt='H'">🏠 Home</button>
+              <button class="gd-filter-btn" :class="flt==='A'?'active':''" @click="flt='A'">✈️ Away</button>
+            </div>
+            <table class="gd-table" style="font-size:.8rem;">
+              <tbody>
+                {% for fg in home_combined %}
+                <tr x-show="flt === 'all' || flt === '{{ fg.home_away }}'">
+                  <td style="color:var(--gray-400);white-space:nowrap;padding-right:.35rem;">{{ fg.date }}</td>
+                  <td style="width:1.4rem;text-align:center;font-size:.68rem;color:var(--gray-400);">{{ fg.home_away }}</td>
+                  <td><a href="/{{ locale }}/team/{{ fg.opponent_id }}" style="text-decoration:none;color:inherit;">{{ fg.opponent }}</a></td>
+                  <td style="font-variant-numeric:tabular-nums;font-weight:600;text-align:right;padding-left:.75rem;white-space:nowrap;">
+                    <span class="gd-form-badge gd-form-badge--{{ fg.result }}" style="width:1.2rem;height:1.2rem;font-size:.65rem;margin-right:.3rem;">{{ fg.result }}</span>{{ fg.score }}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
+        </div>
+
+        <div>
+          <div class="gd-h2h-section-title"><a href="/{{ locale }}/team/{{ game.away_team_id }}" style="text-decoration:none;color:inherit;">{{ game.away_team }}</a></div>
+          {% if game.away_form %}
+          <div class="gd-form-strip">
+            {% for fg in game.away_form %}
+            <a href="/{{ locale }}/game/{{ fg.game_id }}"
+               title="{{ fg.date }} · {{ fg.home_away }} vs {{ fg.opponent }} · {{ fg.score }}"
+               class="gd-form-badge gd-form-badge--{{ fg.result }}"
+               style="width:1.6rem;height:1.6rem;">{{ fg.result }}</a>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% set away_combined = ((game.away_h_form + game.away_a_form) | sort(attribute='date', reverse=true))[:8] %}
+          {% if away_combined %}
+          <div x-data="{ flt: 'all' }" style="margin-top:.5rem;">
+            <div class="gd-filter-bar" style="margin-bottom:.6rem;gap:.35rem;">
+              <button class="gd-filter-btn" :class="flt==='all'?'active':''" @click="flt='all'">All</button>
+              <button class="gd-filter-btn" :class="flt==='H'?'active':''" @click="flt='H'">🏠 Home</button>
+              <button class="gd-filter-btn" :class="flt==='A'?'active':''" @click="flt='A'">✈️ Away</button>
+            </div>
+            <table class="gd-table" style="font-size:.8rem;">
+              <tbody>
+                {% for fg in away_combined %}
+                <tr x-show="flt === 'all' || flt === '{{ fg.home_away }}'">
+                  <td style="color:var(--gray-400);white-space:nowrap;padding-right:.35rem;">{{ fg.date }}</td>
+                  <td style="width:1.4rem;text-align:center;font-size:.68rem;color:var(--gray-400);">{{ fg.home_away }}</td>
+                  <td><a href="/{{ locale }}/team/{{ fg.opponent_id }}" style="text-decoration:none;color:inherit;">{{ fg.opponent }}</a></td>
+                  <td style="font-variant-numeric:tabular-nums;font-weight:600;text-align:right;padding-left:.75rem;white-space:nowrap;">
+                    <span class="gd-form-badge gd-form-badge--{{ fg.result }}" style="width:1.2rem;height:1.2rem;font-size:.65rem;margin-right:.3rem;">{{ fg.result }}</span>{{ fg.score }}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+
+    <!-- TABLE tab -->
+    <div class="gd-tabpanel" x-show="tab === 'table'">
+      {% if game.group_standings %}
+      <h3 style="font-size:.85rem;font-weight:700;margin:0 0 1rem;color:var(--gray-600);text-transform:uppercase;letter-spacing:.05em;">
+        🏆 {{ game.league_name }}{% if game.group_name %} – {{ game.group_name }}{% endif %}
+      </h3>
+      <table class="gd-table">
+        <thead><tr>
+          <th style="width:2rem;text-align:center;">#</th>
+          <th>{{ t.table.team }}</th>
+          <th style="text-align:center;">GP</th>
+          <th style="text-align:center;">W</th>
+          <th style="text-align:center;">L</th>
+          <th style="text-align:center;">GF</th>
+          <th style="text-align:center;">GA</th>
+          <th style="text-align:center;">GD</th>
+          <th style="text-align:center;font-weight:700;color:var(--gray-700);">PTS</th>
+        </tr></thead>
+        <tbody>
+          {% for row in game.group_standings %}
+          <tr{% if row.team_id in [game.home_team_id, game.away_team_id] %} class="gd-standings-highlight"{% endif %}>
+            <td style="text-align:center;color:var(--gray-400);">{{ loop.index }}</td>
+            <td><a href="/{{ locale }}/team/{{ row.team_id }}" style="text-decoration:none;color:inherit;">{{ row.team_name }}</a></td>
+            <td style="text-align:center;color:var(--gray-500);">{{ row.gp }}</td>
+            <td style="text-align:center;color:var(--gray-500);">{{ row.w }}</td>
+            <td style="text-align:center;color:var(--gray-500);">{{ row.l }}</td>
+            <td style="text-align:center;color:var(--gray-500);">{{ row.gf }}</td>
+            <td style="text-align:center;color:var(--gray-500);">{{ row.ga }}</td>
+            <td style="text-align:center;color:var(--gray-500);">{{ row.gf - row.ga }}</td>
+            <td style="text-align:center;font-weight:700;">{{ row.pts }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="gd-empty">
+        <div class="gd-empty-icon">🏆</div>
+        <p>No standings available.</p>
       </div>
       {% endif %}
     </div>
