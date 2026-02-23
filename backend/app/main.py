@@ -1284,15 +1284,27 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                         work.append((ldb, lid, gc, None, None))
             total  = len(work)
             games_n = 0
-            push("info", f"Indexing games for {total} groups across {len(lg_list)} leagues...")
-            for i, (ldb, lid, gc, grp_db_id, grp_name) in enumerate(work, 1):
-                games_n += await asyncio.to_thread(
-                    indexer.index_games_for_league,
-                    ldb, season, lid, gc,
-                    group_name=grp_name, group_db_id=grp_db_id,
-                    force=force,
-                )
-                set_progress(75 + int(i / total * 20))
+            push("info", f"Indexing games for {total} groups across {len(lg_list)} leagues (concurrency=3)...")
+
+            _games_sem = asyncio.Semaphore(3)
+
+            async def _index_group(args: tuple) -> int:
+                ldb, lid, gc, grp_db_id, grp_name = args
+                async with _games_sem:
+                    return await asyncio.to_thread(
+                        indexer.index_games_for_league,
+                        ldb, season, lid, gc,
+                        group_name=grp_name, group_db_id=grp_db_id,
+                        force=force,
+                    )
+
+            group_results = await asyncio.gather(
+                *(_index_group(w) for w in work), return_exceptions=True
+            )
+            for i, r in enumerate(group_results, 1):
+                if isinstance(r, int):
+                    games_n += r
+                set_progress(75 + int(i / total * 20) if total else 95)
             stats["games"] = games_n
             push("ok", f"Games: {games_n}")
 
@@ -1342,12 +1354,46 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             total    = len(finished)
             auto_lbl = " (auto)" if max_tier == 7 else ""
             tier_lbl = f"tier ≤ {effective_tier}{auto_lbl}"
-            push("info", f"Indexing events + lineups for {total} past games ({tier_lbl})...")
+
+            # ── Bulk pre-filter: skip games already indexed within max_age ──
+            if not force:
+                events_eids = [f"game:{gid}:events" for gid, _ in finished]
+                lineup_eids = [f"game:{gid}:lineup" for gid, _ in finished]
+                fresh_ev = indexer.bulk_already_indexed("game_events", events_eids, 720)
+                fresh_ln = indexer.bulk_already_indexed("game_lineup", lineup_eids, 720)
+                pre_count = len(finished)
+                finished = [
+                    (gid, sid) for gid, sid in finished
+                    if f"game:{gid}:events" not in fresh_ev
+                    or f"game:{gid}:lineup" not in fresh_ln
+                ]
+                skipped = pre_count - len(finished)
+                if skipped:
+                    push("info", f"  Skipping {skipped} already-indexed game(s).")
+
+            total    = len(finished)
+            push("info", f"Indexing events + lineups for {total} past games ({tier_lbl}, concurrency=4)...")
             events_n = 0
             lineup_n = 0
-            for i, (gid, sid_) in enumerate(finished, 1):
-                events_n += await asyncio.to_thread(indexer.index_game_events, gid, sid_, force=force)
-                lineup_n += await asyncio.to_thread(indexer.index_game_lineup, gid, sid_, force=force)
+
+            # Run up to 4 games concurrently.  API fetches now happen *outside*
+            # the DB session so the write lock is held only briefly for inserts.
+            _events_sem = asyncio.Semaphore(4)
+
+            async def _process_game(gid: int, sid_: int) -> tuple[int, int]:
+                async with _events_sem:
+                    ev = await asyncio.to_thread(indexer.index_game_events, gid, sid_, force=force)
+                    ln = await asyncio.to_thread(indexer.index_game_lineup, gid, sid_, force=force)
+                    return ev, ln
+
+            game_results = await asyncio.gather(
+                *(_process_game(gid, sid_) for gid, sid_ in finished),
+                return_exceptions=True,
+            )
+            for i, r in enumerate(game_results, 1):
+                if not isinstance(r, Exception):
+                    events_n += r[0]
+                    lineup_n += r[1]
                 set_progress(int(i / total * 95) if total else 99)
             stats["game_events"] = events_n
             stats["lineups"] = lineup_n

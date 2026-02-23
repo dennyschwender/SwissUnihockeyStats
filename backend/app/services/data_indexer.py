@@ -148,6 +148,33 @@ class DataIndexer:
             sync.last_sync = datetime.now(timezone.utc)
             session.commit()
     
+    def bulk_already_indexed(self, entity_type: str, entity_ids: list[str],
+                              max_age_hours: int = 720) -> set[str]:
+        """Return the set of *entity_ids* that already have a fresh 'success'
+        SyncStatus row, so the caller can skip re-indexing them.
+
+        This replaces N individual _should_update() calls (each a DB query)
+        with a single IN-based query.
+        """
+        if not entity_ids:
+            return set()
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        try:
+            with self.db_service.session_scope() as session:
+                rows = (
+                    session.query(SyncStatus.entity_id)
+                    .filter(
+                        SyncStatus.entity_type == entity_type,
+                        SyncStatus.entity_id.in_(entity_ids),
+                        SyncStatus.sync_status == "success",
+                        SyncStatus.last_sync > cutoff,
+                    )
+                    .all()
+                )
+            return {r[0] for r in rows}
+        except Exception:
+            return set()
+
     def _mark_sync_failed(self, session: Session, entity_type: str, entity_id: str, error: str):
         """Mark synchronization as failed.
 
@@ -1178,6 +1205,9 @@ class DataIndexer:
                           force: bool = False) -> int:
         """Fetch and store events (goals, penalties) for a single finished game.
 
+        API calls are made *before* the DB session is opened so that the
+        write lock is held for the minimum possible time.
+
         Returns:
             Number of events stored.
         """
@@ -1185,33 +1215,103 @@ class DataIndexer:
         if not force and not self._should_update("game_events", entity_id, max_age_hours=720):
             return 0
 
+        # ── 1. Fetch from API (no DB lock held) ───────────────────────────
+        try:
+            events_data = self.client.get_game_events_by_id(game_id)
+        except Exception as e:
+            logger.debug(f"Failed to fetch events for game {game_id}: {e}")
+            return 0
+
+        rows = self._extract_table_data(events_data)
+        if not rows:
+            rows = events_data.get("data", {}).get("regions", [{}])[0].get("rows", []) if events_data.get("data") else []
+
+        # Try to get score + confirm finished via summary title
+        # Title format: "Team A - Team B 3:2 (1:0, 2:2, 0:0)"
+        game_is_finished = False
+        home_score_val = None
+        away_score_val = None
+        try:
+            summary = self.client.get_game_summary(game_id)
+            title = summary.get("data", {}).get("title", "") or ""
+            import re as _re
+            m = _re.search(r'(\d+):(\d+)', title)
+            if m:
+                home_score_val = int(m.group(1))
+                away_score_val = int(m.group(2))
+                game_is_finished = True
+        except Exception:
+            pass
+
+        # ── 2. Parse / deduplicate (pure CPU, no I/O) ─────────────────────
+        # Columns from /api/game_events/{id}:
+        #   0 – clock time ("32:16", "")
+        #   1 – event type text ("Torschütze", "Strafe", …)
+        #   2 – team name
+        #   3 – player name / note
+        SKIP_EVENTS = {"spielende", "spielbeginn", "beginn", "ende", ""}
+        raw_events: list[dict] = []
+        for row in rows:
+            cells = row.get("cells", [])
+            if not cells:
+                continue
+
+            def _txt(cell):
+                v = cell.get("text", "")
+                return (v[0] if isinstance(v, list) and v else (v if not isinstance(v, list) else "")) or ""
+
+            time_str    = _txt(cells[0]) if len(cells) > 0 else None
+            event_type  = _txt(cells[1]) if len(cells) > 1 else "unknown"
+            team_name   = _txt(cells[2]) if len(cells) > 2 else None
+            player_name = _txt(cells[3]) if len(cells) > 3 else None
+
+            if event_type.lower() in SKIP_EVENTS:
+                continue
+
+            raw_events.append({
+                "event_type": event_type,
+                "time": time_str,
+                "team": team_name,
+                "player": player_name,
+            })
+
+        # Goals: API emits 2 rows per assisted goal (scorer-only, then
+        # scorer+assist). Merge by (time, team), keeping the richer player.
+        # Penalties: API emits 2 identical rows — keep only one.
+        deduped: list[dict] = []
+        seen_pen: set[tuple] = set()
+        for ev in raw_events:
+            etype_lo = ev["event_type"].lower()
+            is_goal    = etype_lo.startswith(("torschütze", "eigentor"))
+            is_penalty = "'-strafe" in etype_lo
+
+            if is_penalty:
+                key = (ev["event_type"], ev["time"], ev["team"])
+                if key in seen_pen:
+                    continue
+                seen_pen.add(key)
+                deduped.append(ev)
+            elif is_goal:
+                found = False
+                for d in deduped:
+                    if (d["time"] == ev["time"] and d["team"] == ev["team"]
+                            and d["event_type"].lower().startswith(
+                                ("torschütze", "eigentor"))):
+                        if len(ev["player"] or "") > len(d["player"] or ""):
+                            d["player"] = ev["player"]
+                        found = True
+                        break
+                if not found:
+                    deduped.append(ev)
+            else:
+                deduped.append(ev)
+
+        # ── 3. Write to DB (short critical section, no network I/O) ───────
         with self.db_service.session_scope() as session:
             try:
                 # Delete stale events so re-indexing is idempotent
                 session.query(GameEvent).filter(GameEvent.game_id == game_id).delete()
                 session.flush()
-
-                events_data = self.client.get_game_events_by_id(game_id)
-                rows = self._extract_table_data(events_data)
-                if not rows:
-                    rows = events_data.get("data", {}).get("regions", [{}])[0].get("rows", []) if events_data.get("data") else []
-
-                # Try to get score + confirm finished via summary title
-                # Title format: "Team A - Team B 3:2 (1:0, 2:2, 0:0)"
-                game_is_finished = False
-                home_score_val = None
-                away_score_val = None
-                try:
-                    summary = self.client.get_game_summary(game_id)
-                    title = summary.get("data", {}).get("title", "") or ""
-                    import re as _re
-                    m = _re.search(r'(\d+):(\d+)', title)
-                    if m:
-                        home_score_val = int(m.group(1))
-                        away_score_val = int(m.group(2))
-                        game_is_finished = True
-                except Exception:
-                    pass
 
                 # Update game status/score if we got a result
                 if game_is_finished:
@@ -1221,71 +1321,6 @@ class DataIndexer:
                         game_row.home_score = home_score_val
                         game_row.away_score = away_score_val
 
-                # ── Collect raw events ───────────────────────────────────────
-                # Columns from /api/game_events/{id}:
-                #   0 – clock time ("32:16", "")
-                #   1 – event type text ("Torschütze", "Strafe", …)
-                #   2 – team name
-                #   3 – player name / note
-                SKIP_EVENTS = {"spielende", "spielbeginn", "beginn", "ende", ""}
-                raw_events: list[dict] = []
-                for row in rows:
-                    cells = row.get("cells", [])
-                    if not cells:
-                        continue
-
-                    def _txt(cell):
-                        v = cell.get("text", "")
-                        return (v[0] if isinstance(v, list) and v else (v if not isinstance(v, list) else "")) or ""
-
-                    time_str    = _txt(cells[0]) if len(cells) > 0 else None
-                    event_type  = _txt(cells[1]) if len(cells) > 1 else "unknown"
-                    team_name   = _txt(cells[2]) if len(cells) > 2 else None
-                    player_name = _txt(cells[3]) if len(cells) > 3 else None
-
-                    if event_type.lower() in SKIP_EVENTS:
-                        continue
-
-                    raw_events.append({
-                        "event_type": event_type,
-                        "time": time_str,
-                        "team": team_name,
-                        "player": player_name,
-                    })
-
-                # ── Deduplicate ──────────────────────────────────────────────
-                # Goals: API emits 2 rows per assisted goal (scorer-only, then
-                # scorer+assist). Merge by (time, team), keeping the richer player.
-                # Penalties: API emits 2 identical rows — keep only one.
-                deduped: list[dict] = []
-                seen_pen: set[tuple] = set()
-                for ev in raw_events:
-                    etype_lo = ev["event_type"].lower()
-                    is_goal    = etype_lo.startswith(("torschütze", "eigentor"))
-                    is_penalty = "'-strafe" in etype_lo
-
-                    if is_penalty:
-                        key = (ev["event_type"], ev["time"], ev["team"])
-                        if key in seen_pen:
-                            continue
-                        seen_pen.add(key)
-                        deduped.append(ev)
-                    elif is_goal:
-                        found = False
-                        for d in deduped:
-                            if (d["time"] == ev["time"] and d["team"] == ev["team"]
-                                    and d["event_type"].lower().startswith(
-                                        ("torschütze", "eigentor"))):
-                                if len(ev["player"] or "") > len(d["player"] or ""):
-                                    d["player"] = ev["player"]
-                                found = True
-                                break
-                        if not found:
-                            deduped.append(ev)
-                    else:
-                        deduped.append(ev)
-
-                # ── Insert ───────────────────────────────────────────────────
                 count = 0
                 for ev in deduped:
                     evt = GameEvent(
@@ -1307,12 +1342,15 @@ class DataIndexer:
                 return count
 
             except Exception as e:
-                logger.debug(f"Failed to index events for game {game_id}: {e}")
+                logger.debug(f"Failed to write events for game {game_id}: {e}")
                 return 0
 
     def index_game_lineup(self, game_id: int, season_id: int,
                           force: bool = False) -> int:
         """Fetch and store home + away lineups for a single finished game.
+
+        Both API calls are made *before* the DB session is opened so that
+        the write lock is held for the minimum possible time.
 
         Returns number of GamePlayer rows inserted/updated.
         """
@@ -1320,6 +1358,16 @@ class DataIndexer:
         if not force and not self._should_update("game_lineup", entity_id, max_age_hours=720):
             return 0
 
+        # ── 1. Fetch both lineups from API (no DB lock held) ──────────────
+        # API: is_home=0 → HOME lineup, is_home=1 → AWAY lineup.
+        lineup_raw: dict[int, dict] = {}
+        for is_home_flag in (1, 0):
+            try:
+                lineup_raw[is_home_flag] = self.client.get_game_lineup(game_id, is_home_flag)
+            except Exception:
+                lineup_raw[is_home_flag] = {}
+
+        # ── 2. Write to DB (short critical section, no network I/O) ───────
         with self.db_service.session_scope() as session:
             try:
                 # Delete stale lineup so re-indexing is idempotent
@@ -1345,13 +1393,8 @@ class DataIndexer:
                 count = 0
                 with session.no_autoflush:
                     for is_home_flag in (1, 0):
-                        # API: is_home=0 returns the HOME team lineup,
-                        #       is_home=1 returns the AWAY team lineup.
                         team_id = away_team_id if is_home_flag else home_team_id
-                        try:
-                            resp = self.client.get_game_lineup(game_id, is_home_flag)
-                        except Exception:
-                            continue
+                        resp = lineup_raw.get(is_home_flag, {})
 
                         regions = resp.get("data", {}).get("regions", [])
                         for region in regions:
@@ -1435,7 +1478,7 @@ class DataIndexer:
                 return count
 
             except Exception as e:
-                logger.debug(f"Failed to index lineup for game {game_id}: {e}")
+                logger.debug(f"Failed to write lineup for game {game_id}: {e}")
                 return 0
 
     def backfill_team_names(self, season_id: int, force: bool = False) -> int:
