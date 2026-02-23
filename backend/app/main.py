@@ -197,10 +197,11 @@ def _pin_hash(pin: str) -> str:
         100_000,
     ).hex()
 
-# Pre-computed at lifespan startup via run_in_executor (see lifespan() below).
-# Empty string is safe: the server won't accept requests until lifespan
-# completes, and `require_admin` compares against this value instantly.
-_ADMIN_PIN_HASH: str = ""
+# Computed once at import time — blocks import for ~200 ms on Pi ARM but
+# acceptable: done before the server accepts any connections, so
+# require_admin() is always an instant string comparison at runtime.
+# Avoids the reload race condition where _ADMIN_PIN_HASH == '' after restart.
+_ADMIN_PIN_HASH: str = _pin_hash(settings.ADMIN_PIN)
 
 _ADMIN_TOKEN_KEY = "admin_authed"
 
