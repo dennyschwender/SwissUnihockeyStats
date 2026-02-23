@@ -63,7 +63,7 @@ class DatabaseService:
                 cursor = dbapi_conn.cursor()
                 cursor.execute("PRAGMA foreign_keys=ON")
                 cursor.execute("PRAGMA journal_mode=WAL")   # concurrent readers + writer
-                cursor.execute("PRAGMA busy_timeout=10000") # wait up to 10s for locks
+                cursor.execute("PRAGMA busy_timeout=30000") # wait up to 30s for locks
                 cursor.close()
         else:
             # PostgreSQL or other database

@@ -148,16 +148,27 @@ class DataIndexer:
             session.commit()
     
     def _mark_sync_failed(self, session: Session, entity_type: str, entity_id: str, error: str):
-        """Mark synchronization as failed"""
-        sync = session.query(SyncStatus).filter(
-            SyncStatus.entity_type == entity_type,
-            SyncStatus.entity_id == entity_id
-        ).first()
-        
-        if sync:
-            sync.sync_status = "failed"
-            sync.error_message = error
-            session.commit()
+        """Mark synchronization as failed.
+
+        The session may already be in a rolled-back state (e.g. after a
+        sqlite3.OperationalError: database is locked).  Roll it back first
+        so we can issue a fresh query, and swallow any secondary errors so
+        the original exception propagates cleanly.
+        """
+        try:
+            session.rollback()          # clear PendingRollbackError state
+            sync = session.query(SyncStatus).filter(
+                SyncStatus.entity_type == entity_type,
+                SyncStatus.entity_id == entity_id
+            ).first()
+            if sync:
+                sync.sync_status = "failed"
+                sync.error_message = error[:500] if error else error
+                session.commit()
+        except Exception:
+            # Best-effort: if we still can't write, silently ignore so the
+            # original exception is not masked.
+            pass
     
     def _extract_table_data(self, api_response: Dict[str, Any]) -> List[Dict]:
         """Extract data from API table format: data.regions[0].rows"""
