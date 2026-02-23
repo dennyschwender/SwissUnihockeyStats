@@ -622,6 +622,11 @@ html.dark-mode .universal-search-results {
   margin-top: 2rem;
 }
 
+/* Grid children must have min-width:0 so overflow-x:auto can scroll */
+.home-games-grid > * {
+  min-width: 0;
+}
+
 /* Mobile language switcher (hidden on desktop, shown inside hamburger nav) */
 .mobile-lang-switcher {
   display: none;
