@@ -205,6 +205,7 @@
       <div class="chip"><strong id="t-games">—</strong> games</div>
       <div class="chip"><strong id="t-gp">—</strong> lineups</div>
       <div class="chip"><strong id="t-events">—</strong> events</div>
+      <div class="chip" id="db-size-chip" title="SQLite DB file size (click for details)" onclick="toggleEl('db-panel','db-chv')" style="cursor:pointer"><strong id="t-db-size">—</strong> DB</div>
     </div>
 
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
@@ -226,6 +227,45 @@
           </tr></thead>
           <tbody id="sync-tbody"></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- DB health panel -->
+    <div class="sync-panel" id="db-panel" style="margin-top:1.25rem;display:none">
+      <h2 style="display:flex;align-items:center;justify-content:space-between">
+        Database — SQLite Health
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <span class="chevron" id="db-chv">▶</span>
+        </div>
+      </h2>
+      <div class="season-body open" id="db-body">
+        <div style="display:flex;flex-wrap:wrap;gap:1rem;padding:.75rem 1rem;align-items:flex-start">
+          <!-- file sizes -->
+          <div style="min-width:200px">
+            <div class="task-group-label" style="margin-bottom:.4rem">File Sizes</div>
+            <table style="font-size:.78rem;border-collapse:collapse;width:100%">
+              <tbody id="db-files-tbody"></tbody>
+            </table>
+          </div>
+          <!-- pragma -->
+          <div style="min-width:200px">
+            <div class="task-group-label" style="margin-bottom:.4rem">SQLite PRAGMA</div>
+            <table style="font-size:.78rem;border-collapse:collapse;width:100%">
+              <tbody id="db-pragma-tbody"></tbody>
+            </table>
+          </div>
+          <!-- actions -->
+          <div style="min-width:160px">
+            <div class="task-group-label" style="margin-bottom:.4rem">Maintenance</div>
+            <div style="display:flex;flex-direction:column;gap:.4rem">
+              <button class="btn btn-sm" id="vacuum-btn" onclick="runVacuum()" title="VACUUM + WAL checkpoint: reclaims space from deleted rows and merges WAL back into .db">🧹 VACUUM + Checkpoint</button>
+              <button class="btn btn-sm" onclick="loadDbInfo()">↺ Refresh</button>
+            </div>
+            <div style="margin-top:.5rem;font-size:.7rem;color:#6e7681;line-height:1.5">
+              VACUUM rewrites the DB to reclaim free pages and merge the WAL file back. Can take a few seconds on large DBs.
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1138,12 +1178,105 @@ function toggleEl(bodyId, chevId) {
 }
 
 /* ═══════════════════════════════════════════════════════
+   DB Info
+═══════════════════════════════════════════════════════ */
+function fmtBytes(n) {
+  if (n == null || n === 0) return '0 B';
+  const units = ['B','KB','MB','GB'];
+  let i = 0; let v = n;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return v.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+}
+
+function fmt(n) {
+  if (n == null) return '—';
+  return Number(n).toLocaleString();
+}
+
+async function loadDbInfo() {
+  try {
+    const r = await fetch('/admin/api/db-info');
+    if (!r.ok) return;
+    const d = await r.json();
+
+    const files = d.files || {};
+    const pragma = d.pragma || {};
+
+    // Totals chip — sum of db + wal
+    const totalBytes = (files.db?.size || 0) + (files.wal?.size || 0);
+    document.getElementById('t-db-size').textContent = fmtBytes(totalBytes);
+
+    // Show panel if there is info
+    document.getElementById('db-panel').style.display = '';
+
+    // File sizes table
+    const fileRows = [
+      ['Main (.db)',  files.db],
+      ['WAL (.db-wal)', files.wal],
+      ['SHM (.db-shm)', files.shm],
+    ].map(([label, f]) => {
+      if (!f) return '';
+      const color = !f.exists ? '#6e7681' : f.size > 10 * 1024 * 1024 ? '#d29922' : '#3fb950';
+      return `<tr>
+        <td style="padding:3px 6px 3px 0;color:#8b949e">${label}</td>
+        <td style="padding:3px 0;color:${color};font-variant-numeric:tabular-nums">${f.exists ? fmtBytes(f.size) : '—'}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('db-files-tbody').innerHTML = fileRows;
+
+    // PRAGMA table
+    const pages = (pragma.page_count || 0);
+    const freePages = (pragma.freelist_count || 0);
+    const pagesUsed = pages > 0 ? Math.round((1 - freePages / pages) * 100) : 100;
+    const rows = [
+      ['Pages',       `${fmt(pages)} (${fmt(freePages)} free)`],
+      ['Page size',   pragma.page_size ? fmtBytes(pragma.page_size) : '—'],
+      ['Usage',       `${pagesUsed}%`],
+      ['Journal mode', pragma.journal_mode || '—'],
+      ['WAL autocheckpoint', pragma.wal_checkpoint != null ? `${pragma.wal_checkpoint} pages` : '—'],
+      ['Integrity',   pragma.integrity_ok == null ? '—' : (pragma.integrity_ok ? '✓ ok' : '✗ error')],
+    ].map(([k, v]) => `<tr>
+      <td style="padding:3px 6px 3px 0;color:#8b949e;white-space:nowrap">${k}</td>
+      <td style="padding:3px 0;font-variant-numeric:tabular-nums">${v}</td>
+    </tr>`).join('');
+    document.getElementById('db-pragma-tbody').innerHTML = rows;
+
+  } catch(e) {
+    // non-fatal — DB info panel just stays hidden
+  }
+}
+
+async function runVacuum() {
+  const btn = document.getElementById('vacuum-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Running…';
+  log('info', '🧹 VACUUM + WAL checkpoint started…');
+  try {
+    const r = await fetch('/admin/api/vacuum', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      log('ok', `✓ VACUUM complete in ${d.elapsed_s}s`);
+      await loadDbInfo();
+    } else {
+      log('error', 'VACUUM failed: ' + (d.detail || JSON.stringify(d)));
+    }
+  } catch(e) {
+    log('error', 'VACUUM error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🧹 VACUUM + Checkpoint';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
    Boot
 ═══════════════════════════════════════════════════════ */
 loadStats();
 loadScheduler();
+loadDbInfo();
 setInterval(loadStats, 30000);
 setInterval(loadScheduler, 3000);
+setInterval(loadDbInfo, 30000);
 </script>
 </body>
 </html>

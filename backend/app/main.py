@@ -371,6 +371,84 @@ async def admin_stats(_: None = Depends(require_admin)):
         return {"totals": {}, "by_season": [], "sync_status": [], "error": str(exc)}
 
 
+@app.get("/admin/api/db-info")
+async def admin_db_info(_: None = Depends(require_admin)):
+    """SQLite file sizes and PRAGMA health metrics."""
+    import os
+    from app.services.database import get_database_service
+    from sqlalchemy import text as _text
+
+    db_service = get_database_service()
+    url = db_service.database_url  # e.g. sqlite:///data/swissunihockey.db
+    is_sqlite = url.startswith("sqlite")
+
+    file_info: dict = {}
+    pragma_info: dict = {}
+
+    if is_sqlite and ":memory:" not in url:
+        # Strip leading sqlite:/// prefix to get the filesystem path
+        db_path = url.replace("sqlite:///", "").replace("sqlite://", "")
+        for suffix, key in [("", "db"), ("-wal", "wal"), ("-shm", "shm")]:
+            p = db_path + suffix
+            try:
+                size = os.path.getsize(p)
+                file_info[key] = {"path": p, "size": size, "exists": True}
+            except FileNotFoundError:
+                file_info[key] = {"path": p, "size": 0, "exists": False}
+
+    if is_sqlite:
+        try:
+            loop = asyncio.get_running_loop()
+            def _read_pragma():
+                with db_service.session_scope() as s:
+                    def pg(name):
+                        try:
+                            return s.execute(_text(f"PRAGMA {name}")).scalar()
+                        except Exception:
+                            return None
+                    return {
+                        "page_count":    pg("page_count"),
+                        "page_size":     pg("page_size"),
+                        "freelist_count": pg("freelist_count"),
+                        "journal_mode":  pg("journal_mode"),
+                        "wal_checkpoint": pg("wal_autocheckpoint"),
+                        "integrity_ok":  pg("quick_check") == "ok",
+                    }
+            pragma_info = await loop.run_in_executor(None, _read_pragma)
+        except Exception as e:
+            pragma_info = {"error": str(e)}
+
+    return {"files": file_info, "pragma": pragma_info, "is_sqlite": is_sqlite}
+
+
+@app.post("/admin/api/vacuum")
+async def admin_vacuum(_: None = Depends(require_admin)):
+    """Run VACUUM + WAL checkpoint to reclaim free pages and merge WAL back into DB."""
+    from app.services.database import get_database_service
+    from sqlalchemy import text as _text
+
+    db_service = get_database_service()
+    if ":memory:" in db_service.database_url:
+        return {"ok": False, "detail": "VACUUM not applicable for in-memory DB"}
+
+    loop = asyncio.get_running_loop()
+    def _vacuum():
+        import time
+        t0 = time.time()
+        with db_service.engine.connect() as conn:
+            conn.execute(_text("PRAGMA wal_checkpoint(TRUNCATE)"))
+            conn.execute(_text("VACUUM"))
+        return round(time.time() - t0, 2)
+
+    try:
+        elapsed = await loop.run_in_executor(None, _vacuum)
+        logger.info("Admin VACUUM completed in %.2fs", elapsed)
+        return {"ok": True, "elapsed_s": elapsed}
+    except Exception as e:
+        logger.error("Admin VACUUM failed: %s", e, exc_info=True)
+        return {"ok": False, "detail": str(e)}
+
+
 def _admin_stats_sync():
     """Synchronous DB work for admin stats (called via run_in_executor)."""
     from app.services.database import get_database_service
