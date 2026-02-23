@@ -8,7 +8,7 @@
     <span style="color:var(--gray-300);padding:0 .25rem;flex-shrink:0;">vs</span>
     <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;">{{ g.away_team }}</span>
     {% if g.league_label %}
-    <span style="min-width:60px;text-align:right;color:var(--gray-400);font-size:.75rem;font-weight:600;line-height:1.25;flex-shrink:0;">{{ g.league_label }}{% if g.group_name %}<br><span style="font-weight:400;">{{ g.group_name }}</span>{% endif %}</span>
+    <span class="game-row-league" style="min-width:60px;text-align:right;color:var(--gray-400);font-size:.75rem;font-weight:600;line-height:1.25;flex-shrink:0;">{{ g.league_label }}{% if g.group_name %}<br><span style="font-weight:400;">{{ g.group_name }}</span>{% endif %}</span>
     {% endif %}
   </div>
 </a>

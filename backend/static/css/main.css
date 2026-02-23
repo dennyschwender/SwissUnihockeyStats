@@ -722,6 +722,17 @@ html.dark-mode .universal-search-results {
     grid-template-columns: 1fr;
   }
 
+  /* Reduce card padding when in single-column layout */
+  .home-game-card {
+    padding: 1rem;
+  }
+
+  /* Allow filter select to shrink/grow beside the h2 */
+  .home-game-header select {
+    max-width: 140px;
+    font-size: .75rem;
+  }
+
   /* PWA prompt spans full width from bottom on mobile */
   .pwa-install {
     bottom: 0;
@@ -1163,5 +1174,24 @@ html.dark-mode .image-skeleton {
   .filter-select {
     min-width: auto;
     width: 100%;
+  }
+
+  /* ── Home page game rows: hide league label, tighten card ── */
+  .home-game-card {
+    padding: .6rem .625rem;
+  }
+
+  .game-row-league {
+    display: none;
+  }
+
+  /* ── Home top-scorers: hide GP/G/A, keep #, Player, PTS ── */
+  .home-scorers-table th:nth-child(3),
+  .home-scorers-table td:nth-child(3),
+  .home-scorers-table th:nth-child(4),
+  .home-scorers-table td:nth-child(4),
+  .home-scorers-table th:nth-child(5),
+  .home-scorers-table td:nth-child(5) {
+    display: none;
   }
 }
