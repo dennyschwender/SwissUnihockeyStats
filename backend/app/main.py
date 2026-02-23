@@ -431,11 +431,15 @@ async def admin_vacuum(_: None = Depends(require_admin)):
     if ":memory:" in db_service.database_url:
         return {"ok": False, "detail": "VACUUM not applicable for in-memory DB"}
 
+    if db_service.engine is None:
+        return {"ok": False, "detail": "Database engine not initialized"}
+
+    engine = db_service.engine
     loop = asyncio.get_running_loop()
     def _vacuum():
         import time
         t0 = time.time()
-        with db_service.engine.connect() as conn:
+        with engine.connect() as conn:
             conn.execute(_text("PRAGMA wal_checkpoint(TRUNCATE)"))
             conn.execute(_text("VACUUM"))
         return round(time.time() - t0, 2)
