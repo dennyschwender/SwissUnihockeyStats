@@ -672,6 +672,27 @@ _TASK_META = {
     "full":              "Full Index (clubs path + leagues path + lineups + game stats)",
 }
 
+# Minimum minutes before the same (task, season) can be re-triggered without force=True.
+_TASK_COOLDOWN_MINS: dict[str, int] = {
+    "full":              30,
+    "clubs_path":        60,
+    "leagues_path":      30,
+    "leagues":           30,
+    "groups":            30,
+    "games":             15,
+    "events":            10,
+    "players":           60,
+    "teams":             60,
+    "clubs":             120,
+    "player_stats":      30,
+    "player_game_stats": 30,
+    "game_lineups":      30,
+    "team_names":        60,
+    "seasons":           60,
+}
+# Tracks when each (task, season) last finished successfully (in-memory).
+_job_last_done: dict[tuple[str, int], datetime] = {}
+
 
 @app.post("/admin/api/index")
 async def admin_start_indexing(payload: dict, _: None = Depends(require_admin)):
@@ -690,6 +711,23 @@ async def admin_start_indexing(payload: dict, _: None = Depends(require_admin)):
 
     if task not in _TASK_META:
         raise HTTPException(status_code=400, detail=f"Unknown task '{task}'. Valid: {list(_TASK_META)}")
+
+    # Cooldown guard — skip if data was indexed recently and force is not set.
+    if not force:
+        cooldown = _TASK_COOLDOWN_MINS.get(task, 0)
+        last_done = _job_last_done.get((task, season))
+        if cooldown and last_done:
+            age_mins = (datetime.now(timezone.utc) - last_done).total_seconds() / 60
+            remaining = cooldown - age_mins
+            if remaining > 0:
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        f"Data is fresh — last run {age_mins:.0f} min ago "
+                        f"(cooldown {cooldown} min, {remaining:.0f} min left). "
+                        f"Enable \"Force\" to override."
+                    ),
+                )
 
     job_id = str(uuid.uuid4())[:8]
     _admin_jobs[job_id] = {
@@ -1484,7 +1522,10 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         logger.error("Admin indexing job %s failed: %s", job_id, exc, exc_info=True)
     finally:
         if job.get("status") in ("done", "error", "stopped"):
-            job["finished_at"] = datetime.now(timezone.utc).isoformat()
+            now_utc = datetime.now(timezone.utc)
+            job["finished_at"] = now_utc.isoformat()
+            if job.get("status") == "done":
+                _job_last_done[(task, season)] = now_utc
         _admin_tasks.pop(job_id, None)
 
 

@@ -625,6 +625,7 @@ async function triggerIndex(season, task, force) {
       body:    JSON.stringify({ season, task, force: !!force }),
     });
     const d = await r.json();
+    if (r.status === 429) { log('warn', '⏳ ' + d.detail); return; }
     if (!r.ok) { log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
     log('info', `Job ${d.job_id} queued — ${d.label}`);
     registerJob(d);
@@ -644,6 +645,7 @@ async function triggerIndexEvents(season, force) {
       body:    JSON.stringify({ season, task: 'events', force: !!force, max_tier }),
     });
     const d = await r.json();
+    if (r.status === 429) { log('warn', '⏳ ' + d.detail); return; }
     if (!r.ok) { log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
     log('info', `Job ${d.job_id} queued \u2014 ${d.label}`);
     registerJob(d);
