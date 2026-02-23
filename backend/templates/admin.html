@@ -205,7 +205,7 @@
       <div class="chip"><strong id="t-games">—</strong> games</div>
       <div class="chip"><strong id="t-gp">—</strong> lineups</div>
       <div class="chip"><strong id="t-events">—</strong> events</div>
-      <div class="chip" id="db-size-chip" title="SQLite DB file size (click for details)" onclick="toggleEl('db-panel','db-chv')" style="cursor:pointer"><strong id="t-db-size">—</strong> DB</div>
+      <div class="chip" id="db-size-chip" title="SQLite DB file size (click for details)" onclick="toggleEl('db-body','db-chv')" style="cursor:pointer"><strong id="t-db-size">—</strong> DB</div>
     </div>
 
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
@@ -232,7 +232,7 @@
 
     <!-- DB health panel -->
     <div class="sync-panel" id="db-panel" style="margin-top:1.25rem;display:none">
-      <h2 style="display:flex;align-items:center;justify-content:space-between">
+      <h2 style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleEl('db-body','db-chv')">
         Database — SQLite Health
         <div style="display:flex;align-items:center;gap:.5rem">
           <span class="chevron" id="db-chv">▶</span>
