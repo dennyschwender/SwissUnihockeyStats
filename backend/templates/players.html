@@ -6,7 +6,7 @@
 <div class="container" style="padding-top:2rem;padding-bottom:3rem;">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
     <h1 style="margin:0;font-size:2rem;font-weight:700;">🏂 {{ t.players.leaderboard }}</h1>
-    <div style="display:flex;gap:.5rem;">
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
       {% for o, label in [('points', t.players.order_points),('goals', t.players.order_goals),('assists', t.players.order_assists),('pim','PIM')] %}
       <a href="/{{ locale }}/players?order_by={{ o }}&season={{ active_season or '' }}&gender={{ gender }}"
          style="padding:.4rem .9rem;border-radius:.375rem;text-decoration:none;font-size:.875rem;

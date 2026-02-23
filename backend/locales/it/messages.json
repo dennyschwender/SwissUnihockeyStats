@@ -115,7 +115,10 @@
     "time": "Tempo",
     "type": "Tipo",
     "score": "Punteggio",
-    "score_penalty": "Punteggio / Penalità"
+    "score_penalty": "Punteggio / Penalità",
+    "date": "Data",
+    "home": "Casa",
+    "away": "Fuori casa"
   },
   "player": {
     "born": "Nato:",
@@ -138,7 +141,13 @@
     "no_events": "Nessun dato disponibile per questa partita.",
     "no_roster": "Nessun dato di rosa disponibile.",
     "tab_events": "Eventi",
-    "tab_roster": "Rosa"
+    "tab_roster": "Rosa",
+    "tab_h2h": "H2H & Forma",
+    "tab_table": "Classifica",
+    "period_breakdown": "Riepilogo periodi",
+    "h2h_title": "Scontri diretti",
+    "no_h2h": "Nessun incontro precedente trovato.",
+    "form_title": "Forma recente"
   },
   "league_detail": {
     "tab_standings": "Classifica",

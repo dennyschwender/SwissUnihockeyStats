@@ -27,7 +27,7 @@
       <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;gap:.75rem;"
            onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
         <div style="width:90px;font-size:.8rem;color:var(--gray-500);flex-shrink:0;">{{ g.date }}</div>
-        <div style="flex:1;text-align:right;font-weight:500;">{{ g.home_team }}</div>
+        <div style="flex:1;min-width:0;text-align:right;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ g.home_team }}</div>
         <div style="width:90px;text-align:center;font-weight:700;font-size:1.1rem;font-variant-numeric:tabular-nums;flex-shrink:0;">
           {% if g.has_score %}
             {{ g.home_score }} : {{ g.away_score }}
@@ -35,7 +35,7 @@
             <span style="color:var(--gray-400);">vs</span>
           {% endif %}
         </div>
-        <div style="flex:1;font-weight:500;">{{ g.away_team }}</div>
+        <div style="flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ g.away_team }}</div>
         {% if g.time %}
         <div style="width:50px;font-size:.8rem;color:var(--gray-500);text-align:right;flex-shrink:0;">{{ g.time }}</div>
         {% endif %}

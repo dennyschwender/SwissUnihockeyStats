@@ -2028,6 +2028,32 @@ def get_game_box_score(game_id: int) -> dict:
             g.pop("_ev_type", None)
         goals = deduped_goals
 
+        # ── Period scores ────────────────────────────────────────────────────
+        from collections import defaultdict as _defaultdict
+        _ph: dict = _defaultdict(int)
+        _pa: dict = _defaultdict(int)
+        for g in goals:
+            _p = g.get("period") or 0
+            if not _p:
+                continue
+            _own = g.get("own_goal", False)
+            _is_h = g["team"] == home_name
+            if _own:
+                if _is_h:
+                    _pa[_p] += 1
+                else:
+                    _ph[_p] += 1
+            else:
+                if _is_h:
+                    _ph[_p] += 1
+                else:
+                    _pa[_p] += 1
+        _all_periods = sorted(set(list(_ph.keys()) + list(_pa.keys())))
+        period_scores = [
+            {"period": _p, "home": _ph[_p], "away": _pa[_p]}
+            for _p in _all_periods
+        ]
+
         # ── Deduplicate penalties ────────────────────────────────────────────
         # The API also emits 2 identical rows per penalty.
         seen_penalties: set[tuple] = set()
@@ -2039,6 +2065,16 @@ def get_game_box_score(game_id: int) -> dict:
                 deduped_penalties.append(p)
         penalties = deduped_penalties
 
+        # ── Game summary stats ────────────────────────────────────────────────
+        game_summary = {
+            "home_goals": game.home_score,
+            "away_goals": game.away_score,
+            "home_penalties": sum(1 for p in penalties if p["team"] == home_name),
+            "away_penalties": sum(1 for p in penalties if p["team"] == away_name),
+            "home_pim": sum(p["minutes"] for p in penalties if p["team"] == home_name),
+            "away_pim": sum(p["minutes"] for p in penalties if p["team"] == away_name),
+        } if game.home_score is not None else None
+
         # ── Roster ──────────────────────────────────────────────────────────
         roster_home: list[dict] = []
         roster_away: list[dict] = []
@@ -2048,19 +2084,206 @@ def get_game_box_score(game_id: int) -> dict:
             .order_by(GamePlayer.is_home_team.desc(), GamePlayer.jersey_number)
             .all()
         )
+
+        # Batch-load season stats for all roster players
+        _roster_pids = [gp.player_id for gp in gp_rows]
+        _stats_map: dict[int, dict] = {}
+        if _roster_pids:
+            for _sr in (
+                session.query(PlayerStatistics)
+                .filter(
+                    PlayerStatistics.player_id.in_(_roster_pids),
+                    PlayerStatistics.season_id == game.season_id,
+                )
+                .all()
+            ):
+                _pid = _sr.player_id
+                if _pid not in _stats_map:
+                    _stats_map[_pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0}
+                _stats_map[_pid]["gp"] += _sr.games_played or 0
+                _stats_map[_pid]["g"]  += _sr.goals or 0
+                _stats_map[_pid]["a"]  += _sr.assists or 0
+                _stats_map[_pid]["pts"] += _sr.points or 0
+
         for gp in gp_rows:
             pl = session.query(Player).filter(Player.person_id == gp.player_id).first()
             name = (pl.full_name if pl else None) or f"Player {gp.player_id}"
+            _st = _stats_map.get(gp.player_id, {})
             entry = {
                 "jersey": gp.jersey_number,
                 "position": gp.position or "",
                 "player": name,
                 "player_id": gp.player_id,
+                "game_g": gp.goals or 0,
+                "game_a": gp.assists or 0,
+                "game_pim": gp.penalty_minutes or 0,
+                "season_gp": _st.get("gp"),
+                "season_g": _st.get("g"),
+                "season_a": _st.get("a"),
+                "season_pts": _st.get("pts"),
             }
             if gp.is_home_team:
                 roster_home.append(entry)
             else:
                 roster_away.append(entry)
+
+        # ── Head-to-head ─────────────────────────────────────────────────────
+        from sqlalchemy import or_ as _or2
+        _h2h_raw = (
+            session.query(Game)
+            .filter(
+                _or2(
+                    (Game.home_team_id == game.home_team_id) & (Game.away_team_id == game.away_team_id),
+                    (Game.home_team_id == game.away_team_id) & (Game.away_team_id == game.home_team_id),
+                ),
+                Game.id != game_id,
+                Game.home_score.isnot(None),
+                Game.season_id >= game.season_id - 2,
+            )
+            .order_by(Game.game_date.desc())
+            .limit(6)
+            .all()
+        )
+        h2h_games: list[dict] = []
+        for _hg in _h2h_raw:
+            h2h_games.append({
+                "game_id": _hg.id,
+                "date": _hg.game_date.strftime("%Y-%m-%d") if _hg.game_date else "",
+                "home_team": _team_name(_hg.home_team_id),
+                "away_team": _team_name(_hg.away_team_id),
+                "home_team_id": _hg.home_team_id,
+                "away_team_id": _hg.away_team_id,
+                "home_score": _hg.home_score,
+                "away_score": _hg.away_score,
+            })
+
+        # H2H record summary (from home team's perspective)
+        _h2h_w = _h2h_d = _h2h_l = 0
+        for _hg in h2h_games:
+            _home_is_ours = _hg["home_team_id"] == game.home_team_id
+            _my  = _hg["home_score"] if _home_is_ours else _hg["away_score"]
+            _opp = _hg["away_score"] if _home_is_ours else _hg["home_score"]
+            if _my > _opp:   _h2h_w += 1
+            elif _my < _opp: _h2h_l += 1
+            else:             _h2h_d += 1
+        h2h_record = {"w": _h2h_w, "d": _h2h_d, "l": _h2h_l, "total": len(h2h_games)}
+
+        # ── Team form (last 5 scored games before this game) ─────────────────
+        def _team_form(tid: int, home_only: "bool | None" = None, n: int = 5) -> list[dict]:
+            if home_only is True:
+                _loc_filter = (Game.home_team_id == tid,)
+            elif home_only is False:
+                _loc_filter = (Game.away_team_id == tid,)
+            else:
+                _loc_filter = (_or2(Game.home_team_id == tid, Game.away_team_id == tid),)
+            _q = (
+                session.query(Game)
+                .filter(
+                    *_loc_filter,
+                    Game.id != game_id,
+                    Game.home_score.isnot(None),
+                )
+            )
+            if game.game_date:
+                _q = _q.filter(Game.game_date <= game.game_date)
+            _recent = _q.order_by(Game.game_date.desc()).limit(n).all()
+            _form: list[dict] = []
+            for _fg in reversed(_recent):
+                _is_h = _fg.home_team_id == tid
+                _my = _fg.home_score if _is_h else _fg.away_score
+                _op = _fg.away_score if _is_h else _fg.home_score
+                _opp_tid = _fg.away_team_id if _is_h else _fg.home_team_id
+                _res = "W" if _my > _op else ("L" if _my < _op else "D")
+                _form.append({
+                    "game_id": _fg.id,
+                    "date": _fg.game_date.strftime("%Y-%m-%d") if _fg.game_date else "",
+                    "home_away": "H" if _is_h else "A",
+                    "opponent": _team_name(_opp_tid),
+                    "opponent_id": _opp_tid,
+                    "score": f"{_my}–{_op}",
+                    "result": _res,
+                })
+            return _form
+
+        home_form   = _team_form(game.home_team_id)
+        away_form   = _team_form(game.away_team_id)
+        home_h_form = _team_form(game.home_team_id, home_only=True,  n=8)
+        home_a_form = _team_form(game.home_team_id, home_only=False, n=8)
+        away_h_form = _team_form(game.away_team_id, home_only=True,  n=8)
+        away_a_form = _team_form(game.away_team_id, home_only=False, n=8)
+
+        # ── Season record (W-D-L, GF, GA, PIM, averages) up to this game ─────
+        from sqlalchemy import func as _sqlfunc
+        def _season_record(tid: int) -> dict:
+            _q = (
+                session.query(Game)
+                .filter(
+                    _or2(Game.home_team_id == tid, Game.away_team_id == tid),
+                    Game.season_id == game.season_id,
+                    Game.home_score.isnot(None),
+                    Game.id != game_id,
+                )
+            )
+            if game.game_date:
+                _q = _q.filter(Game.game_date <= game.game_date)
+            _w = _d = _l = _gf = _ga = 0
+            _w_h = _d_h = _l_h = _gf_h = _ga_h = 0
+            _w_a = _d_a = _l_a = _gf_a = _ga_a = 0
+            for _rg in _q.all():
+                _is_h = _rg.home_team_id == tid
+                _my = _rg.home_score if _is_h else _rg.away_score
+                _op = _rg.away_score if _is_h else _rg.home_score
+                _gf += _my; _ga += _op
+                _res = ("w" if _my > _op else ("l" if _my < _op else "d"))
+                if _is_h:
+                    _gf_h += _my; _ga_h += _op
+                    if _res == "w": _w_h += 1
+                    elif _res == "l": _l_h += 1
+                    else: _d_h += 1
+                else:
+                    _gf_a += _my; _ga_a += _op
+                    if _res == "w": _w_a += 1
+                    elif _res == "l": _l_a += 1
+                    else: _d_a += 1
+                if _res == "w": _w += 1
+                elif _res == "l": _l += 1
+                else: _d += 1
+            _gp = _w + _d + _l
+            # total team PIM from game_players for this season
+            _pim_q = (
+                session.query(_sqlfunc.coalesce(_sqlfunc.sum(GamePlayer.penalty_minutes), 0))
+                .join(Game, GamePlayer.game_id == Game.id)
+                .filter(
+                    GamePlayer.team_id == tid,
+                    Game.season_id == game.season_id,
+                    Game.home_score.isnot(None),
+                    Game.id != game_id,
+                )
+            )
+            if game.game_date:
+                _pim_q = _pim_q.filter(Game.game_date <= game.game_date)
+            _total_pim = _pim_q.scalar() or 0
+            return {
+                "w":  _w,  "d":  _d,  "l":  _l,  "gf":  _gf,  "ga":  _ga,  "gp":  _gp,
+                "avg_gf":    round(_gf / _gp, 1) if _gp else "—",
+                "avg_ga":    round(_ga / _gp, 1) if _gp else "—",
+                "avg_total": round((_gf + _ga) / _gp, 1) if _gp else "—",
+                "total_pim": _total_pim,
+                "avg_pim":   round(_total_pim / _gp, 1) if _gp else "—",
+                "home": {"w": _w_h, "d": _d_h, "l": _l_h, "gf": _gf_h, "ga": _ga_h, "gp": _w_h + _d_h + _l_h},
+                "away": {"w": _w_a, "d": _d_a, "l": _l_a, "gf": _gf_a, "ga": _ga_a, "gp": _w_a + _d_a + _l_a},
+            }
+
+        home_record = _season_record(game.home_team_id)
+        away_record = _season_record(game.away_team_id)
+
+        # ── Group / league standings ──────────────────────────────────────────
+        _db_league_id = game.group.league_id if game.group else None
+        _db_group_id  = game.group_id
+        _group_name   = (game.group.name or game.group.text or "") if game.group else ""
+        _league_name  = (
+            game.group.league.name or game.group.league.text or ""
+        ) if (game.group and game.group.league) else ""
 
         return {
             "game_id": game_id,
@@ -2078,9 +2301,24 @@ def get_game_box_score(game_id: int) -> dict:
             "goals": goals,
             "penalties": penalties,
             "period_markers": period_markers,
+            "period_scores": period_scores,
             "best_players": best_players,
             "roster_home": roster_home,
             "roster_away": roster_away,
+            "h2h_games": h2h_games,
+            "h2h_record": h2h_record,
+            "home_form": home_form,
+            "away_form": away_form,
+            "home_h_form": home_h_form,
+            "home_a_form": home_a_form,
+            "away_h_form": away_h_form,
+            "away_a_form": away_a_form,
+            "game_summary": game_summary,
+            "home_record": home_record,
+            "away_record": away_record,
+            "group_standings": get_league_standings(_db_league_id, only_group_ids=[_db_group_id]) if _db_league_id else [],
+            "group_name": _group_name,
+            "league_name": _league_name,
         }
 
 

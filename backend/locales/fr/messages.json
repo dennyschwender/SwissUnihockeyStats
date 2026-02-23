@@ -115,7 +115,10 @@
     "time": "Temps",
     "type": "Type",
     "score": "Score",
-    "score_penalty": "Score / Pénalité"
+    "score_penalty": "Score / Pénalité",
+    "date": "Date",
+    "home": "Domicile",
+    "away": "Extérieur"
   },
   "player": {
     "born": "Né(e) :",
@@ -138,7 +141,13 @@
     "no_events": "Aucune donnée disponible pour ce match.",
     "no_roster": "Aucune donnée d'effectif disponible.",
     "tab_events": "Événements",
-    "tab_roster": "Effectif"
+    "tab_roster": "Effectif",
+    "tab_h2h": "H2H & Forme",
+    "tab_table": "Classement",
+    "period_breakdown": "Résumé par période",
+    "h2h_title": "Face à face",
+    "no_h2h": "Aucune rencontre précédente trouvée.",
+    "form_title": "Forme récente"
   },
   "league_detail": {
     "tab_standings": "Classement",

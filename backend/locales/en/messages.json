@@ -115,7 +115,10 @@
     "time": "Time",
     "type": "Type",
     "score": "Score",
-    "score_penalty": "Score / Penalty"
+    "score_penalty": "Score / Penalty",
+    "date": "Date",
+    "home": "Home",
+    "away": "Away"
   },
   "player": {
     "born": "Born:",
@@ -138,7 +141,13 @@
     "no_events": "No event data available for this game.",
     "no_roster": "No roster data available. Run an events index job to fetch lineups.",
     "tab_events": "Events",
-    "tab_roster": "Roster"
+    "tab_roster": "Roster",
+    "tab_h2h": "H2H & Form",
+    "tab_table": "Table",
+    "period_breakdown": "Period Breakdown",
+    "h2h_title": "Head to Head",
+    "no_h2h": "No previous meetings found.",
+    "form_title": "Recent Form"
   },
   "league_detail": {
     "tab_standings": "Standings",

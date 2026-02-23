@@ -294,6 +294,7 @@ function eventsTable(goals, penalties) {
           <button class="gd-filter-btn" :class="filter === 'goal' ? 'active' : ''" @click="filter = 'goal'">{{ t.game.event_goals }}</button>
           <button class="gd-filter-btn" :class="filter === 'penalty' ? 'active' : ''" @click="filter = 'penalty'">{{ t.game.event_penalties }}</button>
         </div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
         <table class="gd-table">
           <thead><tr>
             <th :class="cls('period')"     @click="sortBy('period')"    >{{ t.table.period }}<span class="sort-icon" x-text="icon('period')"></span></th>
@@ -323,6 +324,7 @@ function eventsTable(goals, penalties) {
             </template>
           </tbody>
         </table>
+        </div>
       </div>
       {% else %}
       <div class="gd-empty">

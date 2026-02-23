@@ -115,7 +115,10 @@
     "time": "Zeit",
     "type": "Typ",
     "score": "Stand",
-    "score_penalty": "Stand / Strafe"
+    "score_penalty": "Stand / Strafe",
+    "date": "Datum",
+    "home": "Heim",
+    "away": "Gast"
   },
   "player": {
     "born": "Geboren:",
@@ -138,7 +141,13 @@
     "no_events": "Keine Ereignisdaten für dieses Spiel verfügbar.",
     "no_roster": "Keine Kaderdaten verfügbar. Führen Sie einen Ereignis-Indexjob durch.",
     "tab_events": "Ereignisse",
-    "tab_roster": "Kader"
+    "tab_roster": "Kader",
+    "tab_h2h": "H2H & Form",
+    "tab_table": "Tabelle",
+    "period_breakdown": "Perioden-Übersicht",
+    "h2h_title": "Direktvergleich",
+    "no_h2h": "Keine früheren Begegnungen gefunden.",
+    "form_title": "Aktuelle Form"
   },
   "league_detail": {
     "tab_standings": "Tabelle",
