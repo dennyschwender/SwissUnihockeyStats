@@ -823,7 +823,6 @@ def get_player_leaderboard(
                     Team.name.isnot(None),
                 )
                 .distinct()
-                .subquery()
             )
             base_filter.append(PlayerStatistics.team_name.in_(gc_team_names))
 
@@ -2193,8 +2192,8 @@ def get_game_box_score(game_id: int) -> dict:
             _form: list[dict] = []
             for _fg in reversed(_recent):
                 _is_h = _fg.home_team_id == tid
-                _my = _fg.home_score if _is_h else _fg.away_score
-                _op = _fg.away_score if _is_h else _fg.home_score
+                _my = (_fg.home_score if _is_h else _fg.away_score) or 0
+                _op = (_fg.away_score if _is_h else _fg.home_score) or 0
                 _opp_tid = _fg.away_team_id if _is_h else _fg.home_team_id
                 _res = "W" if _my > _op else ("L" if _my < _op else "D")
                 _form.append({
@@ -2234,8 +2233,8 @@ def get_game_box_score(game_id: int) -> dict:
             _w_a = _d_a = _l_a = _gf_a = _ga_a = 0
             for _rg in _q.all():
                 _is_h = _rg.home_team_id == tid
-                _my = _rg.home_score if _is_h else _rg.away_score
-                _op = _rg.away_score if _is_h else _rg.home_score
+                _my = (_rg.home_score if _is_h else _rg.away_score) or 0
+                _op = (_rg.away_score if _is_h else _rg.home_score) or 0
                 _gf += _my; _ga += _op
                 _res = ("w" if _my > _op else ("l" if _my < _op else "d"))
                 if _is_h:
@@ -2319,7 +2318,7 @@ def get_game_box_score(game_id: int) -> dict:
             "game_summary": game_summary,
             "home_record": home_record,
             "away_record": away_record,
-            "group_standings": get_league_standings(_db_league_id, only_group_ids=[_db_group_id]) if _db_league_id else [],
+            "group_standings": get_league_standings(_db_league_id, only_group_ids=[_db_group_id] if _db_group_id is not None else None) if _db_league_id else [],
             "group_name": _group_name,
             "league_name": _league_name,
         }
