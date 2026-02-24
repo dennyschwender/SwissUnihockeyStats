@@ -675,6 +675,67 @@ async def admin_api_system(_: None = Depends(require_admin)):
         return {"ok": False, "error": str(exc)}
 
 
+@app.get("/admin/api/scheduler-diag")
+async def admin_scheduler_diag(_: None = Depends(require_admin)):
+    """Freshness diagnosis: for every policy × season show what _last_sync_for()
+    actually returns so we can spot mismatches between the scheduler's queries
+    and what the data_indexer writes to sync_status."""
+    from app.services.database import get_database_service
+    from app.models.db_models import Season, SyncStatus
+    from app.services.scheduler import POLICIES, _last_sync_for, _utcnow
+    import asyncio
+
+    def _run():
+        db = get_database_service()
+        now = _utcnow()
+        rows = []
+        with db.session_scope() as session:
+            season_rows = (session.query(Season.id, Season.highlighted)
+                           .order_by(Season.id.desc()).limit(20).all())
+            current_sid = next((r[0] for r in season_rows if r[1]), None)
+            indexed_sids = [r[0] for r in season_rows]
+
+            for policy in POLICIES:
+                seasons_to_check = [None] if policy["scope"] == "global" else indexed_sids
+                for sid in seasons_to_check:
+                    last_sync = _last_sync_for(session, policy["entity_type"], sid)
+                    max_age = policy["max_age"]
+                    if last_sync is None:
+                        status = "NEVER_SYNCED"
+                        next_run = "IMMEDIATE"
+                    else:
+                        age = now - last_sync
+                        if age > max_age:
+                            status = "STALE"
+                            next_run = "IMMEDIATE"
+                        else:
+                            remaining = max_age - age
+                            h, rem = divmod(int(remaining.total_seconds()), 3600)
+                            m = rem // 60
+                            status = "FRESH"
+                            next_run = f"in {h}h {m}m"
+                    rows.append({
+                        "policy":       policy["name"],
+                        "entity_type":  policy["entity_type"],
+                        "scope":        policy["scope"],
+                        "season":       sid,
+                        "is_current":   sid == current_sid,
+                        "current_only": policy.get("current_only", False),
+                        "max_age_h":    round(policy["max_age"].total_seconds() / 3600, 1),
+                        "last_sync":    last_sync.strftime("%Y-%m-%d %H:%M") if last_sync else None,
+                        "status":       status,
+                        "next_run":     next_run,
+                    })
+        return rows
+
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(None, _run)
+        return {"ok": True, "rows": result}
+    except Exception as exc:
+        logger.error("scheduler-diag error: %s", exc, exc_info=True)
+        return {"ok": False, "error": str(exc)}
+
+
 def _admin_stats_sync():
     """Synchronous DB work for admin stats (called via run_in_executor)."""
     from app.services.database import get_database_service
@@ -1552,6 +1613,10 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                 set_progress(62 + int(i / total * 13))
             stats["league_groups"] = groups_n
             push("ok", f"Groups: {groups_n}")
+            # Write season-level sentinel so the scheduler's _last_sync_for()
+            # finds a "league_groups / season:{season}" row with the right entity_type.
+            # Without this the scheduler re-queues league_groups every 5-min tick.
+            await asyncio.to_thread(indexer.record_season_sync, "league_groups", season, groups_n)
 
         # ── GAMES ──────────────────────────────────────────────────────────
         if task in ("games", "leagues_path", "full"):
@@ -1594,6 +1659,8 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                 set_progress(75 + int(done / total * 20) if total else 95)
             stats["games"] = games_n
             push("ok", f"Games: {games_n}")
+            # Season-level sentinel: games entity_ids are "games:league:{id}" (no season year)
+            await asyncio.to_thread(indexer.record_season_sync, "games", season, games_n)
 
         # ── BACKFILL TEAM NAMES ────────────────────────────────────────────
         if task in ("team_names", "games", "leagues_path", "full"):
@@ -1684,6 +1751,8 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             stats["game_events"] = events_n
             stats["lineups"] = lineup_n
             push("ok", f"Game events: {events_n}  Lineups: {lineup_n}")
+            # Season-level sentinel: game_events entity_ids are "game:{id}:events" (no season year)
+            await asyncio.to_thread(indexer.record_season_sync, "game_events", season, events_n)
 
         job["stats"]    = stats
         job["progress"] = 100

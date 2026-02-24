@@ -197,7 +197,43 @@ class DataIndexer:
             # Best-effort: if we still can't write, silently ignore so the
             # original exception is not masked.
             pass
-    
+
+    def record_season_sync(self, entity_type: str, season_id: int, records: int = 0):
+        """Upsert a season-level sync_status sentinel row.
+
+        The scheduler's _last_sync_for() queries sync_status for a row matching
+        entity_type + entity_id LIKE '%{season}%'.  Several tasks (league_groups,
+        games, game_events) write per-entity rows whose entity_id does NOT contain
+        the season year, so _last_sync_for always returns None and the scheduler
+        re-queues those jobs on every tick.
+
+        Calling this method after a season-wide task completes writes:
+            entity_type = <entity_type>
+            entity_id   = "season:<season_id>"
+            sync_status = "completed"
+        which the scheduler will find on the next freshness check.
+        """
+        entity_id = f"season:{season_id}"
+        try:
+            with self.db_service.session_scope() as session:
+                sync = session.query(SyncStatus).filter(
+                    SyncStatus.entity_type == entity_type,
+                    SyncStatus.entity_id   == entity_id,
+                ).first()
+                if not sync:
+                    sync = SyncStatus(entity_type=entity_type, entity_id=entity_id)
+                    session.add(sync)
+                sync.sync_status    = "completed"
+                sync.records_synced = records
+                sync.last_sync      = datetime.now(timezone.utc)
+                session.commit()
+                logger.debug(
+                    "record_season_sync: %s / %s = %d records",
+                    entity_type, entity_id, records,
+                )
+        except Exception as exc:
+            logger.warning("record_season_sync failed for %s season %s: %s", entity_type, season_id, exc)
+
     def _extract_table_data(self, api_response: Dict[str, Any]) -> List[Dict]:
         """Extract data from API table format: data.regions[0].rows"""
         if not isinstance(api_response, dict):
