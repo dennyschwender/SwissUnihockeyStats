@@ -1196,9 +1196,17 @@ class DataIndexer:
                                         session.flush()
                                     except Exception:
                                         session.rollback()
-                                elif tname and not existing.name:
-                                    existing.name = tname
-                                    existing.text = tname
+                                else:
+                                    # Backfill name if missing
+                                    if tname and not existing.name:
+                                        existing.name = tname
+                                        existing.text = tname
+                                    # Backfill league_id / game_class if not yet set
+                                    # (teams indexed via clubs path never get these)
+                                    if not existing.league_id:
+                                        existing.league_id = league_id
+                                    if not existing.game_class:
+                                        existing.game_class = game_class
 
                             game = session.get(Game, game_id)
                             if not game:
@@ -1580,7 +1588,50 @@ class DataIndexer:
             logger.info(f"✓ Backfilled names for {updated} teams in season {season_id}")
             return updated
 
-    def index_leagues_path(self, season_id: int = 2025,
+    def backfill_team_league_attrs(self, season_id: int) -> int:
+        """Backfill Team.league_id and Team.game_class from existing game records.
+
+        Teams indexed via the clubs path never have league_id / game_class set.
+        This method resolves them using the game → group → league chain that was
+        already stored during the leagues indexing pass.
+
+        Returns number of Team rows updated.
+        """
+        logger.info(f"Backfilling team league attrs for season {season_id}...")
+        updated = 0
+        with self.db_service.session_scope() as session:
+            # Build team_id → (league_id, game_class) from all games in the season
+            rows = (
+                session.query(
+                    Game.home_team_id,
+                    Game.away_team_id,
+                    League.league_id,
+                    League.game_class,
+                )
+                .join(LeagueGroup, Game.group_id == LeagueGroup.id)
+                .join(League, LeagueGroup.league_id == League.id)
+                .filter(Game.season_id == season_id)
+                .all()
+            )
+            team_attrs: dict[int, tuple[int, int]] = {}
+            for home_id, away_id, l_id, gc in rows:
+                for tid in (home_id, away_id):
+                    if tid and tid not in team_attrs:
+                        team_attrs[tid] = (l_id, gc)
+
+            for team_id, (l_id, gc) in team_attrs.items():
+                team = session.get(Team, (team_id, season_id))
+                if team and (not team.league_id or not team.game_class):
+                    if not team.league_id:
+                        team.league_id = l_id
+                    if not team.game_class:
+                        team.game_class = gc
+                    updated += 1
+
+            session.commit()
+        logger.info(f"✓ Backfilled league attrs for {updated} teams in season {season_id}")
+        return updated
+self, season_id: int = 2025,
                             index_games: bool = True,
                             index_events: bool = False,
                             force: bool = False) -> Dict[str, int]:
@@ -1643,6 +1694,9 @@ class DataIndexer:
         # 5. Backfill team names from rankings API (fills stubs created during game indexing)
         if index_games:
             stats["team_names"] = self.backfill_team_names(season_id, force=force)
+            # Also backfill league_id / game_class on teams that were indexed
+            # via the clubs path (which never sets these fields)
+            self.backfill_team_league_attrs(season_id)
 
         # 6. Optionally index events for past games (game_date < now, regardless of stored status)
         if index_events:
