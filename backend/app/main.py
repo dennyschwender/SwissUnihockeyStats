@@ -495,6 +495,79 @@ async def admin_vacuum(_: None = Depends(require_admin)):
         return {"ok": False, "detail": str(e)}
 
 
+@app.post("/admin/api/cleanup")
+async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
+    """Remove duplicate rows that can accumulate when indexing runs multiple times.
+
+    Targets:
+    - league_groups: duplicates on (league_id, group_id) — no unique constraint
+    - game_events:   duplicates on (game_id, event_type, period, time, player_id)
+    - sync_status:   completed/failed entries older than 7 days (just clutter)
+    """
+    from app.services.database import get_database_service
+    from sqlalchemy import text as _text
+    import time
+
+    db_service = get_database_service()
+    if db_service.engine is None:
+        return {"ok": False, "detail": "Database engine not initialized"}
+
+    loop = asyncio.get_running_loop()
+
+    def _cleanup():
+        t0 = time.time()
+        counts = {}
+        with db_service.engine.connect() as conn:
+            # ── league_groups duplicates ─────────────────────────────────────
+            # Keep the row with the lowest id per (league_id, group_id).
+            r = conn.execute(_text(
+                "DELETE FROM league_groups "
+                "WHERE id NOT IN ("
+                "  SELECT MIN(id) FROM league_groups GROUP BY league_id, group_id"
+                ")"
+            ))
+            counts["league_groups"] = r.rowcount
+
+            # ── game_events duplicates ───────────────────────────────────────
+            # Keep the row with the lowest id per
+            # (game_id, event_type, period, time, player_id).
+            r = conn.execute(_text(
+                "DELETE FROM game_events "
+                "WHERE id NOT IN ("
+                "  SELECT MIN(id) FROM game_events "
+                "  GROUP BY game_id, event_type, period, time, player_id"
+                ")"
+            ))
+            counts["game_events"] = r.rowcount
+
+            # ── stale sync_status entries ────────────────────────────────────
+            # Remove completed/failed records older than 7 days — pure clutter.
+            r = conn.execute(_text(
+                "DELETE FROM sync_status "
+                "WHERE sync_status IN ('completed', 'failed', 'stale') "
+                "  AND last_sync < datetime('now', '-7 days')"
+            ))
+            counts["sync_status"] = r.rowcount
+
+            conn.commit()
+        counts["total"] = sum(counts.values())
+        counts["elapsed_s"] = round(time.time() - t0, 2)
+        return counts
+
+    try:
+        result = await loop.run_in_executor(None, _cleanup)
+        logger.info(
+            "Admin cleanup: removed %d league_group dups, %d game_event dups, "
+            "%d stale sync_status rows in %.2fs",
+            result["league_groups"], result["game_events"],
+            result["sync_status"], result["elapsed_s"],
+        )
+        return {"ok": True, **result}
+    except Exception as e:
+        logger.error("Admin cleanup failed: %s", e, exc_info=True)
+        return {"ok": False, "detail": str(e)}
+
+
 def _admin_stats_sync():
     """Synchronous DB work for admin stats (called via run_in_executor)."""
     from app.services.database import get_database_service

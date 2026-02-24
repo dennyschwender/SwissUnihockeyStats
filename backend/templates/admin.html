@@ -303,6 +303,7 @@
             <div class="task-group-label" style="margin-bottom:.4rem">Maintenance</div>
             <div style="display:flex;flex-direction:column;gap:.4rem">
               <button class="btn btn-sm" id="vacuum-btn" onclick="runVacuum()" title="VACUUM + WAL checkpoint: reclaims space from deleted rows and merges WAL back into .db">🧹 VACUUM + Checkpoint</button>
+              <button class="btn btn-sm" id="cleanup-btn" onclick="runCleanup()" title="Remove duplicate league_groups, game_events, and old sync_status rows">🗑️ Cleanup Duplicates</button>
               <button class="btn btn-sm" onclick="loadDbInfo()">↺ Refresh</button>
             </div>
             <div style="margin-top:.5rem;font-size:.7rem;color:#6e7681;line-height:1.5">
@@ -1306,6 +1307,33 @@ async function runVacuum() {
   } finally {
     btn.disabled = false;
     btn.textContent = '🧹 VACUUM + Checkpoint';
+  }
+}
+
+async function runCleanup() {
+  const btn = document.getElementById('cleanup-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Running…';
+  log('info', '🗑️ Cleanup duplicates started…');
+  try {
+    const r = await fetch('/admin/api/cleanup', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      log('ok',
+        `✓ Cleanup done in ${d.elapsed_s}s — removed: ` +
+        `${d.league_groups} league_group dups, ` +
+        `${d.game_events} game_event dups, ` +
+        `${d.sync_status} stale sync_status rows ` +
+        `(total: ${d.total})`);
+      await loadStats();
+    } else {
+      log('error', 'Cleanup failed: ' + (d.detail || JSON.stringify(d)));
+    }
+  } catch(e) {
+    log('error', 'Cleanup error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🗑️ Cleanup Duplicates';
   }
 }
 
