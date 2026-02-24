@@ -136,17 +136,26 @@ class DataIndexer:
         session.commit()
     
     def _mark_sync_complete(self, session: Session, entity_type: str, entity_id: str, records_count: int = 0):
-        """Mark synchronization as completed"""
+        """Mark synchronization as completed (upsert — creates the row if it doesn't exist).
+
+        _mark_sync_start is the historic row creator, but several indexer methods
+        (teams, players, game_events, …) never call _mark_sync_start, so calling
+        the old update-only version silently wrote nothing.  This version always
+        creates the row when missing so the scheduler's freshness check works.
+        """
         sync = session.query(SyncStatus).filter(
             SyncStatus.entity_type == entity_type,
             SyncStatus.entity_id == entity_id
         ).first()
-        
-        if sync:
-            sync.sync_status = "completed"
-            sync.records_synced = records_count
-            sync.last_sync = datetime.now(timezone.utc)
-            session.commit()
+
+        if not sync:
+            sync = SyncStatus(entity_type=entity_type, entity_id=entity_id)
+            session.add(sync)
+
+        sync.sync_status    = "completed"
+        sync.records_synced = records_count
+        sync.last_sync      = datetime.now(timezone.utc)
+        session.commit()
     
     def bulk_already_indexed(self, entity_type: str, entity_ids: list[str],
                               max_age_hours: int = 720) -> set[str]:

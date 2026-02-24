@@ -1526,6 +1526,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                 set_progress(10 + int(i / total * 25))
             stats["teams"] = teams_n
             push("ok", f"Teams: {teams_n}")
+            await asyncio.to_thread(indexer.record_season_sync, "teams", season, teams_n)
 
         # ── PLAYERS ────────────────────────────────────────────────────────
         if task in ("players", "clubs_path", "full"):
@@ -1551,6 +1552,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                 set_progress(35 + int(i / total * 25) if total else 60)
             stats["players"] = players_n
             push("ok", f"Players: {players_n}")
+            await asyncio.to_thread(indexer.record_season_sync, "players", season, players_n)
 
         # ── PLAYER STATS ───────────────────────────────────────────────────
         if task in ("player_stats", "clubs_path", "full"):
@@ -1558,6 +1560,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             stats_n = await asyncio.to_thread(indexer.index_player_stats_for_season, season, force=force)
             stats["player_stats"] = stats_n
             push("ok", f"Player stats: {stats_n}")
+            await asyncio.to_thread(indexer.record_season_sync, "player_stats", season, stats_n)
             set_progress(60)
 
         # ── GAME LINEUPS (standalone — without events) ─────────────────────
