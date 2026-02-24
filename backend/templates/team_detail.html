@@ -53,8 +53,16 @@
     <div x-show="tab==='standings'" x-data="{
       rows: window._teamStandings || [],
       teamId: {{ team.id }},
-      playoffSpots(total) { return total >= 6 ? 4 : total >= 4 ? 2 : 1; },
-      playoutSpots(total) { return total >= 4 ? 2 : 1; },
+      _playoffSpots: {{ playoff_spots }},
+      _playoutSpots: {{ playout_spots }},
+      playoffSpots(total) {
+        if (this._playoffSpots > 0) return this._playoffSpots;
+        return total >= 10 ? 4 : 2;
+      },
+      playoutSpots(total) {
+        if (this._playoutSpots > 0) return this._playoutSpots;
+        return total >= 4 ? 2 : 1;
+      },
       rowZone(rank, total) {
         if (rank <= this.playoffSpots(total)) return 'playoff';
         if (rank > total - this.playoutSpots(total)) return 'playout';
@@ -92,9 +100,6 @@
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="row.rank"></td>
                 <td style="padding:.6rem .75rem;">
                   <span x-text="row.team_name"></span>
-                  <template x-if="row.team_id === teamId">
-                    <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;color:var(--swiss-red,#e11d48);margin-left:.4rem;">▶ you</span>
-                  </template>
                 </td>
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gp"></td>
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="row.w"></td>

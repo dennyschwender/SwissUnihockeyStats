@@ -2689,6 +2689,8 @@ async def team_detail(request: Request, locale: str, team_id: int, season: Optio
             "t": get_translations(locale),
             "team": team,
             "error_message": error_message,
+            "playoff_spots": _zone_cutoffs((team or {}).get("league_name") or "")[0],
+            "playout_spots": _zone_cutoffs((team or {}).get("league_name") or "")[1],
         },
     )
 
