@@ -632,6 +632,11 @@ html.dark-mode .universal-search-results {
   display: none;
 }
 
+/* Mobile theme toggle row (hidden on desktop, shown inside hamburger nav) */
+.mobile-theme-row {
+  display: none;
+}
+
 /* Responsive */
 @media (max-width: 960px) {
   .hamburger-btn {
@@ -720,6 +725,41 @@ html.dark-mode .universal-search-results {
     background: var(--swiss-red);
     color: var(--swiss-white);
     border-color: var(--swiss-red);
+  }
+
+  /* Mobile theme toggle becomes visible inside hamburger menu */
+  .mobile-theme-row {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1.5rem 1rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .mobile-theme-btn {
+    display: flex !important;
+    align-items: center;
+    gap: 0.5rem;
+    width: auto;
+    height: auto;
+    padding: 0.4rem 0.9rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .mobile-theme-btn:hover {
+    background: var(--primary-100);
+    border-color: var(--swiss-red);
+    color: var(--swiss-red);
+  }
+
+  .mobile-theme-label {
+    font-size: 0.875rem;
   }
 
   /* Reduce card padding when in single-column layout */

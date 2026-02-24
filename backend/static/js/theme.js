@@ -20,10 +20,7 @@ class ThemeManager {
 
         // Sync button icon once DOM is ready (script runs in <head>)
         document.addEventListener('DOMContentLoaded', () => {
-            const btn = document.getElementById('theme-toggle-btn');
-            if (btn) {
-                btn.textContent = this.getCurrentTheme() === 'dark' ? '☀️' : '🌙';
-            }
+            this._syncButtons(this.getCurrentTheme());
         });
 
         // Listen for system theme changes
@@ -45,15 +42,28 @@ class ThemeManager {
             localStorage.setItem(this.STORAGE_KEY, theme);
         }
 
-        // Update toggle button icon
-        const btn = document.getElementById('theme-toggle-btn');
-        if (btn) {
-            btn.textContent = theme === 'dark' ? '☀️' : '🌙';
-            btn.title = theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
-        }
+        // Update all theme toggle buttons (header + mobile menu)
+        this._syncButtons(theme);
 
         // Dispatch custom event for other components
         window.dispatchEvent(new CustomEvent('themechange', { detail: { theme } }));
+    }
+
+    _syncButtons(theme) {
+        const icon = theme === 'dark' ? '☀️' : '🌙';
+        const title = theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+        document.querySelectorAll('.theme-toggle').forEach(btn => {
+            btn.title = title;
+        });
+        // Update emoji spans separately so buttons can have a label text too
+        document.querySelectorAll('.theme-toggle-icon').forEach(el => {
+            el.textContent = icon;
+        });
+        // Fallback: plain theme-toggle buttons with no icon span
+        const headerBtn = document.getElementById('theme-toggle-btn');
+        if (headerBtn && !headerBtn.querySelector('.theme-toggle-icon')) {
+            headerBtn.textContent = icon;
+        }
     }
 
     toggle() {

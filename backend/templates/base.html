@@ -48,7 +48,7 @@
     <link rel="apple-touch-icon" href="/static/images/icon-192x192.svg">
     
     <!-- CSS -->
-    <link rel="stylesheet" href="/static/css/main.css?v=17">
+    <link rel="stylesheet" href="/static/css/main.css?v=18">
     
     <!-- htmx for dynamic interactions (local, defer) -->
     <script defer src="/static/js/vendor/htmx.min.js"></script>
@@ -113,13 +113,20 @@
                         <button @click="window.location.href = '/it' + window.location.pathname.substring(3)"
                                 :class="{ 'active': locale === 'it' }">IT</button>
                     </div>
+                    <!-- Mobile theme toggle (visible inside hamburger menu only) -->
+                    <div class="mobile-theme-row">
+                        <button class="theme-toggle mobile-theme-btn" onclick="themeManager.toggle()" aria-label="Toggle theme">
+                            <span class="theme-toggle-icon">🌙</span>
+                            <span class="mobile-theme-label">Toggle theme</span>
+                        </button>
+                    </div>
                 </nav>
 
                 <!-- Theme Toggle -->
                 <button id="theme-toggle-btn" class="theme-toggle"
                         onclick="themeManager.toggle()"
                         aria-label="Toggle theme"
-                        title="Toggle dark/light mode">🌙</button>
+                        title="Toggle dark/light mode"><span class="theme-toggle-icon">🌙</span></button>
 
                 <!-- Hamburger (mobile only) -->
                 <button id="hamburger-btn" class="hamburger-btn" onclick="toggleMobileNav()" aria-label="Toggle menu">
