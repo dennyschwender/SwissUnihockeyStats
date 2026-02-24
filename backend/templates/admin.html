@@ -307,6 +307,20 @@
             </table>
           </div>
         </div>
+
+        <p class="section-title" style="margin-top:1.25rem">Recent Sync Activity</p>
+        <div class="sync-panel" id="sync-panel" style="margin-top:0">
+          <h2>Last 100 sync entries</h2>
+          <div style="overflow-x:auto;max-height:350px;overflow-y:auto">
+            <table class="sync-table">
+              <thead><tr>
+                <th>Type</th><th>Entity ID</th><th>Status</th>
+                <th>Last Sync</th><th>Records</th><th>Error</th>
+              </tr></thead>
+              <tbody id="sync-tbody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- Right: active jobs + log -->
@@ -409,19 +423,6 @@
             </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <div class="sync-panel" id="sync-panel" style="margin-top:1.25rem">
-      <h2>Recent Sync Activity (last 100)</h2>
-      <div style="overflow-x:auto;max-height:350px;overflow-y:auto">
-        <table class="sync-table">
-          <thead><tr>
-            <th>Type</th><th>Entity ID</th><th>Status</th>
-            <th>Last Sync</th><th>Records</th><th>Error</th>
-          </tr></thead>
-          <tbody id="sync-tbody"></tbody>
-        </table>
       </div>
     </div>
 
