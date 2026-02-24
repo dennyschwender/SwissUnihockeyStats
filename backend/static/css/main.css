@@ -1340,6 +1340,16 @@ html.dark-mode .search-input {
   width: 2.5rem;
 }
 
+/* Team name cell in compact game lists – truncates at max width */
+.data-table td.team-name-cell {
+  max-width: 130px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+  vertical-align: middle;
+}
+
 /* Clickable row highlight */
 .data-table tbody tr.clickable {
   cursor: pointer;

@@ -4,9 +4,9 @@
     {% for g in upcoming_games %}
     <tr class="clickable" onclick="window.location='/{{ locale }}/game/{{ g.game_id }}'">
       <td style="color:var(--gray-400);font-size:.73rem;white-space:nowrap;vertical-align:middle;">{{ g.weekday }}<br>{{ g.date }}{% if g.time %}<br>{{ g.time }}{% endif %}</td>
-      <td style="font-weight:500;white-space:nowrap;text-align:right;vertical-align:middle;">{{ g.home_team }}</td>
+      <td class="team-name-cell" style="text-align:right;">{{ g.home_team }}</td>
       <td class="col-narrow" style="color:var(--gray-400);white-space:nowrap;vertical-align:middle;">vs</td>
-      <td style="font-weight:500;white-space:nowrap;vertical-align:middle;">{{ g.away_team }}</td>
+      <td class="team-name-cell">{{ g.away_team }}</td>
       {% if g.league_label %}
       <td style="text-align:right;color:var(--gray-400);font-size:.73rem;font-weight:600;white-space:nowrap;vertical-align:middle;">{{ g.league_label }}{% if g.group_name %}<br><span style="font-weight:400;">{{ g.group_name }}</span>{% endif %}</td>
       {% endif %}
