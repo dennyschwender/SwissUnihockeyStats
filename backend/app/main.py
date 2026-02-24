@@ -2709,31 +2709,32 @@ async def universal_search(request: Request, locale: str, q: str = ""):
             html_parts.append('</div></div>')
 
         # --- Teams ---
-        teams_raw = (
-            session.query(Team, League)
-            .outerjoin(
-                League,
-                (League.league_id == Team.league_id) & (League.season_id == Team.season_id)
-            )
+        from sqlalchemy import func
+        # Subquery: for each unique team id, get the most recent season
+        team_subq = (
+            session.query(Team.id, func.max(Team.season_id).label("max_season"))
             .filter(
                 or_(Team.name.ilike(f"%{q}%"), Team.text.ilike(f"%{q}%")),
                 Team.name.isnot(None),
             )
-            .order_by(Team.season_id.desc())
-            .limit(16).all()
+            .group_by(Team.id)
+            .limit(8)
+            .subquery()
         )
-        # deduplicate by (name, league_id) so same club in different leagues all show
-        seen_team_keys: set[str] = set()
-        unique_teams = []
-        for t, lg in teams_raw:
-            key = f"{(t.name or t.text or '').lower()}|{t.league_id}"
-            if key not in seen_team_keys:
-                seen_team_keys.add(key)
-                unique_teams.append((t, lg))
-        unique_teams = unique_teams[:8]
-        if unique_teams:
+        unique_teams_rows = (
+            session.query(Team, League)
+            .join(team_subq, (Team.id == team_subq.c.id) & (Team.season_id == team_subq.c.max_season))
+            .outerjoin(
+                League,
+                (League.league_id == Team.league_id)
+                & (League.season_id == Team.season_id)
+                & (League.game_class == Team.game_class),
+            )
+            .all()
+        )
+        if unique_teams_rows:
             html_parts.append('<div class="search-category"><h3>👥 Teams</h3><div class="search-items">')
-            for t, lg in unique_teams:
+            for t, lg in unique_teams_rows:
                 tname = t.name or t.text or f"Team {t.id}"
                 lgname = (lg.name or lg.text or "") if lg else ""
                 subtitle = f'<span class="search-item-subtitle">{lgname}</span>' if lgname else ""
