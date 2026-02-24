@@ -426,6 +426,15 @@
       </div>
     </div>
 
+    <p class="section-title" style="margin-top:1.25rem">Output</p>
+    <div class="log-panel">
+      <div class="panel-header">
+        DB Actions Log
+        <button class="btn btn-sm" onclick="clearDbLog()">Clear</button>
+      </div>
+      <div class="log-box" id="db-log-box">Ready.</div>
+    </div>
+
   </div>
 
   <!-- ══ Tab: Seasons ══ -->
@@ -1324,26 +1333,42 @@ async function loadDbInfo() {
     document.getElementById('db-pragma-tbody').innerHTML = rows;
 
   } catch(e) {
-    // non-fatal — DB info panel just stays hidden
+    dbLog('error', 'DB info load failed: ' + e.message);
   }
+}
+
+function dbLog(level, msg) {
+  const box = document.getElementById('db-log-box');
+  if (!box) { log(level, msg); return; }
+  if (box.textContent === 'Ready.') box.textContent = '';
+  const line = document.createElement('div');
+  line.className = level;
+  line.textContent = `[${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false})}] ${msg}`;
+  box.appendChild(line);
+  if (box.children.length > 200) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+}
+function clearDbLog() {
+  const box = document.getElementById('db-log-box');
+  if (box) box.innerHTML = '';
 }
 
 async function runVacuum() {
   const btn = document.getElementById('vacuum-btn');
   btn.disabled = true;
   btn.textContent = '⏳ Running…';
-  log('info', '🧹 VACUUM + WAL checkpoint started…');
+  dbLog('info', '🧹 VACUUM + WAL checkpoint started…');
   try {
     const r = await fetch('/admin/api/vacuum', { method: 'POST' });
     const d = await r.json();
     if (d.ok) {
-      log('ok', `✓ VACUUM complete in ${d.elapsed_s}s`);
+      dbLog('ok', `✓ VACUUM complete in ${d.elapsed_s}s`);
       await loadDbInfo();
     } else {
-      log('error', 'VACUUM failed: ' + (d.detail || JSON.stringify(d)));
+      dbLog('error', 'VACUUM failed: ' + (d.detail || JSON.stringify(d)));
     }
   } catch(e) {
-    log('error', 'VACUUM error: ' + e.message);
+    dbLog('error', 'VACUUM error: ' + e.message);
   } finally {
     btn.disabled = false;
     btn.textContent = '🧹 VACUUM + Checkpoint';
@@ -1354,12 +1379,12 @@ async function runCleanup() {
   const btn = document.getElementById('cleanup-btn');
   btn.disabled = true;
   btn.textContent = '⏳ Running…';
-  log('info', '🗑️ Cleanup duplicates started…');
+  dbLog('info', '🗑️ Cleanup duplicates started…');
   try {
     const r = await fetch('/admin/api/cleanup', { method: 'POST' });
     const d = await r.json();
     if (d.ok) {
-      log('ok',
+      dbLog('ok',
         `✓ Cleanup done in ${d.elapsed_s}s — removed: ` +
         `${d.league_groups} league_group dups, ` +
         `${d.game_events} game_event dups, ` +
@@ -1367,12 +1392,12 @@ async function runCleanup() {
         `(total: ${d.total})`);
       await loadStats();
     } else if (d.conflict) {
-      log('warn', '⚠ ' + d.detail + ' — wait for jobs to finish first.');
+      dbLog('warn', '⚠ ' + d.detail + ' — wait for jobs to finish first.');
     } else {
-      log('error', 'Cleanup failed: ' + (d.detail || JSON.stringify(d)));
+      dbLog('error', 'Cleanup failed: ' + (d.detail || JSON.stringify(d)));
     }
   } catch(e) {
-    log('error', 'Cleanup error: ' + e.message);
+    dbLog('error', 'Cleanup error: ' + e.message);
   } finally {
     btn.disabled = false;
     btn.textContent = '🗑️ Cleanup Duplicates';
