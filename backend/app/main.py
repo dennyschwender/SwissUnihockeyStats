@@ -682,8 +682,10 @@ async def admin_scheduler_diag(_: None = Depends(require_admin)):
     and what the data_indexer writes to sync_status."""
     from app.services.database import get_database_service
     from app.models.db_models import Season, SyncStatus
-    from app.services.scheduler import POLICIES, _last_sync_for, _utcnow
+    from app.services.scheduler import get_scheduler, POLICIES, _last_sync_for, _utcnow
     import asyncio
+
+    _sched = get_scheduler()  # capture once; shared with _run() closure
 
     def _run():
         db = get_database_service()
@@ -693,7 +695,11 @@ async def admin_scheduler_diag(_: None = Depends(require_admin)):
             season_rows = (session.query(Season.id, Season.highlighted)
                            .order_by(Season.id.desc()).limit(20).all())
             current_sid = next((r[0] for r in season_rows if r[1]), None)
-            indexed_sids = [r[0] for r in season_rows]
+            # Respect scheduler season filter — excluded/below-min seasons are not managed
+            indexed_sids = [
+                r[0] for r in season_rows
+                if not (_sched and _sched._season_filtered(r[0]))
+            ]
 
             for policy in POLICIES:
                 seasons_to_check = [None] if policy["scope"] == "global" else indexed_sids
@@ -730,7 +736,10 @@ async def admin_scheduler_diag(_: None = Depends(require_admin)):
 
     try:
         result = await asyncio.get_event_loop().run_in_executor(None, _run)
-        return {"ok": True, "rows": result}
+        sf = _sched.get_season_filter() if _sched else {
+            "min_season": None, "excluded_seasons": [], "max_concurrent": 2
+        }
+        return {"ok": True, "rows": result, "season_filter": sf}
     except Exception as exc:
         logger.error("scheduler-diag error: %s", exc, exc_info=True)
         return {"ok": False, "error": str(exc)}

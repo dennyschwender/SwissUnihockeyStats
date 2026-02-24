@@ -175,6 +175,22 @@
     .s-warn { color: #d29922; }
     .s-prog { color: #d29922; }
 
+    /* ── freshness badges inline in season task rows ── */
+    .fresh-badge {
+      display: inline-block; font-size: .58rem; padding: 1px 5px; border-radius: 3px;
+      font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+      vertical-align: middle; white-space: nowrap; margin-left: 4px;
+    }
+    .fresh-badge.ok   { background: #0d2818; color: #3fb950; border: 1px solid #238636; }
+    .fresh-badge.warn { background: #271a00; color: #d29922; border: 1px solid #9e6a03; }
+    .fresh-badge.fail { background: #2d1214; color: #f85149; border: 1px solid #da3633; }
+    .fresh-badge.skip { background: #161b22; color: #6e7681; border: 1px solid #30363d; }
+    .next-run-pill {
+      display: inline-block; font-size: .57rem; padding: 1px 4px; border-radius: 3px;
+      background: #0d1117; color: #6e7681; border: 1px solid #21262d;
+      vertical-align: middle; margin-left: 2px; white-space: nowrap;
+    }
+
     /* ── mobile ── */
     @media (max-width: 600px) {
       .topbar { flex-wrap: wrap; padding: .6rem 1rem; gap: .5rem; }
@@ -594,6 +610,15 @@
 const jobs = {};  // job_id → job object
 let _activitySyncRows = [];   // last sync_status snapshot (DB-backed)
 let _activityHistRows = [];   // last scheduler history snapshot (in-memory)
+let _freshnessMap     = {};   // "entity_type:season" → diag row (from scheduler-diag)
+let _seasonFilter     = { min_season: null, excluded_seasons: [] };
+
+/* task name → entity_type (matches scheduler POLICIES) */
+const TASK_TO_ENTITY = {
+  clubs: 'clubs', teams: 'teams', players: 'players',
+  player_stats: 'player_stats', leagues: 'leagues',
+  groups: 'league_groups', games: 'games', events: 'game_events',
+};
 
 const fmt = n => (n == null ? '—' : Number(n).toLocaleString('de-CH'));
 
@@ -602,9 +627,26 @@ const fmt = n => (n == null ? '—' : Number(n).toLocaleString('de-CH'));
 ═══════════════════════════════════════════════════════ */
 async function loadStats() {
   try {
-    const r = await fetch('/admin/api/stats');
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const d = await r.json();
+    const [statsR, diagR] = await Promise.all([
+      fetch('/admin/api/stats'),
+      fetch('/admin/api/scheduler-diag').catch(() => null),
+    ]);
+    if (!statsR.ok) throw new Error('HTTP ' + statsR.status);
+    const d = await statsR.json();
+
+    // Update freshness map + season filter (best-effort, don’t block stats on failure)
+    if (diagR && diagR.ok) {
+      try {
+        const diagD = await diagR.json();
+        if (diagD.ok) {
+          _freshnessMap = {};
+          for (const row of diagD.rows || []) {
+            if (row.season) _freshnessMap[`${row.entity_type}:${row.season}`] = row;
+          }
+          if (diagD.season_filter) _seasonFilter = diagD.season_filter;
+        }
+      } catch (_) {}
+    }
 
     const t = d.totals || {};
     document.getElementById('t-seasons').textContent = fmt(t.seasons);
@@ -617,7 +659,8 @@ async function loadStats() {
     document.getElementById('t-gp'     ).textContent = fmt(t.game_players);
     document.getElementById('t-events' ).textContent = fmt(t.game_events);
 
-    renderSeasons(d.by_season || []);
+    const visibleSeasons = (d.by_season || []).filter(s => !isSeasonFiltered(s.season_id));
+    renderSeasons(visibleSeasons);
     _activitySyncRows = d.sync_status || [];
     renderActivityTable();
 
@@ -665,7 +708,7 @@ function buildSeasonCard(s, isOpen) {
 <div class="season-card${s.is_current ? ' current-season' : ''}">
   <div class="season-header" onclick="toggleSeason(${sid})">
     <span class="season-year">${year}${s.is_current ? ' <span class="current-badge">&#9733; current</span>' : ''}</span>
-    <div class="season-chips">${summaryChips}</div>
+    <div class="season-chips">${summaryChips}${buildSeasonFreshSummary(sid)}</div>
     <span class="chevron${isOpen ? ' open' : ''}" id="chv-${sid}">▶</span>
   </div>
   <div class="season-body${isOpen ? ' open' : ''}" id="sbody-${sid}" data-sid="${sid}">
@@ -711,7 +754,7 @@ function trow(sid, task, name, counts, extraCls = '') {
   return `
 <div class="task-row">
   <span class="task-name">${name}</span>
-  <div class="task-counts">${counts.join('')}</div>
+  <div class="task-counts">${counts.join('')}${freshnessBadge(sid, task)}</div>
   <button class="btn btn-sm ${extraCls}"
     onclick="triggerIndex(${sid},'${task}',forceFor(${sid}))">▶ Index</button>  <button class="btn btn-sm btn-red"
     onclick="deleteLayer(${sid},'${task}')" title="Delete ${name} data for this season">&#128465;</button></div>`;
@@ -730,7 +773,7 @@ function trowEvents(sid, s) {
 <div class="task-row">
   <span class="task-name">Game Events (finished)</span>
   <div class="task-counts">
-    ${p(s.games,'games')} ${p(s.game_events,'events')}
+    ${p(s.games,'games')} ${p(s.game_events,'events')}${freshnessBadge(sid, 'events')}
     <select id="tier-${sid}" class="tier-select" title="Max league tier to fetch events for">
       ${tierOptions}
     </select>
@@ -749,6 +792,44 @@ function forceFor(sid) {
 function toggleSeason(sid) {
   document.getElementById('sbody-' + sid).classList.toggle('open');
   document.getElementById('chv-'   + sid).classList.toggle('open');
+}
+
+/* ═══════════════════════════════════════════════════════
+   Season filter + freshness helpers
+═══════════════════════════════════════════════════════ */
+function isSeasonFiltered(sid) {
+  if (_seasonFilter.min_season != null && sid < _seasonFilter.min_season) return true;
+  if ((_seasonFilter.excluded_seasons || []).includes(sid)) return true;
+  return false;
+}
+
+function freshnessBadge(sid, task) {
+  const entityType = TASK_TO_ENTITY[task] || task;
+  const row = _freshnessMap[`${entityType}:${sid}`];
+  if (!row) return '';
+  const skipRow = row.current_only && !row.is_current;
+  if (skipRow) return '<span class="fresh-badge skip" title="Past season — not auto-scheduled">past</span>';
+  const cls = row.status === 'FRESH' ? 'ok' : (row.status === 'NEVER_SYNCED' ? 'fail' : 'warn');
+  const lbl = row.status === 'FRESH' ? '✓ fresh' : (row.status === 'NEVER_SYNCED' ? '⚠ never' : '⚡ stale');
+  const maxAgeStr = row.max_age_h >= 24 ? `${Math.round(row.max_age_h / 24)}d` : `${row.max_age_h}h`;
+  const tip = `Next: ${row.next_run} · max age: ${maxAgeStr}`;
+  return `<span class="fresh-badge ${cls}" title="${tip}">${lbl}</span>`
+       + `<span class="next-run-pill" title="${tip}">${row.next_run}</span>`;
+}
+
+function buildSeasonFreshSummary(sid) {
+  const relevant = Object.entries(_freshnessMap)
+    .filter(([k]) => k.endsWith(':' + sid))
+    .map(([, v]) => v)
+    .filter(v => !(v.current_only && !v.is_current));
+  if (!relevant.length) return '';
+  const neverCount = relevant.filter(v => v.status === 'NEVER_SYNCED').length;
+  const staleCount = relevant.filter(v => v.status === 'STALE').length;
+  if (neverCount)
+    return `<span class="s-chip" style="background:#2d1214;color:#f85149;border-color:#da3633" title="${neverCount} data type(s) never synced">⚠ ${neverCount} never synced</span>`;
+  if (staleCount)
+    return `<span class="s-chip warn" title="${staleCount} data type(s) stale">⚡ ${staleCount} stale</span>`;
+  return `<span class="s-chip ok" title="All data types fresh">✓ all fresh</span>`;
 }
 
 /* ═══════════════════════════════════════════════════════
