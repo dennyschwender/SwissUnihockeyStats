@@ -364,14 +364,6 @@ function eventsTable(goals, penalties) {
     {% if game.game_summary %}
     <div class="gd-summary">
       <div class="gd-summary-item">
-        <span class="gd-summary-label">🥅 Goals</span>
-        <span class="gd-summary-val">{{ game.game_summary.home_goals }} – {{ game.game_summary.away_goals }}</span>
-      </div>
-      <div class="gd-summary-item">
-        <span class="gd-summary-label">🟨 Penalties</span>
-        <span class="gd-summary-val">{{ game.game_summary.home_penalties }} – {{ game.game_summary.away_penalties }}</span>
-      </div>
-      <div class="gd-summary-item">
         <span class="gd-summary-label">⏱ PIM</span>
         <span class="gd-summary-val">{{ game.game_summary.home_pim }}' – {{ game.game_summary.away_pim }}'</span>
       </div>
