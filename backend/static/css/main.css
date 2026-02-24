@@ -38,6 +38,9 @@
 
   /* Card background */
   --card-bg: #ffffff;
+
+  /* Highlight row (standings / tables) */
+  --swiss-red-light: #fff1f2;
 }
 
 /* Dark Mode Variables */
@@ -60,6 +63,9 @@ html.dark-mode {
 
   /* Card background */
   --card-bg: #2d2d2d;
+
+  /* Highlight row (standings / tables) */
+  --swiss-red-light: #3d1a1a;
 
   /* Override gray scale for dark mode */
   --gray-50: #2d2d2d;
