@@ -246,9 +246,9 @@
       <div class="chip" id="db-size-chip" title="SQLite DB file size (click for details)" onclick="toggleEl('db-body','db-chv')" style="cursor:pointer"><strong id="t-db-size">—</strong> DB</div>
     </div>
 
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;cursor:pointer" onclick="toggleEl('seasons-wrapper','seasons-chv')">
-      <p class="section-title" style="margin-bottom:0">Seasons</p>
-      <div style="display:flex;align-items:center;gap:.5rem">
+    <div class="season-header" style="border-radius:8px;margin-bottom:.4rem" onclick="toggleEl('seasons-wrapper','seasons-chv')">
+      <span class="season-year" style="font-size:.85rem">Seasons</span>
+      <div style="display:flex;align-items:center;gap:.5rem;margin-left:auto">
         <button class="btn btn-sm" id="pull-seasons-btn" onclick="event.stopPropagation();pullSeasons()" title="Fetch seasons list from API">↻ Pull Seasons</button>
         <span class="chevron" id="seasons-chv">▶</span>
       </div>
