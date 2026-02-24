@@ -1489,6 +1489,24 @@ def get_player_detail(person_id: int) -> dict:
             for t in session.query(_Team).filter(_Team.id.in_(team_ids_needed)).all()
         }
 
+        # Preload group_id → league short name
+        group_ids_needed = {g.group_id for _, g in recent_game_rows if g.group_id}
+        group_league_abbrev: dict[int, str] = {}
+        if group_ids_needed:
+            from app.models.db_models import LeagueGroup as _LG, League as _League2
+            for grp, lg in (
+                session.query(_LG, _League2)
+                .join(_League2, _LG.league_id == _League2.id)
+                .filter(_LG.id.in_(group_ids_needed))
+                .all()
+            ):
+                lname = lg.name or lg.text or ""
+                for pfx in _STRIP_PREFIXES:
+                    if lname.lower().startswith(pfx):
+                        lname = lname[len(pfx):]
+                        break
+                group_league_abbrev[grp.id] = lname
+
         recent_games: list[dict] = []
         for gp, g in recent_game_rows:
             is_home = (gp.team_id == g.home_team_id)
@@ -1516,6 +1534,7 @@ def get_player_detail(person_id: int) -> dict:
                 "score": score_str,
                 "result": result_label,
                 "season_id": g.season_id,
+                "league": group_league_abbrev.get(g.group_id, "") if g.group_id else "",
                 "g": gp.goals or 0,
                 "a": gp.assists or 0,
                 "pim": gp.penalty_minutes or 0,
