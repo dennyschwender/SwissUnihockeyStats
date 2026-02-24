@@ -163,7 +163,7 @@
   .gd-best-player-name { font-weight:600; color:var(--gray-700); }
 
   /* Events filter */
-  .gd-filter-bar { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; align-items:center; }
+  .gd-filter-bar { display:flex; gap:.5rem; margin-bottom:.5rem; flex-wrap:wrap; align-items:center; }
   .gd-filter-btn {
     padding:.3rem .85rem;
     border-radius:1rem;
@@ -177,7 +177,6 @@
   }
   .gd-filter-btn:hover { border-color:var(--swiss-red); color:var(--swiss-red); }
   .gd-filter-btn.active { background:var(--swiss-red); border-color:var(--swiss-red); color:white; }
-  .gd-filter-sep { width:1px; height:1.4rem; background:var(--gray-300); align-self:center; margin:0 .25rem; }
   .gd-row-period-start td { border-top: 2px solid var(--gray-300) !important; }
   html.dark-mode .gd-row-period-start td { border-top-color: var(--gray-500) !important; }
   .gd-row-penalty td:first-child { padding-left: calc(.75rem - 3px); }
@@ -416,7 +415,8 @@ function eventsTable(goals, penalties) {
           <button class="gd-filter-btn" :class="filter === 'all' ? 'active' : ''" @click="filter = 'all'">{{ t.game.event_all }}</button>
           <button class="gd-filter-btn" :class="filter === 'goal' ? 'active' : ''" @click="filter = 'goal'">{{ t.game.event_goals }}</button>
           <button class="gd-filter-btn" :class="filter === 'penalty' ? 'active' : ''" @click="filter = 'penalty'">{{ t.game.event_penalties }}</button>
-          <span class="gd-filter-sep"></span>
+        </div>
+        <div class="gd-filter-bar" style="margin-bottom:1rem;">
           <button class="gd-filter-btn" :class="teamFilter === 'all' ? 'active' : ''" @click="teamFilter = 'all'">{{ t.game.event_all }}</button>
           <button class="gd-filter-btn" :class="teamFilter === '{{ game.home_team }}' ? 'active' : ''" @click="teamFilter = teamFilter === '{{ game.home_team }}' ? 'all' : '{{ game.home_team }}'">{{ game.home_team }}</button>
           <button class="gd-filter-btn" :class="teamFilter === '{{ game.away_team }}' ? 'active' : ''" @click="teamFilter = teamFilter === '{{ game.away_team }}' ? 'all' : '{{ game.away_team }}'">{{ game.away_team }}</button>
