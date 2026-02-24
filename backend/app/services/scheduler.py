@@ -116,6 +116,7 @@ POLICIES: list[dict] = [
         "label":       "Game events refresh",
         "priority":    80,
         "max_tier":    2,   # NLA + NLB + A-level youth only — 2 API calls/game, runs hourly
+        "current_only": True,  # live data — never run on past seasons
     },
     {
         "name":        "player_stats",
@@ -126,6 +127,7 @@ POLICIES: list[dict] = [
         "label":       "Player stats refresh",
         "priority":    85,
         "max_tier":    3,   # up to 1.Liga + B-level youth — 1 API call/player, runs every 4h
+        "current_only": True,  # live data — never run on past seasons
     },
 ]
 
@@ -555,6 +557,11 @@ class Scheduler:
 
         last_sync = _last_sync_for(session, policy["entity_type"], season)
         now = _utcnow()
+
+        # current_only policies (game_events, player_stats) are live data —
+        # they must never run on past seasons, even for an initial sync.
+        if policy.get("current_only") and not is_current_season:
+            return
 
         # Past seasons are frozen once indexed — their data never changes after
         # the season ends, so we index once and never reschedule again.
