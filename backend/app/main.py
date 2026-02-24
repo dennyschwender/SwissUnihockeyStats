@@ -2710,6 +2710,7 @@ async def universal_search(request: Request, locale: str, q: str = ""):
 
         # --- Teams ---
         from sqlalchemy import func
+        from app.services.data_indexer import league_tier as _league_tier
         # Subquery: for each unique team id, get the most recent season
         team_subq = (
             session.query(Team.id, func.max(Team.season_id).label("max_season"))
@@ -2732,6 +2733,11 @@ async def universal_search(request: Request, locale: str, q: str = ""):
             )
             .all()
         )
+        unique_teams_rows.sort(key=lambda r: (
+            _league_tier(r[0].league_id or 0),
+            (r[1].name or r[1].text or "~~~~") if r[1] else "~~~~",
+            r[0].name or "",
+        ))
         if unique_teams_rows:
             html_parts.append('<div class="search-category"><h3>👥 Teams</h3><div class="search-items">')
             for t, lg in unique_teams_rows:
