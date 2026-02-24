@@ -965,7 +965,7 @@ html.dark-mode .universal-search-results {
 .search-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: 0.75rem 1rem;
   border-radius: 8px;
   cursor: pointer;
@@ -978,6 +978,18 @@ html.dark-mode .universal-search-results {
 
 .search-item strong {
   color: var(--gray-900);
+}
+
+.search-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.search-item-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 400;
 }
 
 .search-item .text-gray-600 {

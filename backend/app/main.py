@@ -2708,32 +2708,38 @@ async def universal_search(request: Request, locale: str, q: str = ""):
                 )
             html_parts.append('</div></div>')
 
-        # --- Teams (current season only to avoid duplicates) ---
-        teams = (
-            session.query(Team)
+        # --- Teams ---
+        teams_raw = (
+            session.query(Team, League)
+            .outerjoin(
+                League,
+                (League.league_id == Team.league_id) & (League.season_id == Team.season_id)
+            )
             .filter(
                 or_(Team.name.ilike(f"%{q}%"), Team.text.ilike(f"%{q}%")),
                 Team.name.isnot(None),
             )
             .order_by(Team.season_id.desc())
-            .limit(8).all()
+            .limit(16).all()
         )
-        # deduplicate by name
-        seen_team_names: set[str] = set()
+        # deduplicate by (name, league_id) so same club in different leagues all show
+        seen_team_keys: set[str] = set()
         unique_teams = []
-        for t in teams:
-            key = (t.name or t.text or "").lower()
-            if key not in seen_team_names:
-                seen_team_names.add(key)
-                unique_teams.append(t)
-        unique_teams = unique_teams[:5]
+        for t, lg in teams_raw:
+            key = f"{(t.name or t.text or '').lower()}|{t.league_id}"
+            if key not in seen_team_keys:
+                seen_team_keys.add(key)
+                unique_teams.append((t, lg))
+        unique_teams = unique_teams[:8]
         if unique_teams:
             html_parts.append('<div class="search-category"><h3>👥 Teams</h3><div class="search-items">')
-            for t in unique_teams:
+            for t, lg in unique_teams:
                 tname = t.name or t.text or f"Team {t.id}"
+                lgname = (lg.name or lg.text or "") if lg else ""
+                subtitle = f'<span class="search-item-subtitle">{lgname}</span>' if lgname else ""
                 html_parts.append(
                     f'<div class="search-item" onclick="window.location.href=\'/{locale}/team/{t.id}\'">'
-                    f'<strong>{tname}</strong></div>'
+                    f'<span class="search-item-main"><strong>{tname}</strong>{subtitle}</span></div>'
                 )
             html_parts.append('</div></div>')
 
