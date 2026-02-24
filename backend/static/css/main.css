@@ -633,7 +633,7 @@ html.dark-mode .universal-search-results {
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 960px) {
   .hamburger-btn {
     display: flex;
   }
