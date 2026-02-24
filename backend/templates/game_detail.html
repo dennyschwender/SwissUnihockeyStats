@@ -562,20 +562,20 @@ function eventsTable(goals, penalties) {
 
       {% if game.h2h_games %}
       <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-      <table class="gd-table" style="margin-bottom:1.75rem;table-layout:fixed;width:100%;min-width:320px;">
+      <table class="gd-table" style="margin-bottom:1.75rem;min-width:360px;">
         <thead><tr>
           <th style="width:5.5rem;">{{ t.table.date }}</th>
-          <th style="text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.table.home }}</th>
+          <th style="text-align:right;white-space:nowrap;">{{ t.table.home }}</th>
           <th style="text-align:center !important;width:5rem;">{{ t.table.score }}</th>
-          <th style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.table.away }}</th>
+          <th style="white-space:nowrap;">{{ t.table.away }}</th>
         </tr></thead>
         <tbody>
           {% for hg in game.h2h_games %}
           <tr>
             <td style="color:var(--gray-400);white-space:nowrap;">{{ hg.date }}</td>
-            <td style="text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:.5rem;"><a href="/{{ locale }}/team/{{ hg.home_team_id }}" style="text-decoration:none;color:inherit;{% if hg.home_team_id == game.home_team_id %}font-weight:700;{% endif %}">{{ hg.home_team }}</a></td>
+            <td style="text-align:right;white-space:nowrap;padding-right:.5rem;"><a href="/{{ locale }}/team/{{ hg.home_team_id }}" style="text-decoration:none;color:inherit;{% if hg.home_team_id == game.home_team_id %}font-weight:700;{% endif %}">{{ hg.home_team }}</a></td>
             <td style="text-align:center;font-weight:700;font-variant-numeric:tabular-nums;"><a href="/{{ locale }}/game/{{ hg.game_id }}" style="text-decoration:none;color:inherit;display:block;text-align:center;">{{ hg.home_score }}–{{ hg.away_score }}</a></td>
-            <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:.5rem;"><a href="/{{ locale }}/team/{{ hg.away_team_id }}" style="text-decoration:none;color:inherit;{% if hg.away_team_id == game.away_team_id %}font-weight:700;{% endif %}">{{ hg.away_team }}</a></td>
+            <td style="white-space:nowrap;padding-left:.5rem;"><a href="/{{ locale }}/team/{{ hg.away_team_id }}" style="text-decoration:none;color:inherit;{% if hg.away_team_id == game.away_team_id %}font-weight:700;{% endif %}">{{ hg.away_team }}</a></td>
           </tr>
           {% endfor %}
         </tbody>
