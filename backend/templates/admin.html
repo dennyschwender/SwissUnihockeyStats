@@ -173,6 +173,44 @@
     .s-ok   { color: #3fb950; }
     .s-fail { color: #f85149; }
     .s-prog { color: #d29922; }
+
+    /* ── mobile ── */
+    @media (max-width: 600px) {
+      .topbar { flex-wrap: wrap; padding: .6rem 1rem; gap: .5rem; }
+      .topbar-right { width: 100%; justify-content: flex-end; }
+
+      .layout { padding: .75rem .6rem; gap: .75rem; }
+
+      /* task rows: stack name, then counts + actions on next line */
+      .task-row {
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto;
+      }
+      .task-row .task-name  { grid-column: 1 / 2; grid-row: 1; }
+      .task-row .task-counts { grid-column: 1 / 2; grid-row: 2; }
+      .task-row .tier-select { grid-column: 2 / 3; grid-row: 1; }
+      .task-row > .btn       { grid-column: 2 / 3; grid-row: 2; }
+
+      /* season chips wrap tighter */
+      .season-header { gap: .4rem; padding: .6rem .75rem; }
+      .season-chips  { gap: .25rem; }
+
+      /* quick-row inputs go full width */
+      .quick-row { padding: .6rem .75rem; }
+      .quick-row input[type="number"],
+      .quick-row input[type="text"]  { width: 100% !important; }
+
+      /* sync table + sched history horizontal scroll */
+      .sync-panel { overflow-x: auto; }
+      .sync-table { min-width: 520px; }
+
+      /* log panel max-height reduced */
+      .log-box { max-height: 200px; }
+      .job-panel .job-item { padding: .45rem .6rem; }
+
+      /* sidebar sticky doesn't make sense when stacked */
+      .sidebar { position: static; }
+    }
   </style>
 </head>
 <body>
@@ -208,12 +246,17 @@
       <div class="chip" id="db-size-chip" title="SQLite DB file size (click for details)" onclick="toggleEl('db-body','db-chv')" style="cursor:pointer"><strong id="t-db-size">—</strong> DB</div>
     </div>
 
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;cursor:pointer" onclick="toggleEl('seasons-wrapper','seasons-chv')">
       <p class="section-title" style="margin-bottom:0">Seasons</p>
-      <button class="btn btn-sm" id="pull-seasons-btn" onclick="pullSeasons()" title="Fetch seasons list from API">↻ Pull Seasons</button>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <button class="btn btn-sm" id="pull-seasons-btn" onclick="event.stopPropagation();pullSeasons()" title="Fetch seasons list from API">↻ Pull Seasons</button>
+        <span class="chevron" id="seasons-chv">▶</span>
+      </div>
     </div>
-    <div id="seasons-container">
-      <div style="color:#6e7681;font-size:.8rem;padding:.5rem 0">Loading…</div>
+    <div class="season-body" id="seasons-wrapper" style="border-top:none">
+      <div id="seasons-container">
+        <div style="color:#6e7681;font-size:.8rem;padding:.5rem 0">Loading…</div>
+      </div>
     </div>
 
     <!-- sync table -->
