@@ -767,6 +767,15 @@ html.dark-mode .universal-search-results {
     font-size: 0.875rem;
   }
 
+  /* Reduce page padding on mobile */
+  .container {
+    padding: 0 0.5rem;
+  }
+
+  main {
+    padding: 1.5rem 0;
+  }
+
   /* Reduce card padding when in single-column layout */
   .home-game-card,
   .home-card {
@@ -1187,6 +1196,14 @@ html.dark-mode .image-skeleton {
    RESPONSIVE — SMALL PHONES (≤ 480px)
    ============================================ */
 @media (max-width: 480px) {
+  .container {
+    padding: 0 0.25rem;
+  }
+
+  main {
+    padding: 1rem 0;
+  }
+
   .hero h1 {
     font-size: 1.75rem;
   }
