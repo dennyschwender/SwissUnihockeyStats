@@ -52,7 +52,14 @@
     {% if team.standings %}
     <div x-show="tab==='standings'" x-data="{
       rows: window._teamStandings || [],
-      teamId: {{ team.id }}
+      teamId: {{ team.id }},
+      playoffSpots(total) { return total >= 6 ? 4 : total >= 4 ? 2 : 1; },
+      playoutSpots(total) { return total >= 4 ? 2 : 1; },
+      rowZone(rank, total) {
+        if (rank <= this.playoffSpots(total)) return 'playoff';
+        if (rank > total - this.playoutSpots(total)) return 'playout';
+        return null;
+      }
     }">
       {% if team.group_name %}
       <p style="font-size:.85rem;color:var(--gray-500);margin-bottom:.75rem;">Group: <strong>{{ team.group_name }}</strong></p>
@@ -77,10 +84,9 @@
               <tr
                 @click="window.location='/{{ locale }}/team/' + row.team_id"
                 :style="'cursor:pointer;border-bottom:1px solid var(--gray-100);' +
-                  (row.team_id === teamId
-                    ? 'background:var(--swiss-red-light,#fff1f2);border-left:3px solid var(--swiss-red,#e11d48);font-weight:600;'
-                    : 'background:transparent;border-left:3px solid transparent;')"
-                onmouseover="if(this.style.background!='var(--swiss-red-light, #fff1f2)')this.style.background='var(--gray-50)'"
+                  (row.team_id === teamId ? 'background:var(--swiss-red-light,#fff1f2);font-weight:600;' : '') +
+                  'border-left:3px solid ' + (rowZone(row.rank, rows.length) === 'playoff' ? '#16a34a' : rowZone(row.rank, rows.length) === 'playout' ? '#dc2626' : 'transparent')"
+                onmouseover="if(!this.dataset.isThis||this.dataset.isThis!=='1')this.style.background='var(--gray-50)'"
                 onmouseout="this.dataset.isThis==='1'?this.style.background='var(--swiss-red-light,#fff1f2)':this.style.background=''"
                 :data-is-this="row.team_id === teamId ? '1' : '0'">
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="row.rank"></td>
@@ -103,7 +109,15 @@
           </tbody>
         </table>
       </div>
-      <div style="margin-top:.6rem;font-size:.78rem;color:var(--gray-500);display:flex;gap:1rem;flex-wrap:wrap;">
+      <div style="margin-top:.75rem;display:flex;gap:1.25rem;flex-wrap:wrap;font-size:.78rem;color:var(--gray-500);">
+        <span style="display:flex;align-items:center;gap:.35rem;">
+          <span style="display:inline-block;width:.7rem;height:.7rem;border-radius:2px;background:#16a34a;"></span>
+          Playoff
+        </span>
+        <span style="display:flex;align-items:center;gap:.35rem;">
+          <span style="display:inline-block;width:.7rem;height:.7rem;border-radius:2px;background:#dc2626;"></span>
+          Playout / Relegation
+        </span>
         <span>Points: W=3, OT/SO&nbsp;W=2, OT/SO&nbsp;L=1, L=0</span>
       </div>
     </div>
