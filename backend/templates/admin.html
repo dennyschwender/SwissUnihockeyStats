@@ -179,8 +179,6 @@
       .topbar { flex-wrap: wrap; padding: .6rem 1rem; gap: .5rem; }
       .topbar-right { width: 100%; justify-content: flex-end; }
 
-      .layout { padding: .75rem .6rem; gap: .75rem; }
-
       /* task rows: stack name, then counts + actions on next line */
       .task-row {
         grid-template-columns: 1fr auto;
@@ -208,8 +206,33 @@
       .log-box { max-height: 200px; }
       .job-panel .job-item { padding: .45rem .6rem; }
 
-      /* sidebar sticky doesn't make sense when stacked */
-      .sidebar { position: static; }
+    }
+
+    /* ── tabs ── */
+    .tab-bar {
+      display: flex; border-bottom: 1px solid #30363d;
+      background: #161b22; padding: 0 1.5rem; overflow-x: auto;
+    }
+    .tab-btn {
+      background: none; border: none; border-bottom: 2px solid transparent;
+      color: #8b949e; font-size: .82rem; padding: .65rem 1.1rem;
+      cursor: pointer; white-space: nowrap; transition: color .15s, border-color .15s;
+    }
+    .tab-btn:hover { color: #c9d1d9; }
+    .tab-btn.active { color: #e6edf3; border-bottom-color: #58a6ff; font-weight: 600; }
+    .tab-content { max-width: 1400px; margin: 0 auto; padding: 1.25rem 1.5rem; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .totals-bar { background: #161b22; border-bottom: 1px solid #30363d; padding: .6rem 1.5rem; }
+    .totals-bar .totals { margin-bottom: 0; }
+    /* scheduling tab 2-col layout */
+    .sched-grid { display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; }
+    @media (max-width: 900px) { .sched-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 600px) {
+      .tab-bar { padding: 0 .5rem; }
+      .tab-btn { padding: .5rem .6rem; font-size: .72rem; }
+      .tab-content { padding: .75rem .5rem; }
+      .totals-bar { padding: .5rem .75rem; }
     }
   </style>
 </head>
@@ -225,80 +248,155 @@
   </div>
 </div>
 
-<div class="layout">
+<!-- ── totals bar (always visible) ── -->
+<div class="totals-bar">
+  <div class="totals">
+    <div class="chip"><strong id="t-seasons">—</strong> seasons</div>
+    <div class="chip"><strong id="t-clubs">—</strong> clubs</div>
+    <div class="chip"><strong id="t-teams">—</strong> teams</div>
+    <div class="chip"><strong id="t-players">—</strong> players</div>
+    <div class="chip"><strong id="t-tp">—</strong> roster entries</div>
+    <div class="chip"><strong id="t-pstats">—</strong> player stats</div>
+    <div class="chip"><strong id="t-leagues">—</strong> leagues</div>
+    <div class="chip"><strong id="t-groups">—</strong> groups</div>
+    <div class="chip"><strong id="t-games">—</strong> games</div>
+    <div class="chip"><strong id="t-gp">—</strong> lineups</div>
+    <div class="chip"><strong id="t-events">—</strong> events</div>
+    <div class="chip" id="db-size-chip" title="DB size — click to open Database tab" onclick="switchTab('db')" style="cursor:pointer"><strong id="t-db-size">—</strong> DB</div>
+  </div>
+</div>
 
-  <!-- ══════ LEFT: seasons ══════ -->
-  <div>
+<!-- ── tab navigation ── -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tabBtn-scheduling" onclick="switchTab('scheduling')">⚡ Scheduling</button>
+  <button class="tab-btn" id="tabBtn-settings" onclick="switchTab('settings')">⚙ Settings</button>
+  <button class="tab-btn" id="tabBtn-db" onclick="switchTab('db')">🗄 Database</button>
+  <button class="tab-btn" id="tabBtn-cleanup" onclick="switchTab('cleanup')">📅 Season Cleanup</button>
+</div>
 
-    <!-- totals chips -->
-    <div class="totals">
-      <div class="chip"><strong id="t-seasons">—</strong> seasons</div>
-      <div class="chip"><strong id="t-clubs">—</strong> clubs</div>
-      <div class="chip"><strong id="t-teams">—</strong> teams</div>
-      <div class="chip"><strong id="t-players">—</strong> players</div>
-      <div class="chip"><strong id="t-tp">—</strong> roster entries</div>
-      <div class="chip"><strong id="t-pstats">—</strong> player stats</div>
-      <div class="chip"><strong id="t-leagues">—</strong> leagues</div>
-      <div class="chip"><strong id="t-groups">—</strong> groups</div>
-      <div class="chip"><strong id="t-games">—</strong> games</div>
-      <div class="chip"><strong id="t-gp">—</strong> lineups</div>
-      <div class="chip"><strong id="t-events">—</strong> events</div>
-      <div class="chip" id="db-size-chip" title="SQLite DB file size (click for details)" onclick="toggleEl('db-body','db-chv')" style="cursor:pointer"><strong id="t-db-size">—</strong> DB</div>
+<div class="tab-content">
+
+  <!-- ══ Tab: Scheduling ══ -->
+  <div class="tab-panel active" id="tab-scheduling">
+    <div class="sched-grid">
+
+      <!-- Left: status + queue + executed history -->
+      <div>
+        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
+          <span id="sched-badge" class="s-chip empty" style="font-size:.78rem">loading…</span>
+          <button class="btn btn-green btn-sm" id="sched-enable-btn" onclick="schedSetEnabled(true)">▶ Enable</button>
+          <button class="btn btn-sm" id="sched-disable-btn" onclick="schedSetEnabled(false)">⏸ Disable</button>
+          <span style="font-size:.72rem;color:#6e7681" id="sched-status-txt"></span>
+        </div>
+
+        <p class="section-title">Upcoming Queue</p>
+        <div id="sched-queue" class="season-card" style="overflow:hidden">
+          <div style="padding:.5rem 1rem;font-size:.75rem;color:#6e7681">No jobs queued.</div>
+        </div>
+
+        <p class="section-title" style="margin-top:1.25rem">Executed Jobs</p>
+        <div class="sync-panel" style="margin-top:0">
+          <h2>Recent History</h2>
+          <div style="overflow-x:auto;max-height:400px;overflow-y:auto">
+            <table class="sync-table" id="sched-hist-table">
+              <thead><tr>
+                <th>Policy</th><th>Task</th><th>Season</th>
+                <th>Status</th><th>Scheduled</th><th>Finished</th><th>Stats / Error</th>
+              </tr></thead>
+              <tbody id="sched-hist-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: active jobs + log -->
+      <div>
+        <p class="section-title">Active Jobs</p>
+        <div class="job-panel">
+          <div class="panel-header">
+            Jobs
+            <button class="btn btn-sm" onclick="clearDoneJobs()">Clear done</button>
+          </div>
+          <div id="jobs-container"><div class="no-jobs">No jobs yet.</div></div>
+        </div>
+
+        <p class="section-title">Log</p>
+        <div class="log-panel">
+          <div class="panel-header">
+            Output
+            <button class="btn btn-sm" onclick="clearLog()">Clear</button>
+          </div>
+          <div class="log-box" id="log-box">Ready.</div>
+        </div>
+      </div>
+
     </div>
+  </div>
 
-    <p class="section-title">Seasons</p>
+  <!-- ══ Tab: Settings ══ -->
+  <div class="tab-panel" id="tab-settings">
+
+    <p class="section-title">Scheduler Settings</p>
     <div class="season-card">
-      <div class="season-header" onclick="toggleEl('seasons-wrapper','seasons-chv')">
-        <span class="season-year" style="font-size:.85rem">Seasons</span>
-        <button class="btn btn-sm" id="pull-seasons-btn" onclick="event.stopPropagation();pullSeasons()" title="Fetch seasons list from API">↻ Pull Seasons</button>
-        <span class="chevron" id="seasons-chv">▶</span>
-      </div>
-      <div class="season-body" id="seasons-wrapper">
-        <div id="seasons-container" style="padding:.5rem 0">
-          <div style="color:#6e7681;font-size:.8rem;padding:.5rem 1rem">Loading…</div>
+      <div style="border-top:1px solid #30363d">
+        <div class="quick-row" style="gap:.5rem;align-items:center;flex-wrap:wrap">
+          <label style="font-size:.75rem;color:#8b949e;white-space:nowrap">Min season:</label>
+          <input id="sched-min-season" type="number" min="1996" max="2100" placeholder="all"
+            style="width:72px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+          <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Exclude seasons:</label>
+          <input id="sched-excluded" type="text" placeholder="e.g. 1996,1997,2001"
+            style="width:160px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+          <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Max concurrent:</label>
+          <input id="sched-max-concurrent" type="number" min="1" max="10" placeholder="2"
+            style="width:52px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+          <button class="btn btn-sm" onclick="schedSaveFilter()" style="white-space:nowrap">💾 Save</button>
+          <button class="btn btn-sm" onclick="schedClearFilter()" style="white-space:nowrap;color:#f85149">✕ Clear</button>
         </div>
       </div>
     </div>
 
-    <!-- sync table -->
-    <div class="sync-panel" id="sync-panel" style="display:none">
-      <h2>Recent Sync Activity (last 100)</h2>
-      <div style="overflow-x:auto;max-height:350px;overflow-y:auto">
-        <table class="sync-table">
+    <p class="section-title" style="margin-top:1.25rem">Policy Tier Limits</p>
+    <div class="season-card">
+      <div style="padding:.75rem 1rem;border-top:1px solid #30363d">
+        <div style="font-size:.7rem;color:#6e7681;margin-bottom:.75rem;line-height:1.5">
+          Restrict heavy tasks to top-tier leagues only.
+          Lower tier = fewer leagues = faster &amp; lighter indexing.
+        </div>
+        <table style="font-size:.75rem;width:auto;border-collapse:collapse">
           <thead><tr>
-            <th>Type</th><th>Entity ID</th><th>Status</th>
-            <th>Last Sync</th><th>Records</th><th>Error</th>
+            <th style="text-align:left;padding:2px 8px;color:#8b949e;font-weight:normal">Policy</th>
+            <th style="text-align:left;padding:2px 8px;color:#8b949e;font-weight:normal">Max Tier</th>
           </tr></thead>
-          <tbody id="sync-tbody"></tbody>
+          <tbody id="sched-tiers-tbody"></tbody>
         </table>
+        <div style="margin-top:.75rem">
+          <button class="btn btn-sm" onclick="schedSaveTiers()">💾 Save tier limits</button>
+        </div>
       </div>
     </div>
 
-    <!-- DB health panel -->
-    <div class="sync-panel" id="db-panel" style="margin-top:1.25rem;display:none">
-      <h2 style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleEl('db-body','db-chv')">
-        Database — SQLite Health
-        <div style="display:flex;align-items:center;gap:.5rem">
-          <span class="chevron" id="db-chv">▶</span>
-        </div>
-      </h2>
-      <div class="season-body" id="db-body">
+  </div>
+
+  <!-- ══ Tab: Database ══ -->
+  <div class="tab-panel" id="tab-db">
+
+    <p class="section-title">SQLite Health</p>
+    <div class="sync-panel" id="db-panel" style="margin-top:0">
+      <h2>Database</h2>
+      <div id="db-body" style="display:block">
         <div style="display:flex;flex-wrap:wrap;gap:1rem;padding:.75rem 1rem;align-items:flex-start">
-          <!-- file sizes -->
           <div style="min-width:200px">
             <div class="task-group-label" style="margin-bottom:.4rem">File Sizes</div>
             <table style="font-size:.78rem;border-collapse:collapse;width:100%">
               <tbody id="db-files-tbody"></tbody>
             </table>
           </div>
-          <!-- pragma -->
           <div style="min-width:200px">
             <div class="task-group-label" style="margin-bottom:.4rem">SQLite PRAGMA</div>
             <table style="font-size:.78rem;border-collapse:collapse;width:100%">
               <tbody id="db-pragma-tbody"></tbody>
             </table>
           </div>
-          <!-- actions -->
           <div style="min-width:160px">
             <div class="task-group-label" style="margin-bottom:.4rem">Maintenance</div>
             <div style="display:flex;flex-direction:column;gap:.4rem">
@@ -314,85 +412,38 @@
       </div>
     </div>
 
-    <!-- scheduler panel -->
-    <div style="margin-top:1.25rem">
-      <p class="section-title">Auto-Scheduler</p>
-      <div class="season-card">
-        <div class="season-header" onclick="toggleEl('sched-body','sched-chv')">
-          <span class="season-year" style="font-size:.85rem">Schedule</span>
-          <span id="sched-badge" class="s-chip empty" style="font-size:.72rem">loading…</span>
-          <span class="chevron" id="sched-chv">▶</span>
-        </div>
-        <div class="season-body" id="sched-body">
-          <!-- controls row -->
-          <div class="quick-row" style="gap:.75rem">
-            <button class="btn btn-green btn-sm" id="sched-enable-btn"  onclick="schedSetEnabled(true)">▶ Enable</button>
-            <button class="btn btn-sm"           id="sched-disable-btn" onclick="schedSetEnabled(false)">⏸ Disable</button>
-            <span style="font-size:.72rem;color:#6e7681;margin-left:.5rem" id="sched-status-txt"></span>
-          </div>
+    <div class="sync-panel" id="sync-panel" style="margin-top:1.25rem">
+      <h2>Recent Sync Activity (last 100)</h2>
+      <div style="overflow-x:auto;max-height:350px;overflow-y:auto">
+        <table class="sync-table">
+          <thead><tr>
+            <th>Type</th><th>Entity ID</th><th>Status</th>
+            <th>Last Sync</th><th>Records</th><th>Error</th>
+          </tr></thead>
+          <tbody id="sync-tbody"></tbody>
+        </table>
+      </div>
+    </div>
 
-          <!-- season filter row -->
-          <div class="quick-row" style="gap:.5rem;margin-top:.5rem;align-items:center;flex-wrap:wrap">
-            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap">Min season:</label>
-            <input id="sched-min-season" type="number" min="1996" max="2100" placeholder="all"
-              style="width:72px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
-            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Exclude seasons:</label>
-            <input id="sched-excluded" type="text" placeholder="e.g. 1996,1997,2001"
-              style="width:160px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
-            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Max concurrent:</label>
-            <input id="sched-max-concurrent" type="number" min="1" max="10" placeholder="2"
-              style="width:52px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
-            <button class="btn btn-sm" onclick="schedSaveFilter()" style="white-space:nowrap">💾 Save</button>
-            <button class="btn btn-sm" onclick="schedClearFilter()" style="white-space:nowrap;color:#f85149">✕ Clear</button>
-          </div>
+  </div>
 
-          <!-- policy tier limits -->
-          <div style="margin-top:.6rem">
-            <div class="task-group-label" style="cursor:pointer;user-select:none;display:flex;align-items:center"
-                 onclick="toggleEl('sched-tiers','sched-tiers-chv')">
-              Policy Tier Limits
-              <span id="sched-tiers-chv" class="chevron" style="margin-left:.4rem">&#9654;</span>
-            </div>
-            <div id="sched-tiers" class="season-body" style="border-top:none;padding:.4rem 0 0 0">
-              <div style="font-size:.7rem;color:#6e7681;margin-bottom:.4rem;line-height:1.5">
-                Restrict heavy tasks to top-tier leagues only.
-                Lower tier = fewer leagues = faster &amp; lighter indexing.
-              </div>
-              <table style="font-size:.75rem;width:100%;border-collapse:collapse">
-                <thead><tr>
-                  <th style="text-align:left;padding:2px 8px;color:#8b949e;font-weight:normal">Policy</th>
-                  <th style="text-align:left;padding:2px 8px;color:#8b949e;font-weight:normal">Max Tier</th>
-                </tr></thead>
-                <tbody id="sched-tiers-tbody"></tbody>
-              </table>
-              <div style="margin-top:.5rem">
-                <button class="btn btn-sm" onclick="schedSaveTiers()">💾 Save tier limits</button>
-              </div>
-            </div>
-          </div>
+  <!-- ══ Tab: Season Cleanup ══ -->
+  <div class="tab-panel" id="tab-cleanup">
 
-          <!-- upcoming queue -->
-          <div class="task-group-label">Upcoming Queue</div>
-          <div id="sched-queue">
-            <div style="padding:.5rem 1rem;font-size:.75rem;color:#6e7681">No jobs queued.</div>
-          </div>
-
-          <!-- recent history -->
-          <div class="task-group-label">Recent History</div>
-          <div style="overflow-x:auto;max-height:260px;overflow-y:auto">
-            <table class="sync-table" id="sched-hist-table">
-              <thead><tr>
-                <th>Policy</th><th>Task</th><th>Season</th>
-                <th>Status</th><th>Scheduled</th><th>Finished</th><th>Stats / Error</th>
-              </tr></thead>
-              <tbody id="sched-hist-tbody"></tbody>
-            </table>
-          </div>
+    <p class="section-title">Seasons</p>
+    <div class="season-card">
+      <div class="season-header" onclick="toggleEl('seasons-wrapper','seasons-chv')">
+        <span class="season-year" style="font-size:.85rem">Seasons</span>
+        <button class="btn btn-sm" id="pull-seasons-btn" onclick="event.stopPropagation();pullSeasons()" title="Fetch seasons list from API">↻ Pull Seasons</button>
+        <span class="chevron" id="seasons-chv">▶</span>
+      </div>
+      <div class="season-body" id="seasons-wrapper">
+        <div id="seasons-container" style="padding:.5rem 0">
+          <div style="color:#6e7681;font-size:.8rem;padding:.5rem 1rem">Loading…</div>
         </div>
       </div>
     </div>
 
-    <!-- danger zone: purge seasons -->
     <div style="margin-top:1.25rem">
       <p class="section-title" style="color:#f85149">&#9888; Danger Zone</p>
       <div class="season-card" style="border-color:#3d1f1f">
@@ -435,31 +486,10 @@
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- ══════ RIGHT: sidebar ══════ -->
-  <div class="sidebar">
-
-    <p class="section-title">Active Jobs</p>
-    <div class="job-panel">
-      <div class="panel-header">
-        Jobs
-        <button class="btn btn-sm" onclick="clearDoneJobs()">Clear done</button>
-      </div>
-      <div id="jobs-container"><div class="no-jobs">No jobs yet.</div></div>
-    </div>
-
-    <p class="section-title">Log</p>
-    <div class="log-panel">
-      <div class="panel-header">
-        Output
-        <button class="btn btn-sm" onclick="clearLog()">Clear</button>
-      </div>
-      <div class="log-box" id="log-box">Ready.</div>
-    </div>
 
   </div>
-</div><!-- /layout -->
+
+</div><!-- /tab-content -->
 
 <script>
 /* ═══════════════════════════════════════════════════════
@@ -879,10 +909,11 @@ async function stopJob(job_id) {
    Sync table
 ═══════════════════════════════════════════════════════ */
 function renderSyncTable(rows) {
-  const panel = document.getElementById('sync-panel');
   const tbody = document.getElementById('sync-tbody');
-  if (!rows.length) { panel.style.display = 'none'; return; }
-  panel.style.display = '';
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:.75rem 1rem;color:#6e7681;text-align:center">No sync activity yet.</td></tr>';
+    return;
+  }
   tbody.innerHTML = rows.map(s => {
     const cls = s.status === 'completed' ? 's-ok'
               : s.status === 'failed'    ? 's-fail' : 's-prog';
@@ -1220,6 +1251,17 @@ function fmtRunAt(isoUtc) {
   return d.toLocaleDateString([], {month:'short', day:'numeric'}) + ' ' + d.toLocaleTimeString([], timeFmt);
 }
 
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const panel = document.getElementById('tab-' + name);
+  const btn   = document.getElementById('tabBtn-' + name);
+  if (panel) panel.classList.add('active');
+  if (btn)   btn.classList.add('active');
+  // Trigger DB info load when user first visits db tab
+  if (name === 'db') loadDbInfo();
+}
+
 function toggleEl(bodyId, chevId) {
   document.getElementById(bodyId).classList.toggle('open');
   document.getElementById(chevId).classList.toggle('open');
@@ -1248,9 +1290,6 @@ async function loadDbInfo() {
     // Totals chip — sum of db + wal
     const totalBytes = (files.db?.size || 0) + (files.wal?.size || 0);
     document.getElementById('t-db-size').textContent = fmtBytes(totalBytes);
-
-    // Show panel if there is info
-    document.getElementById('db-panel').style.display = '';
 
     // File sizes table
     const fileRows = [
