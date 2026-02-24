@@ -128,6 +128,7 @@
     "show_all": "Show all"
   },
   "team_tabs": {
+    "tab_standings": "Standings",
     "tab_roster": "Roster & Stats",
     "tab_results": "Recent Results",
     "tab_upcoming": "Upcoming"

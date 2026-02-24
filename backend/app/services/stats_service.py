@@ -1217,7 +1217,26 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                 }
             )
 
-        return {
+        # ── Group standings: find the DB league id and the group the team plays in
+        _league_db_id: int | None = league_row.id if league_row else None
+        _team_group_id: int | None = None
+        _group_name: str = ""
+        if _league_db_id:
+            _group_row = (
+                session.query(Game.group_id, LeagueGroup.name, LeagueGroup.text)
+                .join(LeagueGroup, Game.group_id == LeagueGroup.id)
+                .filter(
+                    or_(Game.home_team_id == team_id, Game.away_team_id == team_id),
+                    Game.season_id == season_id,
+                    Game.group_id.isnot(None),
+                )
+                .first()
+            )
+            if _group_row:
+                _team_group_id = _group_row[0]
+                _group_name = _group_row[1] or _group_row[2] or ""
+
+        _result_data = {
             "id": team.id,
             "name": team.name or team.text or f"Team {team_id}",
             "season_id": season_id,
@@ -1230,7 +1249,21 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             "roster_source": roster_source,
             "recent_games": recent_games,
             "upcoming_games": _get_team_upcoming(session, team_id, season_id or 0),
+            "standings": [],
+            "group_name": _group_name,
         }
+
+    # Fetch standings outside the session scope (get_league_standings opens its own session)
+    if _league_db_id:
+        try:
+            _result_data["standings"] = get_league_standings(
+                _league_db_id,
+                only_group_ids=[_team_group_id] if _team_group_id else None,
+            )
+        except Exception:
+            pass
+
+    return _result_data
 
 
 def _get_team_upcoming(session, team_id: int, season_id: int) -> list[dict]:

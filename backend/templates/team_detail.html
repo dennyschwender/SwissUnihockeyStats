@@ -33,14 +33,82 @@
   </div>
 
   {% if team %}
-  <div x-data="{ tab: 'roster' }">
+  {% if team.standings %}
+  <script>window._teamStandings = {{ team.standings | tojson }};</script>
+  {% endif %}
+  <div x-data="{ tab: '{% if team.standings %}standings{% else %}roster{% endif %}' }">
     <div class="tab-bar">
-      {% for tid, tlabel in [('roster', t.team_tabs.tab_roster),('results', t.team_tabs.tab_results),('upcoming', t.team_tabs.tab_upcoming)] %}
-      <button @click="tab='{{ tid }}'" :class="['tab-btn', tab==='{{ tid }}' && 'active']">
-        {{ tlabel }}{% if tid == 'upcoming' and team.upcoming_games %} <span class="tab-count-badge">{{ team.upcoming_games|length }}</span>{% endif %}
+      {% if team.standings %}
+      <button @click="tab='standings'" :class="['tab-btn', tab==='standings' && 'active']">📊 {{ t.team_tabs.tab_standings }}</button>
+      {% endif %}
+      <button @click="tab='roster'" :class="['tab-btn', tab==='roster' && 'active']">{{ t.team_tabs.tab_roster }}</button>
+      <button @click="tab='results'" :class="['tab-btn', tab==='results' && 'active']">{{ t.team_tabs.tab_results }}</button>
+      <button @click="tab='upcoming'" :class="['tab-btn', tab==='upcoming' && 'active']">
+        {{ t.team_tabs.tab_upcoming }}{% if team.upcoming_games %} <span class="tab-count-badge">{{ team.upcoming_games|length }}</span>{% endif %}
       </button>
-      {% endfor %}
     </div>
+
+    <!-- STANDINGS -->
+    {% if team.standings %}
+    <div x-show="tab==='standings'" x-data="{
+      rows: window._teamStandings || [],
+      teamId: {{ team.id }}
+    }">
+      {% if team.group_name %}
+      <p style="font-size:.85rem;color:var(--gray-500);margin-bottom:.75rem;">Group: <strong>{{ team.group_name }}</strong></p>
+      {% endif %}
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
+              <th style="padding:.5rem .5rem;text-align:center;width:2.5rem;">#</th>
+              <th style="padding:.5rem .75rem;text-align:left;">{{ t.table.team }}</th>
+              <th style="padding:.5rem .5rem;text-align:center;" title="Games Played">GP</th>
+              <th style="padding:.5rem .5rem;text-align:center;" title="Wins">W</th>
+              <th style="padding:.5rem .5rem;text-align:center;" title="Losses">L</th>
+              <th style="padding:.5rem .5rem;text-align:center;" title="Goals For">GF</th>
+              <th style="padding:.5rem .5rem;text-align:center;" title="Goals Against">GA</th>
+              <th style="padding:.5rem .5rem;text-align:center;" title="Goal Difference">GD</th>
+              <th style="padding:.5rem .75rem;text-align:center;font-weight:700;" title="Points">PTS</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="row in rows" :key="row.team_id">
+              <tr
+                @click="window.location='/{{ locale }}/team/' + row.team_id"
+                :style="'cursor:pointer;border-bottom:1px solid var(--gray-100);' +
+                  (row.team_id === teamId
+                    ? 'background:var(--swiss-red-light,#fff1f2);border-left:3px solid var(--swiss-red,#e11d48);font-weight:600;'
+                    : 'background:transparent;border-left:3px solid transparent;')"
+                onmouseover="if(this.style.background!='var(--swiss-red-light, #fff1f2)')this.style.background='var(--gray-50)'"
+                onmouseout="this.dataset.isThis==='1'?this.style.background='var(--swiss-red-light,#fff1f2)':this.style.background=''"
+                :data-is-this="row.team_id === teamId ? '1' : '0'">
+                <td style="padding:.6rem .5rem;text-align:center;" x-text="row.rank"></td>
+                <td style="padding:.6rem .75rem;">
+                  <span x-text="row.team_name"></span>
+                  <template x-if="row.team_id === teamId">
+                    <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;color:var(--swiss-red,#e11d48);margin-left:.4rem;">▶ you</span>
+                  </template>
+                </td>
+                <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gp"></td>
+                <td style="padding:.6rem .5rem;text-align:center;color:#16a34a;" x-text="row.w"></td>
+                <td style="padding:.6rem .5rem;text-align:center;color:#dc2626;" x-text="row.l"></td>
+                <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gf"></td>
+                <td style="padding:.6rem .5rem;text-align:center;" x-text="row.ga"></td>
+                <td style="padding:.6rem .5rem;text-align:center;"
+                  :style="row.gd > 0 ? 'color:#16a34a' : row.gd < 0 ? 'color:#dc2626' : ''"
+                  x-text="(row.gd > 0 ? '+' : '') + row.gd"></td>
+                <td style="padding:.6rem .75rem;text-align:center;font-weight:700;font-size:1rem;" x-text="row.pts"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:.6rem;font-size:.78rem;color:var(--gray-500);display:flex;gap:1rem;flex-wrap:wrap;">
+        <span>Points: W=3, OT/SO&nbsp;W=2, OT/SO&nbsp;L=1, L=0</span>
+      </div>
+    </div>
+    {% endif %}
 
     <!-- ROSTER -->
     {% if team.roster %}

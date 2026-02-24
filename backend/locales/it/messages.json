@@ -128,6 +128,7 @@
     "show_all": "Mostra tutto"
   },
   "team_tabs": {
+    "tab_standings": "Classifica",
     "tab_roster": "Rosa & Statistiche",
     "tab_results": "Risultati recenti",
     "tab_upcoming": "In programma"

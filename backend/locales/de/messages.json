@@ -128,6 +128,7 @@
     "show_all": "Alle anzeigen"
   },
   "team_tabs": {
+    "tab_standings": "Tabelle",
     "tab_roster": "Kader & Statistiken",
     "tab_results": "Letzte Spiele",
     "tab_upcoming": "Bevorstehend"

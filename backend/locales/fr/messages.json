@@ -127,8 +127,7 @@
     "show_less": "Voir moins ▲",
     "show_all": "Voir tout"
   },
-  "team_tabs": {
-    "tab_roster": "Effectif & Statistiques",
+  "team_tabs": {    "tab_standings": "Classement",    "tab_roster": "Effectif & Statistiques",
     "tab_results": "Résultats récents",
     "tab_upcoming": "À venir"
   },
