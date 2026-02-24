@@ -1631,10 +1631,11 @@ class DataIndexer:
             session.commit()
         logger.info(f"✓ Backfilled league attrs for {updated} teams in season {season_id}")
         return updated
-self, season_id: int = 2025,
-                            index_games: bool = True,
-                            index_events: bool = False,
-                            force: bool = False) -> Dict[str, int]:
+
+    def index_leagues_path(self, season_id: int = 2025,
+                           index_games: bool = True,
+                           index_events: bool = False,
+                           force: bool = False) -> Dict[str, int]:
         """Full leagues → groups → games (→ events) indexing orchestration.
 
         Args:
