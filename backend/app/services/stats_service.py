@@ -947,12 +947,15 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
         season_row = session.get(Season, season_id)
         season_name = season_row.text if season_row else str(season_id)
         league_row = (
-            session.query(League).filter(League.id == team.league_id).first()
+            session.query(League).filter(
+                League.league_id == team.league_id,
+                League.season_id == team.season_id,
+                League.game_class == team.game_class,
+            ).first()
             if team.league_id is not None else None
         )
         league_name = (
             (league_row.name or league_row.text if league_row else None)
-            or team.game_class
             or ""
         )
 
