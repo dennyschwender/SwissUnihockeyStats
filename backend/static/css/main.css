@@ -728,12 +728,14 @@ html.dark-mode .universal-search-results {
   }
 
   /* Reduce card padding when in single-column layout */
-  .home-game-card {
+  .home-game-card,
+  .home-card {
     padding: 1rem;
   }
 
   /* Allow filter select to shrink/grow beside the h2 */
-  .home-game-header select {
+  .home-game-header select,
+  .home-card-header .home-card-select {
     max-width: 140px;
     font-size: .75rem;
   }
@@ -1408,3 +1410,932 @@ html.dark-mode .search-input {
   color: var(--gray-500);
   margin-left: .5rem;
 }
+
+/* ============================================
+   ALERT / ERROR BANNER
+   ============================================ */
+
+.alert-error {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.5rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: .5rem;
+  color: #b91c1c;
+}
+
+/* ============================================
+   BACK LINK
+   ============================================ */
+
+.back-link {
+  display: inline-block;
+  color: var(--gray-500);
+  font-size: .875rem;
+  text-decoration: none;
+  margin-bottom: .25rem;
+}
+
+.back-link:hover {
+  color: var(--swiss-red);
+  text-decoration: underline;
+}
+
+/* Red variant (used in club_detail, clubs breadcrumb) */
+.back-link--red {
+  color: var(--swiss-red);
+}
+
+/* ============================================
+   ACTION BUTTONS  (primary / secondary)
+   ============================================ */
+
+.btn-primary {
+  display: inline-block;
+  padding: .75rem 2rem;
+  background: var(--swiss-red);
+  color: #fff;
+  border: none;
+  border-radius: .5rem;
+  font-weight: 600;
+  font-size: 1rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity .2s;
+}
+
+.btn-primary:hover { opacity: .85; }
+
+.btn-secondary {
+  display: inline-block;
+  padding: .75rem 2rem;
+  background: var(--gray-200);
+  color: var(--gray-900);
+  border: none;
+  border-radius: .5rem;
+  font-weight: 600;
+  font-size: 1rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.btn-secondary:hover { background: var(--gray-300); }
+
+.btn-outline {
+  display: inline-block;
+  padding: .75rem 1.5rem;
+  background: transparent;
+  color: var(--gray-700);
+  border: 2px solid var(--gray-300);
+  border-radius: .5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.btn-outline:hover {
+  border-color: var(--swiss-red);
+  color: var(--swiss-red);
+}
+
+/* ============================================
+   ERROR PAGE  (404 / 500)
+   ============================================ */
+
+.error-page {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+}
+
+.error-code {
+  font-size: 8rem;
+  font-weight: 700;
+  color: var(--swiss-red);
+  line-height: 1;
+}
+
+.error-title {
+  margin-top: 1rem;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.error-desc {
+  margin-top: 1rem;
+  font-size: 1.125rem;
+  color: var(--gray-600);
+  max-width: 500px;
+}
+
+.error-actions {
+  margin-top: 2rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.error-divider {
+  margin-top: 3rem;
+  border-top: 1px solid var(--gray-200);
+  padding-top: 2rem;
+  max-width: 600px;
+  width: 100%;
+}
+
+.error-divider-title {
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 1rem;
+}
+
+.error-links-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: .5rem;
+  font-size: .875rem;
+}
+
+.error-links-grid a {
+  color: var(--swiss-red);
+  text-decoration: none;
+}
+
+.error-links-grid a:hover { text-decoration: underline; }
+
+.error-info-box {
+  margin-top: 3rem;
+  padding: 1.5rem;
+  background: var(--gray-50);
+  border-radius: .5rem;
+  max-width: 500px;
+  font-size: .875rem;
+  color: var(--gray-600);
+}
+
+.error-info-box code {
+  background: var(--gray-200);
+  padding: .125rem .5rem;
+  border-radius: .25rem;
+}
+
+.error-time {
+  margin-top: 2rem;
+  font-size: .875rem;
+  color: var(--gray-500);
+}
+
+/* ============================================
+   GAME ROW LIST  (games, schedule, team detail)
+   ============================================ */
+
+/* Vertical flex list of game rows */
+.game-list {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+
+/* Tighter gap for schedule */
+.game-list--compact { gap: .35rem; }
+
+/* Anchor wrapper that resets link styles */
+.game-row-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+/* The clickable row card */
+.game-row {
+  display: flex;
+  align-items: center;
+  padding: .75rem 1rem;
+  background: var(--card-bg, white);
+  border: 1px solid var(--gray-200);
+  border-radius: .5rem;
+  gap: .75rem;
+  transition: box-shadow .12s;
+}
+
+.game-row:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, .08); }
+
+/* Compact variant for schedule */
+.game-row--compact {
+  padding: .55rem .9rem;
+  border-radius: .45rem;
+  gap: .5rem;
+}
+
+/* Date column */
+.game-col-date {
+  width: 90px;
+  font-size: .8rem;
+  color: var(--gray-500);
+  flex-shrink: 0;
+}
+
+/* Narrower date for schedule (time only) */
+.game-col-time-only {
+  width: 48px;
+  font-size: .8rem;
+  color: var(--gray-500);
+  flex-shrink: 0;
+}
+
+/* Team name columns — flex:1 with overflow truncation */
+.game-col-team {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-col-team a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.game-col-team--right { text-align: right; }
+
+/* Score / "vs" centre column */
+.game-col-score {
+  width: 90px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* Narrow "vs" column in schedule */
+.game-col-vs {
+  width: 36px;
+  text-align: center;
+  font-size: .8rem;
+  color: var(--gray-400);
+  flex-shrink: 0;
+}
+
+/* Time column (right-align) */
+.game-col-time {
+  width: 50px;
+  font-size: .8rem;
+  color: var(--gray-500);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* League label on schedule */
+.game-col-league {
+  width: 72px;
+  font-size: .72rem;
+  color: var(--gray-400);
+  text-align: right;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* vs colour in score area */
+.game-score-vs { color: var(--gray-400); }
+
+/* ============================================
+   SCHEDULE DATE HEADING
+   ============================================ */
+
+.schedule-date-heading {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--gray-400);
+  padding: .9rem 0 .3rem;
+}
+
+/* ============================================
+   HOME PAGE CARDS  (recent/upcoming games, top scorers)
+   ============================================ */
+
+.home-card {
+  background: var(--card-bg, white);
+  border: 1px solid var(--gray-200);
+  border-radius: .75rem;
+  padding: 1.25rem;
+}
+
+.home-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.home-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.home-card-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.home-card-select {
+  padding: .35rem .75rem;
+  border: 1px solid var(--gray-200);
+  border-radius: .5rem;
+  font-size: .8rem;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.home-card-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Top scorers within home card */
+.home-scorers-wrap {
+  margin-top: 1.5rem;
+}
+
+.home-scorers-link {
+  display: block;
+  text-align: right;
+  margin-top: .75rem;
+  font-size: .78rem;
+  color: var(--swiss-red);
+  text-decoration: none;
+}
+
+.home-scorers-link:hover { text-decoration: underline; }
+
+/* ============================================
+   FILTER BAR  (leagues, teams)
+   ============================================ */
+
+.filter-bar {
+  background: var(--card-bg, white);
+  border: 1px solid var(--gray-200);
+  border-radius: .6rem;
+  padding: .9rem 1.1rem;
+  margin-bottom: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+}
+
+html.dark-mode .filter-bar {
+  background: var(--bg-secondary);
+}
+
+.filter-bar-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+.filter-bar-label {
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--gray-500);
+  width: 5rem;
+  flex-shrink: 0;
+}
+
+/* Pill button for filter chips (inactive) */
+.filter-chip {
+  padding: .35rem .9rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 999px;
+  font-size: .82rem;
+  font-weight: 500;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color .12s, background .12s, color .12s;
+}
+
+.filter-chip:hover {
+  border-color: var(--swiss-red);
+  color: var(--swiss-red);
+}
+
+/* Active / selected chip */
+.filter-chip.active {
+  border-color: var(--swiss-red);
+  background: var(--swiss-red);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Filter bar search input */
+.filter-search-wrap {
+  position: relative;
+}
+
+.filter-search-icon {
+  position: absolute;
+  left: .75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gray-400);
+  pointer-events: none;
+}
+
+.filter-search-input {
+  width: 100%;
+  padding: .5rem 1rem .5rem 2.2rem;
+  border: 1px solid var(--gray-300);
+  border-radius: .5rem;
+  font-size: .9rem;
+  background: var(--bg-primary, white);
+  color: inherit;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color .12s;
+}
+
+.filter-search-input:focus { border-color: var(--swiss-red); }
+
+.filter-bar-count {
+  font-size: .8rem;
+  color: var(--gray-500);
+}
+
+.filter-clear-btn {
+  padding: .3rem .8rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 999px;
+  font-size: .78rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color .12s, color .12s;
+}
+
+.filter-clear-btn:hover {
+  border-color: var(--swiss-red);
+  color: var(--swiss-red);
+}
+
+/* ============================================
+   SECTION DIVIDER HEADING  (tier / age group)
+   ============================================ */
+
+.section-divider {
+  margin-bottom: 1.75rem;
+}
+
+.section-divider-title {
+  font-size: .8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--gray-400);
+  margin-bottom: .6rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.section-divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--gray-200);
+  display: inline-block;
+}
+
+/* ============================================
+   LISTING CARDS  (league/team grids)
+   ============================================ */
+
+.listing-card {
+  background: var(--card-bg, white);
+  border: 1px solid var(--gray-200);
+  border-radius: .5rem;
+  padding: .9rem 1.1rem;
+  transition: box-shadow .15s, transform .15s;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.listing-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .1);
+  transform: translateY(-1px);
+}
+
+.listing-card--compact { padding: .75rem 1rem; }
+
+.listing-card-name {
+  font-weight: 600;
+  font-size: .95rem;
+  margin-bottom: .3rem;
+}
+
+.listing-card-name--sm { font-size: .92rem; }
+
+.listing-card-meta {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex-wrap: wrap;
+}
+
+/* ============================================
+   BADGE PILLS  (sex, field, group count)
+   ============================================ */
+
+.badge-pill {
+  font-size: .7rem;
+  padding: .1rem .45rem;
+  border-radius: 999px;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.badge-pill--neutral {
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+
+.badge-pill--men   { background: #dbeafe; color: #1d4ed8; }
+.badge-pill--women { background: #fce7f3; color: #9d174d; }
+.badge-pill--mixed { background: #d1fae5; color: #065f46; }
+
+/* ============================================
+   SEX SUBGROUP COLUMNS  (leagues, teams)
+   ============================================ */
+
+.sex-group-wrap {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: .75rem;
+  align-items: flex-start;
+}
+
+.sex-col {
+  flex: 1;
+  min-width: 240px;
+  padding-left: .75rem;
+}
+
+.sex-col--men   { border-left: 3px solid #93c5fd; }
+.sex-col--women { border-left: 3px solid #f9a8d4; }
+.sex-col--mixed { border-left: 3px solid #86efac; }
+
+.sex-col-label {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: .5rem;
+}
+
+.sex-col-label--men   { color: #1d4ed8; }
+.sex-col-label--women { color: #9d174d; }
+.sex-col-label--mixed { color: #065f46; }
+
+/* ============================================
+   DETAIL PAGE LAYOUT
+   ============================================ */
+
+.detail-header {
+  margin-bottom: 1.5rem;
+}
+
+.detail-header--flex {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.detail-header-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-title {
+  margin: .5rem 0 .2rem;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.detail-meta {
+  font-size: .9rem;
+  color: var(--gray-500);
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+.detail-photo {
+  width: 90px;
+  height: 90px;
+  border-radius: .5rem;
+  object-fit: cover;
+  border: 1px solid var(--gray-200);
+  flex-shrink: 0;
+}
+
+/* ============================================
+   STAT BADGES  (career totals on player page)
+   ============================================ */
+
+.stat-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  margin-bottom: 2rem;
+}
+
+.stat-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: .6rem 1.1rem;
+  background: var(--card-bg, white);
+  border: 1px solid var(--gray-200);
+  border-radius: .5rem;
+  min-width: 64px;
+}
+
+.stat-badge-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.stat-badge-label {
+  font-size: .7rem;
+  font-weight: 600;
+  color: var(--gray-400);
+  letter-spacing: .05em;
+  margin-top: .1rem;
+}
+
+/* ============================================
+   SECTION BLOCK  (collapsible / titled sections)
+   ============================================ */
+
+.section-block {
+  margin-bottom: 2rem;
+}
+
+.section-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .75rem;
+}
+
+.section-block-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.section-block-toggle {
+  background: none;
+  border: 1px solid var(--gray-300);
+  border-radius: .375rem;
+  padding: .25rem .75rem;
+  font-size: .8rem;
+  cursor: pointer;
+  color: var(--gray-600);
+  transition: border-color .12s, color .12s;
+}
+
+.section-block-toggle:hover {
+  border-color: var(--swiss-red);
+  color: var(--swiss-red);
+}
+
+/* ============================================
+   TAB BAR  (team detail, reusable)
+   ============================================ */
+
+.tab-bar {
+  display: flex;
+  gap: .25rem;
+  border-bottom: 2px solid var(--gray-200);
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tab-btn {
+  padding: .6rem 1.25rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: .9rem;
+  font-weight: 500;
+  margin-bottom: -2px;
+  border-bottom: 2px solid transparent;
+  color: var(--gray-600);
+  white-space: nowrap;
+  transition: color .12s, border-color .12s;
+}
+
+.tab-btn:hover { color: var(--swiss-red); }
+
+.tab-btn.active {
+  border-bottom-color: var(--swiss-red);
+  color: var(--swiss-red);
+}
+
+.tab-count-badge {
+  background: var(--swiss-red);
+  color: white;
+  border-radius: 9999px;
+  font-size: .7rem;
+  padding: .1rem .45rem;
+  margin-left: .3rem;
+}
+
+/* ============================================
+   SEASON PILLS  (team detail — season switcher)
+   ============================================ */
+
+.season-pills {
+  display: flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+  margin-top: .75rem;
+}
+
+.season-pill {
+  padding: .25rem .7rem;
+  border-radius: 9999px;
+  font-size: .8rem;
+  font-weight: 500;
+  text-decoration: none;
+  border: 1px solid var(--gray-300);
+  background: var(--card-bg, white);
+  color: var(--gray-600);
+  transition: border-color .12s, color .12s, background .12s;
+}
+
+.season-pill:hover { border-color: var(--swiss-red); color: var(--swiss-red); }
+
+.season-pill.active {
+  background: var(--swiss-red);
+  color: white;
+  border-color: var(--swiss-red);
+}
+
+/* ============================================
+   RESULT BADGES  (W / L / D)
+   ============================================ */
+
+.result-badge {
+  font-weight: 700;
+  border-radius: .25rem;
+  padding: .15rem .4rem;
+  text-align: center;
+  display: inline-block;
+  min-width: 2rem;
+}
+
+.result-badge--W { background: #dcfce7; color: #15803d; }
+.result-badge--L { background: #fee2e2; color: #b91c1c; }
+.result-badge--D { background: #f3f4f6; color: #374151; }
+
+.result-text--W { font-weight: 700; color: #16a34a; }
+.result-text--L { font-weight: 700; color: #dc2626; }
+.result-text--D { font-weight: 700; color: var(--gray-500); }
+
+/* Home / Away badge */
+.ha-badge {
+  font-size: .75rem;
+  font-weight: 600;
+  border-radius: .25rem;
+  padding: .15rem .4rem;
+  flex-shrink: 0;
+  min-width: 2rem;
+  text-align: center;
+}
+
+.ha-badge--H { background: #dbeafe; color: #1d4ed8; }
+.ha-badge--A { background: #f3f4f6; color: #374151; }
+
+/* ============================================
+   FAVORITES PAGE
+   ============================================ */
+
+.fav-manager {
+  margin-top: 2rem;
+}
+
+.fav-section {
+  margin-bottom: 3rem;
+}
+
+.fav-section-heading {
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.fav-section-count {
+  color: var(--gray-600);
+  font-size: 1rem;
+}
+
+.fav-action-link {
+  margin-top: 1rem;
+  display: inline-block;
+  padding: .5rem 1rem;
+  background: var(--primary-500, #ef4444);
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: .875rem;
+  transition: opacity .2s;
+}
+
+.fav-action-link:hover { opacity: .85; }
+
+.fav-footer {
+  text-align: center;
+  margin-top: 3rem;
+}
+
+.fav-empty {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.fav-empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.fav-empty-title {
+  color: var(--gray-600);
+  margin-bottom: 1rem;
+}
+
+.fav-empty-desc {
+  color: var(--gray-600);
+  margin-bottom: 2rem;
+}
+
+.fav-browse-btn {
+  display: inline-block;
+  padding: 1rem 2rem;
+  background: var(--swiss-red);
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+/* ============================================
+   INLINE LINK  (hover underline helper)
+   ============================================ */
+
+.link-inherit {
+  color: inherit;
+  text-decoration: none;
+}
+
+.link-inherit:hover { text-decoration: underline; }
+
+/* ============================================
+   CONTENT WRAPPER (club_detail legacy)
+   ============================================ */
+
+.content-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem 3rem;
+}
+

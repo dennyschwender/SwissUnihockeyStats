@@ -3,50 +3,22 @@
 {% block title %}{{ t.common.error }} 404 - {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
-<div style="min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem;">
-    <div style="font-size: 8rem; font-weight: 700; color: var(--swiss-red); line-height: 1;">
-        404
+<div class="error-page">
+    <div class="error-code">404</div>
+    <h1 class="error-title">{{ t.errors.not_found_title }}</h1>
+    <p class="error-desc">{{ t.errors.not_found_desc }}</p>
+    <div class="error-actions">
+        <a href="/{{ locale }}" class="btn-primary">{{ t.errors.go_home }}</a>
+        <button onclick="history.back()" class="btn-secondary">{{ t.common.back }}</button>
     </div>
-    
-    <h1 style="margin-top: 1rem; font-size: 2rem; font-weight: 700; color: var(--gray-900);">
-        {{ t.errors.not_found_title }}
-    </h1>
-    
-    <p style="margin-top: 1rem; font-size: 1.125rem; color: var(--gray-600); max-width: 500px;">
-        {{ t.errors.not_found_desc }}
-    </p>
-    
-    <div style="margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
-        <a href="/{{ locale }}" class="button-primary" style="text-decoration: none; padding: 0.75rem 2rem; background: var(--swiss-red); color: white; border-radius: 0.5rem; font-weight: 600; display: inline-block;">
-            {{ t.errors.go_home }}
-        </a>
-        
-        <button onclick="history.back()" class="button-secondary" style="padding: 0.75rem 2rem; background: var(--gray-200); color: var(--gray-900); border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">
-            {{ t.common.back }}
-        </button>
-    </div>
-    
-    <!-- Helpful links -->
-    <div style="margin-top: 3rem; border-top: 1px solid var(--gray-200); padding-top: 2rem; max-width: 600px;">
-        <p style="font-weight: 600; color: var(--gray-700); margin-bottom: 1rem;">
-            {{ t.errors.popular_pages }}
-        </p>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem; font-size: 0.875rem;">
-            <a href="/{{ locale }}/clubs" style="color: var(--swiss-red); text-decoration: none;">
-                🏒 {{ t.nav.clubs }}
-            </a>
-            <a href="/{{ locale }}/leagues" style="color: var(--swiss-red); text-decoration: none;">
-                🏆 {{ t.nav.leagues }}
-            </a>
-            <a href="/{{ locale }}/teams" style="color: var(--swiss-red); text-decoration: none;">
-                👥 {{ t.nav.teams }}
-            </a>
-            <a href="/{{ locale }}/games" style="color: var(--swiss-red); text-decoration: none;">
-                📅 {{ t.nav.games }}
-            </a>
-            <a href="/{{ locale}}/players" style="color: var(--swiss-red); text-decoration: none;">
-                🏅 {{ t.nav.players }}
-            </a>
+    <div class="error-divider">
+        <p class="error-divider-title">{{ t.errors.popular_pages }}</p>
+        <div class="error-links-grid">
+            <a href="/{{ locale }}/clubs">🏒 {{ t.nav.clubs }}</a>
+            <a href="/{{ locale }}/leagues">🏆 {{ t.nav.leagues }}</a>
+            <a href="/{{ locale }}/teams">👥 {{ t.nav.teams }}</a>
+            <a href="/{{ locale }}/games">📅 {{ t.nav.games }}</a>
+            <a href="/{{ locale}}/players">🏅 {{ t.nav.players }}</a>
         </div>
     </div>
 </div>

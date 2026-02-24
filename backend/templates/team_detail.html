@@ -34,11 +34,10 @@
 
   {% if team %}
   <div x-data="{ tab: 'roster' }">
-    <div style="display:flex;gap:.25rem;border-bottom:2px solid var(--gray-200);margin-bottom:1.5rem;overflow-x:auto;-webkit-overflow-scrolling:touch;">
+    <div class="tab-bar">
       {% for tid, tlabel in [('roster', t.team_tabs.tab_roster),('results', t.team_tabs.tab_results),('upcoming', t.team_tabs.tab_upcoming)] %}
-      <button @click="tab='{{ tid }}'"
-        :style="{ padding:'.6rem 1.25rem', border:'none', background:'none', cursor:'pointer', 'font-size':'.9rem', 'font-weight':'500', 'margin-bottom':'-2px', 'border-bottom': tab==='{{ tid }}' ? '2px solid var(--swiss-red,#e11d48)' : '2px solid transparent', color: tab==='{{ tid }}' ? 'var(--swiss-red,#e11d48)' : 'var(--gray-600)' }">
-        {{ tlabel }}{% if tid == 'upcoming' and team.upcoming_games %} <span style="background:var(--swiss-red,#e11d48);color:white;border-radius:9999px;font-size:.7rem;padding:.1rem .45rem;margin-left:.3rem;">{{ team.upcoming_games|length }}</span>{% endif %}
+      <button @click="tab='{{ tid }}'" :class="['tab-btn', tab==='{{ tid }}' && 'active']">
+        {{ tlabel }}{% if tid == 'upcoming' and team.upcoming_games %} <span class="tab-count-badge">{{ team.upcoming_games|length }}</span>{% endif %}
       </button>
       {% endfor %}
     </div>
@@ -83,10 +82,10 @@
       {% if team.roster %}
       <div style="margin-bottom:.75rem;">
         <input x-model="q" type="search" placeholder="Search name or position…"
-          style="width:100%;max-width:22rem;padding:.4rem .75rem;border:1px solid var(--gray-300);border-radius:.4rem;font-size:.875rem;background:var(--card-bg,white);color:var(--text-primary);">
+          class="search-input" style="max-width:22rem;">
       </div>
-      <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+      <div class="table-scroll">
+        <table class="data-table">
           <thead>
             <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
               {% set th_num  = "padding:.5rem .5rem;text-align:center;white-space:nowrap;" %}
@@ -106,9 +105,7 @@
           </thead>
           <tbody>
             <template x-for="p in rows" :key="p.player_id">
-              <tr @click="window.location='/{{ locale }}/player/' + p.player_id"
-                style="cursor:pointer;border-bottom:1px solid var(--gray-100);"
-                onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+              <tr @click="window.location='/{{ locale }}/player/' + p.player_id" class="clickable">
                 <td style="padding:.6rem .5rem;text-align:center;color:var(--gray-500);" x-text="p.number ?? '—'"></td>
                 <td style="padding:.6rem .75rem;font-weight:500;" :title="p.from_games ? 'Seen in game lineups — not on official roster' : ''">
                   <span x-text="p.name"></span><span x-show="p.from_games" style="font-size:.7rem;color:var(--gray-400);margin-left:.25rem;">*</span>
@@ -128,8 +125,8 @@
         <p x-show="roster.some(p => p.from_games)" style="font-size:.75rem;color:var(--gray-400);margin-top:.5rem;">* player seen in game lineups but absent from official roster</p>
       </div>
       {% else %}
-      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
-        <p style="font-size:2rem">👤</p>
+      <div class="empty-state-center">
+        <p class="empty-state-icon">👤</p>
         <p>No roster data available for this team.</p>
       </div>
       {% endif %}
@@ -138,26 +135,22 @@
     <!-- RECENT RESULTS -->
     <div x-show="tab==='results'">
       {% if team.recent_games %}
-      <div style="display:flex;flex-direction:column;gap:.5rem;">
+      <div class="game-list game-list--compact">
         {% for g in team.recent_games %}
-        <a href="/{{ locale }}/game/{{ g.game_id }}" style="text-decoration:none;color:inherit;">
-          <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;"
-               onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
-            <span style="width:6rem;font-size:.8rem;color:var(--gray-500);">{{ g.date }}</span>
-            <span style="width:2rem;text-align:center;font-weight:700;border-radius:.25rem;padding:.15rem .4rem;
-              {% if g.result=='W' %}background:#dcfce7;color:#15803d{% elif g.result=='L' %}background:#fee2e2;color:#b91c1c{% else %}background:#f3f4f6;color:#374151{% endif %}">
-              {{ g.result }}
-            </span>
-            <span style="margin:0 .5rem;font-size:.8rem;color:var(--gray-500);flex-shrink:0;">{{ g.home_away }}</span>
-            <span style="flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ g.opponent_name }}</span>
-            <span style="font-weight:700;font-size:1.1rem;font-variant-numeric:tabular-nums;flex-shrink:0;">{{ g.score }}</span>
+        <a href="/{{ locale }}/game/{{ g.game_id }}" class="game-row-link">
+          <div class="game-row game-row--compact">
+            <span class="game-col-date">{{ g.date }}</span>
+            <span class="result-badge result-badge--{{ g.result }}">{{ g.result }}</span>
+            <span class="ha-badge ha-badge--{{ g.home_away }}">{{ g.home_away }}</span>
+            <span class="game-col-team">{{ g.opponent_name }}</span>
+            <span class="game-col-score">{{ g.score }}</span>
           </div>
         </a>
         {% endfor %}
       </div>
       {% else %}
-      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
-        <p style="font-size:2rem">📅</p>
+      <div class="empty-state-center">
+        <p class="empty-state-icon">📅</p>
         <p>No completed games for this team yet.</p>
       </div>
       {% endif %}
@@ -166,25 +159,21 @@
     <!-- UPCOMING GAMES -->
     <div x-show="tab==='upcoming'">
       {% if team.upcoming_games %}
-      <div style="display:flex;flex-direction:column;gap:.5rem;">
+      <div class="game-list game-list--compact">
         {% for g in team.upcoming_games %}
-        <a href="/{{ locale }}/game/{{ g.game_id }}" style="text-decoration:none;color:inherit;">
-          <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;gap:.75rem;"
-               onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
-            <span style="width:5.5rem;font-size:.8rem;color:var(--gray-500);flex-shrink:0;">{{ g.weekday }} {{ g.date }}</span>
-            <span style="width:2rem;text-align:center;font-size:.75rem;font-weight:600;border-radius:.25rem;padding:.15rem .4rem;flex-shrink:0;
-              {% if g.home_away=='H' %}background:#dbeafe;color:#1d4ed8{% else %}background:#f3f4f6;color:#374151{% endif %}">
-              {{ g.home_away }}
-            </span>
-            <span style="flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ g.opponent_name }}</span>
-            {% if g.time %}<span style="font-size:.8rem;color:var(--gray-500);flex-shrink:0;">{{ g.time }}</span>{% endif %}
+        <a href="/{{ locale }}/game/{{ g.game_id }}" class="game-row-link">
+          <div class="game-row game-row--compact">
+            <span class="game-col-date">{{ g.weekday }} {{ g.date }}</span>
+            <span class="ha-badge ha-badge--{{ g.home_away }}">{{ g.home_away }}</span>
+            <span class="game-col-team">{{ g.opponent_name }}</span>
+            {% if g.time %}<span class="game-col-time-only">{{ g.time }}</span>{% endif %}
           </div>
         </a>
         {% endfor %}
       </div>
       {% else %}
-      <div style="text-align:center;padding:3rem;color:var(--gray-500);">
-        <p style="font-size:2rem">✅</p>
+      <div class="empty-state-center">
+        <p class="empty-state-icon">✅</p>
         <p>No upcoming games scheduled.</p>
       </div>
       {% endif %}

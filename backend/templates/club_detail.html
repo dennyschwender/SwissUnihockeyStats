@@ -6,15 +6,13 @@
 <div class="content-wrapper">
     <!-- Back Button -->
     <div style="margin-bottom: 1.5rem;">
-        <a href="/{{ locale }}/clubs" style="color: var(--swiss-red); text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
+        <a href="/{{ locale }}/clubs" class="back-link back-link--red">
             ← {{ t.common.back if t.common.back else 'Back to Clubs' }}
         </a>
     </div>
 
     {% if error_message %}
-    <div style="padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 8px; margin-bottom: 1.5rem;">
-        <strong>Error:</strong> {{ error_message }}
-    </div>
+    <div class="alert-error"><strong>Error:</strong> {{ error_message }}</div>
     {% endif %}
 
     <!-- Club Header -->

@@ -1,17 +1,14 @@
 {% if upcoming_games %}
-<table style="width:100%;min-width:360px;border-collapse:collapse;font-size:.82rem;">
+<table class="data-table" style="min-width:360px;font-size:.82rem;">
   <tbody>
     {% for g in upcoming_games %}
-    <tr onclick="window.location='/{{ locale }}/game/{{ g.game_id }}'"
-        style="cursor:pointer;"
-        onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
-      <td style="padding:.35rem .4rem;color:var(--gray-400);font-size:.73rem;white-space:nowrap;vertical-align:middle;">{{ g.weekday }}<br>{{ g.date }}{% if g.time %}<br>{{ g.time }}{% endif %}</td>
-      <td style="padding:.35rem .5rem;font-weight:500;white-space:nowrap;text-align:right;vertical-align:middle;">{{ g.home_team }}</td>
-      <td style="padding:.35rem .5rem;text-align:center;color:var(--gray-400);white-space:nowrap;vertical-align:middle;">vs</td>
-      <td style="padding:.35rem .5rem;font-weight:500;white-space:nowrap;vertical-align:middle;">{{ g.away_team }}</td>
+    <tr class="clickable" onclick="window.location='/{{ locale }}/game/{{ g.game_id }}'">
+      <td style="color:var(--gray-400);font-size:.73rem;white-space:nowrap;vertical-align:middle;">{{ g.weekday }}<br>{{ g.date }}{% if g.time %}<br>{{ g.time }}{% endif %}</td>
+      <td style="font-weight:500;white-space:nowrap;text-align:right;vertical-align:middle;">{{ g.home_team }}</td>
+      <td class="col-narrow" style="color:var(--gray-400);white-space:nowrap;vertical-align:middle;">vs</td>
+      <td style="font-weight:500;white-space:nowrap;vertical-align:middle;">{{ g.away_team }}</td>
       {% if g.league_label %}
-      <td style="padding:.35rem .4rem;text-align:right;color:var(--gray-400);font-size:.73rem;font-weight:600;white-space:nowrap;vertical-align:middle;">{{ g.league_label }}{% if g.group_name %}<br><span style="font-weight:400;">{{ g.group_name }}</span>{% endif %}</td>
-      {% endif %}
+      <td style="text-align:right;color:var(--gray-400);font-size:.73rem;font-weight:600;white-space:nowrap;vertical-align:middle;">{{ g.league_label }}{% if g.group_name %}<br><span style="font-weight:400;">{{ g.group_name }}</span>{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>

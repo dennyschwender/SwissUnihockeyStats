@@ -3,33 +3,30 @@
 {% block title %}{{ league.name if league else "League" }} – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top:2rem;padding-bottom:3rem;">
+<div class="container page-content">
 
   {% if error_message %}
-  <div style="margin-bottom:1.5rem;padding:1rem 1.5rem;background:#fef2f2;border:1px solid #fecaca;border-radius:.5rem;color:#b91c1c;">
-    ⚠ {{ error_message }}
-  </div>
+  <div class="alert-error">⚠ {{ error_message }}</div>
   {% endif %}
 
   <div style="margin-bottom:2rem;">
-    <a href="/{{ locale }}/leagues" style="color:var(--gray-500);font-size:.875rem;text-decoration:none;">← Leagues</a>
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-top:.5rem;">
+    <a href="/{{ locale }}/leagues" class="back-link">← Leagues</a>
+    <div class="page-header" style="margin-top:.5rem;">
       <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
-        <h1 style="margin:0;font-size:2rem;font-weight:700;">🏆 {{ league.name if league else "League" }}</h1>
+        <h1 class="page-title">🏆 {{ league.name if league else "League" }}</h1>
         {% if league.game_class %}
-        <span style="font-size:.875rem;color:var(--gray-500);">
+        <span class="detail-meta">
           {% if league.game_class in [11,12] %}Men{% elif league.game_class in [21,22] %}Women{% elif league.game_class == 31 %}Mixed{% endif %}
         </span>
         {% endif %}
         {% if selected_season_name and available_seasons|length <= 1 %}
-        <span style="font-size:.875rem;color:var(--gray-500);">{{ selected_season_name }}</span>
+        <span class="detail-meta">{{ selected_season_name }}</span>
         {% endif %}
       </div>
       {% if available_seasons|length > 1 %}
-      <div style="display:flex;align-items:center;gap:.5rem;">
-        <label style="font-size:.85rem;font-weight:600;color:var(--gray-500,#6b7280);">Season</label>
-        <select onchange="window.location='/{{ locale }}/league/'+this.value"
-                style="padding:.35rem .75rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;font-size:.9rem;background:var(--card-bg,white);color:inherit;cursor:pointer;">
+      <div class="filter-form">
+        <label class="filter-label">Season</label>
+        <select onchange="window.location='/{{ locale }}/league/'+this.value" class="filter-select">
           {% for s in available_seasons %}
           <option value="{{ s.league_db_id }}"{% if s.id == league.season_id %} selected{% endif %}>{{ s.name }}</option>
           {% endfor %}
@@ -106,13 +103,11 @@
 
     <!-- Group selector (only shown when league has multiple groups) -->
     <template x-if="_leagueGroups.length > 1">
-      <div style="display:flex;gap:.375rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+      <div class="filter-bar-row" style="margin-bottom:1.25rem;">
         <template x-for="grp in _leagueGroups" :key="grp.name">
           <button
             @click="Alpine.store('leagueFilter').group = grp.name"
-            :style="Alpine.store('leagueFilter').group === grp.name
-              ? 'padding:.35rem .85rem;border:1.5px solid var(--swiss-red,#e11d48);border-radius:9999px;background:var(--swiss-red,#e11d48);color:#fff;cursor:pointer;font-size:.82rem;font-weight:600;'
-              : 'padding:.35rem .85rem;border:1.5px solid var(--gray-200,#e5e7eb);border-radius:9999px;background:transparent;color:inherit;cursor:pointer;font-size:.82rem;font-weight:500;'"
+            :class="['filter-chip', Alpine.store('leagueFilter').group === grp.name && 'active']"
             x-text="grp.name">
           </button>
         </template>
@@ -122,17 +117,17 @@
     <!-- STANDINGS -->
     <div x-show="tab==='standings'">
       <template x-if="shownStandings.length > 0">
-        <div style="overflow-x:auto;">
-          <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+        <div class="table-scroll">
+          <table class="data-table">
             <thead>
-              <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
-                <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
-                <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.team }}</th>
-                <th style="padding:.6rem .5rem;text-align:center;" title="Games Played">GP</th>
-                <th style="padding:.6rem .5rem;text-align:center;" title="Wins">W</th>
-                <th style="padding:.6rem .5rem;text-align:center;" title="Losses">L</th>
-                <th style="padding:.6rem .5rem;text-align:center;" title="Goals For">GF</th>
-                <th style="padding:.6rem .5rem;text-align:center;" title="Goals Against">GA</th>
+              <tr>
+                <th class="col-narrow" style="width:2.5rem;">#</th>
+                <th>{{ t.table.team }}</th>
+                <th class="col-narrow" title="Games Played">GP</th>
+                <th class="col-narrow" title="Wins">W</th>
+                <th class="col-narrow" title="Losses">L</th>
+                <th class="col-narrow" title="Goals For">GF</th>
+                <th class="col-narrow" title="Goals Against">GA</th>
                 <th style="padding:.6rem .5rem;text-align:center;" title="Goal Difference">GD</th>
                 <th style="padding:.6rem .75rem;text-align:center;font-weight:700;" title="Points">PTS</th>
               </tr>

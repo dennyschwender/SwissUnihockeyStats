@@ -297,12 +297,10 @@ function eventsTable(goals, penalties) {
 }
 </script>
 
-<div class="container" style="padding-top:2rem;padding-bottom:3rem;">
+<div class="container page-content">
 
   {% if error_message %}
-  <div style="margin-bottom:1.5rem;padding:1rem 1.5rem;background:#fef2f2;border:1px solid #fecaca;border-radius:.5rem;color:#b91c1c;">
-    ⚠ {{ error_message }}
-  </div>
+  <div class="alert-error">⚠ {{ error_message }}</div>
   {% endif %}
 
   <div style="margin-bottom:1.5rem;">

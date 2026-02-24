@@ -3,26 +3,23 @@
 {% block title %}{{ t.nav.schedule }} – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top:2rem;padding-bottom:3rem;">
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
-    <h1 style="margin:0;font-size:2rem;font-weight:700;">📅 {{ t.nav.schedule }}</h1>
-    <span style="font-size:.875rem;color:var(--gray-500,#6b7280);">{{ total }} upcoming</span>
+<div class="container page-content">
+
+  <div class="page-header">
+    <h1 class="page-title">📅 {{ t.nav.schedule }}</h1>
+    <span style="font-size:.875rem;color:var(--gray-500);">{{ total }} upcoming</span>
   </div>
 
   <!-- League category filter pills -->
   {% if league_filters %}
-  <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1.5rem;align-items:center;">
+  <div class="btn-group" style="margin-bottom:1.5rem;">
     <a href="/{{ locale }}/schedule"
-       style="padding:.35rem .8rem;border-radius:.375rem;text-decoration:none;font-size:.8rem;
-       {% if league_category == 'all' %}background:var(--swiss-red,#e11d48);color:white;{% else %}background:var(--gray-100,#f3f4f6);color:var(--gray-700,#374151);{% endif %}">
-      All
-    </a>
+       class="sort-btn sort-btn--sm{% if league_category == 'all' %} active{% endif %}">All</a>
     {% for lf in league_filters %}
       {% for gc_item in lf.classes %}
       <a href="/{{ locale }}/schedule?league_category={{ gc_item.id }}"
          title="{{ gc_item.full_name }}"
-         style="padding:.35rem .8rem;border-radius:.375rem;text-decoration:none;font-size:.8rem;
-         {% if league_category == gc_item.id %}background:var(--swiss-red,#e11d48);color:white;{% else %}background:var(--gray-100,#f3f4f6);color:var(--gray-700,#374151);{% endif %}">
+         class="sort-btn sort-btn--sm{% if league_category == gc_item.id %} active{% endif %}">
         {{ lf.name }}{% if lf.classes|length > 1 %}&thinsp;{{ 'M' if gc_item.game_class == 11 else ('W' if gc_item.game_class == 21 else '') }}{% endif %}
       </a>
       {% endfor %}
@@ -31,57 +28,48 @@
   {% endif %}
 
   {% if games %}
-  <div style="display:flex;flex-direction:column;gap:.35rem;">
+  <div class="game-list game-list--compact">
     {% set ns = namespace(prev_date="") %}
     {% for g in games %}
     {% if g.date != ns.prev_date %}
     {% set ns.prev_date = g.date %}
-    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
-                color:var(--gray-400,#9ca3af);padding:.9rem 0 .3rem 0;">
-      {{ g.weekday }}, {{ g.date }}
-    </div>
+    <div class="schedule-date-heading">{{ g.weekday }}, {{ g.date }}</div>
     {% endif %}
-    <div style="display:flex;align-items:center;padding:.55rem .9rem;background:var(--card-bg,white);
-                border:1px solid var(--gray-200,#e5e7eb);border-radius:.45rem;gap:.5rem;"
-         onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
-      <div style="width:48px;font-size:.8rem;color:var(--gray-500,#6b7280);flex-shrink:0;">{{ g.time or "–" }}</div>
-      <div style="flex:1;text-align:right;font-weight:500;font-size:.875rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-        <a href="/{{ locale }}/team/{{ g.home_team_id }}" style="text-decoration:none;color:inherit;">{{ g.home_team }}</a>
+    <div class="game-row game-row--compact">
+      <div class="game-col-time-only">{{ g.time or "–" }}</div>
+      <div class="game-col-team game-col-team--right">
+        <a href="/{{ locale }}/team/{{ g.home_team_id }}" class="link-inherit">{{ g.home_team }}</a>
       </div>
-      <div style="width:36px;text-align:center;font-size:.8rem;color:var(--gray-400,#9ca3af);flex-shrink:0;">vs</div>
-      <div style="flex:1;font-weight:500;font-size:.875rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-        <a href="/{{ locale }}/team/{{ g.away_team_id }}" style="text-decoration:none;color:inherit;">{{ g.away_team }}</a>
+      <div class="game-col-vs">vs</div>
+      <div class="game-col-team">
+        <a href="/{{ locale }}/team/{{ g.away_team_id }}" class="link-inherit">{{ g.away_team }}</a>
       </div>
-      <div style="width:72px;font-size:.72rem;color:var(--gray-400,#9ca3af);text-align:right;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-        {{ g.league_label or g.league }}
-      </div>
+      <div class="game-col-league">{{ g.league_label or g.league }}</div>
     </div>
     {% endfor %}
   </div>
   {% else %}
-  <div style="text-align:center;padding:3rem;color:var(--gray-500,#6b7280);">
-    <p style="font-size:2rem">📅</p>
+  <div class="empty-state-center">
+    <p class="empty-state-icon">📅</p>
     <p>No upcoming games found{% if league_category != 'all' %} for this league{% endif %}.</p>
   </div>
   {% endif %}
 
   {% if total_pages > 1 %}
-  <div style="display:flex;justify-content:center;align-items:center;gap:.5rem;margin-top:2rem;flex-wrap:wrap;">
+  <div class="pagination">
     {% if page > 1 %}
-    <a href="?league_category={{ league_category }}&page={{ page - 1 }}"
-       style="padding:.4rem .9rem;border-radius:.375rem;text-decoration:none;background:var(--gray-100);color:var(--gray-700);">← Prev</a>
+    <a href="?league_category={{ league_category }}&page={{ page - 1 }}" class="page-link wide">← Prev</a>
     {% endif %}
     {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
     <a href="?league_category={{ league_category }}&page={{ p }}"
-       style="padding:.4rem .75rem;border-radius:.375rem;text-decoration:none;
-       {% if p == page %}background:var(--swiss-red,#e11d48);color:white{% else %}background:var(--gray-100);color:var(--gray-700){% endif %}">{{ p }}</a>
+       class="page-link{% if p == page %} active{% endif %}">{{ p }}</a>
     {% endfor %}
     {% if page < total_pages %}
-    <a href="?league_category={{ league_category }}&page={{ page + 1 }}"
-       style="padding:.4rem .9rem;border-radius:.375rem;text-decoration:none;background:var(--gray-100);color:var(--gray-700);">Next →</a>
+    <a href="?league_category={{ league_category }}&page={{ page + 1 }}" class="page-link wide">Next →</a>
     {% endif %}
-    <span style="font-size:.8rem;color:var(--gray-500);margin-left:.5rem;">{{ total }} total</span>
+    <span class="pagination-total">{{ total }} total</span>
   </div>
   {% endif %}
+
 </div>
 {% endblock %}

@@ -3,70 +3,59 @@
 {% block title %}Games – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top:2rem;padding-bottom:3rem;">
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
-    <h1 style="margin:0;font-size:2rem;font-weight:700;">📅 Games</h1>
-    <div style="display:flex;gap:.5rem;font-size:.875rem;">
+<div class="container page-content">
+
+  <div class="page-header">
+    <h1 class="page-title">📅 Games</h1>
+    <div class="btn-group">
       <a href="/{{ locale }}/games?scored_only=1"
-         style="padding:.4rem .9rem;border-radius:.375rem;text-decoration:none;
-         {% if scored_only %}background:var(--swiss-red,#e11d48);color:white{% else %}background:var(--gray-100);color:var(--gray-700){% endif %}">
-        Results
-      </a>
+         class="sort-btn{% if scored_only %} active{% endif %}">Results</a>
       <a href="/{{ locale }}/games?scored_only=0"
-         style="padding:.4rem .9rem;border-radius:.375rem;text-decoration:none;
-         {% if not scored_only %}background:var(--swiss-red,#e11d48);color:white{% else %}background:var(--gray-100);color:var(--gray-700){% endif %}">
-        All Games
-      </a>
+         class="sort-btn{% if not scored_only %} active{% endif %}">All Games</a>
     </div>
   </div>
 
   {% if games %}
-  <div style="display:flex;flex-direction:column;gap:.5rem;">
+  <div class="game-list">
     {% for g in games %}
-    <a href="/{{ locale }}/game/{{ g.game_id }}" style="text-decoration:none;color:inherit;">
-      <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;gap:.75rem;"
-           onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
-        <div style="width:90px;font-size:.8rem;color:var(--gray-500);flex-shrink:0;">{{ g.date }}</div>
-        <div style="flex:1;min-width:0;text-align:right;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ g.home_team }}</div>
-        <div style="width:90px;text-align:center;font-weight:700;font-size:1.1rem;font-variant-numeric:tabular-nums;flex-shrink:0;">
-          {% if g.has_score %}
-            {{ g.home_score }} : {{ g.away_score }}
-          {% else %}
-            <span style="color:var(--gray-400);">vs</span>
-          {% endif %}
+    <a href="/{{ locale }}/game/{{ g.game_id }}" class="game-row-link">
+      <div class="game-row">
+        <div class="game-col-date">{{ g.date }}</div>
+        <div class="game-col-team game-col-team--right">{{ g.home_team }}</div>
+        <div class="game-col-score">
+          {% if g.has_score %}{{ g.home_score }} : {{ g.away_score }}
+          {% else %}<span class="game-score-vs">vs</span>{% endif %}
         </div>
-        <div style="flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ g.away_team }}</div>
+        <div class="game-col-team">{{ g.away_team }}</div>
         {% if g.time %}
-        <div style="width:50px;font-size:.8rem;color:var(--gray-500);text-align:right;flex-shrink:0;">{{ g.time }}</div>
+        <div class="game-col-time">{{ g.time }}</div>
         {% endif %}
       </div>
     </a>
     {% endfor %}
   </div>
   {% else %}
-  <div style="text-align:center;padding:3rem;color:var(--gray-500);">
-    <p style="font-size:2rem">📅</p>
+  <div class="empty-state-center">
+    <p class="empty-state-icon">📅</p>
     <p>No games found.</p>
   </div>
   {% endif %}
 
   {% if total_pages > 1 %}
-  <div style="display:flex;justify-content:center;align-items:center;gap:.5rem;margin-top:2rem;flex-wrap:wrap;">
+  <div class="pagination">
     {% if page > 1 %}
-    <a href="?scored_only={{ '1' if scored_only else '0' }}&page={{ page - 1 }}"
-       style="padding:.4rem .9rem;border-radius:.375rem;text-decoration:none;background:var(--gray-100);color:var(--gray-700);">← Prev</a>
+    <a href="?scored_only={{ '1' if scored_only else '0' }}&page={{ page - 1 }}" class="page-link wide">← Prev</a>
     {% endif %}
     {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
     <a href="?scored_only={{ '1' if scored_only else '0' }}&page={{ p }}"
-       style="padding:.4rem .75rem;border-radius:.375rem;text-decoration:none;
-       {% if p == page %}background:var(--swiss-red,#e11d48);color:white{% else %}background:var(--gray-100);color:var(--gray-700){% endif %}">{{ p }}</a>
+       class="page-link{% if p == page %} active{% endif %}">{{ p }}</a>
     {% endfor %}
     {% if page < total_pages %}
-    <a href="?scored_only={{ '1' if scored_only else '0' }}&page={{ page + 1 }}"
-       style="padding:.4rem .9rem;border-radius:.375rem;text-decoration:none;background:var(--gray-100);color:var(--gray-700);">Next →</a>
+    <a href="?scored_only={{ '1' if scored_only else '0' }}&page={{ page + 1 }}" class="page-link wide">Next →</a>
     {% endif %}
-    <span style="font-size:.8rem;color:var(--gray-500);margin-left:.5rem;">{{ total }} total</span>
+    <span class="pagination-total">{{ total }} total</span>
   </div>
   {% endif %}
+
 </div>
 {% endblock %}
