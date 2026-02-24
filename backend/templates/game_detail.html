@@ -201,6 +201,7 @@
 
   /* H2H grid */
   .gd-h2h-grid { display:grid; grid-template-columns:1fr 1fr; gap:2rem; }
+  .gd-h2h-grid > div { min-width:0; }
   @media (max-width:640px) { .gd-h2h-grid { grid-template-columns:1fr; } }
   .gd-h2h-section-title { font-size:.85rem; font-weight:700; margin-bottom:.6rem; color:var(--gray-700); }
 
@@ -648,8 +649,8 @@ function eventsTable(goals, penalties) {
                 {% for fg in home_combined %}
                 <tr x-show="flt === 'all' || flt === '{{ fg.home_away }}'">
                   <td style="color:var(--gray-400);white-space:nowrap;padding-right:.35rem;">{{ fg.date }}</td>
-                  <td style="width:1.4rem;text-align:center;font-size:.68rem;color:var(--gray-400);">{{ fg.home_away }}</td>
-                  <td><a href="/{{ locale }}/team/{{ fg.opponent_id }}" style="text-decoration:none;color:inherit;">{{ fg.opponent }}</a></td>
+                  <td style="width:1.4rem;text-align:center;font-size:.68rem;color:var(--gray-400);white-space:nowrap;">{{ fg.home_away }}</td>
+                  <td style="white-space:nowrap;"><a href="/{{ locale }}/team/{{ fg.opponent_id }}" style="text-decoration:none;color:inherit;">{{ fg.opponent }}</a></td>
                   <td style="font-variant-numeric:tabular-nums;font-weight:600;text-align:right;padding-left:.75rem;white-space:nowrap;">
                     <span class="gd-form-badge gd-form-badge--{{ fg.result }}" style="width:1.2rem;height:1.2rem;font-size:.65rem;margin-right:.3rem;">{{ fg.result }}</span>{{ fg.score }}
                   </td>
@@ -688,8 +689,8 @@ function eventsTable(goals, penalties) {
                 {% for fg in away_combined %}
                 <tr x-show="flt === 'all' || flt === '{{ fg.home_away }}'">
                   <td style="color:var(--gray-400);white-space:nowrap;padding-right:.35rem;">{{ fg.date }}</td>
-                  <td style="width:1.4rem;text-align:center;font-size:.68rem;color:var(--gray-400);">{{ fg.home_away }}</td>
-                  <td><a href="/{{ locale }}/team/{{ fg.opponent_id }}" style="text-decoration:none;color:inherit;">{{ fg.opponent }}</a></td>
+                  <td style="width:1.4rem;text-align:center;font-size:.68rem;color:var(--gray-400);white-space:nowrap;">{{ fg.home_away }}</td>
+                  <td style="white-space:nowrap;"><a href="/{{ locale }}/team/{{ fg.opponent_id }}" style="text-decoration:none;color:inherit;">{{ fg.opponent }}</a></td>
                   <td style="font-variant-numeric:tabular-nums;font-weight:600;text-align:right;padding-left:.75rem;white-space:nowrap;">
                     <span class="gd-form-badge gd-form-badge--{{ fg.result }}" style="width:1.2rem;height:1.2rem;font-size:.65rem;margin-right:.3rem;">{{ fg.result }}</span>{{ fg.score }}
                   </td>
