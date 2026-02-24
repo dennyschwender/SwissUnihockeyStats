@@ -91,12 +91,11 @@
                   </template>
                 </td>
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gp"></td>
-                <td style="padding:.6rem .5rem;text-align:center;color:#16a34a;" x-text="row.w"></td>
-                <td style="padding:.6rem .5rem;text-align:center;color:#dc2626;" x-text="row.l"></td>
+                <td style="padding:.6rem .5rem;text-align:center;" x-text="row.w"></td>
+                <td style="padding:.6rem .5rem;text-align:center;" x-text="row.l"></td>
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gf"></td>
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="row.ga"></td>
                 <td style="padding:.6rem .5rem;text-align:center;"
-                  :style="row.gd > 0 ? 'color:#16a34a' : row.gd < 0 ? 'color:#dc2626' : ''"
                   x-text="(row.gd > 0 ? '+' : '') + row.gd"></td>
                 <td style="padding:.6rem .75rem;text-align:center;font-weight:700;font-size:1rem;" x-text="row.pts"></td>
               </tr>
