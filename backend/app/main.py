@@ -580,9 +580,8 @@ async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
 
 
 @app.get("/admin/api/system")
-async def admin_api_system(request: Request):
+async def admin_api_system(_: None = Depends(require_admin)):
     """Return system / container performance metrics for the admin System tab."""
-    _require_admin(request)
     import os as _os
     try:
         import psutil

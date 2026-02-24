@@ -1390,11 +1390,17 @@ let _prevNetTs  = null;
 
 async function loadSystemStats(force = false) {
   if (!force && !document.getElementById('tab-system').classList.contains('active')) return;
+  const errEl = document.getElementById('sys-error');
   try {
     const r   = await fetch('/admin/api/system');
+    if (!r.ok) {
+      errEl.style.display = '';
+      errEl.textContent = 'HTTP ' + r.status + ' — see server logs.';
+      document.getElementById('sys-refresh-ts').textContent = 'Error';
+      return;
+    }
     const d   = await r.json();
     const now = Date.now();
-    const errEl = document.getElementById('sys-error');
     if (!d.ok) {
       errEl.style.display = '';
       errEl.textContent = 'Error: ' + (d.error || 'unknown');
@@ -1457,6 +1463,9 @@ async function loadSystemStats(force = false) {
     document.getElementById('sys-refresh-ts').textContent =
       'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
   } catch(e) {
+    document.getElementById('sys-error').style.display = '';
+    document.getElementById('sys-error').textContent = 'Fetch error: ' + e.message;
+    document.getElementById('sys-refresh-ts').textContent = 'Error';
     console.error('System stats error:', e);
   }
 }
