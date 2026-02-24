@@ -220,6 +220,10 @@
     }
     .tab-btn:hover { color: #c9d1d9; }
     .tab-btn.active { color: #e6edf3; border-bottom-color: #58a6ff; font-weight: 600; }
+    .sys-gauge-track { background:#21262d; border-radius:4px; height:10px; overflow:hidden; margin:.2rem 0 .15rem; }
+    .sys-gauge-bar   { height:100%; border-radius:4px; transition:width .5s ease; background:#1f6feb; width:0% }
+    .sys-gauge-bar.warn { background:#d29922; }
+    .sys-gauge-bar.crit { background:#f85149; }
     .tab-content { max-width: 1400px; margin: 0 auto; padding: 1.25rem 1.5rem; }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
@@ -272,6 +276,7 @@
   <button class="tab-btn" id="tabBtn-scheduling" onclick="switchTab('scheduling')">⚡ Scheduling</button>
   <button class="tab-btn" id="tabBtn-settings" onclick="switchTab('settings')">⚙ Settings</button>
   <button class="tab-btn" id="tabBtn-db" onclick="switchTab('db')">🗄 Database</button>
+  <button class="tab-btn" id="tabBtn-system" onclick="switchTab('system')">🐳 System</button>
 </div>
 
 <div class="tab-content">
@@ -482,6 +487,79 @@
         </div>
       </div>
     </div>
+
+  </div>
+
+  <!-- ══ Tab: System ══ -->
+  <div class="tab-panel" id="tab-system">
+
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
+      <span id="sys-refresh-ts" style="font-size:.7rem;color:#6e7681">Loading…</span>
+      <button class="btn btn-sm" onclick="loadSystemStats(true)">↺ Refresh</button>
+    </div>
+
+    <!-- Gauge cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.75rem;margin-bottom:.75rem">
+
+      <div class="sync-panel" style="margin:0;padding:.75rem 1rem">
+        <div style="font-size:.68rem;color:#6e7681;text-transform:uppercase;letter-spacing:.04em">CPU Usage</div>
+        <div style="font-size:1.6rem;font-weight:700;color:#e6edf3;line-height:1.2;margin:.2rem 0 .3rem" id="sys-cpu-val">—</div>
+        <div class="sys-gauge-track"><div class="sys-gauge-bar" id="sys-cpu-bar"></div></div>
+        <div style="font-size:.68rem;color:#6e7681;margin-top:.3rem" id="sys-cpu-sub">— cores</div>
+      </div>
+
+      <div class="sync-panel" style="margin:0;padding:.75rem 1rem">
+        <div style="font-size:.68rem;color:#6e7681;text-transform:uppercase;letter-spacing:.04em">Memory</div>
+        <div style="font-size:1.6rem;font-weight:700;color:#e6edf3;line-height:1.2;margin:.2rem 0 .3rem" id="sys-mem-val">—</div>
+        <div class="sys-gauge-track"><div class="sys-gauge-bar" id="sys-mem-bar"></div></div>
+        <div style="font-size:.68rem;color:#6e7681;margin-top:.3rem" id="sys-mem-sub">— / —</div>
+      </div>
+
+      <div class="sync-panel" style="margin:0;padding:.75rem 1rem">
+        <div style="font-size:.68rem;color:#6e7681;text-transform:uppercase;letter-spacing:.04em">Disk</div>
+        <div style="font-size:1.6rem;font-weight:700;color:#e6edf3;line-height:1.2;margin:.2rem 0 .3rem" id="sys-disk-val">—</div>
+        <div class="sys-gauge-track"><div class="sys-gauge-bar" id="sys-disk-bar"></div></div>
+        <div style="font-size:.68rem;color:#6e7681;margin-top:.3rem" id="sys-disk-sub">— / —</div>
+      </div>
+
+    </div><!-- /gauge cards -->
+
+    <!-- Info cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.75rem">
+
+      <div class="sync-panel" style="margin:0;padding:.75rem 1rem">
+        <div style="font-size:.68rem;color:#6e7681;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">Network I/O</div>
+        <table style="font-size:.78rem;border-collapse:collapse;width:100%">
+          <tr><td style="color:#6e7681;padding:2px 0;width:52px">↑ Sent</td><td id="sys-net-sent">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">↓ Recv</td><td id="sys-net-recv">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">Pkts ↑</td><td id="sys-net-psent">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">Pkts ↓</td><td id="sys-net-precv">—</td></tr>
+        </table>
+      </div>
+
+      <div class="sync-panel" style="margin:0;padding:.75rem 1rem">
+        <div style="font-size:.68rem;color:#6e7681;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">App Process</div>
+        <table style="font-size:.78rem;border-collapse:collapse;width:100%">
+          <tr><td style="color:#6e7681;padding:2px 0;width:60px">PID</td><td id="sys-proc-pid">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">RSS Mem</td><td id="sys-proc-mem">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">CPU %</td><td id="sys-proc-cpu">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">Threads</td><td id="sys-proc-thr">—</td></tr>
+        </table>
+      </div>
+
+      <div class="sync-panel" style="margin:0;padding:.75rem 1rem">
+        <div style="font-size:.68rem;color:#6e7681;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">System / Container</div>
+        <table style="font-size:.78rem;border-collapse:collapse;width:100%">
+          <tr><td style="color:#6e7681;padding:2px 0;width:60px">Host</td><td id="sys-hostname" style="font-family:monospace;font-size:.7rem;word-break:break-all">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">Uptime</td><td id="sys-uptime">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">cg Limit</td><td id="sys-cg-limit">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">cg Used</td><td id="sys-cg-used">—</td></tr>
+        </table>
+      </div>
+
+    </div><!-- /info cards -->
+
+    <div id="sys-error" style="display:none;color:#f85149;font-size:.78rem;margin-top:.75rem"></div>
 
   </div>
 
@@ -1294,13 +1372,106 @@ function switchTab(name) {
   const btn   = document.getElementById('tabBtn-' + name);
   if (panel) panel.classList.add('active');
   if (btn)   btn.classList.add('active');
-  // Trigger DB info load when user first visits db tab
-  if (name === 'db') loadDbInfo();
+  // Trigger lazy loads on first visit
+  if (name === 'db')     loadDbInfo();
+  if (name === 'system') loadSystemStats(true);
 }
 
 function toggleEl(bodyId, chevId) {
   document.getElementById(bodyId).classList.toggle('open');
   document.getElementById(chevId).classList.toggle('open');
+}
+
+/* ═══════════════════════════════════════════════════════
+   System tab
+═══════════════════════════════════════════════════════ */
+let _prevNetIo = null;
+let _prevNetTs  = null;
+
+async function loadSystemStats(force = false) {
+  if (!force && !document.getElementById('tab-system').classList.contains('active')) return;
+  try {
+    const r   = await fetch('/admin/api/system');
+    const d   = await r.json();
+    const now = Date.now();
+    const errEl = document.getElementById('sys-error');
+    if (!d.ok) {
+      errEl.style.display = '';
+      errEl.textContent = 'Error: ' + (d.error || 'unknown');
+      return;
+    }
+    errEl.style.display = 'none';
+
+    // CPU
+    const cpuPct = d.cpu.percent ?? 0;
+    _sysGauge('sys-cpu-bar', 'sys-cpu-val', cpuPct, cpuPct.toFixed(1) + '%');
+    document.getElementById('sys-cpu-sub').textContent =
+      d.cpu.count + ' logical core' + (d.cpu.count !== 1 ? 's' : '') +
+      (d.cpu.freq_mhz ? ' · ' + Math.round(d.cpu.freq_mhz) + ' MHz' : '');
+
+    // Memory
+    const memPct = d.mem.percent ?? 0;
+    _sysGauge('sys-mem-bar', 'sys-mem-val', memPct, memPct.toFixed(1) + '%');
+    document.getElementById('sys-mem-sub').textContent =
+      fmtBytes(d.mem.used) + ' / ' + fmtBytes(d.mem.total);
+
+    // Disk
+    if (d.disk) {
+      _sysGauge('sys-disk-bar', 'sys-disk-val', d.disk.percent, d.disk.percent.toFixed(1) + '%');
+      document.getElementById('sys-disk-sub').textContent =
+        fmtBytes(d.disk.used) + ' / ' + fmtBytes(d.disk.total) + '  (' + d.disk.path + ')';
+    }
+
+    // Network rates (delta between consecutive polls)
+    if (_prevNetIo && _prevNetTs) {
+      const dt       = Math.max((now - _prevNetTs) / 1000, 0.1);
+      const sentRate = Math.max(0, (d.net_io.bytes_sent   - _prevNetIo.bytes_sent)   / dt);
+      const recvRate = Math.max(0, (d.net_io.bytes_recv   - _prevNetIo.bytes_recv)   / dt);
+      const pSent    = Math.max(0, (d.net_io.packets_sent - _prevNetIo.packets_sent) / dt);
+      const pRecv    = Math.max(0, (d.net_io.packets_recv - _prevNetIo.packets_recv) / dt);
+      document.getElementById('sys-net-sent').textContent  = fmtBytes(sentRate)  + '/s';
+      document.getElementById('sys-net-recv').textContent  = fmtBytes(recvRate)  + '/s';
+      document.getElementById('sys-net-psent').textContent = pSent.toFixed(1) + '/s';
+      document.getElementById('sys-net-precv').textContent = pRecv.toFixed(1) + '/s';
+    } else {
+      document.getElementById('sys-net-sent').textContent  = fmtBytes(d.net_io.bytes_sent)  + ' total';
+      document.getElementById('sys-net-recv').textContent  = fmtBytes(d.net_io.bytes_recv)  + ' total';
+      document.getElementById('sys-net-psent').textContent = '—';
+      document.getElementById('sys-net-precv').textContent = '—';
+    }
+    _prevNetIo = { ...d.net_io };
+    _prevNetTs = now;
+
+    // Process
+    document.getElementById('sys-proc-pid').textContent = d.process.pid;
+    document.getElementById('sys-proc-mem').textContent = fmtBytes(d.process.rss);
+    document.getElementById('sys-proc-cpu').textContent = (d.process.cpu_pct ?? 0).toFixed(1) + '%';
+    document.getElementById('sys-proc-thr').textContent = d.process.threads;
+
+    // System / container
+    document.getElementById('sys-hostname').textContent = d.hostname;
+    document.getElementById('sys-uptime').textContent   = _fmtUptime(d.uptime_s);
+    document.getElementById('sys-cg-limit').textContent = d.cgroup_mem_limit ? fmtBytes(d.cgroup_mem_limit) : '—';
+    document.getElementById('sys-cg-used').textContent  = d.cgroup_mem_used  ? fmtBytes(d.cgroup_mem_used)  : '—';
+
+    document.getElementById('sys-refresh-ts').textContent =
+      'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
+  } catch(e) {
+    console.error('System stats error:', e);
+  }
+}
+
+function _sysGauge(barId, valId, pct, label) {
+  const bar = document.getElementById(barId);
+  bar.style.width = Math.min(Math.max(pct, 0), 100) + '%';
+  bar.className   = 'sys-gauge-bar' + (pct >= 90 ? ' crit' : pct >= 70 ? ' warn' : '');
+  document.getElementById(valId).textContent = label;
+}
+
+function _fmtUptime(s) {
+  if (!s) return '—';
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  return (d ? d + 'd ' : '') + (h ? h + 'h ' : '') + m + 'm';
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1440,6 +1611,7 @@ setTimeout(loadDbInfo, 2000);
 setInterval(loadStats, 30000);
 setInterval(loadScheduler, 3000);
 setInterval(loadDbInfo, 30000);
+setInterval(loadSystemStats, 5000);
 </script>
 </body>
 </html>

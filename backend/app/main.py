@@ -579,6 +579,103 @@ async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
         return {"ok": False, "detail": str(e)}
 
 
+@app.get("/admin/api/system")
+async def admin_api_system(request: Request):
+    """Return system / container performance metrics for the admin System tab."""
+    _require_admin(request)
+    import os as _os
+    try:
+        import psutil
+    except ImportError:
+        return {"ok": False, "error": "psutil not installed — run: pip install psutil"}
+
+    try:
+        cpu_pct   = psutil.cpu_percent(interval=0.2)
+        cpu_count = psutil.cpu_count(logical=True)
+        _freq     = psutil.cpu_freq()
+        cpu_freq  = round(_freq.current, 1) if _freq else None
+
+        vm  = psutil.virtual_memory()
+        mem = {
+            "total":     vm.total,
+            "used":      vm.used,
+            "available": vm.available,
+            "percent":   vm.percent,
+        }
+
+        disk = None
+        for _path in ["/app/data", "/"]:
+            try:
+                du   = psutil.disk_usage(_path)
+                disk = {
+                    "path":    _path,
+                    "total":   du.total,
+                    "used":    du.used,
+                    "free":    du.free,
+                    "percent": du.percent,
+                }
+                break
+            except Exception:
+                pass
+
+        _net   = psutil.net_io_counters()
+        net_io = {
+            "bytes_sent":   _net.bytes_sent,
+            "bytes_recv":   _net.bytes_recv,
+            "packets_sent": _net.packets_sent,
+            "packets_recv": _net.packets_recv,
+        } if _net else {}
+
+        proc = psutil.Process(_os.getpid())
+        with proc.oneshot():
+            proc_rss     = proc.memory_info().rss
+            proc_cpu_pct = proc.cpu_percent(interval=None)
+            proc_threads = proc.num_threads()
+
+        uptime_s = int(time.time() - psutil.boot_time())
+
+        # cgroup v2 (and v1 fallback) memory limit — only meaningful inside a container
+        cgroup_mem_limit = None
+        cgroup_mem_used  = None
+        for _p in ("/sys/fs/cgroup/memory.max",
+                   "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
+            try:
+                val = Path(_p).read_text().strip()
+                if val not in ("max", "0", ""):
+                    cgroup_mem_limit = int(val)
+                break
+            except Exception:
+                pass
+        for _p in ("/sys/fs/cgroup/memory.current",
+                   "/sys/fs/cgroup/memory/memory.usage_in_bytes"):
+            try:
+                cgroup_mem_used = int(Path(_p).read_text().strip())
+                break
+            except Exception:
+                pass
+
+        return {
+            "ok":  True,
+            "cpu": {"percent": cpu_pct, "count": cpu_count, "freq_mhz": cpu_freq},
+            "mem": mem,
+            "disk": disk,
+            "net_io": net_io,
+            "process": {
+                "pid":     _os.getpid(),
+                "rss":     proc_rss,
+                "cpu_pct": proc_cpu_pct,
+                "threads": proc_threads,
+            },
+            "uptime_s":         uptime_s,
+            "hostname":         _os.environ.get("HOSTNAME", "unknown"),
+            "cgroup_mem_limit": cgroup_mem_limit,
+            "cgroup_mem_used":  cgroup_mem_used,
+        }
+    except Exception as exc:
+        logger.error("System stats error: %s", exc, exc_info=True)
+        return {"ok": False, "error": str(exc)}
+
+
 def _admin_stats_sync():
     """Synchronous DB work for admin stats (called via run_in_executor)."""
     from app.services.database import get_database_service
