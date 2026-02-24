@@ -1085,17 +1085,26 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                     pos_raw if pos_raw.lower() not in _UNKNOWN_POS
                     else (gp_info.get("position") or "")
                 )
+                # Prefer PlayerStatistics for G/A/PTS/PIM; fall back to per-game
+                # accumulation from GamePlayer (populated by player_game_stats task)
+                # so that the roster shows real numbers even when PlayerStatistics
+                # hasn't been indexed yet or has a team-name mismatch.
+                gp_val  = ps.get("gp") or gp_info.get("gp", 0)
+                g_val   = ps.get("g")  if ps.get("g")  else gp_info.get("g",   0)
+                a_val   = ps.get("a")  if ps.get("a")  else gp_info.get("a",   0)
+                pts_val = ps.get("pts") if ps.get("pts") else (g_val + a_val)
+                pim_val = ps.get("pim") if ps.get("pim") else gp_info.get("pim", 0)
                 roster.append(
                     {
                         "player_id": pl.person_id,
                         "name": pl.full_name or f"Player {pl.person_id}",
                         "number": number,
                         "position": position,
-                        "gp": ps.get("gp", 0),
-                        "g":  ps.get("g", 0),
-                        "a":  ps.get("a", 0),
-                        "pts": ps.get("pts", 0),
-                        "pim": ps.get("pim", 0),
+                        "gp":  gp_val,
+                        "g":   g_val,
+                        "a":   a_val,
+                        "pts": pts_val,
+                        "pim": pim_val,
                     }
                 )
 
@@ -1130,17 +1139,21 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             for pid in extras_pids:
                 info = gp_agg[pid]
                 ps = extras_stat_map.get(pid) or {}
+                g_val   = ps.get("g")   if ps.get("g")   else info["g"]
+                a_val   = ps.get("a")   if ps.get("a")   else info["a"]
+                pts_val = ps.get("pts") if ps.get("pts") else (g_val + a_val)
+                pim_val = ps.get("pim") if ps.get("pim") else info["pim"]
                 roster.append(
                     {
                         "player_id": pid,
                         "name": info["name"],
                         "number": info["number"],
                         "position": info["position"] or "",
-                        "gp": ps.get("gp") or info["gp"],
-                        "g":  ps.get("g", 0),
-                        "a":  ps.get("a", 0),
-                        "pts": ps.get("pts", 0),
-                        "pim": ps.get("pim", 0),
+                        "gp":  ps.get("gp") or info["gp"],
+                        "g":   g_val,
+                        "a":   a_val,
+                        "pts": pts_val,
+                        "pim": pim_val,
                         "from_games": True,
                     }
                 )
