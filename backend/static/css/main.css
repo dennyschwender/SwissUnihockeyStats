@@ -700,6 +700,11 @@ html.dark-mode .universal-search-results {
     display: none;
   }
 
+  /* Hide header theme toggle on mobile — it moves inside the burger menu */
+  #theme-toggle-btn {
+    display: none;
+  }
+
   /* Mobile language switcher becomes visible inside hamburger menu */
   .mobile-lang-switcher {
     display: flex;
