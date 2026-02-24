@@ -1182,3 +1182,229 @@ html.dark-mode .image-skeleton {
   }
 }
 
+
+/* ============================================
+   PAGE LAYOUT UTILITIES
+   ============================================ */
+
+/* Vertical padding for standard page content blocks */
+.page-content {
+  padding-top: 2rem;
+  padding-bottom: 3rem;
+}
+
+/* Flex row: title on left, controls on right */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* H1 page title (resets default margins, enforces size) */
+.page-title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+/* Inline group of buttons/links */
+.btn-group {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+/* ============================================
+   SORT / FILTER PILL BUTTONS
+   ============================================ */
+
+/* Rectangular pill for sort/filter toggle links */
+.sort-btn {
+  padding: .4rem .9rem;
+  border-radius: .375rem;
+  text-decoration: none;
+  font-size: .875rem;
+  background: var(--gray-100);
+  color: var(--gray-700);
+  border: none;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+
+.sort-btn:hover {
+  background: var(--gray-200);
+}
+
+.sort-btn.active {
+  background: var(--swiss-red);
+  color: #fff;
+}
+
+/* Slightly smaller variant (gender filter, etc.) */
+.sort-btn--sm {
+  padding: .35rem .8rem;
+  font-size: .85rem;
+}
+
+/* ============================================
+   FILTER ROW
+   ============================================ */
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.filter-form {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+/* ============================================
+   SEARCH INPUT
+   ============================================ */
+
+.search-wrap {
+  margin-bottom: 1.25rem;
+}
+
+.search-input {
+  width: 100%;
+  max-width: 400px;
+  padding: .6rem .9rem;
+  border: 1px solid var(--gray-300);
+  border-radius: .375rem;
+  font-size: .9rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: border-color .12s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--swiss-red);
+}
+
+html.dark-mode .search-input {
+  background: var(--bg-secondary);
+}
+
+/* ============================================
+   DATA TABLE  (scrollable stats tables)
+   ============================================ */
+
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .875rem;
+}
+
+.data-table thead tr {
+  background: var(--gray-50, #f9fafb);
+  border-bottom: 2px solid var(--gray-200);
+}
+
+.data-table th {
+  padding: .6rem .75rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+.data-table td {
+  padding: .6rem .75rem;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Narrow centered columns (rank, GP, G, A, PTS, PIM) */
+.data-table th.col-narrow,
+.data-table td.col-narrow {
+  padding: .6rem .5rem;
+  text-align: center;
+}
+
+/* Rank column has a fixed narrow width */
+.data-table th.col-rank {
+  width: 2.5rem;
+}
+
+/* Clickable row highlight */
+.data-table tbody tr.clickable {
+  cursor: pointer;
+}
+
+.data-table tbody tr.clickable:hover {
+  background: var(--gray-50);
+}
+
+/* ============================================
+   EMPTY STATE (inline / content areas)
+   ============================================ */
+
+.empty-state-center {
+  text-align: center;
+  padding: 3rem;
+  color: var(--gray-500);
+}
+
+.empty-state-icon {
+  font-size: 2rem;
+  margin-bottom: .5rem;
+}
+
+/* ============================================
+   PAGINATION
+   ============================================ */
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: .5rem;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+.page-link {
+  padding: .4rem .75rem;
+  border-radius: .375rem;
+  text-decoration: none;
+  background: var(--gray-100);
+  color: var(--gray-700);
+  transition: background .12s, color .12s;
+}
+
+.page-link:hover {
+  background: var(--gray-200);
+}
+
+/* Prev / Next have slightly wider padding */
+.page-link.wide {
+  padding: .4rem .9rem;
+}
+
+.page-link.active {
+  background: var(--swiss-red);
+  color: #fff;
+}
+
+.pagination-total {
+  font-size: .8rem;
+  color: var(--gray-500);
+  margin-left: .5rem;
+}

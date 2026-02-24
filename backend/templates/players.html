@@ -3,14 +3,14 @@
 {% block title %}{{ t.players.leaderboard }} – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top:2rem;padding-bottom:3rem;">
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
-    <h1 style="margin:0;font-size:2rem;font-weight:700;">🏂 {{ t.players.leaderboard }}</h1>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+<div class="container page-content">
+
+  <div class="page-header">
+    <h1 class="page-title">🏂 {{ t.players.leaderboard }}</h1>
+    <div class="btn-group">
       {% for o, label in [('points', t.players.order_points),('goals', t.players.order_goals),('assists', t.players.order_assists),('pim','PIM')] %}
       <a href="/{{ locale }}/players?order_by={{ o }}&season={{ active_season or '' }}&gender={{ gender }}"
-         style="padding:.4rem .9rem;border-radius:.375rem;text-decoration:none;font-size:.875rem;
-         {% if order_by == o %}background:var(--swiss-red,#e11d48);color:white;{% else %}background:var(--gray-100);color:var(--gray-700);{% endif %}">
+         class="sort-btn{% if order_by == o %} active{% endif %}">
         {{ label }}
       </a>
       {% endfor %}
@@ -18,26 +18,23 @@
   </div>
 
   <!-- Season + Gender filter row -->
-  <div style="display:flex;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
+  <div class="filter-row">
     {% if seasons and seasons|length > 1 %}
-    <form method="get" style="display:flex;align-items:center;gap:.5rem;">
+    <form method="get" class="filter-form">
       <input type="hidden" name="order_by" value="{{ order_by }}">
       <input type="hidden" name="gender" value="{{ gender }}">
-      <label style="font-size:.85rem;font-weight:600;color:var(--gray-500,#6b7280);">Season</label>
-      <select name="season" onchange="this.form.submit()"
-              style="padding:.35rem .75rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;
-                     font-size:.9rem;background:var(--card-bg,white);color:inherit;cursor:pointer;">
+      <label class="filter-label">Season</label>
+      <select name="season" onchange="this.form.submit()" class="filter-select">
         {% for s in seasons %}
         <option value="{{ s.id }}" {% if s.id == active_season %}selected{% endif %}>{{ s.name }}</option>
         {% endfor %}
       </select>
     </form>
     {% endif %}
-    <div style="display:flex;gap:.4rem;">
+    <div class="btn-group">
       {% for gkey, glabel in [('all','All'), ('men','Men'), ('women','Women')] %}
       <a href="/{{ locale }}/players?order_by={{ order_by }}&season={{ active_season or '' }}&gender={{ gkey }}"
-         style="padding:.35rem .8rem;border-radius:.375rem;text-decoration:none;font-size:.85rem;
-         {% if gender == gkey %}background:var(--swiss-red,#e11d48);color:white;{% else %}background:var(--gray-100);color:var(--gray-700);{% endif %}">
+         class="sort-btn sort-btn--sm{% if gender == gkey %} active{% endif %}">
         {{ glabel }}
       </a>
       {% endfor %}
@@ -45,80 +42,78 @@
   </div>
 
   <!-- Search bar -->
-  <div style="margin-bottom:1.25rem;">
+  <div class="search-wrap">
     <input type="text" placeholder="{{ t.players.search_placeholder }}"
       hx-get="/{{ locale }}/players/search"
       hx-trigger="keyup changed delay:400ms"
       hx-target="#search-results"
       hx-include="[name='q']"
       name="q"
-      style="width:100%;max-width:400px;padding:.6rem .9rem;border:1px solid var(--gray-300);border-radius:.375rem;font-size:.9rem;">
+      class="search-input">
   </div>
 
   <!-- Search results overlay -->
   <div id="search-results"></div>
 
   {% if players %}
-  <div style="overflow-x:auto;">
-    <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+  <div class="table-scroll">
+    <table class="data-table">
       <thead>
-        <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
-          <th style="padding:.6rem .5rem;text-align:center;width:2.5rem;">#</th>
-          <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.player }}</th>
-          <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.team }}</th>
-          <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.league }}</th>
-          <th style="padding:.6rem .5rem;text-align:center;">GP</th>
-          <th style="padding:.6rem .5rem;text-align:center;">G</th>
-          <th style="padding:.6rem .5rem;text-align:center;">A</th>
-          <th style="padding:.6rem .75rem;text-align:center;font-weight:700;">PTS</th>
-          <th style="padding:.6rem .5rem;text-align:center;">PIM</th>
+        <tr>
+          <th class="col-narrow col-rank">#</th>
+          <th>{{ t.table.player }}</th>
+          <th>{{ t.table.team }}</th>
+          <th>{{ t.table.league }}</th>
+          <th class="col-narrow">GP</th>
+          <th class="col-narrow">G</th>
+          <th class="col-narrow">A</th>
+          <th class="col-narrow" style="font-weight:700;">PTS</th>
+          <th class="col-narrow">PIM</th>
         </tr>
       </thead>
       <tbody>
         {% for row in players %}
-        <tr onclick="window.location='/{{ locale }}/player/{{ row.player_id }}'"
-          style="cursor:pointer;border-bottom:1px solid var(--gray-100);"
-          onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
-          <td style="padding:.6rem .5rem;text-align:center;font-weight:600;color:var(--gray-500);">
+        <tr class="clickable" onclick="window.location='/{{ locale }}/player/{{ row.player_id }}'">
+          <td class="col-narrow" style="font-weight:600;color:var(--gray-500);">
             {% if row.rank == 1 %}🥇{% elif row.rank == 2 %}🥈{% elif row.rank == 3 %}🥉{% else %}{{ row.rank }}{% endif %}
           </td>
-          <td style="padding:.6rem .75rem;font-weight:500;">{{ row.player_name }}</td>
-          <td style="padding:.6rem .75rem;color:var(--gray-600);">{{ row.team_name }}</td>
-          <td style="padding:.6rem .75rem;font-size:.8rem;color:var(--gray-500);white-space:nowrap;">{% if row.gender %}{{ row.gender }} · {% endif %}{{ row.league }}</td>
-          <td style="padding:.6rem .5rem;text-align:center;">{{ row.gp }}</td>
-          <td style="padding:.6rem .5rem;text-align:center;">{{ row.g }}</td>
-          <td style="padding:.6rem .5rem;text-align:center;">{{ row.a }}</td>
-          <td style="padding:.6rem .75rem;text-align:center;font-weight:700;font-size:1rem;">{{ row.pts }}</td>
-          <td style="padding:.6rem .5rem;text-align:center;">{{ row.pim }}</td>
+          <td style="font-weight:500;">{{ row.player_name }}</td>
+          <td style="color:var(--gray-600);">{{ row.team_name }}</td>
+          <td style="font-size:.8rem;color:var(--gray-500);white-space:nowrap;">{% if row.gender %}{{ row.gender }} · {% endif %}{{ row.league }}</td>
+          <td class="col-narrow">{{ row.gp }}</td>
+          <td class="col-narrow">{{ row.g }}</td>
+          <td class="col-narrow">{{ row.a }}</td>
+          <td class="col-narrow" style="font-weight:700;font-size:1rem;">{{ row.pts }}</td>
+          <td class="col-narrow">{{ row.pim }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
   {% else %}
-  <div style="text-align:center;padding:3rem;color:var(--gray-500);">
-    <p style="font-size:2rem">📊</p>
+  <div class="empty-state-center">
+    <p class="empty-state-icon">📊</p>
     <p>No player statistics available yet.</p>
   </div>
   {% endif %}
 
   {% if total_pages > 1 %}
-  <div style="display:flex;justify-content:center;align-items:center;gap:.5rem;margin-top:2rem;flex-wrap:wrap;">
+  <div class="pagination">
     {% if page > 1 %}
     <a href="?order_by={{ order_by }}&season={{ active_season or '' }}&gender={{ gender }}&page={{ page - 1 }}"
-       style="padding:.4rem .9rem;border-radius:.375rem;text-decoration:none;background:var(--gray-100);color:var(--gray-700);">← Prev</a>
+       class="page-link wide">← Prev</a>
     {% endif %}
     {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
     <a href="?order_by={{ order_by }}&season={{ active_season or '' }}&gender={{ gender }}&page={{ p }}"
-       style="padding:.4rem .75rem;border-radius:.375rem;text-decoration:none;
-       {% if p == page %}background:var(--swiss-red,#e11d48);color:white{% else %}background:var(--gray-100);color:var(--gray-700){% endif %}">{{ p }}</a>
+       class="page-link{% if p == page %} active{% endif %}">{{ p }}</a>
     {% endfor %}
     {% if page < total_pages %}
     <a href="?order_by={{ order_by }}&season={{ active_season or '' }}&gender={{ gender }}&page={{ page + 1 }}"
-       style="padding:.4rem .9rem;border-radius:.375rem;text-decoration:none;background:var(--gray-100);color:var(--gray-700);">Next →</a>
+       class="page-link wide">Next →</a>
     {% endif %}
-    <span style="font-size:.8rem;color:var(--gray-500);margin-left:.5rem;">{{ total }} total</span>
+    <span class="pagination-total">{{ total }} total</span>
   </div>
   {% endif %}
+
 </div>
 {% endblock %}
