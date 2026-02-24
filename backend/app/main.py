@@ -2696,12 +2696,18 @@ async def team_detail(request: Request, locale: str, team_id: int, season: Optio
 
 
 @app.get("/{locale}/schedule", response_class=HTMLResponse)
-async def schedule_page(request: Request, locale: str, league_category: str = "all", page: int = 1):
-    """Upcoming games schedule page with pagination and league filter"""
+async def schedule_page(
+    request: Request,
+    locale: str,
+    sex: str = "all",
+    age: str = "all",
+    field: str = "all",
+    page: int = 1,
+):
+    """Upcoming games schedule page with pagination and sex/age/field filters"""
     from app.services.stats_service import get_schedule
     from app.services.database import get_database_service
-    from app.models.db_models import PlayerStatistics as _PS, League as _League
-    from app.services.data_indexer import league_tier as _lt
+    from app.models.db_models import PlayerStatistics as _PS
     from sqlalchemy import func as _func
 
     per_page = 50
@@ -2718,39 +2724,13 @@ async def schedule_page(request: Request, locale: str, league_category: str = "a
     offset = (page - 1) * per_page
     data = get_schedule(
         season_id=active_season,
-        league_category=league_category if league_category != "all" else None,
+        sex=sex,
+        age=age,
+        field=field,
         limit=per_page,
         offset=offset,
     )
     total_pages = max(1, (data["total"] + per_page - 1) // per_page)
-
-    with db.session_scope() as session:
-        league_rows = (
-            session.query(_League.league_id, _League.game_class, _League.name)
-            .filter(_League.season_id == active_season)
-            .distinct()
-            .order_by(_League.league_id, _League.game_class)
-            .all()
-        )
-        leagues_grouped: dict = {}
-        for league_id, game_class, name in league_rows:
-            key = f"{league_id}_{game_class}"
-            if league_id not in leagues_grouped:
-                base_name = name.split()[-1] if name else f"League {league_id}"
-                leagues_grouped[league_id] = {
-                    "name": base_name,
-                    "classes": [],
-                    "tier": _lt(league_id),
-                }
-            leagues_grouped[league_id]["classes"].append({
-                "id": key,
-                "game_class": game_class,
-                "full_name": name,
-            })
-        league_filters = [
-            {"id": lid, "name": ldata["name"], "classes": ldata["classes"], "tier": ldata["tier"]}
-            for lid, ldata in sorted(leagues_grouped.items(), key=lambda x: (x[1]["tier"], x[0]))
-        ]
 
     return templates.TemplateResponse(
         request,
@@ -2762,8 +2742,9 @@ async def schedule_page(request: Request, locale: str, league_category: str = "a
             "page": page,
             "total_pages": total_pages,
             "total": data["total"],
-            "league_category": league_category,
-            "league_filters": league_filters,
+            "sex": sex,
+            "age": age,
+            "field": field,
         },
     )
 

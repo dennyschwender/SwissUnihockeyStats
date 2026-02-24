@@ -10,22 +10,37 @@
     <span style="font-size:.875rem;color:var(--gray-500);">{{ total }} upcoming</span>
   </div>
 
-  <!-- League category filter pills -->
-  {% if league_filters %}
-  <div class="btn-group" style="margin-bottom:1.5rem;">
-    <a href="/{{ locale }}/schedule"
-       class="sort-btn sort-btn--sm{% if league_category == 'all' %} active{% endif %}">All</a>
-    {% for lf in league_filters %}
-      {% for gc_item in lf.classes %}
-      <a href="/{{ locale }}/schedule?league_category={{ gc_item.id }}"
-         title="{{ gc_item.full_name }}"
-         class="sort-btn sort-btn--sm{% if league_category == gc_item.id %} active{% endif %}">
-        {{ lf.name }}{% if lf.classes|length > 1 %}&thinsp;{{ 'M' if gc_item.game_class == 11 else ('W' if gc_item.game_class == 21 else '') }}{% endif %}
-      </a>
-      {% endfor %}
-    {% endfor %}
+  <!-- League filters (same style as Leagues page) -->
+  <div class="filter-bar" style="margin-bottom:1.5rem;">
+    <!-- Sex / Gender -->
+    <div class="filter-bar-row">
+      <span class="filter-bar-label">{{ t.leagues.filter_sex }}</span>
+      <a href="?sex=all&age={{ age }}&field={{ field }}" class="filter-chip{% if sex == 'all' %} active{% endif %}">{{ t.leagues.filter_all }}</a>
+      <a href="?sex=men&age={{ age }}&field={{ field }}" class="filter-chip{% if sex == 'men' %} active{% endif %}">{{ t.leagues.filter_men }}</a>
+      <a href="?sex=women&age={{ age }}&field={{ field }}" class="filter-chip{% if sex == 'women' %} active{% endif %}">{{ t.leagues.filter_women }}</a>
+      <a href="?sex=mixed&age={{ age }}&field={{ field }}" class="filter-chip{% if sex == 'mixed' %} active{% endif %}">{{ t.leagues.filter_mixed }}</a>
+    </div>
+    <!-- Age / Category -->
+    <div class="filter-bar-row">
+      <span class="filter-bar-label">{{ t.leagues.filter_age }}</span>
+      <a href="?sex={{ sex }}&age=all&field={{ field }}" class="filter-chip{% if age == 'all' %} active{% endif %}">{{ t.leagues.filter_all }}</a>
+      <a href="?sex={{ sex }}&age=senior&field={{ field }}" class="filter-chip{% if age == 'senior' %} active{% endif %}">{{ t.leagues.filter_senior }}</a>
+      <a href="?sex={{ sex }}&age=U21&field={{ field }}" class="filter-chip{% if age == 'U21' %} active{% endif %}">U21</a>
+      <a href="?sex={{ sex }}&age=U18&field={{ field }}" class="filter-chip{% if age == 'U18' %} active{% endif %}">U18</a>
+      <a href="?sex={{ sex }}&age=U16&field={{ field }}" class="filter-chip{% if age == 'U16' %} active{% endif %}">U16</a>
+      <a href="?sex={{ sex }}&age=U14&field={{ field }}" class="filter-chip{% if age == 'U14' %} active{% endif %}">U14</a>
+      <a href="?sex={{ sex }}&age=U12&field={{ field }}" class="filter-chip{% if age == 'U12' %} active{% endif %}">U12</a>
+      <a href="?sex={{ sex }}&age=U10&field={{ field }}" class="filter-chip{% if age == 'U10' %} active{% endif %}">U10</a>
+      <a href="?sex={{ sex }}&age=senioren&field={{ field }}" class="filter-chip{% if age == 'senioren' %} active{% endif %}">{{ t.leagues.filter_senioren }}</a>
+    </div>
+    <!-- Field type -->
+    <div class="filter-bar-row">
+      <span class="filter-bar-label">{{ t.leagues.filter_field }}</span>
+      <a href="?sex={{ sex }}&age={{ age }}&field=all" class="filter-chip{% if field == 'all' %} active{% endif %}">{{ t.leagues.filter_all }}</a>
+      <a href="?sex={{ sex }}&age={{ age }}&field=big" class="filter-chip{% if field == 'big' %} active{% endif %}">{{ t.leagues.big_field }}</a>
+      <a href="?sex={{ sex }}&age={{ age }}&field=small" class="filter-chip{% if field == 'small' %} active{% endif %}">{{ t.leagues.small_field }}</a>
+    </div>
   </div>
-  {% endif %}
 
   {% if games %}
   <div class="game-list game-list--compact">
@@ -51,21 +66,22 @@
   {% else %}
   <div class="empty-state-center">
     <p class="empty-state-icon">📅</p>
-    <p>No upcoming games found{% if league_category != 'all' %} for this league{% endif %}.</p>
+    <p>No upcoming games found{% if sex != 'all' or age != 'all' or field != 'all' %} for this filter{% endif %}.</p>
   </div>
   {% endif %}
 
   {% if total_pages > 1 %}
+  {% set fp = 'sex=' ~ sex ~ '&age=' ~ age ~ '&field=' ~ field %}
   <div class="pagination">
     {% if page > 1 %}
-    <a href="?league_category={{ league_category }}&page={{ page - 1 }}" class="page-link wide">← Prev</a>
+    <a href="?{{ fp }}&page={{ page - 1 }}" class="page-link wide">← Prev</a>
     {% endif %}
     {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
-    <a href="?league_category={{ league_category }}&page={{ p }}"
+    <a href="?{{ fp }}&page={{ p }}"
        class="page-link{% if p == page %} active{% endif %}">{{ p }}</a>
     {% endfor %}
     {% if page < total_pages %}
-    <a href="?league_category={{ league_category }}&page={{ page + 1 }}" class="page-link wide">Next →</a>
+    <a href="?{{ fp }}&page={{ page + 1 }}" class="page-link wide">Next →</a>
     {% endif %}
     <span class="pagination-total">{{ total }} total</span>
   </div>

@@ -1685,12 +1685,42 @@ def get_upcoming_games(
 
 def get_schedule(
     season_id: Optional[int] = None,
-    league_category: Optional[str] = None,
+    sex: str = "all",
+    age: str = "all",
+    field: str = "all",
     limit: int = 50,
     offset: int = 0,
 ) -> dict:
     """Paginated upcoming games (no score yet) ordered by date, for the schedule page."""
     from datetime import date as _date
+
+    # Map filter dimensions → sets of valid game_class values
+    _SEX_GC: dict[str, set[int]] = {
+        "women": {21, 22, 26, 28, 41, 42, 43, 44},
+        "mixed":  {49},
+        "men":   {11, 12, 14, 16, 18, 19, 31, 32, 33, 34, 35, 51},
+    }
+    _AGE_GC: dict[str, set[int]] = {
+        "senior":   {11, 12, 21, 22},
+        "U21":      {19, 26},
+        "U18":      {18, 31, 41},
+        "U16":      {16, 28, 32, 42},
+        "U14":      {14, 33, 43, 49},
+        "U12":      {34, 36, 44},
+        "U10":      {35},
+        "senioren": {51},
+    }
+    _FIELD_GC: dict[str, set[int]] = {
+        "big":   {11, 21, 14, 16, 18, 19, 26, 28, 49},
+        "small": {12, 22, 31, 32, 33, 34, 35, 36, 41, 42, 43, 44, 51},
+    }
+
+    active_gc: Optional[set] = None
+    for val, mapping in [(sex, _SEX_GC), (age, _AGE_GC), (field, _FIELD_GC)]:
+        if val and val != "all" and val in mapping:
+            s = mapping[val]
+            active_gc = s if active_gc is None else active_gc & s
+
     db = get_database_service()
     with db.session_scope() as session:
         if season_id is None:
@@ -1707,19 +1737,13 @@ def get_schedule(
             )
         )
 
-        if league_category and league_category != "all":
-            parts = league_category.split("_")
-            if len(parts) == 2:
-                try:
-                    lid, gc = int(parts[0]), int(parts[1])
-                    base_q = (
-                        base_q
-                        .join(LeagueGroup, Game.group_id == LeagueGroup.id)
-                        .join(League, LeagueGroup.league_id == League.id)
-                        .filter(League.league_id == lid, League.game_class == gc)
-                    )
-                except ValueError:
-                    pass
+        if active_gc is not None:
+            base_q = (
+                base_q
+                .join(LeagueGroup, Game.group_id == LeagueGroup.id)
+                .join(League, LeagueGroup.league_id == League.id)
+                .filter(League.game_class.in_(list(active_gc)))
+            )
 
         total = base_q.count()
         games_raw = (
