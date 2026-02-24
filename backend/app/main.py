@@ -504,6 +504,17 @@ async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
     - game_events:   duplicates on (game_id, event_type, period, time, player_id)
     - sync_status:   completed/failed entries older than 7 days (just clutter)
     """
+    # Refuse to run while any indexing/purge job is active — a mid-flight
+    # insert could race with our DELETE and leave orphaned FK references.
+    running = [j for j in _admin_jobs.values() if j.get("status") == "running"]
+    if running:
+        labels = ", ".join(j.get("label", j["job_id"]) for j in running)
+        return {
+            "ok": False,
+            "conflict": True,
+            "detail": f"Cannot cleanup while jobs are running: {labels}",
+        }
+
     from app.services.database import get_database_service
     from sqlalchemy import text as _text
     import time

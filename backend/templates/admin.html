@@ -1326,6 +1326,8 @@ async function runCleanup() {
         `${d.sync_status} stale sync_status rows ` +
         `(total: ${d.total})`);
       await loadStats();
+    } else if (d.conflict) {
+      log('warn', '⚠ ' + d.detail + ' — wait for jobs to finish first.');
     } else {
       log('error', 'Cleanup failed: ' + (d.detail || JSON.stringify(d)));
     }
