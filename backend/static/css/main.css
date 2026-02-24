@@ -614,10 +614,10 @@ html.dark-mode .universal-search-results {
 .hamburger-btn.active span:nth-child(2) { opacity: 0; }
 .hamburger-btn.active span:nth-child(3) { transform: translateY(-9px) rotate(-45deg); }
 
-/* Home page responsive 2-column games grid */
+/* Home page responsive 2-column games grid — collapses when < ~860px */
 .home-games-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
   gap: 1.5rem;
   margin-top: 2rem;
 }
@@ -720,11 +720,6 @@ html.dark-mode .universal-search-results {
     background: var(--swiss-red);
     color: var(--swiss-white);
     border-color: var(--swiss-red);
-  }
-
-  /* 2-col games grid collapses on mobile */
-  .home-games-grid {
-    grid-template-columns: 1fr;
   }
 
   /* Reduce card padding when in single-column layout */
