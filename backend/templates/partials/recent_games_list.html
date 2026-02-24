@@ -9,6 +9,7 @@
       <td style="font-weight:500;white-space:nowrap;vertical-align:middle;">{{ g.away_team }}</td>
       {% if g.league_label %}
       <td style="text-align:right;color:var(--gray-400);font-size:.73rem;font-weight:600;white-space:nowrap;vertical-align:middle;">{{ g.league_label }}{% if g.group_name %}<br><span style="font-weight:400;">{{ g.group_name }}</span>{% endif %}</td>
+      {% endif %}
     </tr>
     {% endfor %}
   </tbody>
