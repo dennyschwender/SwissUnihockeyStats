@@ -104,6 +104,11 @@
     <!-- Group selector (only shown when league has multiple groups) -->
     <template x-if="_leagueGroups.length > 1">
       <div class="filter-bar-row" style="margin-bottom:1.25rem;">
+        <button
+          @click="Alpine.store('leagueFilter').group = 'all'"
+          :class="['filter-chip', Alpine.store('leagueFilter').group === 'all' && 'active']">
+          All
+        </button>
         <template x-for="grp in _leagueGroups" :key="grp.name">
           <button
             @click="Alpine.store('leagueFilter').group = grp.name"
@@ -286,13 +291,22 @@
             get isFiltered() {
               return this.nameFilter.trim() !== '' || this.teamFilter.length > 0;
             },
+            get activeGroupTeams() {
+              const ag = Alpine.store('leagueFilter').group;
+              if (ag === 'all') return null;
+              return new Set((_standingsByGrp[ag] || []).map(r => r.team_name));
+            },
             get teams() {
-              return [...new Set(this.allRows.map(x => x.team_name))].sort();
+              const grpTeams = this.activeGroupTeams;
+              const src = grpTeams ? this.allRows.filter(x => grpTeams.has(x.team_name)) : this.allRows;
+              return [...new Set(src.map(x => x.team_name))].sort();
             },
             filteredRows() {
+              const grpTeams = this.activeGroupTeams;
               let q = this.nameFilter.trim().toLowerCase();
               let tf = this.teamFilter;
               let r = this.allRows.filter(x => {
+                if (grpTeams && !grpTeams.has(x.team_name)) return false;
                 if (q && !x.player_name.toLowerCase().includes(q)) return false;
                 if (tf.length && !tf.includes(x.team_name)) return false;
                 return true;
@@ -415,9 +429,18 @@
             sortCol: 'pim',
             sortDir: -1,
             visibleCount: 25,
+            get activeGroupTeams() {
+              const ag = Alpine.store('leagueFilter').group;
+              if (ag === 'all') return null;
+              return new Set((_standingsByGrp[ag] || []).map(r => r.team_name));
+            },
             filteredRows() {
+              const grpTeams = this.activeGroupTeams;
               let q = this.nameFilter.trim().toLowerCase();
-              let r = this.allRows.filter(x => !q || x.player_name.toLowerCase().includes(q));
+              let r = this.allRows.filter(x => {
+                if (grpTeams && !grpTeams.has(x.team_name)) return false;
+                return !q || x.player_name.toLowerCase().includes(q);
+              });
               let col = this.sortCol, dir = this.sortDir;
               r.sort((a, b) => dir * (typeof a[col] === 'string' ? a[col].localeCompare(b[col]) : a[col] - b[col]));
               return r;
