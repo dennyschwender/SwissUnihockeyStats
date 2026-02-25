@@ -385,12 +385,15 @@
         <div class="quick-row" style="gap:.5rem;align-items:center;flex-wrap:wrap">
           <label style="font-size:.75rem;color:#8b949e;white-space:nowrap">Min season:</label>
           <input id="sched-min-season" type="number" min="1996" max="2100" placeholder="all"
+            oninput="schedMarkDirty()"
             style="width:72px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
           <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Exclude seasons:</label>
           <input id="sched-excluded" type="text" placeholder="e.g. 1996,1997,2001"
+            oninput="schedMarkDirty()"
             style="width:160px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
           <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Max concurrent:</label>
           <input id="sched-max-concurrent" type="number" min="1" max="10" placeholder="2"
+            oninput="schedMarkDirty()"
             style="width:52px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
           <button class="btn btn-sm" onclick="schedSaveFilter()" style="white-space:nowrap">💾 Save</button>
           <button class="btn btn-sm" onclick="schedClearFilter()" style="white-space:nowrap;color:#f85149">✕ Clear</button>
@@ -612,6 +615,7 @@ let _activitySyncRows = [];   // last sync_status snapshot (DB-backed)
 let _activityHistRows = [];   // last scheduler history snapshot (in-memory)
 let _freshnessMap     = {};   // "entity_type:season" → diag row (from scheduler-diag)
 let _seasonFilter     = { min_season: null, excluded_seasons: [] };
+let _settingsDirty    = false;   // true when user has unsaved edits in the Settings panel
 
 /* task name → entity_type (matches scheduler POLICIES) */
 const TASK_TO_ENTITY = {
@@ -1248,41 +1252,38 @@ function renderScheduler(d) {
     statusTxt.textContent = 'scheduler paused';
   }
 
-  // Season filter inputs (only update if not focused to avoid clobbering user input)
-  const sf = d.season_filter || {};
-  const minEl = document.getElementById('sched-min-season');
-  const excEl = document.getElementById('sched-excluded');
-  const maxEl = document.getElementById('sched-max-concurrent');
-  if (minEl && document.activeElement !== minEl)
-    minEl.value = sf.min_season != null ? sf.min_season : '';
-  if (excEl && document.activeElement !== excEl)
-    excEl.value = (sf.excluded_seasons || []).join(', ');
-  if (maxEl && document.activeElement !== maxEl)
-    maxEl.value = sf.max_concurrent ?? 2;
+  // Season filter inputs + policy tier table — skip if user has unsaved edits
+  if (!_settingsDirty) {
+    const sf = d.season_filter || {};
+    const minEl = document.getElementById('sched-min-season');
+    const excEl = document.getElementById('sched-excluded');
+    const maxEl = document.getElementById('sched-max-concurrent');
+    if (minEl) minEl.value = sf.min_season != null ? sf.min_season : '';
+    if (excEl) excEl.value = (sf.excluded_seasons || []).join(', ');
+    if (maxEl) maxEl.value = sf.max_concurrent ?? 2;
 
-  // Policy tier selects
-  const TIER_LABELS = {
-    1: 'T1 \u2014 NLA/L-UPL only',
-    2: 'T2 \u2014 + NLB, U21A/U18A/U16A',
-    3: 'T3 \u2014 + 1. Liga, U21B/U18B/U16B',
-    4: 'T4 \u2014 + 2. Liga, U21C/U18C/U16C',
-    5: 'T5 \u2014 + 3. Liga, U21D',
-    6: 'T6 \u2014 All (+ 4./5. Liga, Regional, Cups)',
-  };
-  const tiersBodyEl = document.getElementById('sched-tiers-tbody');
-  const tiersPanel  = document.getElementById('sched-tiers');
-  // Don't overwrite the tier table while the panel is open — user may be editing
-  if (tiersBodyEl && d.policy_tiers && !(tiersPanel && tiersPanel.classList.contains('open'))) {
-    tiersBodyEl.innerHTML = Object.entries(d.policy_tiers).map(([name, tier]) => {
-      const opts = Object.entries(TIER_LABELS).map(([v, lbl]) =>
-        `<option value="${v}"${+v === tier ? ' selected' : ''}>${lbl}</option>`
-      ).join('');
-      return `<tr>
-        <td style="padding:2px 8px;color:#e6edf3">${name}</td>
-        <td style="padding:2px 8px"><select id="tier-${name}"
-          style="background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 4px;font-size:.75rem">${opts}</select></td>
-      </tr>`;
-    }).join('');
+    // Policy tier selects
+    const TIER_LABELS = {
+      1: 'T1 \u2014 NLA/L-UPL only',
+      2: 'T2 \u2014 + NLB, U21A/U18A/U16A',
+      3: 'T3 \u2014 + 1. Liga, U21B/U18B/U16B',
+      4: 'T4 \u2014 + 2. Liga, U21C/U18C/U16C',
+      5: 'T5 \u2014 + 3. Liga, U21D',
+      6: 'T6 \u2014 All (+ 4./5. Liga, Regional, Cups)',
+    };
+    const tiersBodyEl = document.getElementById('sched-tiers-tbody');
+    if (tiersBodyEl && d.policy_tiers) {
+      tiersBodyEl.innerHTML = Object.entries(d.policy_tiers).map(([name, tier]) => {
+        const opts = Object.entries(TIER_LABELS).map(([v, lbl]) =>
+          `<option value="${v}"${+v === tier ? ' selected' : ''}>${lbl}</option>`
+        ).join('');
+        return `<tr>
+          <td style="padding:2px 8px;color:#e6edf3">${name}</td>
+          <td style="padding:2px 8px"><select id="tier-${name}" onchange="schedMarkDirty()"
+            style="background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 4px;font-size:.75rem">${opts}</select></td>
+        </tr>`;
+      }).join('');
+    }
   }
 
   // Queue
@@ -1316,6 +1317,8 @@ async function schedSetEnabled(v) {
   if (r.ok) await loadScheduler();
 }
 
+function schedMarkDirty() { _settingsDirty = true; }
+
 async function schedSaveFilter() {
   const rawMin = document.getElementById('sched-min-season').value.trim();
   const rawExc = document.getElementById('sched-excluded').value.trim();
@@ -1337,6 +1340,7 @@ async function schedSaveFilter() {
     body: JSON.stringify({action: 'max_concurrent', value: max_concurrent}),
   });
   if (r1.ok && r2.ok) {
+    _settingsDirty = false;
     log('info', `✓ Scheduler settings saved — min: ${min_season ?? 'none'}, excluded: ${excluded_seasons.join(', ') || 'none'}, max concurrent: ${max_concurrent}`);
     await loadScheduler();
   } else {
@@ -1353,6 +1357,7 @@ async function schedClearFilter() {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({action: 'max_concurrent', value: 2}),
   });
+  _settingsDirty = false;
   log('info', '✓ Scheduler settings cleared (max concurrent reset to 2)');
   await loadScheduler();
 }
@@ -1370,6 +1375,7 @@ async function schedSaveTiers() {
     body: JSON.stringify({action: 'policy_tiers', tiers}),
   });
   if (r.ok) {
+    _settingsDirty = false;
     log('info', '✓ Policy tier limits saved');
     await loadScheduler();
   } else {
