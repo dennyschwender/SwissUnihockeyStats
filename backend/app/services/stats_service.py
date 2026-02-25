@@ -600,8 +600,14 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
             session.query(Game.id).filter(Game.group_id.in_(group_ids)).all()
         ]
 
-        # Derive league_abbrev from the DB name by stripping the gender prefix.
-        league_abbrev = _re.sub(r'^(Herren|Damen)\s+', '', str(league.name or "")).strip()
+        # Derive league_abbrev from the DB name by stripping the gender/age prefix
+        # so it matches what the API returns (e.g. "Junioren U21 B" → "U21 B").
+        # Order matters: "Junioren/-innen" must be tried before "Junioren".
+        league_abbrev = _re.sub(
+            r'^(Junioren/-innen|Junioren|Juniorinnen|Herren|Damen|Senioren)\s+',
+            '',
+            str(league.name or ""),
+        ).strip()
 
         # ── Primary path: GamePlayer ──────────────────────────────────────────
         player_ids = []
