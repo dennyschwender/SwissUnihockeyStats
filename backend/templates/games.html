@@ -1,57 +1,116 @@
 {% extends "base.html" %}
 
-{% block title %}Games – {{ t.common.app_name }}{% endblock %}
+{% block title %}{% if mode == 'schedule' %}{{ t.nav.schedule }}{% else %}Games{% endif %} – {{ t.common.app_name }}{% endblock %}
 
 {% block content %}
 <div class="container page-content">
 
   <div class="page-header">
     <h1 class="page-title">📅 Games</h1>
-    <div class="btn-group">
-      <a href="/{{ locale }}/games?scored_only=1"
-         class="sort-btn{% if scored_only %} active{% endif %}">Results</a>
-      <a href="/{{ locale }}/games?scored_only=0"
-         class="sort-btn{% if not scored_only %} active{% endif %}">All Games</a>
+    <span style="font-size:.875rem;color:var(--gray-500);">{{ total }} games</span>
+  </div>
+
+  <!-- Mode toggle: Results / Schedule -->
+  {% set fp = 'sex=' ~ sex ~ '&age=' ~ age ~ '&field=' ~ field ~ ('&level=' ~ level if level != 'all' else '') %}
+  <div class="btn-group" style="margin-bottom:1.25rem;">
+    <a href="?mode=results&{{ fp }}" class="sort-btn{% if mode == 'results' %} active{% endif %}">Results</a>
+    <a href="?mode=schedule&{{ fp }}" class="sort-btn{% if mode == 'schedule' %} active{% endif %}">Schedule</a>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar" style="margin-bottom:1.5rem;">
+    <!-- Sex / Gender -->
+    <div class="filter-bar-row">
+      <span class="filter-bar-label">{{ t.leagues.filter_sex }}</span>
+      <a href="?mode={{ mode }}&sex=all&age={{ age }}&field={{ field }}{% if level != 'all' %}&level={{ level }}{% endif %}" class="filter-chip{% if sex == 'all' %} active{% endif %}">{{ t.leagues.filter_all }}</a>
+      <a href="?mode={{ mode }}&sex=men&age={{ age }}&field={{ field }}{% if level != 'all' %}&level={{ level }}{% endif %}" class="filter-chip{% if sex == 'men' %} active{% endif %}">{{ t.leagues.filter_men }}</a>
+      <a href="?mode={{ mode }}&sex=women&age={{ age }}&field={{ field }}{% if level != 'all' %}&level={{ level }}{% endif %}" class="filter-chip{% if sex == 'women' %} active{% endif %}">{{ t.leagues.filter_women }}</a>
+      <a href="?mode={{ mode }}&sex=mixed&age={{ age }}&field={{ field }}{% if level != 'all' %}&level={{ level }}{% endif %}" class="filter-chip{% if sex == 'mixed' %} active{% endif %}">{{ t.leagues.filter_mixed }}</a>
     </div>
+    <!-- Age / Category -->
+    <div class="filter-bar-row">
+      <span class="filter-bar-label">{{ t.leagues.filter_age }}</span>
+      {% for a_val, a_label in [('all', t.leagues.filter_all), ('senior', t.leagues.filter_senior), ('U21','U21'), ('U18','U18'), ('U16','U16'), ('U14','U14'), ('U12','U12'), ('U10','U10'), ('senioren', t.leagues.filter_senioren)] %}
+      <a href="?mode={{ mode }}&sex={{ sex }}&age={{ a_val }}&field={{ field }}" class="filter-chip{% if age == a_val %} active{% endif %}">{{ a_label }}</a>
+      {% endfor %}
+    </div>
+    <!-- Field type -->
+    <div class="filter-bar-row">
+      <span class="filter-bar-label">{{ t.leagues.filter_field }}</span>
+      <a href="?mode={{ mode }}&sex={{ sex }}&age={{ age }}&field=all{% if level != 'all' %}&level={{ level }}{% endif %}" class="filter-chip{% if field == 'all' %} active{% endif %}">{{ t.leagues.filter_all }}</a>
+      <a href="?mode={{ mode }}&sex={{ sex }}&age={{ age }}&field=big{% if level != 'all' %}&level={{ level }}{% endif %}" class="filter-chip{% if field == 'big' %} active{% endif %}">{{ t.leagues.big_field }}</a>
+      <a href="?mode={{ mode }}&sex={{ sex }}&age={{ age }}&field=small{% if level != 'all' %}&level={{ level }}{% endif %}" class="filter-chip{% if field == 'small' %} active{% endif %}">{{ t.leagues.small_field }}</a>
+    </div>
+    <!-- Level (only when a U* age is selected) -->
+    {% if age in ('U21','U18','U16','U14','U12','U10') %}
+    <div class="filter-bar-row">
+      <span class="filter-bar-label">Level</span>
+      <a href="?mode={{ mode }}&sex={{ sex }}&age={{ age }}&field={{ field }}&level=all" class="filter-chip{% if level == 'all' %} active{% endif %}">{{ t.leagues.filter_all }}</a>
+      {% for lvl in ('A','B','C','D','E') %}
+      <a href="?mode={{ mode }}&sex={{ sex }}&age={{ age }}&field={{ field }}&level={{ lvl }}" class="filter-chip{% if level == lvl %} active{% endif %}">{{ lvl }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
   </div>
 
   {% if games %}
+  {% if mode == 'schedule' %}
+  <!-- Schedule view: compact, grouped by date -->
+  <div class="game-list game-list--compact">
+    {% set ns = namespace(prev_date="") %}
+    {% for g in games %}
+    {% if g.date != ns.prev_date %}
+    {% set ns.prev_date = g.date %}
+    <div class="schedule-date-heading">{{ g.weekday }}, {{ g.date }}</div>
+    {% endif %}
+    <div class="game-row game-row--compact">
+      <div class="game-col-time-only">{{ g.time or "–" }}</div>
+      <div class="game-col-team game-col-team--right">
+        <a href="/{{ locale }}/team/{{ g.home_team_id }}" class="link-inherit">{{ g.home_team }}</a>
+      </div>
+      <div class="game-col-vs">vs</div>
+      <div class="game-col-team">
+        <a href="/{{ locale }}/team/{{ g.away_team_id }}" class="link-inherit">{{ g.away_team }}</a>
+      </div>
+      <div class="game-col-league">{{ g.league_label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <!-- Results view: scores, link to game detail -->
   <div class="game-list">
     {% for g in games %}
     <a href="/{{ locale }}/game/{{ g.game_id }}" class="game-row-link">
       <div class="game-row">
         <div class="game-col-date">{{ g.date }}</div>
         <div class="game-col-team game-col-team--right">{{ g.home_team }}</div>
-        <div class="game-col-score">
-          {% if g.has_score %}{{ g.home_score }} : {{ g.away_score }}
-          {% else %}<span class="game-score-vs">vs</span>{% endif %}
-        </div>
+        <div class="game-col-score">{{ g.home_score }} : {{ g.away_score }}</div>
         <div class="game-col-team">{{ g.away_team }}</div>
-        {% if g.time %}
-        <div class="game-col-time">{{ g.time }}</div>
-        {% endif %}
+        {% if g.time %}<div class="game-col-time">{{ g.time }}</div>{% endif %}
+        <div class="game-col-league" style="font-size:.75rem;color:var(--gray-500);">{{ g.league_label }}</div>
       </div>
     </a>
     {% endfor %}
   </div>
+  {% endif %}
   {% else %}
   <div class="empty-state-center">
     <p class="empty-state-icon">📅</p>
-    <p>No games found.</p>
+    <p>No games found{% if sex != 'all' or age != 'all' or field != 'all' or level != 'all' %} for this filter{% endif %}.</p>
   </div>
   {% endif %}
 
   {% if total_pages > 1 %}
+  {% set pp = 'mode=' ~ mode ~ '&sex=' ~ sex ~ '&age=' ~ age ~ '&field=' ~ field ~ ('&level=' ~ level if level != 'all' else '') %}
   <div class="pagination">
     {% if page > 1 %}
-    <a href="?scored_only={{ '1' if scored_only else '0' }}&page={{ page - 1 }}" class="page-link wide">← Prev</a>
+    <a href="?{{ pp }}&page={{ page - 1 }}" class="page-link wide">← Prev</a>
     {% endif %}
     {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
-    <a href="?scored_only={{ '1' if scored_only else '0' }}&page={{ p }}"
-       class="page-link{% if p == page %} active{% endif %}">{{ p }}</a>
+    <a href="?{{ pp }}&page={{ p }}" class="page-link{% if p == page %} active{% endif %}">{{ p }}</a>
     {% endfor %}
     {% if page < total_pages %}
-    <a href="?scored_only={{ '1' if scored_only else '0' }}&page={{ page + 1 }}" class="page-link wide">Next →</a>
+    <a href="?{{ pp }}&page={{ page + 1 }}" class="page-link wide">Next →</a>
     {% endif %}
     <span class="pagination-total">{{ total }} total</span>
   </div>
@@ -59,3 +118,4 @@
 
 </div>
 {% endblock %}
+

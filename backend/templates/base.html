@@ -100,7 +100,6 @@
                         <li><a href="/{{ locale }}/teams" {% if '/teams' in request.url.path %}class="active"{% endif %}>{{ t.nav.teams }}</a></li>
                         <li><a href="/{{ locale }}/players" {% if '/players' in request.url.path or '/player/' in request.url.path %}class="active"{% endif %}>{{ t.nav.players }}</a></li>
                         <li><a href="/{{ locale }}/games" {% if '/games' in request.url.path and '/game/' not in request.url.path %}class="active"{% endif %}>{{ t.nav.games }}</a></li>
-                        <li><a href="/{{ locale }}/schedule" {% if '/schedule' in request.url.path %}class="active"{% endif %}>{{ t.nav.schedule }}</a></li>
                     </ul>
                     <!-- Mobile language switcher (visible inside hamburger menu only) -->
                     <div class="mobile-lang-switcher" x-data="{ locale: '{{ locale }}' }">

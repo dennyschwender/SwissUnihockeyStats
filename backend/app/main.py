@@ -2705,57 +2705,10 @@ async def team_detail(request: Request, locale: str, team_id: int, season: Optio
 
 
 @app.get("/{locale}/schedule", response_class=HTMLResponse)
-async def schedule_page(
-    request: Request,
-    locale: str,
-    sex: str = "all",
-    age: str = "all",
-    field: str = "all",
-    page: int = 1,
-):
-    """Upcoming games schedule page with pagination and sex/age/field filters"""
-    from app.services.stats_service import get_schedule
-    from app.services.database import get_database_service
-    from app.models.db_models import PlayerStatistics as _PS
-    from sqlalchemy import func as _func
-
-    per_page = 50
-    db = get_database_service()
-    with db.session_scope() as session:
-        active_season_row = (
-            session.query(_PS.season_id, _func.count(_PS.id).label("count"))
-            .group_by(_PS.season_id)
-            .order_by(_func.count(_PS.id).desc())
-            .first()
-        )
-        active_season = active_season_row[0] if active_season_row else get_current_season()
-
-    offset = (page - 1) * per_page
-    data = get_schedule(
-        season_id=active_season,
-        sex=sex,
-        age=age,
-        field=field,
-        limit=per_page,
-        offset=offset,
-    )
-    total_pages = max(1, (data["total"] + per_page - 1) // per_page)
-
-    return templates.TemplateResponse(
-        request,
-        "schedule.html",
-        {
-            "locale": locale,
-            "t": get_translations(locale),
-            "games": data["games"],
-            "page": page,
-            "total_pages": total_pages,
-            "total": data["total"],
-            "sex": sex,
-            "age": age,
-            "field": field,
-        },
-    )
+async def schedule_page(request: Request, locale: str, sex: str = "all", age: str = "all", field: str = "all", page: int = 1):
+    """Redirect /schedule → /games?mode=schedule (preserving filters)."""
+    params = f"mode=schedule&sex={sex}&age={age}&field={field}&page={page}"
+    return RedirectResponse(url=f"/{locale}/games?{params}", status_code=301)
 
 
 @app.get("/{locale}/players", response_class=HTMLResponse)
@@ -2881,14 +2834,31 @@ async def player_detail(request: Request, locale: str, player_id: int):
 # ==================== Other Pages ====================
 
 @app.get("/{locale}/games", response_class=HTMLResponse)
-async def games_page(request: Request, locale: str, scored_only: str = "1", page: int = 1):
-    """Games schedule page — DB-backed with pagination"""
+async def games_page(
+    request: Request,
+    locale: str,
+    mode: str = "results",   # "results" | "schedule"
+    sex: str = "all",
+    age: str = "all",
+    field: str = "all",
+    level: str = "all",
+    page: int = 1,
+    # backward-compat alias kept so old /games?scored_only=0 links still work
+    scored_only: Optional[str] = None,
+):
+    """Combined results + schedule page with sex/age/field/level filters."""
     from app.services.stats_service import get_recent_games
 
+    # Honor legacy scored_only param
+    if scored_only is not None and mode == "results":
+        mode = "results" if scored_only != "0" else "schedule"
+
     per_page = 50
-    with_score = scored_only != "0"
     offset = (page - 1) * per_page
-    data = get_recent_games(limit=per_page, offset=offset, with_score_only=with_score)
+    data = get_recent_games(
+        mode=mode, sex=sex, age=age, field=field, level=level,
+        limit=per_page, offset=offset,
+    )
     total_pages = max(1, (data["total"] + per_page - 1) // per_page)
     return templates.TemplateResponse(
         request,
@@ -2897,7 +2867,11 @@ async def games_page(request: Request, locale: str, scored_only: str = "1", page
             "locale": locale,
             "t": get_translations(locale),
             "games": data["games"],
-            "scored_only": with_score,
+            "mode": mode,
+            "sex": sex,
+            "age": age,
+            "field": field,
+            "level": level,
             "page": page,
             "total_pages": total_pages,
             "total": data["total"],

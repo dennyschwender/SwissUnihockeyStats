@@ -11,7 +11,7 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import case, func, or_
+from sqlalchemy import and_, case, func, or_
 
 from app.models.db_models import (
     Game,
@@ -2420,58 +2420,136 @@ def get_game_box_score(game_id: int) -> dict:
 
 def get_recent_games(
     season_id: Optional[int] = None,
+    mode: str = "results",      # "results" = scored, date DESC  |  "schedule" = upcoming, date ASC
+    sex: str = "all",
+    age: str = "all",
+    field: str = "all",
+    level: str = "all",
     limit: int = 50,
     offset: int = 0,
-    with_score_only: bool = False,
+    with_score_only: bool = False,   # kept for backward compat; overridden when mode is explicit
 ) -> dict:
-    """Return recent/upcoming games for a season with pagination metadata."""
+    """Return games for the combined Games/Schedule page with sex/age/field/level filters."""
+    from datetime import date as _date
+
+    # ---------- game_class filter sets (same as schedule/teams) ----------
+    _SEX_GC: dict[str, set[int]] = {
+        "women": {21, 22, 26, 28, 41, 42, 43, 44},
+        "mixed":  {49},
+        "men":   {11, 12, 14, 16, 18, 19, 31, 32, 33, 34, 35, 51},
+    }
+    _AGE_GC: dict[str, set[int]] = {
+        "senior":   {11, 12, 21, 22},
+        "U21":      {19, 26},
+        "U18":      {18, 31, 41},
+        "U16":      {16, 28, 32, 42},
+        "U14":      {14, 33, 43, 49},
+        "U12":      {34, 36, 44},
+        "U10":      {35},
+        "senioren": {51},
+    }
+    _FIELD_GC: dict[str, set[int]] = {
+        "big":   {11, 21, 14, 16, 18, 19, 26, 28, 49},
+        "small": {12, 22, 31, 32, 33, 34, 35, 36, 41, 42, 43, 44, 51},
+    }
+    # level → (national league_id, regional game_classes)
+    _LEVEL_LID: dict[str, int] = {"A": 13, "B": 14, "C": 15, "D": 16}
+    _LEVEL_REGIONAL_GCS: dict[str, list[int]] = {
+        "A": [31, 41], "B": [32, 42], "C": [33, 43], "D": [34, 44], "E": [35],
+    }
+
+    active_gc: Optional[set] = None
+    for val, mapping in [(sex, _SEX_GC), (age, _AGE_GC), (field, _FIELD_GC)]:
+        if val and val != "all" and val in mapping:
+            s = mapping[val]
+            active_gc = s if active_gc is None else active_gc & s
+
     db = get_database_service()
     with db.session_scope() as session:
         if season_id is None:
             season_id = _get_current_season_id(session)
 
-        q = session.query(Game).filter(Game.season_id == season_id)
-        if with_score_only:
-            q = q.filter(Game.home_score.isnot(None))
+        today = _date.today()
+        base_q = session.query(Game).filter(Game.season_id == season_id)
 
-        total = q.count()
-        games_raw = q.order_by(Game.game_date.desc()).offset(offset).limit(limit).all()
+        if mode == "schedule":
+            base_q = base_q.filter(Game.home_score.is_(None), Game.game_date >= today)
+        else:
+            # "results" mode (default)
+            base_q = base_q.filter(Game.home_score.isnot(None))
 
-        # Preload team names in batch
-        team_ids = set()
-        for g in games_raw:
-            team_ids.add(g.home_team_id)
-            team_ids.add(g.away_team_id)
+        need_league_join = active_gc is not None or (level and level != "all")
+        if need_league_join:
+            base_q = (
+                base_q
+                .join(LeagueGroup, Game.group_id == LeagueGroup.id)
+                .join(League, LeagueGroup.league_id == League.id)
+            )
+            if active_gc is not None:
+                base_q = base_q.filter(League.game_class.in_(list(active_gc)))
+            if level and level != "all":
+                lvl_conds = []
+                if level in _LEVEL_LID:
+                    lvl_conds.append(
+                        and_(League.league_id == _LEVEL_LID[level],
+                             League.game_class.notin_([11, 12, 21, 22]))
+                    )
+                if level in _LEVEL_REGIONAL_GCS:
+                    lvl_conds.append(League.game_class.in_(_LEVEL_REGIONAL_GCS[level]))
+                if lvl_conds:
+                    base_q = base_q.filter(or_(*lvl_conds))
 
+        total = base_q.count()
+        order = Game.game_date.asc() if mode == "schedule" else Game.game_date.desc()
+        games_raw = base_q.order_by(order, Game.game_time.asc()).offset(offset).limit(limit).all()
+
+        if not games_raw:
+            return {"games": [], "total": total, "offset": offset, "limit": limit}
+
+        # Preload team names
+        team_ids = {g.home_team_id for g in games_raw} | {g.away_team_id for g in games_raw}
         t_names: dict[int, str] = {}
-        for t in session.query(Team).filter(
-            Team.id.in_(team_ids), Team.season_id == season_id
-        ).all():
+        for t in session.query(Team).filter(Team.id.in_(team_ids), Team.season_id == season_id).all():
             if t.name or t.text:
                 t_names[t.id] = str(t.name or t.text or "")
-        # Cross-season fallback for nameless stubs
         missing = {tid for tid in team_ids if tid not in t_names}
         if missing:
-            for t in session.query(Team).filter(
-                Team.id.in_(missing), Team.name.isnot(None)
-            ).all():
-                t_names[t.id] = str(t.name or "")
+            for t in session.query(Team).filter(Team.id.in_(missing), Team.name.isnot(None)).all():
+                t_names.setdefault(t.id, str(t.name or ""))
+
+        # Preload league labels per group
+        group_ids = {g.group_id for g in games_raw if g.group_id}
+        grp_label: dict[int, str] = {}
+        if group_ids:
+            for grp, lg in (
+                session.query(LeagueGroup, League)
+                .outerjoin(League, League.id == LeagueGroup.league_id)
+                .filter(LeagueGroup.id.in_(group_ids))
+                .all()
+            ):
+                if lg:
+                    gc = int(lg.game_class) if lg.game_class is not None else None
+                    lg_raw = str(lg.name or lg.text or "")
+                    mw = _mw_from_league(gc, lg_raw)
+                    for pfx in ("Herren ", "Damen ", "Junioren ", "Juniorinnen "):
+                        lg_raw = lg_raw.replace(pfx, "")
+                    label_parts = [p for p in [mw, lg_raw.replace(" ", "").strip()] if p]
+                    grp_label[grp.id] = " - ".join(label_parts)
 
         result = []
         for g in games_raw:
-            result.append(
-                {
-                    "game_id": g.id,
-                    "date": g.game_date.strftime("%Y-%m-%d") if g.game_date else "",
-                    "time": g.game_time or "",
-                    "home_team": t_names.get(g.home_team_id, f"Team {g.home_team_id}"),
-                    "away_team": t_names.get(g.away_team_id, f"Team {g.away_team_id}"),
-                    "home_team_id": g.home_team_id,
-                    "away_team_id": g.away_team_id,
-                    "home_score": g.home_score,
-                    "away_score": g.away_score,
-                    "status": g.status or "",
-                    "has_score": g.home_score is not None,
-                }
-            )
+            result.append({
+                "game_id":      g.id,
+                "date":         g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
+                "weekday":      g.game_date.strftime("%a") if g.game_date else "",
+                "time":         g.game_time or "",
+                "home_team":    t_names.get(g.home_team_id, f"Team {g.home_team_id}"),
+                "away_team":    t_names.get(g.away_team_id, f"Team {g.away_team_id}"),
+                "home_team_id": g.home_team_id,
+                "away_team_id": g.away_team_id,
+                "home_score":   g.home_score,
+                "away_score":   g.away_score,
+                "has_score":    g.home_score is not None,
+                "league_label": grp_label.get(g.group_id, "") if g.group_id else "",
+            })
         return {"games": result, "total": total, "offset": offset, "limit": limit}
