@@ -2538,7 +2538,7 @@ async def teams_page(request: Request, locale: str, season: Optional[int] = None
         if season is None:
             season = next((s["id"] for s in seasons if s["current"]), seasons[0]["id"] if seasons else None)
 
-        limit = 50 if club else 500
+        limit = 50 if club else 5000
         teams_list = get_teams_list(season_id=season, sort="league", limit=limit, q=club)
 
         if not teams_list and not club:
