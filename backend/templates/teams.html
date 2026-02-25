@@ -74,6 +74,36 @@ document.addEventListener('alpine:init', () => {
         });
       },
 
+      // Levels present in the current sex/age/field/q selection (ignoring activeLevel)
+      get availableLevels() {
+        const ql = this.q.toLowerCase();
+        const levels = new Set();
+        for (const t of this.teams) {
+          if (!t.level) continue;
+          const isSenior = t.gender === 'men' || t.gender === 'women';
+          const sOk = this.activeSex  === 'all' || t.sex === this.activeSex;
+          const aOk = this.activeAge  === 'all'
+            || (this.activeAge === 'senior'  ? isSenior
+            : (this.activeAge === 'senioren' ? t.gender === 'Senioren'
+            : t.gender === this.activeAge));
+          const fOk = this.activeField === 'all' || t.field === this.activeField;
+          const qOk = !ql || t.text.toLowerCase().includes(ql) || t.league_name.toLowerCase().includes(ql);
+          if (sOk && aOk && fOk && qOk) levels.add(t.level);
+        }
+        return ['A','B','C','D','E'].filter(l => levels.has(l));
+      },
+
+      // Show Level row only when a specific U* age group is active
+      get showLevelFilter() {
+        return ['U21','U18','U16','U14','U12','U10'].includes(this.activeAge);
+      },
+
+      // When switching age away from youth, reset level
+      setAge(val) {
+        this.activeAge = val;
+        if (!['U21','U18','U16','U14','U12','U10'].includes(val)) this.activeLevel = 'all';
+      },
+
       get sections() { return buildSections(this.filtered); },
       get count()    { return this.filtered.length; },
 
@@ -131,15 +161,15 @@ document.addEventListener('alpine:init', () => {
     <!-- Age -->
     <div class="filter-bar-row">
       <span class="filter-bar-label">Age</span>
-      <button :class="['filter-chip', activeAge==='all' && 'active']"      @click="activeAge='all'">All</button>
-      <button :class="['filter-chip', activeAge==='senior' && 'active']"   @click="activeAge='senior'">Senior</button>
-      <button :class="['filter-chip', activeAge==='U21' && 'active']"      @click="activeAge='U21'">U21</button>
-      <button :class="['filter-chip', activeAge==='U18' && 'active']"      @click="activeAge='U18'">U18</button>
-      <button :class="['filter-chip', activeAge==='U16' && 'active']"      @click="activeAge='U16'">U16</button>
-      <button :class="['filter-chip', activeAge==='U14' && 'active']"      @click="activeAge='U14'">U14</button>
-      <button :class="['filter-chip', activeAge==='U12' && 'active']"      @click="activeAge='U12'">U12</button>
-      <button :class="['filter-chip', activeAge==='U10' && 'active']"      @click="activeAge='U10'">U10</button>
-      <button :class="['filter-chip', activeAge==='senioren' && 'active']" @click="activeAge='senioren'">Senioren</button>
+      <button :class="['filter-chip', activeAge==='all' && 'active']"      @click="setAge('all')">All</button>
+      <button :class="['filter-chip', activeAge==='senior' && 'active']"   @click="setAge('senior')">Senior</button>
+      <button :class="['filter-chip', activeAge==='U21' && 'active']"      @click="setAge('U21')">U21</button>
+      <button :class="['filter-chip', activeAge==='U18' && 'active']"      @click="setAge('U18')">U18</button>
+      <button :class="['filter-chip', activeAge==='U16' && 'active']"      @click="setAge('U16')">U16</button>
+      <button :class="['filter-chip', activeAge==='U14' && 'active']"      @click="setAge('U14')">U14</button>
+      <button :class="['filter-chip', activeAge==='U12' && 'active']"      @click="setAge('U12')">U12</button>
+      <button :class="['filter-chip', activeAge==='U10' && 'active']"      @click="setAge('U10')">U10</button>
+      <button :class="['filter-chip', activeAge==='senioren' && 'active']" @click="setAge('senioren')">Senioren</button>
     </div>
 
     <!-- Field -->
@@ -150,15 +180,13 @@ document.addEventListener('alpine:init', () => {
       <button :class="['filter-chip', activeField==='small' && 'active']" @click="activeField='small'">Small field</button>
     </div>
 
-    <!-- Level (youth only) -->
-    <div class="filter-bar-row">
+    <!-- Level: only visible when a U* age group is selected; shows only available levels -->
+    <div class="filter-bar-row" x-show="showLevelFilter">
       <span class="filter-bar-label">Level</span>
       <button :class="['filter-chip', activeLevel==='all' && 'active']" @click="activeLevel='all'">All</button>
-      <button :class="['filter-chip', activeLevel==='A' && 'active']"   @click="activeLevel='A'">A</button>
-      <button :class="['filter-chip', activeLevel==='B' && 'active']"   @click="activeLevel='B'">B</button>
-      <button :class="['filter-chip', activeLevel==='C' && 'active']"   @click="activeLevel='C'">C</button>
-      <button :class="['filter-chip', activeLevel==='D' && 'active']"   @click="activeLevel='D'">D</button>
-      <button :class="['filter-chip', activeLevel==='E' && 'active']"   @click="activeLevel='E'">E</button>
+      <template x-for="lvl in availableLevels" :key="lvl">
+        <button :class="['filter-chip', activeLevel===lvl && 'active']" @click="activeLevel=lvl" x-text="lvl"></button>
+      </template>
     </div>
 
     <!-- Count + clear -->
