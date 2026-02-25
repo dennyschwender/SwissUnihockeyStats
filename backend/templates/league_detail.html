@@ -105,6 +105,7 @@
     <template x-if="_leagueGroups.length > 1">
       <div class="filter-bar-row" style="margin-bottom:1.25rem;">
         <button
+          x-show="tab !== 'standings'"
           @click="Alpine.store('leagueFilter').group = 'all'"
           :class="['filter-chip', Alpine.store('leagueFilter').group === 'all' && 'active']">
           All
