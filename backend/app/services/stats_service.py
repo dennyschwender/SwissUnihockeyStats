@@ -233,8 +233,9 @@ def get_teams_list(
             )
 
         if sort == "league":
-            # Sort by tier level first, then season desc, then league name, then team name
-            order: list[Any] = [_tier_order_expr(), func.coalesce(League.name, "~~~~"), Team.name]
+            # Sort by tier level first, then by league_id (proxy for A/B/C/D level),
+            # then season desc, then team name
+            order: list[Any] = [_tier_order_expr(), func.coalesce(League.league_id, 99), Team.name]
             if all_seasons:
                 order.insert(1, Season.id.desc())
             query = query.order_by(*order)

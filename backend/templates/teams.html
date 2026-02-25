@@ -14,8 +14,18 @@ document.addEventListener('alpine:init', () => {
     const locale = {{ locale | tojson }};
     const club   = {{ club | tojson }};
 
-    const AGE_SORT = { U21:7, U18:8, U16:9, U14:10, U12:11, U10:12, Senioren:13 };
-    const SEX_SORT = { men:0, women:1, mixed:2 };
+    const AGE_SORT   = { U21:7, U18:8, U16:9, U14:10, U12:11, U10:12, Senioren:13 };
+    const SEX_SORT   = { men:0, women:1, mixed:2 };
+    const LEVEL_SORT = { A:0, B:1, C:2, D:3, E:4 };
+
+    function teamSort(a, b) {
+      // Primary: level (A < B < C < D < E < none)
+      const la = LEVEL_SORT[a.level] ?? 99;
+      const lb = LEVEL_SORT[b.level] ?? 99;
+      if (la !== lb) return la - lb;
+      // Secondary: name
+      return (a.text || '').localeCompare(b.text || '');
+    }
 
     function buildSections(list) {
       const map = {};
@@ -34,7 +44,7 @@ document.addEventListener('alpine:init', () => {
         .map(s => {
           const subgroups = Object.values(s.subMap)
             .sort((a, b) => (SEX_SORT[a.sex] ?? 99) - (SEX_SORT[b.sex] ?? 99))
-            .map(sg => ({ ...sg, teams: sg.teams.slice().sort((a, b) => a.text.localeCompare(b.text)) }));
+            .map(sg => ({ ...sg, teams: sg.teams.slice().sort(teamSort) }));
           const flat = subgroups.length === 1 ? subgroups[0].teams : [];
           return { key: s.key, label: s.label, sort: s.sort, subgroups, teams: flat };
         });
