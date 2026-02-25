@@ -2353,6 +2353,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
         get_league_by_id,
         get_league_standings,
         get_league_top_scorers,
+        get_league_top_penalties,
         get_recent_games,
         get_all_seasons,
     )
@@ -2375,6 +2376,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
                 "standings": [],
                 "standings_by_group": {},
                 "topscorers": [],
+                "top_penalties": [],
                 "games": [],
                 "upcoming_games": [],
                 "available_seasons": [],
@@ -2421,6 +2423,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
         for gid in grp["ids"]
     }
     topscorers = get_league_top_scorers(league_id, limit=100)
+    top_penalties = get_league_top_penalties(league_id, limit=100)
 
     # Upcoming (unscored) games for this league
     from app.services.stats_service import get_upcoming_games
@@ -2517,6 +2520,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             "standings": standings,
             "standings_by_group": standings_by_group,
             "topscorers": topscorers,
+            "top_penalties": top_penalties,
             "games": recent_games,
             "upcoming_games": upcoming_games,
             "available_seasons": available_seasons,

@@ -358,7 +358,8 @@
 
     <!-- PENALTIES -->
     <div x-show="tab==='penalties'">
-      {% if topscorers %}
+      {% if top_penalties %}
+      <script type="application/json" id="penalties-data">{{ top_penalties | tojson }}</script>
       <div x-data="penaltiesTable()">
         <div style="margin-bottom:.75rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;">
           <div style="position:relative;flex:1;min-width:140px;">
@@ -422,9 +423,8 @@
       <script>
         document.addEventListener('alpine:init', () => {
           Alpine.data('penaltiesTable', () => ({
-            allRows: JSON.parse(document.getElementById('scorers-data').textContent)
+            allRows: JSON.parse(document.getElementById('penalties-data').textContent)
               .map(x => ({ ...x, pim_pg: x.gp > 0 ? +(x.pim / x.gp).toFixed(2) : 0 }))
-              .filter(x => x.pim > 0)
               .sort((a, b) => b.pim - a.pim || b.pen_match - a.pen_match),
             nameFilter: '',
             sortCol: 'pim',

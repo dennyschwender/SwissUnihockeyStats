@@ -749,6 +749,159 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
         return result
 
 
+# ---------------------------------------------------------------------------
+# 4. Top penalties per league
+# ---------------------------------------------------------------------------
+
+def get_league_top_penalties(db_league_id: int, limit: int = 100) -> list[dict]:
+    """
+    Top penalty-minute leaders for a league, ordered by PIM descending.
+
+    Uses the same filtering strategy as get_league_top_scorers (GamePlayer
+    primary path, 3-tier fallback) but orders by penalty_minutes DESC and
+    only returns rows where penalty_minutes > 0.
+    """
+    import re as _re
+    db = get_database_service()
+    with db.session_scope() as session:
+        league = session.query(League).filter(League.id == db_league_id).first()
+        if league is None:
+            return []
+
+        group_ids = [g.id for g in league.groups]
+        if not group_ids:
+            return []
+
+        game_ids = [
+            r[0] for r in
+            session.query(Game.id).filter(Game.group_id.in_(group_ids)).all()
+        ]
+
+        league_abbrev = _re.sub(
+            r'^(Junioren/-innen|Junioren|Juniorinnen|Herren|Damen|Senioren)\s+',
+            '',
+            str(league.name or ""),
+        ).strip()
+
+        player_ids = []
+        if game_ids:
+            player_ids = [
+                r[0] for r in
+                session.query(GamePlayer.player_id)
+                .filter(GamePlayer.game_id.in_(game_ids))
+                .distinct()
+                .all()
+            ]
+
+        gc_filters = [
+            PlayerStatistics.season_id == league.season_id,
+            PlayerStatistics.league_abbrev == league_abbrev,
+            PlayerStatistics.penalty_minutes > 0,
+        ]
+        if league.game_class:
+            gc_filters.append(
+                (PlayerStatistics.game_class == league.game_class)
+                | (PlayerStatistics.game_class == None)  # noqa: E711
+            )
+
+        order_col = PlayerStatistics.penalty_minutes.desc()
+
+        if player_ids:
+            stats = (
+                session.query(PlayerStatistics, Player)
+                .join(Player, PlayerStatistics.player_id == Player.person_id)
+                .filter(
+                    PlayerStatistics.player_id.in_(player_ids),
+                    *gc_filters,
+                )
+                .order_by(order_col)
+                .limit(limit)
+                .all()
+            )
+        else:
+            home_ids = {r[0] for r in session.query(Game.home_team_id).filter(Game.group_id.in_(group_ids)).all()}
+            away_ids = {r[0] for r in session.query(Game.away_team_id).filter(Game.group_id.in_(group_ids)).all()}
+            all_team_ids = list((home_ids | away_ids) - {None})
+            if not all_team_ids:
+                return []
+
+            base_q = (
+                session.query(PlayerStatistics, Player)
+                .join(Player, PlayerStatistics.player_id == Player.person_id)
+                .filter(
+                    PlayerStatistics.season_id == league.season_id,
+                    PlayerStatistics.league_abbrev == league_abbrev,
+                    PlayerStatistics.penalty_minutes > 0,
+                )
+                .order_by(order_col)
+            )
+
+            def _run(extra_filter):
+                return base_q.filter(extra_filter).limit(limit).all()
+
+            stats = _run(PlayerStatistics.team_id.in_(all_team_ids))
+
+            if not stats:
+                roster_player_ids = [
+                    r[0] for r in
+                    session.query(TeamPlayer.player_id)
+                    .filter(
+                        TeamPlayer.team_id.in_(all_team_ids),
+                        TeamPlayer.season_id == league.season_id,
+                    )
+                    .distinct()
+                    .all()
+                ]
+                if roster_player_ids:
+                    gc_clause = (
+                        (PlayerStatistics.game_class == league.game_class)
+                        | (PlayerStatistics.game_class == None)  # noqa: E711
+                    ) if league.game_class else True
+                    stats = base_q.filter(
+                        PlayerStatistics.player_id.in_(roster_player_ids),
+                        gc_clause,
+                    ).limit(limit).all()
+
+            if not stats:
+                team_names = [
+                    r[0] for r in
+                    session.query(Team.name)
+                    .filter(Team.id.in_(all_team_ids), Team.name.isnot(None))
+                    .distinct()
+                    .all()
+                ]
+                if not team_names:
+                    return []
+                gc_clause = (
+                    (PlayerStatistics.game_class == league.game_class)
+                    | (PlayerStatistics.game_class == None)  # noqa: E711
+                ) if league.game_class else True
+                stats = base_q.filter(
+                    PlayerStatistics.team_name.in_(team_names),
+                    gc_clause,
+                ).limit(limit).all()
+
+        result = []
+        for i, (ps, pl) in enumerate(stats, 1):
+            result.append({
+                "rank": i,
+                "player_id": pl.person_id,
+                "player_name": pl.full_name or f"Player {pl.person_id}",
+                "team_name": ps.team_name or "Unknown",
+                "team_id": ps.team_id,
+                "gp": ps.games_played,
+                "g": ps.goals,
+                "a": ps.assists,
+                "pts": ps.points,
+                "pim": ps.penalty_minutes,
+                "pen_2": getattr(ps, 'pen_2min', 0) or 0,
+                "pen_5": getattr(ps, 'pen_5min', 0) or 0,
+                "pen_10": getattr(ps, 'pen_10min', 0) or 0,
+                "pen_match": getattr(ps, 'pen_match', 0) or 0,
+            })
+        return result
+
+
 def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) -> list[dict]:
     """
     Overall top scorers across all leagues in a season.
