@@ -124,9 +124,41 @@ class DatabaseService:
                 ("pen_5min",  "INTEGER DEFAULT 0"),
                 ("pen_10min", "INTEGER DEFAULT 0"),
                 ("pen_match", "INTEGER DEFAULT 0"),
+                ("game_class", "INTEGER"),
             ]:
                 if col_def[0] not in existing_cols:
                     conn.execute(text(f"ALTER TABLE player_statistics ADD COLUMN {col_def[0]} {col_def[1]}"))
+
+            # ── Backfill game_class from TeamPlayer → Team (idempotent) ────────
+            conn.execute(text("""
+                UPDATE player_statistics
+                SET game_class = (
+                    SELECT t.game_class
+                    FROM team_players tp
+                    JOIN teams t ON t.id = tp.team_id AND t.season_id = tp.season_id
+                    WHERE tp.player_id = player_statistics.player_id
+                      AND tp.season_id = player_statistics.season_id
+                      AND t.name = player_statistics.team_name
+                    LIMIT 1
+                )
+                WHERE game_class IS NULL
+            """))
+
+            # ── Backfill team_id from Teams using (name, season_id, game_class) ──
+            # Only possible once game_class is known (disambiguates same-named clubs
+            # that field both male and female teams).
+            conn.execute(text("""
+                UPDATE player_statistics
+                SET team_id = (
+                    SELECT t.id
+                    FROM teams t
+                    WHERE t.name = player_statistics.team_name
+                      AND t.season_id = player_statistics.season_id
+                      AND t.game_class = player_statistics.game_class
+                    LIMIT 1
+                )
+                WHERE team_id IS NULL AND game_class IS NOT NULL
+            """))
 
             conn.commit()
             logger.debug("SQLite migrations applied")

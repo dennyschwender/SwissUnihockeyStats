@@ -301,6 +301,7 @@ class PlayerStatistics(Base):
     pen_10min: Mapped[Optional[int]] = mapped_column(Integer, default=0)  # count of 10-minute penalties
     pen_match: Mapped[Optional[int]] = mapped_column(Integer, default=0)  # count of match penalties
     plus_minus: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    game_class: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Gender/age class (mirrors Team.game_class)
     last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     
     # Relationships

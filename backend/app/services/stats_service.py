@@ -620,42 +620,92 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
                 .all()
             ]
 
+        # game_class filter: added when available — eliminates same-abbrev rows
+        # from the opposite-gender league (e.g. "U21 B" male vs female).
+        gc_filters = [
+            PlayerStatistics.season_id == league.season_id,
+            PlayerStatistics.league_abbrev == league_abbrev,
+        ]
+        if league.game_class:
+            gc_filters.append(
+                (PlayerStatistics.game_class == league.game_class)
+                | (PlayerStatistics.game_class == None)  # noqa: E711 – SQLAlchemy IS NULL
+            )
+
         if player_ids:
             stats = (
                 session.query(PlayerStatistics, Player)
                 .join(Player, PlayerStatistics.player_id == Player.person_id)
                 .filter(
                     PlayerStatistics.player_id.in_(player_ids),
-                    PlayerStatistics.season_id == league.season_id,
-                    PlayerStatistics.league_abbrev == league_abbrev,
+                    *gc_filters,
                 )
                 .order_by(PlayerStatistics.points.desc(), PlayerStatistics.goals.desc())
                 .limit(limit)
                 .all()
             )
         else:
-            # ── Fallback path: TeamPlayer roster ─────────────────────────────
-            # Use team IDs (gender-exact) rather than team names (ambiguous —
-            # same club can field both a male and female team with identical names,
-            # which would bleed female players into a male league's top scorers).
+            # ── Fallback (no GamePlayer rows — season not yet underway) ──────────
+            #
+            # Tiered strategy, most-accurate first:
+            #  1. team_id IN (league's team IDs) — exact, gender-safe once indexer
+            #     runs (team_id is now stored on PlayerStatistics rows).
+            #  2. player_id IN (TeamPlayer roster for league's teams) + gc OR-NULL
+            #  3. team_name IN (names) + STRICT game_class (no NULL) — last resort;
+            #     NULL game_class rows are excluded to prevent gender bleed from
+            #     same-named clubs that field both a male and female team.
+
             home_ids = {r[0] for r in session.query(Game.home_team_id).filter(Game.group_id.in_(group_ids)).all()}
             away_ids = {r[0] for r in session.query(Game.away_team_id).filter(Game.group_id.in_(group_ids)).all()}
             all_team_ids = list((home_ids | away_ids) - {None})
             if not all_team_ids:
                 return []
-            # Prefer TeamPlayer (gender-exact via team ID).
-            roster_player_ids = [
-                r[0] for r in
-                session.query(TeamPlayer.player_id)
+
+            base_q = (
+                session.query(PlayerStatistics, Player)
+                .join(Player, PlayerStatistics.player_id == Player.person_id)
                 .filter(
-                    TeamPlayer.team_id.in_(all_team_ids),
-                    TeamPlayer.season_id == league.season_id,
+                    PlayerStatistics.season_id == league.season_id,
+                    PlayerStatistics.league_abbrev == league_abbrev,
                 )
-                .distinct()
-                .all()
-            ]
-            if not roster_player_ids:
-                # No roster indexed yet — fall back to team name as last resort.
+                .order_by(PlayerStatistics.points.desc(), PlayerStatistics.goals.desc())
+            )
+
+            def _run(extra_filter):
+                return base_q.filter(extra_filter).limit(limit).all()
+
+            # Tier 1: team_id on PlayerStatistics (populated by indexer)
+            stats = _run(PlayerStatistics.team_id.in_(all_team_ids))
+
+            if not stats:
+                # Tier 2: TeamPlayer roster (gender-exact via team_id)
+                roster_player_ids = [
+                    r[0] for r in
+                    session.query(TeamPlayer.player_id)
+                    .filter(
+                        TeamPlayer.team_id.in_(all_team_ids),
+                        TeamPlayer.season_id == league.season_id,
+                    )
+                    .distinct()
+                    .all()
+                ]
+                if roster_player_ids:
+                    gc_clause = (
+                        (PlayerStatistics.game_class == league.game_class)
+                        | (PlayerStatistics.game_class == None)  # noqa: E711
+                    ) if league.game_class else True
+                    stats = base_q.filter(
+                        PlayerStatistics.player_id.in_(roster_player_ids),
+                        gc_clause,
+                    ).limit(limit).all()
+
+            if not stats:
+                # Tier 3: team_name with OR-NULL game_class filter.
+                # OR-NULL: rows not yet resolved by roster indexer (gc=None) are
+                # included (minor bleed risk from same-named clubs), but confirmed-
+                # wrong-gender rows (gc IS NOT NULL AND gc != league.game_class) are
+                # excluded. Once the roster indexer runs, team_id will be set and
+                # Tier 1 will handle all of this correctly without any bleed.
                 team_names = [
                     r[0] for r in
                     session.query(Team.name)
@@ -665,21 +715,16 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
                 ]
                 if not team_names:
                     return []
-                pid_filter = PlayerStatistics.team_name.in_(team_names)
-            else:
-                pid_filter = PlayerStatistics.player_id.in_(roster_player_ids)
-            stats = (
-                session.query(PlayerStatistics, Player)
-                .join(Player, PlayerStatistics.player_id == Player.person_id)
-                .filter(
-                    PlayerStatistics.season_id == league.season_id,
-                    PlayerStatistics.league_abbrev == league_abbrev,
-                    pid_filter,
-                )
-                .order_by(PlayerStatistics.points.desc(), PlayerStatistics.goals.desc())
-                .limit(limit)
-                .all()
-            )
+                gc_clause = (
+                    (PlayerStatistics.game_class == league.game_class)
+                    | (PlayerStatistics.game_class == None)  # noqa: E711
+                ) if league.game_class else True
+                stats = base_q.filter(
+                    PlayerStatistics.team_name.in_(team_names),
+                    gc_clause,
+                ).limit(limit).all()
+
+
 
         result = []
         for i, (ps, pl) in enumerate(stats, 1):

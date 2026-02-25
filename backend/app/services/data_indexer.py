@@ -602,6 +602,29 @@ class DataIndexer:
 
         regions = stats_data.get("data", {}).get("regions", [])
         count = 0
+
+        # Build team_name → (game_class, team_id) lookup for this player's roster memberships
+        # so each PlayerStatistics row is tagged with the correct gender/age class and exact team.
+        _gc_map: dict[str, int] = {}   # team_name → game_class
+        _tid_map: dict[str, int] = {}  # team_name → team.id
+        try:
+            for tname, tgc, tid in (
+                session.query(Team.name, Team.game_class, Team.id)
+                .join(TeamPlayer, TeamPlayer.team_id == Team.id)
+                .filter(
+                    Team.season_id == season_id,
+                    TeamPlayer.player_id == person_id,
+                    TeamPlayer.season_id == season_id,
+                    Team.game_class.isnot(None),
+                )
+                .all()
+            ):
+                if tname:
+                    _gc_map[tname] = tgc
+                    _tid_map[tname] = tid
+        except Exception:
+            pass
+
         for region in regions:
             for row in region.get("rows", []):
                 cells = row.get("cells", [])
@@ -626,6 +649,8 @@ class DataIndexer:
 
                 league_abbrev   = _txt(1)
                 team_name_txt   = _txt(2)
+                game_class      = _gc_map.get(team_name_txt)
+                team_db_id      = _tid_map.get(team_name_txt)
                 games_played    = _int(3)
                 goals           = _int(4)
                 assists         = _int(5)
@@ -641,6 +666,8 @@ class DataIndexer:
                 def _apply(obj):
                     obj.league_abbrev   = league_abbrev
                     obj.team_name       = team_name_txt
+                    obj.game_class      = game_class
+                    obj.team_id         = team_db_id
                     obj.games_played    = games_played
                     obj.goals           = goals
                     obj.assists         = assists
@@ -676,6 +703,8 @@ class DataIndexer:
                         season_id       = season_id,
                         league_abbrev   = league_abbrev,
                         team_name       = team_name_txt,
+                        game_class      = game_class,
+                        team_id         = team_db_id,
                         games_played    = games_played,
                         goals           = goals,
                         assists         = assists,
