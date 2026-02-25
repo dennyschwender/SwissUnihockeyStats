@@ -634,28 +634,47 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
                 .all()
             )
         else:
-            # ── Fallback path: team name ──────────────────────────────────────
+            # ── Fallback path: TeamPlayer roster ─────────────────────────────
+            # Use team IDs (gender-exact) rather than team names (ambiguous —
+            # same club can field both a male and female team with identical names,
+            # which would bleed female players into a male league's top scorers).
             home_ids = {r[0] for r in session.query(Game.home_team_id).filter(Game.group_id.in_(group_ids)).all()}
             away_ids = {r[0] for r in session.query(Game.away_team_id).filter(Game.group_id.in_(group_ids)).all()}
             all_team_ids = list((home_ids | away_ids) - {None})
             if not all_team_ids:
                 return []
-            team_names = [
+            # Prefer TeamPlayer (gender-exact via team ID).
+            roster_player_ids = [
                 r[0] for r in
-                session.query(Team.name)
-                .filter(Team.id.in_(all_team_ids), Team.name.isnot(None))
+                session.query(TeamPlayer.player_id)
+                .filter(
+                    TeamPlayer.team_id.in_(all_team_ids),
+                    TeamPlayer.season_id == league.season_id,
+                )
                 .distinct()
                 .all()
             ]
-            if not team_names:
-                return []
+            if not roster_player_ids:
+                # No roster indexed yet — fall back to team name as last resort.
+                team_names = [
+                    r[0] for r in
+                    session.query(Team.name)
+                    .filter(Team.id.in_(all_team_ids), Team.name.isnot(None))
+                    .distinct()
+                    .all()
+                ]
+                if not team_names:
+                    return []
+                pid_filter = PlayerStatistics.team_name.in_(team_names)
+            else:
+                pid_filter = PlayerStatistics.player_id.in_(roster_player_ids)
             stats = (
                 session.query(PlayerStatistics, Player)
                 .join(Player, PlayerStatistics.player_id == Player.person_id)
                 .filter(
                     PlayerStatistics.season_id == league.season_id,
                     PlayerStatistics.league_abbrev == league_abbrev,
-                    PlayerStatistics.team_name.in_(team_names),
+                    pid_filter,
                 )
                 .order_by(PlayerStatistics.points.desc(), PlayerStatistics.goals.desc())
                 .limit(limit)
