@@ -853,7 +853,20 @@ class DataIndexer:
 
             except Exception as e:
                 logger.error(f"Failed to index leagues for season {season_id}: {e}", exc_info=True)
-                self._mark_sync_failed(session, "leagues", entity_id, str(e))
+                # If this is a past season that already has leagues indexed, treat
+                # the API failure as non-fatal and mark completed so the scheduler
+                # doesn't re-queue it every tick (the API may no longer serve old data).
+                existing = session.query(League).filter(
+                    League.season_id == season_id
+                ).count()
+                if existing > 0:
+                    logger.info(
+                        f"[leagues] API failed but {existing} leagues already exist "
+                        f"for season {season_id} — marking completed to suppress retries"
+                    )
+                    self._mark_sync_complete(session, "leagues", entity_id, existing)
+                else:
+                    self._mark_sync_failed(session, "leagues", entity_id, str(e))
                 return 0
 
     def index_groups_for_league(self, league_db_id: int, season_id: int,

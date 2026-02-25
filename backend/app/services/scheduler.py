@@ -568,6 +568,20 @@ class Scheduler:
         if not is_current_season and last_sync is not None:
             return
 
+        # For past seasons: if the last attempt (even a failed one) was recent,
+        # don't keep retrying.  This prevents infinite re-queuing when the API
+        # no longer serves historical data (returns error → status='failed' →
+        # _last_sync_for finds nothing → schedules again → repeat).
+        if not is_current_season and last_sync is None:
+            last_attempt = _last_attempt_for(session, policy["entity_type"], season)
+            if last_attempt is not None:
+                # Coerce to timezone-aware if needed
+                if hasattr(last_attempt, 'tzinfo') and last_attempt.tzinfo is None:
+                    from datetime import timezone as _tz
+                    last_attempt = last_attempt.replace(tzinfo=_tz.utc)
+                if (now - last_attempt) < policy["max_age"]:
+                    return  # back off until max_age expires
+
         if last_sync is None or self._cold_start:
             # Never synced or cold-start (first run after enable) –
             # run soon, staggered by priority to avoid thundering herd.
@@ -713,6 +727,25 @@ def _last_sync_for(session, entity_type: str, season: int | None):
         q = q.filter(
             SyncStatus.entity_id.like(f"%{season}%")
         )
+
+    row = q.order_by(SyncStatus.last_sync.desc()).first()
+    return row[0] if row else None
+
+
+def _last_attempt_for(session, entity_type: str, season: int | None):
+    """
+    Return the most recent sync attempt datetime (any status) for this
+    entity_type / season, or None if never attempted.  Used to suppress
+    retries for past seasons that keep failing (e.g. API no longer returns
+    historical data) so we don't hammer the API every tick.
+    """
+    from app.models.db_models import SyncStatus
+
+    q = (session.query(SyncStatus.last_sync)
+         .filter(SyncStatus.entity_type == entity_type))
+
+    if season is not None:
+        q = q.filter(SyncStatus.entity_id.like(f"%{season}%"))
 
     row = q.order_by(SyncStatus.last_sync.desc()).first()
     return row[0] if row else None
