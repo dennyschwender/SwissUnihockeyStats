@@ -93,43 +93,38 @@ class DatabaseService:
         logger.info("Database initialized successfully")
 
     def _run_sqlite_migrations(self):
-        """Run idempotent SQLite migrations to fix schema issues."""
+        """Idempotent SQLite schema migrations run on every startup.
+
+        Rules for keeping this clean:
+        - ADD COLUMN stanzas can be removed once all deployed DBs have been
+          updated (i.e. after the next Pi docker pull + restart).
+        - Backfill UPDATEs stay as long as rows without those values can exist
+          (they are WHERE-gated so they are cheap no-ops once fully backfilled).
+        - One-time repair statements (index rebuilds, duplicate deletes, etc.)
+          must be removed after all instances have been updated.
+        """
         from sqlalchemy import text
         with self.engine.connect() as conn:
-            # ── Fix player_statistics duplicates (caused by NULL team_id in
-            # the old unique index which allowed duplicate rows). Keep the
-            # most-recently-updated row per (player_id, season_id, league_abbrev).
-            conn.execute(text("""
-                DELETE FROM player_statistics
-                WHERE id NOT IN (
-                    SELECT MAX(id)
-                    FROM player_statistics
-                    GROUP BY player_id, season_id, COALESCE(league_abbrev, '')
-                )
-            """))
 
-            # ── Rebuild the unique index on the correct columns ─────────────
-            conn.execute(text("DROP INDEX IF EXISTS idx_stats_unique"))
-            conn.execute(text("""
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_stats_unique
-                ON player_statistics (player_id, season_id, league_abbrev)
-            """))
-
-            # ── Add penalty breakdown columns (idempotent) ──────────────────
+            # ── Add new columns to player_statistics (idempotent) ───────────
+            # Can be removed once all deployed DBs have been updated past the
+            # commit that added each column.
             existing_cols = {
                 row[1] for row in conn.execute(text("PRAGMA table_info(player_statistics)"))
             }
-            for col_def in [
+            for col, typedef in [
                 ("pen_2min",  "INTEGER DEFAULT 0"),
                 ("pen_5min",  "INTEGER DEFAULT 0"),
                 ("pen_10min", "INTEGER DEFAULT 0"),
                 ("pen_match", "INTEGER DEFAULT 0"),
                 ("game_class", "INTEGER"),
             ]:
-                if col_def[0] not in existing_cols:
-                    conn.execute(text(f"ALTER TABLE player_statistics ADD COLUMN {col_def[0]} {col_def[1]}"))
+                if col not in existing_cols:
+                    conn.execute(text(f"ALTER TABLE player_statistics ADD COLUMN {col} {typedef}"))
 
-            # ── Backfill game_class from TeamPlayer → Team (idempotent) ────────
+            # ── Backfill game_class (WHERE IS NULL — cheap once done) ───────
+            # Derives gender/age class from the player's TeamPlayer → Team rows.
+            # Runs incrementally: only touches rows not yet resolved.
             conn.execute(text("""
                 UPDATE player_statistics
                 SET game_class = (
@@ -144,9 +139,9 @@ class DatabaseService:
                 WHERE game_class IS NULL
             """))
 
-            # ── Backfill team_id from Teams using (name, season_id, game_class) ──
-            # Only possible once game_class is known (disambiguates same-named clubs
-            # that field both male and female teams).
+            # ── Backfill team_id (WHERE IS NULL AND game_class IS NOT NULL) ─
+            # Uses (name, season_id, game_class) to disambiguate same-named clubs
+            # that field both male and female teams. Requires game_class first.
             conn.execute(text("""
                 UPDATE player_statistics
                 SET team_id = (
