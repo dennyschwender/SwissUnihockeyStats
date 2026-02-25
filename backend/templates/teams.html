@@ -46,6 +46,7 @@ document.addEventListener('alpine:init', () => {
       activeSex:   'all',
       activeAge:   'all',
       activeField: 'all',
+      activeLevel: 'all',
 
       get filtered() {
         const ql = this.q.toLowerCase();
@@ -57,8 +58,9 @@ document.addEventListener('alpine:init', () => {
             : (this.activeAge === 'senioren'  ? t.gender === 'Senioren'
             : t.gender === this.activeAge));
           const fOk = this.activeField === 'all' || t.field === this.activeField;
+          const lOk = this.activeLevel === 'all' || t.level === this.activeLevel;
           const qOk = !ql || t.text.toLowerCase().includes(ql) || t.league_name.toLowerCase().includes(ql);
-          return sOk && aOk && fOk && qOk;
+          return sOk && aOk && fOk && lOk && qOk;
         });
       },
 
@@ -138,11 +140,22 @@ document.addEventListener('alpine:init', () => {
       <button :class="['filter-chip', activeField==='small' && 'active']" @click="activeField='small'">Small field</button>
     </div>
 
+    <!-- Level (youth only) -->
+    <div class="filter-bar-row">
+      <span class="filter-bar-label">Level</span>
+      <button :class="['filter-chip', activeLevel==='all' && 'active']" @click="activeLevel='all'">All</button>
+      <button :class="['filter-chip', activeLevel==='A' && 'active']"   @click="activeLevel='A'">A</button>
+      <button :class="['filter-chip', activeLevel==='B' && 'active']"   @click="activeLevel='B'">B</button>
+      <button :class="['filter-chip', activeLevel==='C' && 'active']"   @click="activeLevel='C'">C</button>
+      <button :class="['filter-chip', activeLevel==='D' && 'active']"   @click="activeLevel='D'">D</button>
+      <button :class="['filter-chip', activeLevel==='E' && 'active']"   @click="activeLevel='E'">E</button>
+    </div>
+
     <!-- Count + clear -->
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
       <span class="filter-bar-count" x-text="count + ' team' + (count !== 1 ? 's' : '')"></span>
-      <button x-show="q || activeSex !== 'all' || activeAge !== 'all' || activeField !== 'all'"
-              @click="q=''; activeSex='all'; activeAge='all'; activeField='all';"
+      <button x-show="q || activeSex !== 'all' || activeAge !== 'all' || activeField !== 'all' || activeLevel !== 'all'"
+              @click="q=''; activeSex='all'; activeAge='all'; activeField='all'; activeLevel='all';"
               class="filter-clear-btn">
         ✕ Clear filters
       </button>

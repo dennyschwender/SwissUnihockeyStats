@@ -2531,8 +2531,10 @@ async def league_detail(request: Request, locale: str, league_id: int):
 @app.get("/{locale}/teams", response_class=HTMLResponse)
 async def teams_page(request: Request, locale: str, season: Optional[int] = None, club: str = ""):
     """Teams listing page. Optional ?club=name pre-filters by club name."""
+    import re as _re
     from app.services.stats_service import get_teams_list, get_seasons_with_teams
     from app.services.data_indexer import LEAGUE_TIERS, _DEFAULT_TIER
+    _LEVEL_RE = _re.compile(r'\b([A-E])\b')
     try:
         seasons = get_seasons_with_teams()
         if season is None:
@@ -2588,6 +2590,12 @@ async def teams_page(request: Request, locale: str, season: Optional[int] = None
             else:
                 tier = 0
                 tier_label = None
+            # Level (A/B/C/D) — only meaningful for youth; seniors have no level
+            if gender not in ("men", "women"):
+                lm = _LEVEL_RE.search(ln)
+                level = lm.group(1) if lm else None
+            else:
+                level = None
             teams_flat.append({
                 "id": t["id"],
                 "text": t["text"],
@@ -2597,6 +2605,7 @@ async def teams_page(request: Request, locale: str, season: Optional[int] = None
                 "field": field,
                 "tier": tier,
                 "tier_label": tier_label,
+                "level": level,
             })
 
         return templates.TemplateResponse(
