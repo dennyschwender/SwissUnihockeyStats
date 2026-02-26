@@ -119,6 +119,9 @@ POLICIES: list[dict] = [
         "current_only": True,
     },
     # ── Player season stats: cascade T1 → T2 → … → T6 ──────────────────────
+    # current_only is NOT set: these run once for past seasons too (frozen after
+    # first successful sync). Tiers beyond the players policy max_tier will find
+    # 0 players and freeze immediately via the empty-tier stamp.
     {
         "name":        "player_stats_t1",
         "entity_type": "player_stats_t1",
@@ -129,7 +132,6 @@ POLICIES: list[dict] = [
         "priority":    85,
         "max_tier":    1,
         "fixed_tier":  True,
-        "current_only": True,
     },
     {
         "name":        "player_stats_t2",
@@ -142,7 +144,6 @@ POLICIES: list[dict] = [
         "max_tier":    2,
         "fixed_tier":  True,
         "requires":    "player_stats_t1",
-        "current_only": True,
     },
     {
         "name":        "player_stats_t3",
@@ -155,7 +156,6 @@ POLICIES: list[dict] = [
         "max_tier":    3,
         "fixed_tier":  True,
         "requires":    "player_stats_t2",
-        "current_only": True,
     },
     {
         "name":        "player_stats_t4",
@@ -168,7 +168,6 @@ POLICIES: list[dict] = [
         "max_tier":    4,
         "fixed_tier":  True,
         "requires":    "player_stats_t3",
-        "current_only": True,
     },
     {
         "name":        "player_stats_t5",
@@ -181,7 +180,6 @@ POLICIES: list[dict] = [
         "max_tier":    5,
         "fixed_tier":  True,
         "requires":    "player_stats_t4",
-        "current_only": True,
     },
     {
         "name":        "player_stats_t6",
@@ -194,9 +192,9 @@ POLICIES: list[dict] = [
         "max_tier":    6,
         "fixed_tier":  True,
         "requires":    "player_stats_t5",
-        "current_only": True,
     },
     # ── Per-game G/A/PIM: cascade T1 → T2 → … → T6 ──────────────────────────
+    # current_only is NOT set: same rationale as player_stats above.
     {
         "name":        "player_game_stats_t1",
         "entity_type": "player_game_stats_t1",
@@ -207,7 +205,6 @@ POLICIES: list[dict] = [
         "priority":    86,
         "max_tier":    1,
         "fixed_tier":  True,
-        "current_only": True,
     },
     {
         "name":        "player_game_stats_t2",
@@ -220,7 +217,6 @@ POLICIES: list[dict] = [
         "max_tier":    2,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t1",
-        "current_only": True,
     },
     {
         "name":        "player_game_stats_t3",
@@ -233,7 +229,6 @@ POLICIES: list[dict] = [
         "max_tier":    3,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t2",
-        "current_only": True,
     },
     {
         "name":        "player_game_stats_t4",
@@ -246,7 +241,6 @@ POLICIES: list[dict] = [
         "max_tier":    4,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t3",
-        "current_only": True,
     },
     {
         "name":        "player_game_stats_t5",
@@ -259,7 +253,6 @@ POLICIES: list[dict] = [
         "max_tier":    5,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t4",
-        "current_only": True,
     },
     {
         "name":        "player_game_stats_t6",
@@ -272,7 +265,6 @@ POLICIES: list[dict] = [
         "max_tier":    6,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t5",
-        "current_only": True,
     },
 ]
 
@@ -708,8 +700,8 @@ class Scheduler:
         last_sync = _last_sync_for(session, policy["entity_type"], season)
         now = _utcnow()
 
-        # current_only policies (game_events, player_stats) are live data —
-        # they must never run on past seasons, even for an initial sync.
+        # current_only policies (e.g. game_events) are live data that changes
+        # every match — they must never run on past seasons, even for an initial sync.
         if policy.get("current_only") and not is_current_season:
             return
 
