@@ -814,6 +814,10 @@ class DataIndexer:
 
                 if not player_ids:
                     logger.info("No players found for season %s%s", season_id, tier_lbl)
+                    # Stamp the SyncStatus so the scheduler doesn't re-queue
+                    # this tier indefinitely (empty tier = nothing to do).
+                    if exact_tier is not None:
+                        self._mark_sync_complete(session, entity_type, entity_id, 0)
                     return 0
 
                 count = 0
@@ -2013,6 +2017,11 @@ class DataIndexer:
         tier_lbl = f" (tier {exact_tier} only)" if exact_tier else ""
         if not player_ids:
             logger.info("No players found for season %s%s", season_id, tier_lbl)
+            # Stamp the SyncStatus so the scheduler doesn't re-queue this tier
+            # indefinitely when the tier genuinely has no players.
+            if exact_tier is not None:
+                with self.db_service.session_scope() as session:
+                    self._mark_sync_complete(session, entity_type, entity_id, 0)
             return 0
 
         logger.info(
