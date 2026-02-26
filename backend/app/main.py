@@ -706,7 +706,19 @@ async def admin_scheduler_diag(_: None = Depends(require_admin)):
                 for sid in seasons_to_check:
                     last_sync = _last_sync_for(session, policy["entity_type"], sid)
                     max_age = policy["max_age"]
-                    if last_sync is None:
+                    is_current = sid == current_sid
+                    # Past seasons are frozen once indexed: the scheduler intentionally
+                    # never re-queues them, so they should never show as stale.
+                    is_frozen = (
+                        not is_current
+                        and sid is not None
+                        and last_sync is not None
+                        and not policy.get("current_only", False)
+                    )
+                    if is_frozen:
+                        status = "FROZEN"
+                        next_run = "—"
+                    elif last_sync is None:
                         status = "NEVER_SYNCED"
                         next_run = "IMMEDIATE"
                     else:
@@ -725,7 +737,7 @@ async def admin_scheduler_diag(_: None = Depends(require_admin)):
                         "entity_type":  policy["entity_type"],
                         "scope":        policy["scope"],
                         "season":       sid,
-                        "is_current":   sid == current_sid,
+                        "is_current":   is_current,
                         "current_only": policy.get("current_only", False),
                         "max_age_h":    round(policy["max_age"].total_seconds() / 3600, 1),
                         "last_sync":    last_sync.strftime("%Y-%m-%d %H:%M") if last_sync else None,

@@ -886,8 +886,11 @@ function buildSeasonFreshSummary(sid) {
     .map(([, v]) => v)
     .filter(v => !(v.current_only && !v.is_current));
   if (!relevant.length) return '';
-  const neverCount = relevant.filter(v => v.status === 'NEVER_SYNCED').length;
-  const staleCount = relevant.filter(v => v.status === 'STALE').length;
+  // Exclude FROZEN rows — past seasons are intentionally frozen by the scheduler
+  // once indexed (data doesn't change), so they should never appear as warnings.
+  const active = relevant.filter(v => v.status !== 'FROZEN');
+  const neverCount = active.filter(v => v.status === 'NEVER_SYNCED').length;
+  const staleCount = active.filter(v => v.status === 'STALE').length;
   if (neverCount)
     return `<span class="s-chip" style="background:#2d1214;color:#f85149;border-color:#da3633" title="${neverCount} data type(s) never synced">⚠ ${neverCount} never synced</span>`;
   if (staleCount)
@@ -1606,17 +1609,18 @@ async function loadSchedDiag() {
       return;
     }
 
-    // Count problems per policy for a summary header
-    const problems = rows.filter(r => r.status !== 'FRESH');
+    // Count problems per policy for a summary header (FROZEN = intentional, not a problem)
+    const problems = rows.filter(r => r.status !== 'FRESH' && r.status !== 'FROZEN');
 
     tbody.innerHTML = rows.map(r => {
       const isFresh    = r.status === 'FRESH';
       const isNever    = r.status === 'NEVER_SYNCED';
+      const isFrozen   = r.status === 'FROZEN';
       const skipRow    = r.current_only && !r.is_current;
 
-      const statusCls  = isFresh ? 's-ok' : (isNever ? 's-fail' : 's-warn');
-      const statusLbl  = isNever ? '⚠ NEVER SYNCED' : r.status;
-      const rowStyle   = skipRow ? 'opacity:.4;' : (isNever || r.status==='STALE' ? 'background:#1a0e0e;' : '');
+      const statusCls  = isFresh ? 's-ok' : (isNever ? 's-fail' : isFrozen ? '' : 's-warn');
+      const statusLbl  = isNever ? '⚠ NEVER SYNCED' : isFrozen ? '❄ frozen' : r.status;
+      const rowStyle   = skipRow ? 'opacity:.4;' : (isNever || r.status==='STALE' ? 'background:#1a0e0e;' : isFrozen ? 'opacity:.45;' : '');
       const seasonLbl  = r.season ? `S${r.season}${r.is_current ? ' ★' : ''}` : 'global';
       const skipNote   = skipRow ? ' <span style="color:#6e7681;font-size:.6rem">(past, skip)</span>' : '';
       const maxAgeLbl  = r.max_age_h >= 24 ? `${Math.round(r.max_age_h/24)}d` : `${r.max_age_h}h`;
