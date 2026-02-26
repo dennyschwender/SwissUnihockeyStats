@@ -788,14 +788,17 @@ def _admin_stats_sync():
                 return {}
 
         # ── Global totals ──────────────────────────────────────────────────
+        # clubs/teams: COUNT(DISTINCT id) — same API id reused across seasons
+        # leagues: COUNT(DISTINCT league_id, game_class) — unique league type
+        # league_groups: COUNT(DISTINCT group_id) — unique API group
         totals = {
             "seasons":       safe_count(session.query(func.count(Season.id))),
-            "clubs":         safe_count(session.query(func.count(Club.id))),
-            "teams":         safe_count(session.query(func.count(Team.id))),
+            "clubs":         safe_count(session.query(func.count(func.distinct(Club.id)))),
+            "teams":         safe_count(session.query(func.count(func.distinct(Team.id)))),
             "players":       safe_count(session.query(func.count(Player.person_id))),
             "team_players":  safe_count(session.query(func.count(TeamPlayer.id))),
-            "leagues":       safe_count(session.query(func.count(League.id))),
-            "league_groups": safe_count(session.query(func.count(LeagueGroup.id))),
+            "leagues":       safe_count(session.query(func.count(func.distinct(League.league_id)))),
+            "league_groups": safe_count(session.query(func.count(func.distinct(LeagueGroup.group_id)))),
             "games":         safe_count(session.query(func.count(Game.id))),
             "game_events":   safe_count(session.query(func.count(GameEvent.id))),
             "game_players":  safe_count(session.query(func.count(GamePlayer.id))),
