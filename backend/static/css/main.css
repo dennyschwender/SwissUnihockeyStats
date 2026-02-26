@@ -1012,6 +1012,14 @@ html.dark-mode .universal-search-results {
   font-size: 0.875rem;
 }
 
+/* Player search results dropdown on /players page */
+#search-results:not(:empty) {
+  display: block !important;
+}
+#search-results .search-items {
+  padding: 0.5rem 0;
+}
+
 /* Favorites Star Icon */
 .favorite-btn {
   background: none;

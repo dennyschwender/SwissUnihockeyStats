@@ -402,6 +402,65 @@
     </div>
 
     <p class="section-title" style="margin-top:1.25rem">Policy Tier Limits</p>
+
+    <!-- Tier reference info box -->
+    <div style="background:#111827;border:1px solid #1d4ed8;border-radius:8px;padding:.75rem 1rem;margin-bottom:.9rem;font-size:.75rem;line-height:1.6">
+      <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.55rem">
+        <span style="font-size:.85rem">ℹ️</span>
+        <strong style="color:#93c5fd;font-size:.75rem;letter-spacing:.04em;text-transform:uppercase">League Tier Reference</strong>
+      </div>
+      <table style="border-collapse:collapse;width:100%">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:2px 10px 4px 0;color:#6e7681;font-weight:600;white-space:nowrap">Tier</th>
+            <th style="text-align:left;padding:2px 10px 4px 0;color:#6e7681;font-weight:600">Leagues included</th>
+            <th style="text-align:left;padding:2px 0 4px;color:#6e7681;font-weight:600">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#3fb950;font-weight:700;white-space:nowrap">T1</td>
+            <td style="padding:2px 10px 2px 0;color:#c9d1d9">NLA · SML · L-UPL</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Top national leagues (M + F + youth open)</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#58a6ff;font-weight:700;white-space:nowrap">T2</td>
+            <td style="padding:2px 10px 2px 0;color:#c9d1d9">NLB · 1. Liga Damen · …</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Second division</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#58a6ff;font-weight:700;white-space:nowrap">T3</td>
+            <td style="padding:2px 10px 2px 0;color:#c9d1d9">1. Liga (Herren) · …</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Third division + B-level youth</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#d29922;font-weight:700;white-space:nowrap">T4</td>
+            <td style="padding:2px 10px 2px 0;color:#c9d1d9">2. Liga · …</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Fourth division</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#d29922;font-weight:700;white-space:nowrap">T5</td>
+            <td style="padding:2px 10px 2px 0;color:#c9d1d9">3. Liga · …</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Fifth division</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#8b949e;font-weight:700;white-space:nowrap">T6</td>
+            <td style="padding:2px 10px 2px 0;color:#c9d1d9">4. Liga · 5. Liga · Regional · …</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Lowest recognised tiers</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#6e7681;font-weight:700;white-space:nowrap">T7 / All</td>
+            <td style="padding:2px 10px 2px 0;color:#6e7681;font-style:italic">everything else</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Unlisted / other leagues</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top:.55rem;color:#6e7681;font-size:.7rem;line-height:1.5">
+        The cascade scheduler runs T1 first, then T2 only once T1 is fresh, then T3, and so on —
+        so lowering the tier limit speeds up indexing by skipping lower leagues entirely.
+      </div>
+    </div>
+
     <div class="season-card">
       <div style="padding:.75rem 1rem;border-top:1px solid #30363d">
         <div style="font-size:.7rem;color:#6e7681;margin-bottom:.75rem;line-height:1.5">
@@ -935,7 +994,7 @@ async function deleteLayer(season, layer) {
 }
 
 function registerJob(data) {
-  jobs[data.job_id] = { ...data, status: 'running', progress: 0 };
+  jobs[data.job_id] = { ...data, status: 'running', progress: 0, startedAt: Date.now() };
   renderJobs();
   setTimeout(() => pollJob(data.job_id), 1200);
 }
@@ -961,6 +1020,12 @@ async function pollJob(job_id) {
 
     _pollErrors[job_id] = 0;  // reset error counter on success
     const d = await r.json();
+
+    // Preserve startedAt across polls
+    if (!d.startedAt && jobs[job_id] && jobs[job_id].startedAt)
+      d.startedAt = jobs[job_id].startedAt;
+    if (!d.startedAt && d.status === 'running')
+      d.startedAt = Date.now();
 
     // On first encounter of a job (e.g. after page refresh), replay the
     // full output history so the log isn't blank for an already-running job.
@@ -1054,6 +1119,7 @@ function renderJobs() {
     <span class="job-tag ${st}${pulseC}">${st}</span>
     <span class="job-label">${j.label || j.task || '—'}</span>
     <span class="job-season">${j.season ? 'S'+j.season : ''}</span>
+    ${st === 'running' ? `<span class="job-elapsed" id="elapsed-${j.job_id}" style="font-size:.7rem;color:#6e7681;margin-left:auto;margin-right:.4rem;white-space:nowrap;font-variant-numeric:tabular-nums">${_fmtElapsed(j.startedAt)}</span>` : ''}
     ${stopBtn}
   </div>
   <div style="display:flex;align-items:center;gap:.5rem;">
@@ -1064,6 +1130,30 @@ function renderJobs() {
 </div>`;
   }).join('');
 }
+
+/* ═══════════════════════════════════════════════════════
+   Running-clock helpers
+═══════════════════════════════════════════════════════ */
+function _fmtElapsed(startedAt) {
+  if (!startedAt) return '';
+  const s = Math.floor((Date.now() - startedAt) / 1000);
+  if (s < 0) return '0s';
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60), rs = s % 60;
+  if (m < 60) return m + 'm ' + String(rs).padStart(2,'0') + 's';
+  const h = Math.floor(m / 60), rm = m % 60;
+  return h + 'h ' + String(rm).padStart(2,'0') + 'm ' + String(rs).padStart(2,'0') + 's';
+}
+
+// Tick every second — just update the text of existing elapsed spans,
+// no full re-render needed.
+setInterval(() => {
+  for (const [id, j] of Object.entries(jobs)) {
+    if (j.status !== 'running' || !j.startedAt) continue;
+    const el = document.getElementById('elapsed-' + id);
+    if (el) el.textContent = _fmtElapsed(j.startedAt);
+  }
+}, 1000);
 
 async function clearDoneJobs() {
   // Remove finished entries from server history so they don't come back on the next poll

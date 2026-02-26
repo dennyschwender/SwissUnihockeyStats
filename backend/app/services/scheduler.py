@@ -110,24 +110,169 @@ POLICIES: list[dict] = [
     {
         "name":        "game_events",
         "entity_type": "game_events",
-        "max_age":     timedelta(hours=1),
+        "max_age":     timedelta(hours=24),
         "task":        "events",
         "scope":       "season",
         "label":       "Game events refresh",
         "priority":    80,
-        "max_tier":    2,   # NLA + NLB + A-level youth only — 2 API calls/game, runs hourly
-        "current_only": True,  # live data — never run on past seasons
+        "max_tier":    2,   # NLA + NLB + A-level youth only
+        "current_only": True,
     },
+    # ── Player season stats: cascade T1 → T2 → … → T6 ──────────────────────
     {
-        "name":        "player_stats",
-        "entity_type": "player_stats",
-        "max_age":     timedelta(hours=4),
+        "name":        "player_stats_t1",
+        "entity_type": "player_stats_t1",
+        "max_age":     timedelta(hours=24),
         "task":        "player_stats",
         "scope":       "season",
-        "label":       "Player stats refresh",
+        "label":       "Player stats \u2013 T1 (NLA/L-UPL)",
         "priority":    85,
-        "max_tier":    3,   # up to 1.Liga + B-level youth — 1 API call/player, runs every 4h
-        "current_only": True,  # live data — never run on past seasons
+        "max_tier":    1,
+        "fixed_tier":  True,
+        "current_only": True,
+    },
+    {
+        "name":        "player_stats_t2",
+        "entity_type": "player_stats_t2",
+        "max_age":     timedelta(hours=24),
+        "task":        "player_stats",
+        "scope":       "season",
+        "label":       "Player stats \u2013 T2 (NLB)",
+        "priority":    85,
+        "max_tier":    2,
+        "fixed_tier":  True,
+        "requires":    "player_stats_t1",
+        "current_only": True,
+    },
+    {
+        "name":        "player_stats_t3",
+        "entity_type": "player_stats_t3",
+        "max_age":     timedelta(hours=24),
+        "task":        "player_stats",
+        "scope":       "season",
+        "label":       "Player stats \u2013 T3 (1.Liga)",
+        "priority":    85,
+        "max_tier":    3,
+        "fixed_tier":  True,
+        "requires":    "player_stats_t2",
+        "current_only": True,
+    },
+    {
+        "name":        "player_stats_t4",
+        "entity_type": "player_stats_t4",
+        "max_age":     timedelta(hours=24),
+        "task":        "player_stats",
+        "scope":       "season",
+        "label":       "Player stats \u2013 T4 (2.Liga)",
+        "priority":    85,
+        "max_tier":    4,
+        "fixed_tier":  True,
+        "requires":    "player_stats_t3",
+        "current_only": True,
+    },
+    {
+        "name":        "player_stats_t5",
+        "entity_type": "player_stats_t5",
+        "max_age":     timedelta(hours=24),
+        "task":        "player_stats",
+        "scope":       "season",
+        "label":       "Player stats \u2013 T5 (3.Liga)",
+        "priority":    85,
+        "max_tier":    5,
+        "fixed_tier":  True,
+        "requires":    "player_stats_t4",
+        "current_only": True,
+    },
+    {
+        "name":        "player_stats_t6",
+        "entity_type": "player_stats_t6",
+        "max_age":     timedelta(hours=24),
+        "task":        "player_stats",
+        "scope":       "season",
+        "label":       "Player stats \u2013 T6 (4./5.Liga, Regional)",
+        "priority":    85,
+        "max_tier":    6,
+        "fixed_tier":  True,
+        "requires":    "player_stats_t5",
+        "current_only": True,
+    },
+    # ── Per-game G/A/PIM: cascade T1 → T2 → … → T6 ──────────────────────────
+    {
+        "name":        "player_game_stats_t1",
+        "entity_type": "player_game_stats_t1",
+        "max_age":     timedelta(hours=24),
+        "task":        "player_game_stats",
+        "scope":       "season",
+        "label":       "Per-game G/A/PIM \u2013 T1 (NLA/L-UPL)",
+        "priority":    86,
+        "max_tier":    1,
+        "fixed_tier":  True,
+        "current_only": True,
+    },
+    {
+        "name":        "player_game_stats_t2",
+        "entity_type": "player_game_stats_t2",
+        "max_age":     timedelta(hours=24),
+        "task":        "player_game_stats",
+        "scope":       "season",
+        "label":       "Per-game G/A/PIM \u2013 T2 (NLB)",
+        "priority":    86,
+        "max_tier":    2,
+        "fixed_tier":  True,
+        "requires":    "player_game_stats_t1",
+        "current_only": True,
+    },
+    {
+        "name":        "player_game_stats_t3",
+        "entity_type": "player_game_stats_t3",
+        "max_age":     timedelta(hours=24),
+        "task":        "player_game_stats",
+        "scope":       "season",
+        "label":       "Per-game G/A/PIM \u2013 T3 (1.Liga)",
+        "priority":    86,
+        "max_tier":    3,
+        "fixed_tier":  True,
+        "requires":    "player_game_stats_t2",
+        "current_only": True,
+    },
+    {
+        "name":        "player_game_stats_t4",
+        "entity_type": "player_game_stats_t4",
+        "max_age":     timedelta(hours=24),
+        "task":        "player_game_stats",
+        "scope":       "season",
+        "label":       "Per-game G/A/PIM \u2013 T4 (2.Liga)",
+        "priority":    86,
+        "max_tier":    4,
+        "fixed_tier":  True,
+        "requires":    "player_game_stats_t3",
+        "current_only": True,
+    },
+    {
+        "name":        "player_game_stats_t5",
+        "entity_type": "player_game_stats_t5",
+        "max_age":     timedelta(hours=24),
+        "task":        "player_game_stats",
+        "scope":       "season",
+        "label":       "Per-game G/A/PIM \u2013 T5 (3.Liga)",
+        "priority":    86,
+        "max_tier":    5,
+        "fixed_tier":  True,
+        "requires":    "player_game_stats_t4",
+        "current_only": True,
+    },
+    {
+        "name":        "player_game_stats_t6",
+        "entity_type": "player_game_stats_t6",
+        "max_age":     timedelta(hours=24),
+        "task":        "player_game_stats",
+        "scope":       "season",
+        "label":       "Per-game G/A/PIM \u2013 T6 (4./5.Liga, Regional)",
+        "priority":    86,
+        "max_tier":    6,
+        "fixed_tier":  True,
+        "requires":    "player_game_stats_t5",
+        "current_only": True,
     },
 ]
 
@@ -266,10 +411,15 @@ class Scheduler:
         }
 
     def get_policy_tiers(self) -> dict:
-        """Return the effective max_tier for every season-scoped policy."""
+        """Return the effective max_tier for every season-scoped policy.
+
+        Policies marked with fixed_tier=True have their tier baked into their
+        name and are excluded — they should not appear in the tier editor.
+        """
         return {
             p["name"]: self._policy_tiers.get(p["name"], p.get("max_tier", 7))
-            for p in POLICIES if p["scope"] == "season"
+            for p in POLICIES
+            if p["scope"] == "season" and not p.get("fixed_tier")
         }
 
     def set_policy_tiers(self, tiers: dict[str, int]):
@@ -562,6 +712,16 @@ class Scheduler:
         # they must never run on past seasons, even for an initial sync.
         if policy.get("current_only") and not is_current_season:
             return
+
+        # Cascade prerequisite: ensure ordering on the very first run
+        # (T1 must have completed at least once before T2 is eligible, etc.).
+        # We do NOT block on staleness here — each tier's own max_age already
+        # governs when it re-runs.  Blocking on staleness caused T3–T6 to stay
+        # permanently gated whenever T1/T2 hadn't refreshed within the window.
+        if "requires" in policy:
+            req_last = _last_sync_for(session, policy["requires"], season)
+            if req_last is None:
+                return  # prerequisite has never completed for this season yet
 
         # Past seasons are frozen once indexed — their data never changes after
         # the season ends, so we index once and never reschedule again.

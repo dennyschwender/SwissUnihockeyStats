@@ -1565,11 +1565,17 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
 
         # ── PLAYER STATS ───────────────────────────────────────────────────
         if task in ("player_stats", "clubs_path", "full"):
-            push("info", f"Indexing player statistics for season {season}...")
-            stats_n = await asyncio.to_thread(indexer.index_player_stats_for_season, season, force=force)
+            _exact_tier_ps = max_tier if max_tier < 7 else None
+            _tier_lbl_ps   = f" (tier {max_tier} only)" if _exact_tier_ps else ""
+            push("info", f"Indexing player statistics for season {season}{_tier_lbl_ps}...")
+            stats_n = await asyncio.to_thread(
+                indexer.index_player_stats_for_season,
+                season, force=force, exact_tier=_exact_tier_ps,
+            )
             stats["player_stats"] = stats_n
             push("ok", f"Player stats: {stats_n}")
-            await asyncio.to_thread(indexer.record_season_sync, "player_stats", season, stats_n)
+            if not _exact_tier_ps:  # only write global sentinel for full runs
+                await asyncio.to_thread(indexer.record_season_sync, "player_stats", season, stats_n)
             set_progress(60)
 
         # ── GAME LINEUPS (standalone — without events) ─────────────────────
@@ -1598,8 +1604,14 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
 
         # ── PLAYER GAME STATS (standalone or as part of full) ──────────────
         if task in ("player_game_stats", "full"):
-            push("info", f"Updating per-game G/A/PIM for season {season}...")
-            pgstats_n = await asyncio.to_thread(indexer.index_player_game_stats_for_season, season_id=season, force=force)
+            # max_tier < 7 means this is a tier-specific scheduler policy run
+            _exact_tier = max_tier if max_tier < 7 else None
+            _tier_lbl   = f" (tier {max_tier} only)" if _exact_tier else ""
+            push("info", f"Updating per-game G/A/PIM for season {season}{_tier_lbl}...")
+            pgstats_n = await asyncio.to_thread(
+                indexer.index_player_game_stats_for_season,
+                season_id=season, force=force, exact_tier=_exact_tier,
+            )
             stats["player_game_stats"] = pgstats_n
             push("ok", f"Player game stats: {pgstats_n}")
 
@@ -2779,38 +2791,78 @@ async def players_page(request: Request, locale: str, order_by: str = "points", 
 
 @app.get("/{locale}/players/search", response_class=HTMLResponse)
 async def search_players(request: Request, locale: str, q: str = ""):
-    """HTMX player name search — returns partial HTML rows."""
+    """HTMX player name search — returns partial HTML cards with team/league info."""
     from app.services.database import get_database_service
-    from app.models.db_models import Player
-    from sqlalchemy import or_
+    from app.models.db_models import Player, PlayerStatistics
+    from sqlalchemy import or_, func
 
-    filtered: list[dict] = []
+    if not q or len(q) < 2:
+        return HTMLResponse(
+            '<p style="text-align:center;padding:1.5rem;color:var(--gray-500);font-size:.875rem">'
+            "Enter at least 2 characters to search\u2026</p>"
+        )
 
-    if q and len(q) >= 2:
-        db = get_database_service()
-        with db.session_scope() as session:
-            rows = (
-                session.query(Player)
-                .filter(
-                    or_(
-                        Player.full_name.ilike(f"%{q}%"),
-                        Player.name_normalized.like(f"%{q.lower()}%"),
-                    )
+    db = get_database_service()
+    with db.session_scope() as session:
+        player_rows = (
+            session.query(Player)
+            .filter(
+                or_(
+                    Player.full_name.ilike(f"%{q}%"),
+                    Player.name_normalized.like(f"%{q.lower()}%"),
                 )
-                .limit(50)
-                .all()
             )
-            for pl in rows:
-                filtered.append({"id": pl.person_id, "name": pl.full_name or f"Player {pl.person_id}"})
+            .limit(50)
+            .all()
+        )
 
-    if not filtered:
-        msg = "Enter at least 2 characters to search" if not q else "No players found"
-        return HTMLResponse(f'<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--gray-600)">{msg}</td></tr>')
+        if not player_rows:
+            return HTMLResponse(
+                f'<p style="text-align:center;padding:1.5rem;color:var(--gray-500);font-size:.875rem">'
+                f"No players found for <em>{q}</em></p>"
+            )
 
-    rows_html = ""
-    for p in filtered:
-        rows_html += f'<tr onclick="window.location=\'/{locale}/player/{p["id"]}\'" style="cursor:pointer"><td colspan="8">{p["name"]}</td></tr>'
-    return HTMLResponse(rows_html)
+        # Fetch most recent stats row per player to get team + league info
+        player_ids = [p.person_id for p in player_rows]
+        latest_subq = (
+            session.query(
+                PlayerStatistics.player_id,
+                func.max(PlayerStatistics.season_id).label("max_season"),
+            )
+            .filter(PlayerStatistics.player_id.in_(player_ids))
+            .group_by(PlayerStatistics.player_id)
+            .subquery()
+        )
+        stats_rows = (
+            session.query(PlayerStatistics)
+            .join(
+                latest_subq,
+                (PlayerStatistics.player_id == latest_subq.c.player_id)
+                & (PlayerStatistics.season_id == latest_subq.c.max_season),
+            )
+            .all()
+        )
+        stats_map: dict[int, PlayerStatistics] = {s.player_id: s for s in stats_rows}
+
+        parts = []
+        for pl in player_rows:
+            name = pl.full_name or f"Player {pl.person_id}"
+            st = stats_map.get(pl.person_id)
+            subtitle = ""
+            if st:
+                team = st.team_name or ""
+                league = st.league_abbrev or ""
+                if team and league:
+                    subtitle = f'<span class="search-item-subtitle">{team} \u00b7 {league}</span>'
+                elif team:
+                    subtitle = f'<span class="search-item-subtitle">{team}</span>'
+            parts.append(
+                f'<div class="search-item" onclick="window.location.href=\'/{locale}/player/{pl.person_id}\'">'
+                f'<span class="search-item-main"><strong>{name}</strong>{subtitle}</span>'
+                f"</div>"
+            )
+
+        return HTMLResponse('<div class="search-items">' + "".join(parts) + "</div>")
 
 
 @app.get("/{locale}/player/{player_id}", response_class=HTMLResponse)

@@ -6,7 +6,7 @@
 <div class="container page-content">
 
   <div class="page-header">
-    <h1 class="page-title">🏂 {{ t.players.leaderboard }}</h1>
+    <h1 class="page-title">{{ t.players.leaderboard }}</h1>
     <div class="btn-group">
       {% for o, label in [('points', t.players.order_points),('goals', t.players.order_goals),('assists', t.players.order_assists),('pim','PIM')] %}
       <a href="/{{ locale }}/players?order_by={{ o }}&season={{ active_season or '' }}&gender={{ gender }}"
@@ -41,19 +41,25 @@
     </div>
   </div>
 
-  <!-- Search bar -->
-  <div class="search-wrap">
+  <!-- Search bar + results -->
+  <div style="position:relative;margin-bottom:1.5rem;">
     <input type="text" placeholder="{{ t.players.search_placeholder }}"
       hx-get="/{{ locale }}/players/search"
-      hx-trigger="keyup changed delay:400ms"
+      hx-trigger="keyup changed delay:300ms"
       hx-target="#search-results"
       hx-include="[name='q']"
       name="q"
-      class="search-input">
+      class="search-input"
+      autocomplete="off"
+      onblur="setTimeout(()=>{var r=document.getElementById('search-results');if(r)r.style.display='none';},200)"
+      style="width:100%;padding:.65rem 1rem;border:1px solid var(--gray-300);border-radius:8px;font-size:.95rem;background:var(--card-bg);color:var(--text-primary);box-shadow:0 1px 4px var(--shadow-color);">
+    <div id="search-results"
+      style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:40;
+             background:var(--card-bg);border:1px solid var(--gray-200);border-radius:10px;
+             box-shadow:0 4px 20px var(--shadow-color);max-height:420px;overflow-y:auto;
+             display:none;"
+      hx-on:htmx:after-swap="this.style.display=this.innerHTML.trim()?'block':'none'"></div>
   </div>
-
-  <!-- Search results overlay -->
-  <div id="search-results"></div>
 
   {% if players %}
   <div class="table-scroll">

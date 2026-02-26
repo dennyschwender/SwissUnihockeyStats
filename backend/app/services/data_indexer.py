@@ -742,36 +742,77 @@ class DataIndexer:
                 self._mark_sync_complete(session, "player_stats_one", entity_id, count)
         return count
 
-    def index_player_stats_for_season(self, season_id: int, force: bool = False) -> int:
-        """Index player statistics for every known player in a season."""
-        entity_id = f"season:{season_id}"
-        if not force and not self._should_update("player_stats", entity_id, max_age_hours=4):
+    def index_player_stats_for_season(
+        self, season_id: int, force: bool = False, exact_tier: int | None = None
+    ) -> int:
+        """Index player statistics for every known player in a season.
+
+        Args:
+            season_id:  Season to process.
+            force:      Bypass the recency check.
+            exact_tier: When set (1–6), only process players whose team's league
+                        is at that specific tier.  Each tier slice has its own
+                        SyncStatus row so the scheduler can track them
+                        independently.  When None, all players are processed.
+        """
+        if exact_tier is not None:
+            entity_type = f"player_stats_t{exact_tier}"
+            entity_id   = f"season_player_stats:t{exact_tier}:{season_id}"
+        else:
+            entity_type = "player_stats"
+            entity_id   = f"season:{season_id}"
+
+        if not force and not self._should_update(entity_type, entity_id, max_age_hours=24):
             return 0
 
-        logger.info("Indexing player stats for season %s...", season_id)
+        tier_lbl = f" (tier {exact_tier} only)" if exact_tier else ""
+        logger.info("Indexing player stats for season %s%s...", season_id, tier_lbl)
 
         with self.db_service.session_scope() as session:
             try:
-                from app.models.db_models import Season as SeasonModel, GamePlayer as _GamePlayer
+                from app.models.db_models import Season as SeasonModel, GamePlayer as _GamePlayer, Team as _TTeam
                 season_row = session.get(SeasonModel, season_id)
                 season_label = season_row.text if season_row and season_row.text else str(season_id)
 
-                tp_ids = {
-                    r[0] for r in
-                    session.query(TeamPlayer.player_id)
-                    .filter(TeamPlayer.season_id == season_id)
-                    .distinct().all()
-                }
-                gp_ids = {
-                    r[0] for r in
-                    session.query(_GamePlayer.player_id)
-                    .filter(_GamePlayer.season_id == season_id)
-                    .distinct().all()
-                }
+                if exact_tier is not None:
+                    tier_team_ids = {
+                        t.id for t in session.query(_TTeam)
+                        .filter(_TTeam.season_id == season_id).all()
+                        if league_tier(t.league_id or 0) == exact_tier
+                    }
+                    tp_ids = {
+                        r[0] for r in
+                        session.query(TeamPlayer.player_id)
+                        .filter(
+                            TeamPlayer.season_id == season_id,
+                            TeamPlayer.team_id.in_(tier_team_ids),
+                        ).distinct().all()
+                    }
+                    gp_ids = {
+                        r[0] for r in
+                        session.query(_GamePlayer.player_id)
+                        .filter(
+                            _GamePlayer.season_id == season_id,
+                            _GamePlayer.team_id.in_(tier_team_ids),
+                        ).distinct().all()
+                    }
+                else:
+                    tp_ids = {
+                        r[0] for r in
+                        session.query(TeamPlayer.player_id)
+                        .filter(TeamPlayer.season_id == season_id)
+                        .distinct().all()
+                    }
+                    gp_ids = {
+                        r[0] for r in
+                        session.query(_GamePlayer.player_id)
+                        .filter(_GamePlayer.season_id == season_id)
+                        .distinct().all()
+                    }
                 player_ids = list(tp_ids | gp_ids)
 
                 if not player_ids:
-                    logger.info("No players found for season %s", season_id)
+                    logger.info("No players found for season %s%s", season_id, tier_lbl)
                     return 0
 
                 count = 0
@@ -782,13 +823,26 @@ class DataIndexer:
                     )
 
                 session.commit()
-                self._mark_sync_complete(session, "player_stats", entity_id, count)
-                logger.info("✓ Indexed %d player stat rows for season %s", count, season_id)
+                self._mark_sync_complete(session, entity_type, entity_id, count)
+                logger.info("✓ Indexed %d player stat rows for season %s%s", count, season_id, tier_lbl)
+
+                # When running untiered (exact_tier=None), also stamp each
+                # tier-specific SyncStatus row.  This lets the scheduler know
+                # all tiers are fresh after a full manual re-index so they
+                # won't queue individual tier jobs for another 24 h.
+                if exact_tier is None:
+                    for t in range(1, 7):
+                        self._mark_sync_complete(
+                            session,
+                            f"player_stats_t{t}",
+                            f"season_player_stats:t{t}:{season_id}",
+                            count,
+                        )
                 return count
 
             except Exception as e:
-                logger.error("Failed to index player stats for season %s: %s", season_id, e, exc_info=True)
-                self._mark_sync_failed(session, "player_stats", entity_id, str(e))
+                logger.error("Failed to index player stats for season %s%s: %s", season_id, tier_lbl, e, exc_info=True)
+                self._mark_sync_failed(session, entity_type, entity_id, str(e))
                 return 0
 
     # ==================== LEAGUES PATH ====================
@@ -1888,45 +1942,101 @@ class DataIndexer:
                 logger.error("Failed updating game stats for player %s: %s", player_id, exc, exc_info=True)
         return updated
 
-    def index_player_game_stats_for_season(self, season_id: int, force: bool = False) -> int:
+    def index_player_game_stats_for_season(
+        self, season_id: int, force: bool = False, exact_tier: int | None = None
+    ) -> int:
         """Update game_players G/A/PIM for all known players in a season.
 
-        Iterates every player active in the season (from team_players union
-        game_players) and calls index_player_game_stats() for each.
+        Args:
+            season_id: Season to process.
+            force: Bypass the recency check.
+            exact_tier: When set (1, 2, 3 …), only process players whose team's
+                league is at that specific tier.  Each tier slice has its own
+                SyncStatus row so the scheduler can track them independently.
+                When None, all players in the season are processed.
+
         Returns total game_players rows updated.
         """
-        entity_id = f"season_game_stats:{season_id}"
-        if not force and not self._should_update("player_game_stats_season", entity_id, max_age_hours=4):
+        if exact_tier is not None:
+            entity_type = f"player_game_stats_t{exact_tier}"
+            entity_id   = f"season_game_stats:t{exact_tier}:{season_id}"
+        else:
+            entity_type = "player_game_stats_season"
+            entity_id   = f"season_game_stats:{season_id}"
+
+        if not force and not self._should_update(entity_type, entity_id, max_age_hours=4):
             return 0
 
         with self.db_service.session_scope() as session:
-            tp_ids = {
-                r[0] for r in
-                session.query(TeamPlayer.player_id)
-                .filter(TeamPlayer.season_id == season_id)
-                .distinct().all()
-            }
-            gp_ids = {
-                r[0] for r in
-                session.query(GamePlayer.player_id)
-                .filter(GamePlayer.season_id == season_id)
-                .distinct().all()
-            }
+            if exact_tier is not None:
+                from app.models.db_models import Team as _TTeam
+                tier_team_ids = {
+                    t.id for t in session.query(_TTeam)
+                    .filter(_TTeam.season_id == season_id).all()
+                    if league_tier(t.league_id or 0) == exact_tier
+                }
+                tp_ids = {
+                    r[0] for r in
+                    session.query(TeamPlayer.player_id)
+                    .filter(
+                        TeamPlayer.season_id == season_id,
+                        TeamPlayer.team_id.in_(tier_team_ids),
+                    ).distinct().all()
+                }
+                gp_ids = {
+                    r[0] for r in
+                    session.query(GamePlayer.player_id)
+                    .filter(
+                        GamePlayer.season_id == season_id,
+                        GamePlayer.team_id.in_(tier_team_ids),
+                    ).distinct().all()
+                }
+            else:
+                tp_ids = {
+                    r[0] for r in
+                    session.query(TeamPlayer.player_id)
+                    .filter(TeamPlayer.season_id == season_id)
+                    .distinct().all()
+                }
+                gp_ids = {
+                    r[0] for r in
+                    session.query(GamePlayer.player_id)
+                    .filter(GamePlayer.season_id == season_id)
+                    .distinct().all()
+                }
             player_ids = list(tp_ids | gp_ids)
 
+        tier_lbl = f" (tier {exact_tier} only)" if exact_tier else ""
         if not player_ids:
-            logger.info("No players found for season %s", season_id)
+            logger.info("No players found for season %s%s", season_id, tier_lbl)
             return 0
 
-        logger.info("Updating per-game G/A/PIM for %d players in season %s...", len(player_ids), season_id)
+        logger.info(
+            "Updating per-game G/A/PIM for %d players in season %s%s...",
+            len(player_ids), season_id, tier_lbl,
+        )
         total = 0
         for pid in player_ids:
             n = self.index_player_game_stats(pid, season_id=season_id, force=force)
             total += n
 
         with self.db_service.session_scope() as session:
-            self._mark_sync_complete(session, "player_game_stats_season", entity_id, total)
-        logger.info("\u2713 Updated %d game_players rows with G/A/PIM for season %s", total, season_id)
+            self._mark_sync_complete(session, entity_type, entity_id, total)
+            # When running untiered (exact_tier=None), also stamp each
+            # tier-specific SyncStatus row so the scheduler sees all tiers as
+            # fresh after a full manual re-index.
+            if exact_tier is None:
+                for t in range(1, 7):
+                    self._mark_sync_complete(
+                        session,
+                        f"player_game_stats_t{t}",
+                        f"season_game_stats:t{t}:{season_id}",
+                        total,
+                    )
+        logger.info(
+            "\u2713 Updated %d game_players rows with G/A/PIM for season %s%s",
+            total, season_id, tier_lbl,
+        )
         return total
 
     def get_indexing_stats(self) -> Dict[str, Any]:
