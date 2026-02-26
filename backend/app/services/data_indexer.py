@@ -5,6 +5,8 @@ SEASONS → CLUBS → TEAMS → PLAYERS
 SEASONS → LEAGUES → GROUPS → GAMES → PLAYERS
 """
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
@@ -1875,7 +1877,7 @@ class DataIndexer:
 
     # ==================== PLAYER GAME STATS PATH ====================
 
-    def index_player_game_stats(self, player_id: int, season_id: int, force: bool = False) -> int:
+    def index_player_game_stats(self, player_id: int, season_id: int, force: bool = False, request_timeout: int | None = None) -> int:
         """Update game_players.goals/assists/penalty_minutes for one player using
         GET /api/players/:id/overview (per-game breakdown).
 
@@ -1891,7 +1893,7 @@ class DataIndexer:
             return 0
 
         try:
-            data = self.client.get_player_overview(player_id, season=season_id)
+            data = self.client.get_player_overview(player_id, season=season_id, request_timeout=request_timeout)
             regions = data.get("data", {}).get("regions", [])
         except Exception as exc:
             logger.debug("Could not fetch overview for player %s: %s", player_id, exc)
@@ -1951,7 +1953,7 @@ class DataIndexer:
 
     def index_player_game_stats_for_season(
         self, season_id: int, force: bool = False, exact_tier: int | None = None,
-        on_progress=None,
+        on_progress=None, max_workers: int = 5,
     ) -> int:
         """Update game_players G/A/PIM for all known players in a season.
 
@@ -2029,11 +2031,26 @@ class DataIndexer:
             len(player_ids), season_id, tier_lbl,
         )
         total = 0
-        for i, pid in enumerate(player_ids, 1):
-            n = self.index_player_game_stats(pid, season_id=season_id, force=force)
-            total += n
-            if on_progress and len(player_ids):
-                on_progress(int(i / len(player_ids) * 95))
+        completed = 0
+        _lock = threading.Lock()
+
+        def _fetch_one(pid: int) -> int:
+            nonlocal completed
+            n = self.index_player_game_stats(pid, season_id=season_id, force=force,
+                                             request_timeout=10)
+            with _lock:
+                completed += 1
+                if on_progress:
+                    on_progress(int(completed / len(player_ids) * 95))
+            return n
+
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {pool.submit(_fetch_one, pid) for pid in player_ids}
+            for fut in as_completed(futures):
+                try:
+                    total += fut.result()
+                except Exception as exc:
+                    logger.warning("player_game_stats worker error: %s", exc)
 
         with self.db_service.session_scope() as session:
             self._mark_sync_complete(session, entity_type, entity_id, total)

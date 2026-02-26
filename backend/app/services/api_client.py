@@ -168,7 +168,7 @@ class SwissUnihockeyClient:
         self.use_cache = use_cache
         self.cache = CacheManager(cache_dir) if use_cache else None
 
-    def _make_request(self, endpoint: str, params: Optional[Dict[str, Any]] = None, category: str = "general", force_refresh: bool = False) -> Dict[str, Any]:
+    def _make_request(self, endpoint: str, params: Optional[Dict[str, Any]] = None, category: str = "general", force_refresh: bool = False, timeout: int | None = None) -> Dict[str, Any]:
         if params is None:
             params = {}
         params["locale"] = self.locale
@@ -179,10 +179,11 @@ class SwissUnihockeyClient:
                 return cached
 
         url = f"{self.base_url}{endpoint}"
+        _timeout = timeout if timeout is not None else self.timeout
         last_exc = None
         for attempt in range(self.retry_attempts):
             try:
-                resp = self.session.get(url, params=params, timeout=self.timeout)
+                resp = self.session.get(url, params=params, timeout=_timeout)
                 resp.raise_for_status()
                 data = resp.json()
                 if self.use_cache:
@@ -233,8 +234,8 @@ class SwissUnihockeyClient:
     def get_player_stats(self, player_id: int, **params) -> Dict[str, Any]:
         return self._make_request(f"/api/players/{player_id}/statistics", params)
 
-    def get_player_overview(self, player_id: int, **params) -> Dict[str, Any]:
-        return self._make_request(f"/api/players/{player_id}/overview", params)
+    def get_player_overview(self, player_id: int, *, request_timeout: int | None = None, **params) -> Dict[str, Any]:
+        return self._make_request(f"/api/players/{player_id}/overview", params, timeout=request_timeout)
 
     # --- Games ---
     def get_games(self, **params) -> Dict[str, Any]:
