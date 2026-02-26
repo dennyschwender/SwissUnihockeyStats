@@ -743,7 +743,8 @@ class DataIndexer:
         return count
 
     def index_player_stats_for_season(
-        self, season_id: int, force: bool = False, exact_tier: int | None = None
+        self, season_id: int, force: bool = False, exact_tier: int | None = None,
+        on_progress=None,
     ) -> int:
         """Index player statistics for every known player in a season.
 
@@ -817,10 +818,12 @@ class DataIndexer:
 
                 count = 0
                 staged: dict[tuple, PlayerStatistics] = {}
-                for person_id in player_ids:
+                for i, person_id in enumerate(player_ids, 1):
                     count += self._upsert_player_stats_from_api(
                         person_id, season_id, season_label, session, staged
                     )
+                    if on_progress and player_ids:
+                        on_progress(int(i / len(player_ids) * 95))
 
                 session.commit()
                 self._mark_sync_complete(session, entity_type, entity_id, count)
@@ -1943,7 +1946,8 @@ class DataIndexer:
         return updated
 
     def index_player_game_stats_for_season(
-        self, season_id: int, force: bool = False, exact_tier: int | None = None
+        self, season_id: int, force: bool = False, exact_tier: int | None = None,
+        on_progress=None,
     ) -> int:
         """Update game_players G/A/PIM for all known players in a season.
 
@@ -2016,9 +2020,11 @@ class DataIndexer:
             len(player_ids), season_id, tier_lbl,
         )
         total = 0
-        for pid in player_ids:
+        for i, pid in enumerate(player_ids, 1):
             n = self.index_player_game_stats(pid, season_id=season_id, force=force)
             total += n
+            if on_progress and len(player_ids):
+                on_progress(int(i / len(player_ids) * 95))
 
         with self.db_service.session_scope() as session:
             self._mark_sync_complete(session, entity_type, entity_id, total)

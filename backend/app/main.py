@@ -1585,6 +1585,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             stats_n = await asyncio.to_thread(
                 indexer.index_player_stats_for_season,
                 season, force=force, exact_tier=_exact_tier_ps,
+                on_progress=set_progress,
             )
             stats["player_stats"] = stats_n
             push("ok", f"Player stats: {stats_n}")
@@ -1625,6 +1626,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             pgstats_n = await asyncio.to_thread(
                 indexer.index_player_game_stats_for_season,
                 season_id=season, force=force, exact_tier=_exact_tier,
+                on_progress=set_progress,
             )
             stats["player_game_stats"] = pgstats_n
             push("ok", f"Player game stats: {pgstats_n}")
