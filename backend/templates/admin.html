@@ -994,7 +994,8 @@ async function deleteLayer(season, layer) {
 }
 
 function registerJob(data) {
-  jobs[data.job_id] = { ...data, status: 'running', progress: 0, startedAt: Date.now() };
+  const startedAt = data.started_at ? new Date(data.started_at).getTime() : Date.now();
+  jobs[data.job_id] = { ...data, status: 'running', progress: 0, startedAt };
   renderJobs();
   setTimeout(() => pollJob(data.job_id), 1200);
 }
@@ -1021,10 +1022,12 @@ async function pollJob(job_id) {
     _pollErrors[job_id] = 0;  // reset error counter on success
     const d = await r.json();
 
-    // Preserve startedAt across polls
-    if (!d.startedAt && jobs[job_id] && jobs[job_id].startedAt)
+    // Derive startedAt from the server-sent ISO timestamp (survives page refresh)
+    if (d.started_at)
+      d.startedAt = new Date(d.started_at).getTime();
+    else if (jobs[job_id] && jobs[job_id].startedAt)
       d.startedAt = jobs[job_id].startedAt;
-    if (!d.startedAt && d.status === 'running')
+    else if (d.status === 'running')
       d.startedAt = Date.now();
 
     // On first encounter of a job (e.g. after page refresh), replay the
@@ -1296,7 +1299,8 @@ async function loadScheduler() {
       (d.history || []).forEach(h => {
         if (!jobs[h.job_id]) {
           const isRunning = h.status === 'running' || h.status === 'pending';
-          jobs[h.job_id] = { job_id: h.job_id, label: h.policy + (h.season ? ` S${h.season}` : ''), season: h.season, task: h.task, status: isRunning ? 'running' : h.status, progress: isRunning ? 0 : 100 };
+          const startedAt = h.started_at ? new Date(h.started_at).getTime() : (isRunning ? Date.now() : undefined);
+          jobs[h.job_id] = { job_id: h.job_id, label: h.policy + (h.season ? ` S${h.season}` : ''), season: h.season, task: h.task, status: isRunning ? 'running' : h.status, progress: isRunning ? 0 : 100, startedAt };
           renderJobs();
           if (isRunning) pollJob(h.job_id);
         }
@@ -1307,7 +1311,8 @@ async function loadScheduler() {
       const manualJobs = await jobsResp.json();
       manualJobs.forEach(j => {
         if (!jobs[j.job_id]) {
-          jobs[j.job_id] = { ...j };
+          const startedAt = j.started_at ? new Date(j.started_at).getTime() : (j.status === 'running' ? Date.now() : undefined);
+          jobs[j.job_id] = { ...j, startedAt };
           renderJobs();
           if (j.status === 'running') {
             pollJob(j.job_id);

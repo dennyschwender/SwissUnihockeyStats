@@ -980,20 +980,22 @@ async def admin_start_indexing(payload: dict, _: None = Depends(require_admin)):
                 )
 
     job_id = str(uuid.uuid4())[:8]
+    _started_at = datetime.now(timezone.utc).isoformat()
     _admin_jobs[job_id] = {
-        "job_id":    job_id,
-        "season":    season,
-        "task":      task,
-        "label":     _TASK_META[task],
-        "status":    "running",
-        "progress":  0,
-        "stats":     {},
-        "log_lines": [],
-        "error":     None,
+        "job_id":     job_id,
+        "season":     season,
+        "task":       task,
+        "label":      _TASK_META[task],
+        "status":     "running",
+        "progress":   0,
+        "stats":      {},
+        "log_lines":  [],
+        "error":      None,
+        "started_at": _started_at,
     }
     t = asyncio.create_task(_run(job_id, season, task, force, max_tier=max_tier), name=f"job-{job_id}")
     _admin_tasks[job_id] = t
-    return {"job_id": job_id, "season": season, "task": task, "label": _TASK_META[task]}
+    return {"job_id": job_id, "season": season, "task": task, "label": _TASK_META[task], "started_at": _started_at}
 
 
 _JOB_EXPIRY_SECS = 300  # auto-purge finished jobs after 5 minutes
