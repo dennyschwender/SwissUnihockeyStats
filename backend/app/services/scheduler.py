@@ -402,21 +402,35 @@ class Scheduler:
             "max_concurrent": self._max_concurrent,
         }
 
+    # Extra per-task tier keys that are configurable but don't correspond to a
+    # single non-cascade POLICY entry.  These control the manual season-card
+    # dropdowns and are displayed in the Settings tier editor.
+    _EXTRA_TIER_DEFAULTS: dict[str, int] = {
+        "player_stats":      3,
+        "game_lineups":      3,
+        "player_game_stats": 3,
+    }
+
     def get_policy_tiers(self) -> dict:
         """Return the effective max_tier for every season-scoped policy.
 
         Policies marked with fixed_tier=True have their tier baked into their
         name and are excluded — they should not appear in the tier editor.
+        Extra per-task keys (player_stats, game_lineups, player_game_stats) are
+        appended at the end so they show up in the Settings tier table.
         """
-        return {
+        result = {
             p["name"]: self._policy_tiers.get(p["name"], p.get("max_tier", 7))
             for p in POLICIES
             if p["scope"] == "season" and not p.get("fixed_tier")
         }
+        for key, default in self._EXTRA_TIER_DEFAULTS.items():
+            result[key] = self._policy_tiers.get(key, default)
+        return result
 
     def set_policy_tiers(self, tiers: dict[str, int]):
         """Override max_tier for the given policies and persist to disk."""
-        valid_names = {p["name"] for p in POLICIES}
+        valid_names = {p["name"] for p in POLICIES} | set(self._EXTRA_TIER_DEFAULTS)
         for name, tier in tiers.items():
             if name not in valid_names:
                 continue

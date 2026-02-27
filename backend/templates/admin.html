@@ -1510,8 +1510,8 @@ function renderScheduler(d) {
         events:            d.policy_tiers.game_events,
         players:           d.policy_tiers.players,
         player_stats:      d.policy_tiers.player_stats,
-        game_lineups:      d.policy_tiers.game_events || 3,
-        player_game_stats: d.policy_tiers.player_stats,
+        game_lineups:      d.policy_tiers.game_lineups      || 3,
+        player_game_stats: d.policy_tiers.player_game_stats || 3,
         leagues:           d.policy_tiers.leagues,
       };
       for (const [task, tier] of Object.entries(_policyMap)) {
