@@ -285,6 +285,11 @@ class DataIndexer:
                 seasons_data = self.client.get_seasons()
                 entries = seasons_data.get("entries", [])
                 
+                # Derive the latest season that has actually started.
+                # Sep-Dec: current year; Jan-Aug: previous year.
+                _now_dt = datetime.now()
+                _max_season = _now_dt.year if _now_dt.month >= 9 else _now_dt.year - 1
+
                 count = 0
                 for entry in entries:
                     context = entry.get("set_in_context", {})
@@ -292,7 +297,13 @@ class DataIndexer:
                     
                     if not season_id:
                         continue
-                    
+
+                    # Skip seasons that haven't started yet (e.g. API already
+                    # exposes 2026/27 in February 2026 — ignore it until Sep 2026).
+                    if season_id > _max_season:
+                        logger.debug("Skipping future season %s (max=%s)", season_id, _max_season)
+                        continue
+
                     # Check if season exists
                     season = session.query(Season).filter(Season.id == season_id).first()
                     
@@ -1407,7 +1418,11 @@ class DataIndexer:
         #   1 – event type text ("Torschütze", "Strafe", …)
         #   2 – team name
         #   3 – player name / note
-        SKIP_EVENTS = {"spielende", "spielbeginn", "beginn", "ende", ""}
+        # Exact-match skips + prefix-skips for period-boundary events
+        # (e.g. "Beginn 3. Drittel", "Ende 1. Drittel") that the old exact set
+        # never caught because they contain the period number.
+        SKIP_EVENTS_EXACT = {"spielende", "spielbeginn", ""}
+        SKIP_EVENTS_PREFIX = ("beginn", "ende")
         raw_events: list[dict] = []
         for row in rows:
             cells = row.get("cells", [])
@@ -1423,7 +1438,8 @@ class DataIndexer:
             team_name   = _txt(cells[2]) if len(cells) > 2 else None
             player_name = _txt(cells[3]) if len(cells) > 3 else None
 
-            if event_type.lower() in SKIP_EVENTS:
+            etype_lo = event_type.lower()
+            if etype_lo in SKIP_EVENTS_EXACT or etype_lo.startswith(SKIP_EVENTS_PREFIX):
                 continue
 
             raw_events.append({
@@ -1436,8 +1452,11 @@ class DataIndexer:
         # Goals: API emits 2 rows per assisted goal (scorer-only, then
         # scorer+assist). Merge by (time, team), keeping the richer player.
         # Penalties: API emits 2 identical rows — keep only one.
+        # Others (e.g. "Bester Spieler", "Technische Matchstrafe", «Spielabbruch»):
+        # deduplicate by (event_type, time, team) in case the API repeats them.
         deduped: list[dict] = []
         seen_pen: set[tuple] = set()
+        seen_other: set[tuple] = set()
         for ev in raw_events:
             etype_lo = ev["event_type"].lower()
             is_goal    = etype_lo.startswith(("torschütze", "eigentor"))
@@ -1462,6 +1481,10 @@ class DataIndexer:
                 if not found:
                     deduped.append(ev)
             else:
+                key = (ev["event_type"], ev["time"], ev["team"])
+                if key in seen_other:
+                    continue
+                seen_other.add(key)
                 deduped.append(ev)
 
         # ── 3. Write to DB (short critical section, no network I/O) ───────

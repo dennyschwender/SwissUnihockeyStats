@@ -155,6 +155,11 @@ class DatabaseService:
                 WHERE team_id IS NULL AND game_class IS NOT NULL
             """))
 
+            # ── Drop the now-unused player_id index on game_events ──────────
+            # player_id is always NULL (API returns names, not IDs), so the
+            # index only stored NULLs.
+            conn.execute(text("DROP INDEX IF EXISTS idx_event_player"))
+
             conn.commit()
             logger.debug("SQLite migrations applied")
     

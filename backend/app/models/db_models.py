@@ -277,7 +277,8 @@ class GameEvent(Base):
     __table_args__ = (
         ForeignKeyConstraint(['team_id', 'season_id'], ['teams.id', 'teams.season_id']),
         Index('idx_event_game', 'game_id'),
-        Index('idx_event_player', 'player_id'),
+        # idx_event_player intentionally removed: player_id is always NULL (API
+        # provides only player names, not IDs), so indexing it wasted space.
     )
 
 
