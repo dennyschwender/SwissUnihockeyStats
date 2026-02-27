@@ -332,7 +332,7 @@ function eventsTable(goals, penalties) {
     <div class="gd-meta-venue"><a href="https://www.google.com/maps/search/?api=1&query={{ game.venue | urlencode }}" target="_blank" rel="noopener">📍 {{ game.venue }}</a></div>
     {% endif %}
     {% if game.league_name %}
-    <div class="gd-meta-league"><a href="/{{ locale }}/league/{{ game.league_db_id }}">🏆 {{ game.league_name }}{% if game.group_name %} – {{ game.group_name }}{% endif %}</a></div>
+    <div class="gd-meta-league"><a href="/{{ locale }}/league/{{ game.league_db_id }}">🏆 {{ game.league_name }}{% if game.group_name %} – {{ game.group_name }}{% endif %}{% if game.phase and game.phase != 'Regelsaison' %} – {{ game.phase }}{% endif %}</a></div>
     {% endif %}
 
     <div class="gd-matchup">
@@ -756,7 +756,7 @@ function eventsTable(goals, penalties) {
     <div class="gd-tabpanel" x-show="tab === 'table'">
       {% if game.group_standings %}
       <h3 style="font-size:.85rem;font-weight:700;margin:0 0 1rem;color:var(--gray-600);text-transform:uppercase;letter-spacing:.05em;">
-        🏆 {{ game.league_name }}{% if game.group_name %} – {{ game.group_name }}{% endif %}
+        🏆 {{ game.league_name }}{% if game.group_name %} – {{ game.group_name }}{% endif %}{% if game.phase and game.phase != 'Regelsaison' %} – {{ game.phase }}{% endif %}
       </h3>
       <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
       <table class="gd-table" style="min-width:420px;">

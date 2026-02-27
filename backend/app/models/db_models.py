@@ -91,7 +91,8 @@ class LeagueGroup(Base):
     name: Mapped[Optional[str]] = mapped_column(String(200))
     text: Mapped[Optional[str]] = mapped_column(String(200))
     last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
-    
+    phase: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # e.g. 'Regelsaison', 'Playoff Viertelfinals'
+
     # Relationships
     league = relationship("League", back_populates="groups")
     games = relationship("Game", back_populates="group", cascade="all, delete-orphan")

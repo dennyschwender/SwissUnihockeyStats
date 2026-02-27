@@ -22,8 +22,29 @@ from app.services.database import get_database_service
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# League tier mapping  (lower number = higher competitive level)
+
+def _phase_from_slider_text(slider_text: str) -> str:
+    """Extract a stable phase bucket from a slider round title.
+
+    Examples::
+
+        'Runde 22 / 31.1.26'               → 'Regelsaison'
+        'Playoff Viertelfinals / 14.2.26'  → 'Playoff Viertelfinals'
+        'Final / ...'                       → 'Final'
+        ''                                  → 'Regelsaison'
+
+    All numbered rounds ("Runde N") collapse into the single bucket
+    ``'Regelsaison'`` so that Vorrunde and Rückrunde share one
+    :class:`LeagueGroup`.  Every other label gets its own bucket, which
+    means playoff phases each become a separate group.
+    """
+    import re as _re
+    if not slider_text:
+        return "Regelsaison"
+    label = slider_text.split(" / ")[0].strip()
+    if _re.match(r'Runde\s+\d+$', label, _re.IGNORECASE):
+        return "Regelsaison"
+    return label or "Regelsaison"
 # Note: the API groups all A-level youth under league_id 13 (U14A/U16A/U18A/U21A),
 # all B-level under 14, all C-level under 15 — sub-categories cannot be split further.
 #
@@ -1051,6 +1072,37 @@ class DataIndexer:
                 round_id = None  # None = start from the latest (current) round
                 forward_start_round = None  # will be set from first response's next link
 
+                # Per-phase LeagueGroup cache: maps "league_db_id:group_name:phase" → LeagueGroup.id
+                # Avoids repeated DB lookups for the same phase within one indexing run.
+                _phase_group_cache: dict[str, int] = {}
+
+                def _get_or_create_phase_group(phase: str) -> int:
+                    """Return the PK of the LeagueGroup for (league, group_name, phase).
+                    Creates a new row when none exists yet.
+                    """
+                    cache_key = f"{league_db_id}:{group_name or ''}:{phase}"
+                    if cache_key in _phase_group_cache:
+                        return _phase_group_cache[cache_key]
+                    _gk = abs(hash(cache_key)) % (10 ** 9)
+                    _grp = session.query(LeagueGroup).filter(
+                        LeagueGroup.league_id == league_db_id,
+                        LeagueGroup.group_id == _gk,
+                    ).first()
+                    if not _grp:
+                        _grp = LeagueGroup(
+                            league_id=league_db_id,
+                            group_id=_gk,
+                            name=group_name or "",
+                            text=group_name or "",
+                            phase=phase,
+                        )
+                        session.add(_grp)
+                        session.flush()
+                    elif not _grp.phase:
+                        _grp.phase = phase
+                    _phase_group_cache[cache_key] = _grp.id
+                    return _grp.id
+
                 while True:
                     call_kwargs = {**base_kwargs}
                     if round_id is not None:
@@ -1064,6 +1116,9 @@ class DataIndexer:
                     if round_id is None and forward_start_round is None:
                         forward_start_round = (slider.get("next") or {}).get("set_in_context", {}).get("round")
                     regions = d.get("regions", [])
+                    # Route games to the correct per-phase LeagueGroup
+                    _current_phase = _phase_from_slider_text(slider.get("text", ""))
+                    _effective_group_id = _get_or_create_phase_group(_current_phase)
 
                     for region in regions:
                         for row in region.get("rows", []):
@@ -1186,7 +1241,7 @@ class DataIndexer:
                                 game = Game(
                                     id=game_id,
                                     season_id=season_id,
-                                    group_id=group_db_id,
+                                    group_id=_effective_group_id,
                                     home_team_id=home_team_id,
                                     away_team_id=away_team_id,
                                 )
@@ -1203,6 +1258,7 @@ class DataIndexer:
                             game.game_date = game_date
                             game.game_time = game_time_str
                             game.venue = venue
+                            game.group_id = _effective_group_id
                             # Only overwrite score/status when the API returned a real
                             # result; never clobber an existing stored score with None
                             # (this prevents re-indexing from wiping completed games).
@@ -1232,6 +1288,8 @@ class DataIndexer:
                     d = games_data.get("data", {})
                     slider = d.get("slider", {})
                     regions = d.get("regions", [])
+                    _current_phase = _phase_from_slider_text(slider.get("text", ""))
+                    _effective_group_id = _get_or_create_phase_group(_current_phase)
 
                     for region in regions:
                         for row in region.get("rows", []):
@@ -1326,7 +1384,7 @@ class DataIndexer:
 
                             game = session.get(Game, game_id)
                             if not game:
-                                game = Game(id=game_id, season_id=season_id, group_id=group_db_id,
+                                game = Game(id=game_id, season_id=season_id, group_id=_effective_group_id,
                                             home_team_id=home_team_id, away_team_id=away_team_id)
                                 session.add(game)
                                 try:
@@ -1340,6 +1398,7 @@ class DataIndexer:
                             game.game_date = game_date
                             game.game_time = game_time_str
                             game.venue = venue
+                            game.group_id = _effective_group_id
                             if home_score is not None:
                                 game.home_score = home_score
                                 game.away_score = away_score

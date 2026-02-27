@@ -155,6 +155,11 @@ class DatabaseService:
                 WHERE team_id IS NULL AND game_class IS NOT NULL
             """))
 
+            # ── Add phase column to league_groups ────────────────────────────
+            lg_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(league_groups)"))}
+            if "phase" not in lg_cols:
+                conn.execute(text("ALTER TABLE league_groups ADD COLUMN phase TEXT"))
+
             # ── Drop the now-unused player_id index on game_events ──────────
             # player_id is always NULL (API returns names, not IDs), so the
             # index only stored NULLs.

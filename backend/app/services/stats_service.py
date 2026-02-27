@@ -2596,6 +2596,7 @@ def get_game_box_score(game_id: int) -> dict:
         _db_league_id = game.group.league_id if game.group else None
         _db_group_id  = game.group_id
         _group_name   = (game.group.name or game.group.text or "") if game.group else ""
+        _phase        = (game.group.phase or "") if game.group else ""
         _league_name  = (
             game.group.league.name or game.group.league.text or ""
         ) if (game.group and game.group.league) else ""
@@ -2634,6 +2635,7 @@ def get_game_box_score(game_id: int) -> dict:
             "away_record": away_record,
             "group_standings": get_league_standings(_db_league_id, only_group_ids=[_db_group_id] if _db_group_id is not None else None) if _db_league_id else [],
             "group_name": _group_name,
+            "phase": _phase,
             "league_name": _league_name,
         }
 
