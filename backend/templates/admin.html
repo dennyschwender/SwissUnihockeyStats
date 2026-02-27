@@ -738,8 +738,9 @@ let _settingsDirty    = false;   // true when user has unsaved edits in the Sett
 /* task name → entity_type (matches scheduler POLICIES) */
 const TASK_TO_ENTITY = {
   clubs: 'clubs', teams: 'teams', players: 'players',
-  player_stats: 'player_stats', leagues: 'leagues',
-  groups: 'league_groups', games: 'games', events: 'game_events',
+  player_stats: 'player_stats', game_lineups: 'game_lineups',
+  player_game_stats: 'player_game_stats',
+  leagues: 'leagues', groups: 'league_groups', games: 'games', events: 'game_events',
 };
 
 const fmt = n => (n == null ? '—' : Number(n).toLocaleString('de-CH'));
@@ -947,7 +948,11 @@ function isSeasonFiltered(sid) {
 
 function freshnessBadge(sid, task) {
   const entityType = TASK_TO_ENTITY[task] || task;
-  const row = _freshnessMap[`${entityType}:${sid}`];
+  let row = _freshnessMap[`${entityType}:${sid}`];
+  // Scheduler tracks some tasks per-tier (e.g. player_stats_t1…t6) — fall back to any tier variant
+  if (!row) {
+    for (let t = 1; t <= 6 && !row; t++) row = _freshnessMap[`${entityType}_t${t}:${sid}`];
+  }
   if (!row) return '';
   const skipRow = row.current_only && !row.is_current;
   if (skipRow) return '<span class="fresh-badge skip" title="Past season — not auto-scheduled">past</span>';

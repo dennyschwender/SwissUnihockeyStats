@@ -1620,8 +1620,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             )
             stats["player_stats"] = stats_n
             push("ok", f"Player stats: {stats_n}")
-            if not _exact_tier_ps:  # only write global sentinel for full runs
-                await asyncio.to_thread(indexer.record_season_sync, "player_stats", season, stats_n)
+            await asyncio.to_thread(indexer.record_season_sync, "player_stats", season, stats_n)
             set_progress(60)
 
         # ── GAME LINEUPS (standalone — without events) ─────────────────────
@@ -1647,6 +1646,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                 set_progress(int(i / total_gl * 95) if total_gl else 99)
             stats["game_lineups"] = lineup_n2
             push("ok", f"Game lineups: {lineup_n2}")
+            await asyncio.to_thread(indexer.record_season_sync, "game_lineups", season, lineup_n2)
 
         # ── PLAYER GAME STATS (standalone or as part of full) ──────────────
         if task in ("player_game_stats", "full"):
@@ -1661,6 +1661,8 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             )
             stats["player_game_stats"] = pgstats_n
             push("ok", f"Player game stats: {pgstats_n}")
+            if not _exact_tier:  # scheduler tier-runs use their own entity_type keys
+                await asyncio.to_thread(indexer.record_season_sync, "player_game_stats", season, pgstats_n)
 
         # ── LEAGUES ────────────────────────────────────────────────────────
         if task in ("leagues", "groups", "games", "leagues_path", "full"):
