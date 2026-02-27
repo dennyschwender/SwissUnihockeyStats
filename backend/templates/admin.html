@@ -728,7 +728,7 @@
 ═══════════════════════════════════════════════════════ */
 const jobs = {};  // job_id → job object
 // Per-task tier defaults — updated from scheduler policy_tiers on load
-let _defaultTiers = { clubs: 6, teams: 6, leagues: 5, events: 2, players: 2, player_stats: 2, game_lineups: 3, player_game_stats: 2 };
+let _defaultTiers = { clubs: 6, teams: 6, leagues: 5, groups: 5, games: 3, events: 2, players: 2, player_stats: 2, game_lineups: 3, player_game_stats: 2 };
 let _activitySyncRows = [];   // last sync_status snapshot (DB-backed)
 let _activityHistRows = [];   // last scheduler history snapshot (in-memory)
 let _freshnessMap     = {};   // "entity_type:season" → diag row (from scheduler-diag)
@@ -846,8 +846,8 @@ function buildSeasonCard(s, isOpen) {
 
     <div class="task-group-label">Leagues Path</div>
     ${trowTier(sid,'leagues', 'Leagues',                [p(s.leagues,'leagues')])}
-    ${trow(sid,'groups',  'League Groups',          [p(s.leagues,'leagues'),   p(s.league_groups,'groups')])}
-    ${trow(sid,'games',   'Games (per league)',     [p(s.league_groups,'groups'), p(s.games,'games')])}
+    ${trowTier(sid,'groups',  'League Groups',          [p(s.leagues,'leagues'),   p(s.league_groups,'groups')])}
+    ${trowTier(sid,'games',   'Games (per league)',     [p(s.league_groups,'groups'), p(s.games,'games')])}
     ${trowEvents(sid, s)}
 
     <div class="quick-row">
@@ -1513,6 +1513,8 @@ function renderScheduler(d) {
         game_lineups:      d.policy_tiers.game_lineups      || 3,
         player_game_stats: d.policy_tiers.player_game_stats || 3,
         leagues:           d.policy_tiers.leagues,
+        groups:            d.policy_tiers.league_groups     || 5,
+        games:             d.policy_tiers.games             || 3,
       };
       for (const [task, tier] of Object.entries(_policyMap)) {
         if (!tier) continue;
