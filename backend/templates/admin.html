@@ -727,6 +727,7 @@
    Globals
 ═══════════════════════════════════════════════════════ */
 const jobs = {};  // job_id → job object
+let _defaultEventsTier = 2;    // updated from scheduler policy_tiers.game_events on load
 let _activitySyncRows = [];   // last sync_status snapshot (DB-backed)
 let _activityHistRows = [];   // last scheduler history snapshot (in-memory)
 let _freshnessMap     = {};   // "entity_type:season" → diag row (from scheduler-diag)
@@ -890,7 +891,7 @@ function trowEvents(sid, s) {
     [5, '+ 3. Liga'],
     [6, '+ 4./5. Liga'],
     [7, 'All leagues'],
-  ].map(([v, lbl]) => `<option value="${v}"${v===2?' selected':''}>${lbl}</option>`).join('');
+  ].map(([v, lbl]) => `<option value="${v}"${v===_defaultEventsTier?' selected':''}>${lbl}</option>`).join('');
   return `
 <div class="task-row">
   <span class="task-name">Game Events (finished)</span>
@@ -1458,6 +1459,11 @@ function renderScheduler(d) {
     };
     const tiersBodyEl = document.getElementById('sched-tiers-tbody');
     if (tiersBodyEl && d.policy_tiers) {
+      // Sync the manual events-tier dropdown default to the configured policy
+      if (d.policy_tiers.game_events) {
+        _defaultEventsTier = d.policy_tiers.game_events;
+        document.querySelectorAll('.tier-select').forEach(el => { el.value = _defaultEventsTier; });
+      }
       tiersBodyEl.innerHTML = Object.entries(d.policy_tiers).map(([name, tier]) => {
         const opts = Object.entries(TIER_LABELS).map(([v, lbl]) =>
           `<option value="${v}"${+v === tier ? ' selected' : ''}>${lbl}</option>`
