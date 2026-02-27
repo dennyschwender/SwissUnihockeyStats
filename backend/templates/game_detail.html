@@ -650,7 +650,7 @@ function eventsTable(goals, penalties) {
               <button class="gd-filter-btn" :class="flt==='A'?'active':''" @click="flt='A'">✈️ Away</button>
             </div>
             <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-            <table class="gd-table" style="font-size:.8rem;min-width:320px;width:auto;">
+            <table class="gd-table" style="font-size:.8rem;min-width:320px;">
               <tbody>
                 {% for fg in home_combined %}
                 <tr x-show="flt === 'all' || flt === '{{ fg.home_away }}'">
@@ -690,7 +690,7 @@ function eventsTable(goals, penalties) {
               <button class="gd-filter-btn" :class="flt==='A'?'active':''" @click="flt='A'">✈️ Away</button>
             </div>
             <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-            <table class="gd-table" style="font-size:.8rem;min-width:320px;width:auto;">
+            <table class="gd-table" style="font-size:.8rem;min-width:320px;">
               <tbody>
                 {% for fg in away_combined %}
                 <tr x-show="flt === 'all' || flt === '{{ fg.home_away }}'">
