@@ -2603,6 +2603,7 @@ def get_game_box_score(game_id: int) -> dict:
         return {
             "game_id": game_id,
             "season_id": game.season_id,
+            "league_db_id": _db_league_id,
             "home_team_id": game.home_team_id,
             "away_team_id": game.away_team_id,
             "home_team": home_name,

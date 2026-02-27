@@ -18,9 +18,12 @@
     text-align: center;
   }
   .gd-meta-date { font-size:.8rem; color:var(--gray-500); margin-bottom:.2rem; }
-  .gd-meta-venue { font-size:.8rem; color:var(--gray-500); margin-bottom:1.25rem; }
+  .gd-meta-venue { font-size:.8rem; color:var(--gray-500); margin-bottom:.2rem; }
   .gd-meta-venue a { color:inherit; text-decoration:none; }
   .gd-meta-venue a:hover { color:var(--swiss-red); }
+  .gd-meta-league { font-size:.8rem; margin-bottom:1.25rem; }
+  .gd-meta-league a { color:var(--swiss-red); text-decoration:none; font-weight:600; }
+  .gd-meta-league a:hover { text-decoration:underline; }
   .gd-matchup { display:flex; flex-direction:column; align-items:center; width:100%; }
   .gd-team-row { text-align:center; padding:.35rem 1rem; width:100%; }
   .gd-team-name { font-size:1.25rem; font-weight:700; text-decoration:none; color:inherit; display:block; }
@@ -327,6 +330,9 @@ function eventsTable(goals, penalties) {
     <div class="gd-meta-date">{{ game.date }}{% if game.time %} · {{ game.time }}{% endif %}</div>
     {% if game.venue %}
     <div class="gd-meta-venue"><a href="https://www.google.com/maps/search/?api=1&query={{ game.venue | urlencode }}" target="_blank" rel="noopener">📍 {{ game.venue }}</a></div>
+    {% endif %}
+    {% if game.league_name %}
+    <div class="gd-meta-league"><a href="/{{ locale }}/league/{{ game.league_db_id }}">🏆 {{ game.league_name }}{% if game.group_name %} – {{ game.group_name }}{% endif %}</a></div>
     {% endif %}
 
     <div class="gd-matchup">
