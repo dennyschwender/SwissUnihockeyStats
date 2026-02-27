@@ -69,12 +69,13 @@
     }
     .task-row {
       display: grid;
-      grid-template-columns: 200px 1fr auto auto;
+      grid-template-columns: 200px 1fr auto;
       align-items: center;
       gap: .5rem;
       padding: .45rem 1rem;
       border-bottom: 1px solid #1c2128;
     }
+    .task-btns { display: flex; gap: .3rem; flex-shrink: 0; }
     .task-row:hover { background: #1a2130; }
     .task-name { font-size: .8rem; color: #c9d1d9; }
     .task-counts { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
@@ -196,24 +197,32 @@
       .topbar { flex-wrap: wrap; padding: .6rem 1rem; gap: .5rem; }
       .topbar-right { width: 100%; justify-content: flex-end; }
 
-      /* task rows: stack name, then counts + actions on next line */
+      /* season header: year+chevron stay on top row, chips wrap below */
+      .season-header { flex-wrap: wrap; padding: .6rem .75rem; gap: .35rem; }
+      .season-year   { flex: 1; min-width: 80px; }
+      .season-chips  { order: 3; width: 100%; gap: .25rem; }
+      .chevron       { order: 2; flex-shrink: 0; }
+
+      /* task rows: vertical stack */
       .task-row {
-        grid-template-columns: 1fr auto;
-        grid-template-rows: auto auto;
+        display: flex;
+        flex-direction: column;
+        gap: .3rem;
+        padding: .5rem .75rem;
       }
-      .task-row .task-name  { grid-column: 1 / 2; grid-row: 1; }
-      .task-row .task-counts { grid-column: 1 / 2; grid-row: 2; }
-      .task-row .tier-select { grid-column: 2 / 3; grid-row: 1; }
-      .task-row > .btn       { grid-column: 2 / 3; grid-row: 2; }
+      .task-row .task-btns {
+        display: flex;
+        gap: .4rem;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+      }
+      .task-row .task-btns .btn { flex: 1; justify-content: center; }
+      .tier-select { width: 100%; }
 
-      /* season chips wrap tighter */
-      .season-header { gap: .4rem; padding: .6rem .75rem; }
-      .season-chips  { gap: .25rem; }
-
-      /* quick-row inputs go full width */
+      /* quick-row */
       .quick-row { padding: .6rem .75rem; }
       .quick-row input[type="number"],
-      .quick-row input[type="text"]  { width: 100% !important; }
+      .quick-row input[type="text"] { width: 100% !important; }
 
       /* sync table + sched history horizontal scroll */
       .sync-panel { overflow-x: auto; }
@@ -222,7 +231,6 @@
       /* log panel max-height reduced */
       .log-box { max-height: 200px; }
       .job-panel .job-item { padding: .45rem .6rem; }
-
     }
 
     /* ── tabs ── */
@@ -818,9 +826,11 @@ function trow(sid, task, name, counts, extraCls = '') {
 <div class="task-row">
   <span class="task-name">${name}</span>
   <div class="task-counts">${counts.join('')}${freshnessBadge(sid, task)}</div>
-  <button class="btn btn-sm ${extraCls}"
-    onclick="triggerIndex(${sid},'${task}',forceFor(${sid}))">▶ Index</button>  <button class="btn btn-sm btn-red"
-    onclick="deleteLayer(${sid},'${task}')" title="Delete ${name} data for this season">&#128465;</button></div>`;
+  <div class="task-btns">
+    <button class="btn btn-sm ${extraCls}" onclick="triggerIndex(${sid},'${task}',forceFor(${sid}))">▶ Index</button>
+    <button class="btn btn-sm btn-red" onclick="deleteLayer(${sid},'${task}')" title="Delete ${name} data for this season">&#128465;</button>
+  </div>
+</div>`;
 }
 function trowEvents(sid, s) {
   const tierOptions = [
@@ -841,10 +851,10 @@ function trowEvents(sid, s) {
       ${tierOptions}
     </select>
   </div>
-  <button class="btn btn-sm"
-    onclick="triggerIndexEvents(${sid},forceFor(${sid}))">&#9654; Index</button>
-  <button class="btn btn-sm btn-red"
-    onclick="deleteLayer(${sid},'events')" title="Delete Game Events data for this season">&#128465;</button>
+  <div class="task-btns">
+    <button class="btn btn-sm" onclick="triggerIndexEvents(${sid},forceFor(${sid}))">&#9654; Index</button>
+    <button class="btn btn-sm btn-red" onclick="deleteLayer(${sid},'events')" title="Delete Game Events data for this season">&#128465;</button>
+  </div>
 </div>`;
 }
 function forceFor(sid) {
