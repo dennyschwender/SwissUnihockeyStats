@@ -1759,9 +1759,9 @@ def get_player_detail(person_id: int) -> dict:
                 "result": result_label,
                 "season_id": g.season_id,
                 "league": group_league_abbrev.get(g.group_id, "") if g.group_id else "",
-                "g": gp.goals or 0,
-                "a": gp.assists or 0,
-                "pim": gp.penalty_minutes or 0,
+                "g": gp.goals,           # None = not yet indexed (distinct from 0 goals)
+                "a": gp.assists,
+                "pim": gp.penalty_minutes,
             })
 
         result = {

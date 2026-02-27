@@ -1705,9 +1705,9 @@ class DataIndexer:
                                         is_home_team=not bool(is_home_flag),  # flag=0→home, flag=1→away
                                         jersey_number=jersey,
                                         position=str(position)[:50] if position else None,
-                                        goals=0,
-                                        assists=0,
-                                        penalty_minutes=0,
+                                        goals=None,      # NULL = not yet fetched by player_game_stats
+                                        assists=None,
+                                        penalty_minutes=None,
                                         last_updated=datetime.now(timezone.utc),
                                     )
                                     session.add(gp)
