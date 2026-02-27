@@ -1864,23 +1864,36 @@ async def home(request: Request, locale: str, league_category: str = "all"):
     from app.services.data_indexer import league_tier
     from sqlalchemy import distinct, func
     
-    # Get the season with the most player statistics (active season)
+    # Active season = the highlighted (current) season that has any player stats;
+    # fall back to the season with most stats rows (avoids showing last year while
+    # current season indexing is still in progress).
     db = get_database_service()
     with db.session_scope() as session:
-        active_season_row = (
-            session.query(
-                PlayerStatistics.season_id,
-                func.count(PlayerStatistics.id).label('count')
-            )
-            .group_by(PlayerStatistics.season_id)
-            .order_by(func.count(PlayerStatistics.id).desc())
-            .first()
+        from app.models.db_models import Season as SeasonModel
+        highlighted = (
+            session.query(SeasonModel.id)
+            .filter(SeasonModel.highlighted == True)
+            .scalar()
         )
-        
-        if active_season_row:
-            active_season = active_season_row[0]
+        if highlighted:
+            has_stats = (
+                session.query(PlayerStatistics.id)
+                .filter(PlayerStatistics.season_id == highlighted)
+                .first()
+            )
+            active_season = highlighted if has_stats else get_current_season()
         else:
-            active_season = get_current_season()
+            # fallback: season with most stats rows
+            row = (
+                session.query(
+                    PlayerStatistics.season_id,
+                    func.count(PlayerStatistics.id).label('count')
+                )
+                .group_by(PlayerStatistics.season_id)
+                .order_by(func.count(PlayerStatistics.id).desc())
+                .first()
+            )
+            active_season = row[0] if row else get_current_season()
     
     # Get upcoming games (filtered by league category if specified)
     upcoming = get_upcoming_games(
