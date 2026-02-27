@@ -160,6 +160,19 @@ class DatabaseService:
             # index only stored NULLs.
             conn.execute(text("DROP INDEX IF EXISTS idx_event_player"))
 
+            # ── Remove phantom future-season rows ────────────────────────────
+            # index_seasons now skips seasons that haven't started yet, but any
+            # already-created phantom rows (e.g. 2026/27 created in Feb 2026)
+            # should be cleaned up so they don't appear in admin stats.
+            # Safe because seasons > current_year+1 have no child rows.
+            conn.execute(text("""
+                DELETE FROM seasons
+                WHERE id > (CASE WHEN strftime('%m','now') >= '09'
+                                 THEN CAST(strftime('%Y','now') AS INTEGER)
+                                 ELSE CAST(strftime('%Y','now') AS INTEGER) - 1
+                            END)
+            """))
+
             conn.commit()
             logger.debug("SQLite migrations applied")
     
