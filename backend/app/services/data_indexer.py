@@ -1610,6 +1610,13 @@ class DataIndexer:
         # ── 2. Write to DB (short critical section, no network I/O) ───────
         with self.db_service.session_scope() as session:
             try:
+                # Preserve any G/A/PIM already populated by player_game_stats
+                # before wiping the lineup (re-index must not lose scored data).
+                existing_stats: dict[int, tuple] = {
+                    gp.player_id: (gp.goals, gp.assists, gp.penalty_minutes)
+                    for gp in session.query(GamePlayer).filter(GamePlayer.game_id == game_id).all()
+                    if gp.goals is not None or gp.assists is not None or gp.penalty_minutes is not None
+                }
                 # Delete stale lineup so re-indexing is idempotent
                 session.query(GamePlayer).filter(GamePlayer.game_id == game_id).delete()
                 session.flush()
@@ -1697,6 +1704,7 @@ class DataIndexer:
                                     game_id=game_id, player_id=player_id
                                 ).first()
                                 if not existing_gp:
+                                    _saved = existing_stats.get(player_id, (None, None, None))
                                     gp = GamePlayer(
                                         game_id=game_id,
                                         player_id=player_id,
@@ -1705,9 +1713,9 @@ class DataIndexer:
                                         is_home_team=not bool(is_home_flag),  # flag=0→home, flag=1→away
                                         jersey_number=jersey,
                                         position=str(position)[:50] if position else None,
-                                        goals=None,      # NULL = not yet fetched by player_game_stats
-                                        assists=None,
-                                        penalty_minutes=None,
+                                        goals=_saved[0],            # restore previous stats if any
+                                        assists=_saved[1],           # NULL = not yet fetched
+                                        penalty_minutes=_saved[2],
                                         last_updated=datetime.now(timezone.utc),
                                     )
                                     session.add(gp)
