@@ -873,10 +873,18 @@ function p(n, label) {
   const cls = n > 0 ? ' has-data' : '';
   return `<span class="count-pill${cls}">${fmt(n)} ${label}</span>`;
 }
+const _TIER_LABELS = [
+  [1,'T1 \u2014 NLA/L-UPL only'],
+  [2,'T2 \u2014 + NLB, U21A/U18A/U16A'],
+  [3,'T3 \u2014 + 1. Liga, U21B/U18B/U16B'],
+  [4,'T4 \u2014 + 2. Liga, U21C/U18C/U16C'],
+  [5,'T5 \u2014 + 3. Liga, U21D'],
+  [6,'T6 \u2014 All (+ 4./5. Liga, Regional, Cups)'],
+  [7,'T7 \u2014 Everything'],
+];
 function _tierOpts(task) {
   const def = _defaultTiers[task] ?? 2;
-  return [[1,'NLA/SML/L-UPL only'],[2,'+ NLB'],[3,'+ 1. Liga'],[4,'+ 2. Liga'],[5,'+ 3. Liga'],[6,'+ 4./5. Liga'],[7,'All leagues']]
-    .map(([v,lbl]) => `<option value="${v}"${v===def?' selected':''}>${lbl}</option>`).join('');
+  return _TIER_LABELS.map(([v,lbl]) => `<option value="${v}"${v===def?' selected':''}>${lbl}</option>`).join('');
 }
 function trow(sid, task, name, counts, extraCls = '') {
   return `
@@ -903,15 +911,7 @@ function trowTier(sid, task, name, counts) {
 </div>`;
 }
 function trowEvents(sid, s) {
-  const tierOptions = [
-    [1, 'NLA/SML/L-UPL only'],
-    [2, '+ NLB'],
-    [3, '+ 1. Liga'],
-    [4, '+ 2. Liga'],
-    [5, '+ 3. Liga'],
-    [6, '+ 4./5. Liga'],
-    [7, 'All leagues'],
-  ].map(([v, lbl]) => `<option value="${v}"${v===_defaultTiers.events?' selected':''}>${lbl}</option>`).join('');
+  const tierOptions = _TIER_LABELS.map(([v, lbl]) => `<option value="${v}"${v===_defaultTiers.events?' selected':''}>${lbl}</option>`).join('');
   return `
 <div class="task-row">
   <span class="task-name">Game Events (finished)</span>
