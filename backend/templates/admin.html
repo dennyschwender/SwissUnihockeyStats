@@ -488,6 +488,55 @@
       </div>
     </div>
 
+    <p class="section-title" style="margin-top:1.25rem">Rendering Filters</p>
+    <div class="season-card" style="font-size:.75rem;color:#8b949e">
+      <div style="border-top:1px solid #30363d;padding:.6rem .9rem">
+        <p style="margin:0 0 .5rem;color:#6e7681">Items listed here are hidden from all public pages (leagues, clubs, teams lists). Separate entries with commas. IDs are the numeric API IDs.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem .8rem">
+          <div>
+            <label style="display:block;margin-bottom:2px;color:#8b949e">Excluded league names</label>
+            <input id="rf-lg-names" type="text" placeholder="e.g. Herren Test, Test Liga"
+              oninput="rfMarkDirty()"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:3px 7px;font-size:.78rem">
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:2px;color:#8b949e">Excluded league IDs</label>
+            <input id="rf-lg-ids" type="text" placeholder="e.g. 99, 100"
+              oninput="rfMarkDirty()"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:3px 7px;font-size:.78rem">
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:2px;color:#8b949e">Excluded club names</label>
+            <input id="rf-club-names" type="text" placeholder="e.g. Test Club"
+              oninput="rfMarkDirty()"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:3px 7px;font-size:.78rem">
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:2px;color:#8b949e">Excluded club IDs</label>
+            <input id="rf-club-ids" type="text" placeholder="e.g. 12345"
+              oninput="rfMarkDirty()"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:3px 7px;font-size:.78rem">
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:2px;color:#8b949e">Excluded team names</label>
+            <input id="rf-team-names" type="text" placeholder="e.g. Test Team 1"
+              oninput="rfMarkDirty()"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:3px 7px;font-size:.78rem">
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:2px;color:#8b949e">Excluded team IDs</label>
+            <input id="rf-team-ids" type="text" placeholder="e.g. 44444"
+              oninput="rfMarkDirty()"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:3px 7px;font-size:.78rem">
+          </div>
+        </div>
+        <div style="margin-top:.6rem;display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="rfSave()">💾 Save</button>
+          <button class="btn btn-sm" onclick="rfClear()" style="color:#f85149">✕ Clear all</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ══ Tab: Database ══ -->
@@ -1498,6 +1547,70 @@ async function schedClearFilter() {
   await loadScheduler();
 }
 
+// ── Rendering filters ─────────────────────────────────────────────────────────
+let _rfDirty = false;
+function rfMarkDirty() { _rfDirty = true; }
+
+function _parseList(raw) {
+  return raw.split(',').map(s => s.trim()).filter(Boolean);
+}
+function _parseIntList(raw) {
+  return _parseList(raw).map(Number).filter(n => !isNaN(n));
+}
+
+async function loadRenderingFilters() {
+  try {
+    const r = await fetch('/admin/api/rendering');
+    if (!r.ok) return;
+    const d = await r.json();
+    if (_rfDirty) return; // don't overwrite unsaved edits
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = (val||[]).join(', '); };
+    setVal('rf-lg-names',   d.excluded_league_names);
+    setVal('rf-lg-ids',     d.excluded_league_ids);
+    setVal('rf-club-names', d.excluded_club_names);
+    setVal('rf-club-ids',   d.excluded_club_ids);
+    setVal('rf-team-names', d.excluded_team_names);
+    setVal('rf-team-ids',   d.excluded_team_ids);
+  } catch(e) { /* graceful */ }
+}
+
+async function rfSave() {
+  const payload = {
+    excluded_league_names:  _parseList(document.getElementById('rf-lg-names').value),
+    excluded_league_ids:    _parseIntList(document.getElementById('rf-lg-ids').value),
+    excluded_club_names:    _parseList(document.getElementById('rf-club-names').value),
+    excluded_club_ids:      _parseIntList(document.getElementById('rf-club-ids').value),
+    excluded_team_names:    _parseList(document.getElementById('rf-team-names').value),
+    excluded_team_ids:      _parseIntList(document.getElementById('rf-team-ids').value),
+  };
+  const r = await fetch('/admin/api/rendering', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload),
+  });
+  if (r.ok) {
+    _rfDirty = false;
+    log('info', '✓ Rendering filters saved');
+    await loadRenderingFilters();
+  } else {
+    log('error', 'Failed to save rendering filters');
+  }
+}
+
+async function rfClear() {
+  const empty = { excluded_league_names:[], excluded_league_ids:[], excluded_club_names:[], excluded_club_ids:[], excluded_team_names:[], excluded_team_ids:[] };
+  const r = await fetch('/admin/api/rendering', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(empty),
+  });
+  if (r.ok) {
+    _rfDirty = false;
+    log('info', '✓ Rendering filters cleared');
+    await loadRenderingFilters();
+  } else {
+    log('error', 'Failed to clear rendering filters');
+  }
+}
+
 async function schedSaveTiers() {
   const tiersBodyEl = document.getElementById('sched-tiers-tbody');
   if (!tiersBodyEl) return;
@@ -1917,6 +2030,7 @@ async function runCleanup() {
 ═══════════════════════════════════════════════════════ */
 loadStats();
 loadScheduler();
+loadRenderingFilters();
 // Stagger DB info so it doesn't contend with stats at boot
 setTimeout(loadDbInfo, 2000);
 setInterval(loadStats, 30000);

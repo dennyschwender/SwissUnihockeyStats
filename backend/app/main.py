@@ -25,6 +25,7 @@ from app.api.v1.router import api_router
 from app.lib.i18n import get_translations, get_locale_from_path, DEFAULT_LOCALE
 from app.services.swissunihockey import get_swissunihockey_client
 from app.services.data_cache import preload_common_data, preload_data, get_cached_teams, get_cached_leagues, get_cached_clubs
+from app.services import rendering_config as _rcfg
 
 # Configure logging
 logging.basicConfig(
@@ -1273,6 +1274,33 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
     raise HTTPException(status_code=400, detail=f"Unknown action '{action}'")
 
 
+@app.get("/admin/api/rendering")
+async def admin_rendering_get(_: None = Depends(require_admin)):
+    """Return current rendering exclusion config."""
+    return _rcfg.get_config()
+
+
+@app.post("/admin/api/rendering")
+async def admin_rendering_post(payload: dict, _: None = Depends(require_admin)):
+    """Update rendering exclusion config.
+
+    Accepts the full config object:
+      {
+        "excluded_league_ids":   [1, 2],
+        "excluded_league_names": ["Herren Test"],
+        "excluded_club_ids":     [],
+        "excluded_club_names":   ["Test Club"],
+        "excluded_team_ids":     [],
+        "excluded_team_names":   []
+      }
+    """
+    try:
+        updated = _rcfg.set_config(payload)
+        return {"ok": True, **updated}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.post("/admin/api/purge")
 async def admin_purge_seasons(payload: dict, _: None = Depends(require_admin)):
     """Purge data for one or more seasons as a background job.
@@ -2057,7 +2085,9 @@ async def clubs_page(request: Request, locale: str):
     """Clubs listing page"""
     # Use cached data instead of API call (loads on-demand if needed)
     clubs_list = await get_cached_clubs()
-    
+    if isinstance(clubs_list, list):
+        clubs_list = _rcfg.filter_clubs(clubs_list)
+
     return templates.TemplateResponse(
         request,
         "clubs.html",
@@ -2075,7 +2105,8 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
     # Use cached data instead of API call - instant results!
     all_clubs = await get_cached_clubs()
     
-    # Filter clubs by search query
+    # Apply rendering exclusions, then filter by search query
+    all_clubs = _rcfg.filter_clubs(all_clubs)
     filtered_clubs = all_clubs
     if q:
         filtered_clubs = [
@@ -2259,6 +2290,9 @@ async def leagues_page(request: Request, locale: str, season: Optional[int] = No
 
     leagues_list = get_leagues_from_db(season_id=season)
 
+    # Apply rendering exclusions before any processing
+    leagues_list = _rcfg.filter_leagues(leagues_list)
+
     # Tier → human-readable label (matches admin categorization)
     TIER_DISPLAY: dict[int, str] = {
         1: "NLA / L-UPL",
@@ -2283,11 +2317,8 @@ async def leagues_page(request: Request, locale: str, season: Optional[int] = No
     }
 
     # Build flat list with annotated gender / field / tier for client-side filtering
-    _EXCLUDED_LEAGUE_NAMES = {"Herren Test"}
     leagues_flat = []
     for lg in leagues_list:
-        if lg["name"] in _EXCLUDED_LEAGUE_NAMES:
-            continue
         gc = lg["game_class"]
         if gc in (11, 12):
             gender = "men"
@@ -2613,10 +2644,16 @@ async def teams_page(request: Request, locale: str, season: Optional[int] = None
             1: "NLA / L-UPL", 2: "NLB", 3: "1. Liga",
             4: "2. Liga", 5: "3. Liga", 6: "4. / 5. Liga & Cups",
         }
+        _rc = _rcfg.get_config()
+        _excl_lg_names = set(_rc.get("excluded_league_names") or [])
+        _excl_lg_ids   = set(_rc.get("excluded_league_ids") or [])
+        teams_list = _rcfg.filter_teams(teams_list)
         teams_flat: list[dict] = []
         for t in teams_list:
             ln = t.get("league_name") or ""
-            if ln == "Herren Test":
+            if ln in _excl_lg_names:
+                continue
+            if t.get("league_id") in _excl_lg_ids:
                 continue
             gc = t.get("game_class") or 0
             if gc in (11, 12):
