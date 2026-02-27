@@ -771,7 +771,7 @@ function buildSeasonCard(s, isOpen) {
 <div class="season-card${s.is_current ? ' current-season' : ''}">
   <div class="season-header" onclick="toggleSeason(${sid})">
     <span class="season-year">${year}${s.is_current ? ' <span class="current-badge">&#9733; current</span>' : ''}</span>
-    <div class="season-chips">${summaryChips}${buildSeasonFreshSummary(sid)}</div>
+    <div class="season-chips">${summaryChips}${buildCompletenessChip(s)}${buildSeasonFreshSummary(sid)}</div>
     <span class="chevron${isOpen ? ' open' : ''}" id="chv-${sid}">▶</span>
   </div>
   <div class="season-body${isOpen ? ' open' : ''}" id="sbody-${sid}" data-sid="${sid}">
@@ -878,6 +878,34 @@ function freshnessBadge(sid, task) {
   const tip = `Next: ${row.next_run} · max age: ${maxAgeStr}`;
   return `<span class="fresh-badge ${cls}" title="${tip}">${lbl}</span>`
        + `<span class="next-run-pill" title="${tip}">${row.next_run}</span>`;
+}
+
+function buildCompletenessChip(s) {
+  // Layers we expect to be > 0 for a fully-indexed season, with friendly labels.
+  // game_events is omitted — it's optional (only indexed for top tiers).
+  const layers = [
+    [s.clubs,        'clubs'],
+    [s.leagues,      'leagues'],
+    [s.league_groups,'groups'],
+    [s.teams,        'teams'],
+    [s.games,        'games'],
+    [s.team_players, 'roster'],
+    [s.game_players, 'lineups'],
+    [s.player_stats, 'player stats'],
+  ];
+  const missing = layers.filter(([n]) => !n || n === 0).map(([, lbl]) => lbl);
+  const total   = layers.length;
+  const done    = total - missing.length;
+
+  if (missing.length === total)
+    return `<span class="s-chip empty" title="No data indexed yet">⬜ empty</span>`;
+  if (missing.length === 0)
+    return `<span class="s-chip ok" title="All ${total} data layers indexed">✅ complete</span>`;
+
+  const tip = `Missing: ${missing.join(', ')}`;
+  const pct = Math.round(done / total * 100);
+  const cls = missing.length <= 2 ? 'warn' : '';
+  return `<span class="s-chip ${cls}" title="${tip}">📊 ${done}/${total} layers (${pct}%)</span>`;
 }
 
 function buildSeasonFreshSummary(sid) {
