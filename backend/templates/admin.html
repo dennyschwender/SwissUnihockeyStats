@@ -727,7 +727,8 @@
    Globals
 ═══════════════════════════════════════════════════════ */
 const jobs = {};  // job_id → job object
-let _defaultEventsTier = 2;    // updated from scheduler policy_tiers.game_events on load
+// Per-task tier defaults — updated from scheduler policy_tiers on load
+let _defaultTiers = { events: 2, players: 2, player_stats: 2, game_lineups: 3, player_game_stats: 2 };
 let _activitySyncRows = [];   // last sync_status snapshot (DB-backed)
 let _activityHistRows = [];   // last scheduler history snapshot (in-memory)
 let _freshnessMap     = {};   // "entity_type:season" → diag row (from scheduler-diag)
@@ -837,10 +838,10 @@ function buildSeasonCard(s, isOpen) {
     <div class="task-group-label">Clubs Path</div>
     ${trow(sid,'clubs',   'Clubs',                 [p(s.clubs,'clubs')])}
     ${trow(sid,'teams',   'Teams (per club)',       [p(s.clubs,'clubs'),       p(s.teams,'teams')])}
-    ${trow(sid,'players',          'Players (per team)',        [p(s.teams,'teams'),          p(s.team_players,'roster')])}
-    ${trow(sid,'player_stats',      'Player Statistics',         [p(s.team_players,'roster'),  p(s.player_stats,'stats')])}
-    ${trow(sid,'game_lineups',      'Game Lineups',              [p(s.games,'games'),          p(s.game_players,'lineups')])}
-    ${trow(sid,'player_game_stats', 'Player Game Stats (G/A/PIM)',[p(s.game_players,'lineups'), p(s.player_stats,'stats')])}
+    ${trowTier(sid,'players',          'Players (per team)',        [p(s.teams,'teams'),          p(s.team_players,'roster')])}
+    ${trowTier(sid,'player_stats',      'Player Statistics',         [p(s.team_players,'roster'),  p(s.player_stats,'stats')])}
+    ${trowTier(sid,'game_lineups',      'Game Lineups',              [p(s.games,'games'),          p(s.game_players,'lineups')])}
+    ${trowTier(sid,'player_game_stats', 'Player Game Stats (G/A/PIM)',[p(s.game_players,'lineups'), p(s.player_stats,'stats')])}
 
     <div class="task-group-label">Leagues Path</div>
     ${trow(sid,'leagues', 'Leagues',                [p(s.leagues,'leagues')])}
@@ -871,6 +872,11 @@ function p(n, label) {
   const cls = n > 0 ? ' has-data' : '';
   return `<span class="count-pill${cls}">${fmt(n)} ${label}</span>`;
 }
+function _tierOpts(task) {
+  const def = _defaultTiers[task] ?? 2;
+  return [[1,'NLA/SML/L-UPL only'],[2,'+ NLB'],[3,'+ 1. Liga'],[4,'+ 2. Liga'],[5,'+ 3. Liga'],[6,'+ 4./5. Liga'],[7,'All leagues']]
+    .map(([v,lbl]) => `<option value="${v}"${v===def?' selected':''}>${lbl}</option>`).join('');
+}
 function trow(sid, task, name, counts, extraCls = '') {
   return `
 <div class="task-row">
@@ -878,6 +884,19 @@ function trow(sid, task, name, counts, extraCls = '') {
   <div class="task-counts">${counts.join('')}${freshnessBadge(sid, task)}</div>
   <div class="task-btns">
     <button class="btn btn-sm ${extraCls}" onclick="triggerIndex(${sid},'${task}',forceFor(${sid}))">▶ Index</button>
+    <button class="btn btn-sm btn-red" onclick="deleteLayer(${sid},'${task}')" title="Delete ${name} data for this season">&#128465;</button>
+  </div>
+</div>`;
+}
+function trowTier(sid, task, name, counts) {
+  return `
+<div class="task-row">
+  <span class="task-name">${name}</span>
+  <div class="task-counts">${counts.join('')}${freshnessBadge(sid, task)}
+    <select id="tier-${task}-${sid}" class="tier-select" title="Max league tier">${_tierOpts(task)}</select>
+  </div>
+  <div class="task-btns">
+    <button class="btn btn-sm" onclick="triggerIndexTiered(${sid},'${task}',forceFor(${sid}))">▶ Index</button>
     <button class="btn btn-sm btn-red" onclick="deleteLayer(${sid},'${task}')" title="Delete ${name} data for this season">&#128465;</button>
   </div>
 </div>`;
@@ -891,13 +910,13 @@ function trowEvents(sid, s) {
     [5, '+ 3. Liga'],
     [6, '+ 4./5. Liga'],
     [7, 'All leagues'],
-  ].map(([v, lbl]) => `<option value="${v}"${v===_defaultEventsTier?' selected':''}>${lbl}</option>`).join('');
+  ].map(([v, lbl]) => `<option value="${v}"${v===_defaultTiers.events?' selected':''}>${lbl}</option>`).join('');
   return `
 <div class="task-row">
   <span class="task-name">Game Events (finished)</span>
   <div class="task-counts">
     ${p(s.games,'games')} ${p(s.game_events,'events')}${freshnessBadge(sid, 'events')}
-    <select id="tier-${sid}" class="tier-select" title="Max league tier to fetch events for">
+    <select id="tier-events-${sid}" class="tier-select" title="Max league tier to fetch events for">
       ${tierOptions}
     </select>
   </div>
@@ -1042,8 +1061,28 @@ async function triggerIndex(season, task, force) {
     log('error', 'Request error: ' + e.message);
   }
 }
+async function triggerIndexTiered(season, task, force) {
+  const sel = document.getElementById(`tier-${task}-${season}`);
+  const max_tier = sel ? parseInt(sel.value, 10) : (_defaultTiers[task] ?? 7);
+  const tierLabel = sel ? sel.options[sel.selectedIndex].text : 'auto';
+  log('info', `▶ season=${season}  task=${task}  force=${force}  tier≤${max_tier} (${tierLabel})`);
+  try {
+    const r = await fetch('/admin/api/index', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ season, task, force: !!force, max_tier }),
+    });
+    const d = await r.json();
+    if (r.status === 429) { log('warn', '⏳ ' + d.detail); return; }
+    if (!r.ok) { log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
+    log('info', `Job ${d.job_id} queued — ${d.label}`);
+    registerJob(d);
+  } catch(e) {
+    log('error', 'Request error: ' + e.message);
+  }
+}
 async function triggerIndexEvents(season, force) {
-  const sel = document.getElementById('tier-' + season);
+  const sel = document.getElementById('tier-events-' + season);
   const max_tier = sel ? parseInt(sel.value, 10) : 7;
   const tierLabel = sel ? sel.options[sel.selectedIndex].text : 'all';
   log('info', `\u25b6 season=${season}  task=events  force=${force}  tier\u2264${max_tier} (${tierLabel})`);
@@ -1459,10 +1498,19 @@ function renderScheduler(d) {
     };
     const tiersBodyEl = document.getElementById('sched-tiers-tbody');
     if (tiersBodyEl && d.policy_tiers) {
-      // Sync the manual events-tier dropdown default to the configured policy
-      if (d.policy_tiers.game_events) {
-        _defaultEventsTier = d.policy_tiers.game_events;
-        document.querySelectorAll('.tier-select').forEach(el => { el.value = _defaultEventsTier; });
+      // Sync manual tier dropdowns from policy config
+      const _policyMap = {
+        events:            d.policy_tiers.game_events,
+        players:           d.policy_tiers.players,
+        player_stats:      d.policy_tiers.player_stats,
+        game_lineups:      d.policy_tiers.game_events || 3,
+        player_game_stats: d.policy_tiers.player_stats,
+      };
+      for (const [task, tier] of Object.entries(_policyMap)) {
+        if (!tier) continue;
+        _defaultTiers[task] = tier;
+        const attr = task === 'events' ? '[id^="tier-events-"]' : `[id^="tier-${task}-"]`;
+        document.querySelectorAll(`.tier-select${attr}`).forEach(el => { el.value = tier; });
       }
       tiersBodyEl.innerHTML = Object.entries(d.policy_tiers).map(([name, tier]) => {
         const opts = Object.entries(TIER_LABELS).map(([v, lbl]) =>
