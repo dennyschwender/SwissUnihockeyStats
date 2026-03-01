@@ -769,6 +769,147 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# 4a. Per-phase top scorer aggregation from GamePlayer rows
+# ---------------------------------------------------------------------------
+
+def get_league_top_scorers_by_phase(
+    db_league_id: int,
+    phase_to_group_ids: dict[str, list[int]],
+    limit: int = 100,
+) -> dict[str, list[dict]]:
+    """
+    Build top-scorer lists per canonical phase using per-game GamePlayer rows.
+
+    Returns a dict  { phase_key: [scorer_dict, ...] }  only for phases that
+    have at least one GamePlayer row.  If no GamePlayer data exists at all for
+    this league, returns {}.
+
+    scorer_dict keys: player_id, player_name, team_name, team_id,
+                      gp, g, a, pts, pim
+    """
+    from collections import defaultdict
+    from sqlalchemy import func as _func
+
+    db = get_database_service()
+    with db.session_scope() as session:
+        # Flat mapping: group_id → phase
+        gid_to_phase: dict[int, str] = {}
+        for ph, gids in phase_to_group_ids.items():
+            for gid in gids:
+                gid_to_phase[gid] = ph
+
+        all_group_ids = list(gid_to_phase.keys())
+        if not all_group_ids:
+            return {}
+
+        # Fetch all played games in this league grouped by group_id
+        games_in_groups = (
+            session.query(Game.id, Game.group_id)
+            .filter(
+                Game.group_id.in_(all_group_ids),
+                Game.home_score.isnot(None),  # played only
+            )
+            .all()
+        )
+        if not games_in_groups:
+            return {}
+
+        game_id_to_phase: dict[int, str] = {
+            g.id: gid_to_phase[g.group_id]
+            for g in games_in_groups
+            if g.group_id in gid_to_phase
+        }
+        all_game_ids = list(game_id_to_phase.keys())
+        if not all_game_ids:
+            return {}
+
+        # Check whether any GamePlayer rows exist for these games
+        gp_rows = (
+            session.query(
+                GamePlayer.game_id,
+                GamePlayer.player_id,
+                GamePlayer.team_id,
+                GamePlayer.goals,
+                GamePlayer.assists,
+                GamePlayer.penalty_minutes,
+            )
+            .filter(GamePlayer.game_id.in_(all_game_ids))
+            .all()
+        )
+        if not gp_rows:
+            return {}  # no game-level detail → caller will suppress chips
+
+        # Aggregate per (phase, player_id, team_id)
+        # key: (phase, player_id, team_id)
+        agg: dict[tuple, dict] = {}
+        for row in gp_rows:
+            ph = game_id_to_phase.get(row.game_id)
+            if ph is None:
+                continue
+            key = (ph, row.player_id, row.team_id)
+            if key not in agg:
+                agg[key] = {"gp": 0, "g": 0, "a": 0, "pim": 0}
+            agg[key]["gp"] += 1
+            agg[key]["g"]   += row.goals or 0
+            agg[key]["a"]   += row.assists or 0
+            agg[key]["pim"] += row.penalty_minutes or 0
+
+        # Resolve player names and team names
+        player_ids = {k[1] for k in agg}
+        team_ids   = {k[2] for k in agg if k[2]}
+
+        player_names: dict[int, str] = {}
+        for pl in session.query(Player).filter(Player.person_id.in_(player_ids)).all():
+            player_names[pl.person_id] = pl.full_name or f"Player {pl.person_id}"
+
+        # Get the league's season_id for team name lookup
+        league = session.query(League).filter(League.id == db_league_id).first()
+        season_id = league.season_id if league else None
+
+        team_names: dict[int, str] = {}
+        if team_ids:
+            q = session.query(Team).filter(Team.id.in_(team_ids))
+            if season_id:
+                q = q.filter(Team.season_id == season_id)
+            for t in q.all():
+                team_names[t.id] = t.name or t.text or f"Team {t.id}"
+            # fallback: any season
+            missing = team_ids - team_names.keys()
+            if missing:
+                for t in session.query(Team).filter(
+                    Team.id.in_(missing), Team.name.isnot(None)
+                ).all():
+                    team_names.setdefault(t.id, t.name)
+
+        # Build phase → sorted list
+        phase_lists: dict[str, list[dict]] = {}
+        for (ph, pid, tid), stats in agg.items():
+            if ph not in phase_lists:
+                phase_lists[ph] = []
+            phase_lists[ph].append({
+                "player_id":   pid,
+                "player_name": player_names.get(pid, f"Player {pid}"),
+                "team_name":   team_names.get(tid, "Unknown") if tid else "Unknown",
+                "team_id":     tid,
+                "gp":  stats["gp"],
+                "g":   stats["g"],
+                "a":   stats["a"],
+                "pts": stats["g"] + stats["a"],
+                "pim": stats["pim"],
+            })
+
+        result: dict[str, list[dict]] = {}
+        for ph, rows in phase_lists.items():
+            rows.sort(key=lambda x: (-x["pts"], -x["g"]))
+            # re-rank and trim
+            for i, r in enumerate(rows[:limit], 1):
+                r["rank"] = i
+            result[ph] = rows[:limit]
+
+        return result
+
+
+# ---------------------------------------------------------------------------
 # 4. Top penalties per league
 # ---------------------------------------------------------------------------
 

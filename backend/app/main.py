@@ -2476,6 +2476,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
         get_league_standings,
         get_league_top_scorers,
         get_league_top_penalties,
+        get_league_top_scorers_by_phase,
         get_recent_games,
         get_all_seasons,
     )
@@ -2499,6 +2500,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
                 "standings_by_group": {},
                 "standings_by_phase": {},
                 "series_by_phase": {},
+                "topscorers_by_phase": {},
                 "topscorers": [],
                 "top_penalties": [],
                 "games": [],
@@ -2545,6 +2547,8 @@ async def league_detail(request: Request, locale: str, league_id: int):
     }
     topscorers = get_league_top_scorers(league_id, limit=100)
     top_penalties = get_league_top_penalties(league_id, limit=100)
+    # Per-phase scorer aggregation from GamePlayer rows (empty if game details not indexed)
+    topscorers_by_phase: dict = {}
 
     # Helper: map raw phase string → canonical category key
     def _canonical_phase(phase_str: str | None) -> str:
@@ -2672,6 +2676,11 @@ async def league_detail(request: Request, locale: str, league_id: int):
         if _ph != "regular":
             standings_by_phase[_ph] = get_league_standings(league_id, only_group_ids=_gids)
 
+    # Per-phase top scorer aggregation (only when GamePlayer rows exist)
+    topscorers_by_phase = get_league_top_scorers_by_phase(
+        league_id, _phase_to_group_ids, limit=100
+    )
+
     upcoming_games: list[dict] = []
     if group_ids_for_league:
         with db.session_scope() as sess:
@@ -2767,6 +2776,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             "standings_by_group": standings_by_group,
             "standings_by_phase": standings_by_phase,
             "series_by_phase": series_by_phase,
+            "topscorers_by_phase": topscorers_by_phase,
             "topscorers": topscorers,
             "top_penalties": top_penalties,
             "games": recent_games,
