@@ -383,8 +383,8 @@ function eventsTable(goals, penalties) {
 
     {% if game.best_players %}
     <div class="gd-best-row">
-      {% set home_best = game.best_players | selectattr('team', 'equalto', game.home_team) | first | default(none) %}
-      {% set away_best = game.best_players | selectattr('team', 'equalto', game.away_team) | first | default(none) %}
+      {% set home_best = game.best_players | selectattr('is_home') | first | default(none) %}
+      {% set away_best = game.best_players | rejectattr('is_home') | first | default(none) %}
       <div class="gd-best-side gd-best-side--home">
         {% if home_best %}
         <span class="gd-best-player-label">⭐ {{ t.game.best_player }}</span>

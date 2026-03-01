@@ -2307,7 +2307,19 @@ def get_game_box_score(game_id: int) -> dict:
                 period_markers.append({"time": time_str, "label": ev_type, "period": period})
 
             elif kind == "best_player":
-                best_players.append({"team": team_label, "player": player_name})
+                # Resolve which side by team_id first, then by substring match
+                # (raw event team is club name; Team.name may add " II" etc.)
+                if ev.team_id:
+                    _is_home = ev.team_id == game.home_team_id
+                else:
+                    _tl_low = team_label.lower()
+                    _is_home = bool(
+                        _tl_low and (
+                            _tl_low in home_name.lower()
+                            or home_name.lower().startswith(_tl_low)
+                        )
+                    )
+                best_players.append({"team": team_label, "player": player_name, "is_home": _is_home})
 
         # ── Deduplicate goals ────────────────────────────────────────────────
         # The API emits 2 rows per assisted goal: one scorer-only and one
