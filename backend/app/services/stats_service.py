@@ -47,6 +47,9 @@ _POS_ABBREV: dict[str, str] = {
     "stürmerin (rechts)":  "A",
 }
 
+# Position values that are considered unknown / placeholder.
+_UNKNOWN_POS: frozenset[str] = frozenset({"nicht bekannt", ""})
+
 
 def _get_current_season_id(session) -> int:
     """Return the season id marked as highlighted (current), fallback to max."""
@@ -1145,8 +1148,6 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
     Roster is built from official TeamPlayer index, enriched with game lineup data
     to fill missing jersey numbers / positions and add unlisted players.
     """
-    _UNKNOWN_POS = {"nicht bekannt", ""}
-
     db = get_database_service()
     with db.session_scope() as session:
         # All seasons this team_id exists in (for the season selector)
@@ -1325,6 +1326,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                     pos_raw if pos_raw.lower() not in _UNKNOWN_POS
                     else (gp_info.get("position") or "")
                 )
+                position = _POS_ABBREV.get(position.lower(), position)
                 # Prefer PlayerStatistics for G/A/PTS/PIM; fall back to per-game
                 # accumulation from GamePlayer (populated by player_game_stats task)
                 # so that the roster shows real numbers even when PlayerStatistics
@@ -1388,7 +1390,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                         "player_id": pid,
                         "name": info["name"],
                         "number": info["number"],
-                        "position": info["position"] or "",
+                        "position": _POS_ABBREV.get((info["position"] or "").lower(), info["position"] or ""),
                         "gp":  ps.get("gp") or info["gp"],
                         "g":   g_val,
                         "a":   a_val,
@@ -1409,7 +1411,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                         "player_id": pid,
                         "name": info["name"],
                         "number": info["number"],
-                        "position": info["position"] or "",
+                        "position": _POS_ABBREV.get((info["position"] or "").lower(), info["position"] or ""),
                         "gp": info["gp"],
                         "g":  info["g"],
                         "a":  info["a"],
@@ -2446,6 +2448,23 @@ def get_game_box_score(game_id: int) -> dict:
         _home_stats_map = _build_stats_map(_home_pids, home_name)
         _away_stats_map = _build_stats_map(_away_pids, away_name)
 
+        # Batch-load TeamPlayer positions as fallback for players whose game
+        # lineup entry has no position (empty string / not set yet).
+        _all_roster_pids = [gp.player_id for gp in gp_rows]
+        _tp_pos_map: dict[int, str] = {}
+        if _all_roster_pids:
+            for _tp in (
+                session.query(TeamPlayer)
+                .filter(
+                    TeamPlayer.player_id.in_(_all_roster_pids),
+                    TeamPlayer.season_id == game.season_id,
+                    TeamPlayer.team_id.in_([game.home_team_id, game.away_team_id]),
+                )
+                .all()
+            ):
+                if _tp.player_id not in _tp_pos_map and _tp.position and _tp.position.lower() not in _UNKNOWN_POS:
+                    _tp_pos_map[_tp.player_id] = _tp.position
+
         # Detect whether player_game_stats has been indexed for this game.
         # If the sum of goals across all game_players rows is 0 but the game
         # score is non-zero, the per-player stats are just the lineup-indexer
@@ -2464,7 +2483,10 @@ def get_game_box_score(game_id: int) -> dict:
             _st = (_home_stats_map if gp.is_home_team else _away_stats_map).get(gp.player_id, {})
             entry = {
                 "jersey": gp.jersey_number,
-                "position": _POS_ABBREV.get((gp.position or "").lower(), gp.position or ""),
+                "position": _POS_ABBREV.get(
+                    (gp.position or _tp_pos_map.get(gp.player_id) or "").lower(),
+                    gp.position or _tp_pos_map.get(gp.player_id) or "",
+                ),
                 "player": name,
                 "player_id": gp.player_id,
                 "game_g":   gp.goals           if _game_stats_indexed else None,
