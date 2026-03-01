@@ -2601,6 +2601,12 @@ async def league_detail(request: Request, locale: str, league_id: int):
     # --- Series data per phase (playoff / playout) ---
     from datetime import date as _date
     from app.models.db_models import Team as _TmModel
+    # Build regular-season rank map: team_id → rank (1-based position in standings)
+    _reg_rank: dict[int, int] = {}
+    for _ri, _rs in enumerate(standings, 1):
+        _tid = _rs.get("team_id")
+        if _tid:
+            _reg_rank[_tid] = _ri
     series_by_phase: dict[str, list[dict]] = {}
     for _sph, _sgids in _phase_to_group_ids.items():
         if _sph not in ("playoff", "playout"):
@@ -2628,18 +2634,22 @@ async def league_detail(request: Request, locale: str, league_id: int):
                     _snm.setdefault(_t.id, _t.name)
                     if _t.logo_url:
                         _slogo.setdefault(_t.id, _t.logo_url)
-            # Group games by sorted team-pair
+            # Group games by sorted team-pair key (stable), but determine
+            # team_a / team_b from the home/away of the FIRST game in the series.
             _pairs: dict[tuple, list] = {}
             for _g in _sgames:
-                _ta = min(_g.home_team_id, _g.away_team_id)
-                _tb = max(_g.home_team_id, _g.away_team_id)
-                _pairs.setdefault((_ta, _tb), []).append(_g)
+                _key = tuple(sorted([_g.home_team_id, _g.away_team_id]))
+                _pairs.setdefault(_key, []).append(_g)
             _series_list = []
-            for (_ta, _tb), _pgames in sorted(_pairs.items(), key=lambda x: _snm.get(x[0][0], "")):
+            for _key, _pgames in sorted(_pairs.items(), key=lambda x: _snm.get(x[0], "")):
+                _sorted_pgames = sorted(_pgames, key=lambda x: x.game_date or _date.min)
+                _first_g = _sorted_pgames[0]
+                _ta = _first_g.home_team_id   # home of game 1 = team A
+                _tb = _first_g.away_team_id   # away of game 1 = team B
                 _ta_wins = 0
                 _tb_wins = 0
                 _games_list = []
-                for _g in sorted(_pgames, key=lambda x: x.game_date or _date.min):
+                for _g in _sorted_pgames:
                     _played = _g.home_score is not None
                     if _played:
                         _home_wins = _g.home_score > _g.away_score
@@ -2672,6 +2682,8 @@ async def league_detail(request: Request, locale: str, league_id: int):
                     "team_b_name": _snm.get(_tb, f"Team {_tb}"),
                     "team_a_logo": _slogo.get(_ta),
                     "team_b_logo": _slogo.get(_tb),
+                    "team_a_rank": _reg_rank.get(_ta),
+                    "team_b_rank": _reg_rank.get(_tb),
                     "team_a_wins": _ta_wins,
                     "team_b_wins": _tb_wins,
                     "games": _games_list,
