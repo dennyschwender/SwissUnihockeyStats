@@ -2400,25 +2400,35 @@ def get_game_box_score(game_id: int) -> dict:
             .all()
         )
 
-        # Batch-load season stats for all roster players
-        _roster_pids = [gp.player_id for gp in gp_rows]
-        _stats_map: dict[int, dict] = {}
-        if _roster_pids:
+        # Batch-load season stats for all roster players, split by team so that
+        # players who changed clubs mid-season only show stats for this team.
+        _home_pids = [gp.player_id for gp in gp_rows if gp.is_home_team]
+        _away_pids = [gp.player_id for gp in gp_rows if not gp.is_home_team]
+
+        def _build_stats_map(pids: list[int], team_name_filter: str) -> dict[int, dict]:
+            smap: dict[int, dict] = {}
+            if not pids:
+                return smap
             for _sr in (
                 session.query(PlayerStatistics)
                 .filter(
-                    PlayerStatistics.player_id.in_(_roster_pids),
+                    PlayerStatistics.player_id.in_(pids),
                     PlayerStatistics.season_id == game.season_id,
+                    PlayerStatistics.team_name == team_name_filter,
                 )
                 .all()
             ):
                 _pid = _sr.player_id
-                if _pid not in _stats_map:
-                    _stats_map[_pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0}
-                _stats_map[_pid]["gp"] += _sr.games_played or 0
-                _stats_map[_pid]["g"]  += _sr.goals or 0
-                _stats_map[_pid]["a"]  += _sr.assists or 0
-                _stats_map[_pid]["pts"] += _sr.points or 0
+                if _pid not in smap:
+                    smap[_pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0}
+                smap[_pid]["gp"] += _sr.games_played or 0
+                smap[_pid]["g"]  += _sr.goals or 0
+                smap[_pid]["a"]  += _sr.assists or 0
+                smap[_pid]["pts"] += _sr.points or 0
+            return smap
+
+        _home_stats_map = _build_stats_map(_home_pids, home_name)
+        _away_stats_map = _build_stats_map(_away_pids, away_name)
 
         # Detect whether player_game_stats has been indexed for this game.
         # If the sum of goals across all game_players rows is 0 but the game
@@ -2435,7 +2445,7 @@ def get_game_box_score(game_id: int) -> dict:
         for gp in gp_rows:
             pl = session.query(Player).filter(Player.person_id == gp.player_id).first()
             name = (pl.full_name if pl else None) or f"Player {gp.player_id}"
-            _st = _stats_map.get(gp.player_id, {})
+            _st = (_home_stats_map if gp.is_home_team else _away_stats_map).get(gp.player_id, {})
             entry = {
                 "jersey": gp.jersey_number,
                 "position": gp.position or "",
@@ -2634,6 +2644,7 @@ def get_game_box_score(game_id: int) -> dict:
             "best_players": best_players,
             "roster_home": roster_home,
             "roster_away": roster_away,
+            "game_stats_indexed": _game_stats_indexed,
             "h2h_games": h2h_games,
             "h2h_record": h2h_record,
             "home_form": home_form,

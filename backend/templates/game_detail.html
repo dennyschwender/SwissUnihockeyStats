@@ -476,14 +476,16 @@ function eventsTable(goals, penalties) {
         <div x-data='sortTable({{ game.roster_home | tojson }}, "jersey", "asc")'>
           <div class="gd-roster-header">{{ game.home_team }}</div>
           <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-          <table class="gd-table" style="font-size:.8rem;min-width:420px;">
+          <table class="gd-table" style="font-size:.8rem;min-width:{% if game.game_stats_indexed %}420px{% else %}300px{% endif %};">
             <thead><tr>
               <th :class="cls('jersey')"     @click="sortBy('jersey')"     style="width:2rem;">#<span class="sort-icon" x-text="icon('jersey')"></span></th>
               <th :class="cls('position')"   @click="sortBy('position')"   style="width:3rem;">{{ t.table.pos }}<span class="sort-icon" x-text="icon('position')"></span></th>
               <th :class="cls('player')"     @click="sortBy('player')"     >{{ t.table.player }}<span class="sort-icon" x-text="icon('player')"></span></th>
+              {% if game.game_stats_indexed %}
               <th :class="cls('game_g')"     @click="sortBy('game_g')"     style="text-align:center;" title="Goals (game)">G&#9733;<span class="sort-icon" x-text="icon('game_g')"></span></th>
               <th :class="cls('game_a')"     @click="sortBy('game_a')"     style="text-align:center;" title="Assists (game)">A&#9733;<span class="sort-icon" x-text="icon('game_a')"></span></th>
               <th :class="cls('game_pim')"   @click="sortBy('game_pim')"   style="text-align:center;" title="PIM (game)">PIM&#9733;<span class="sort-icon" x-text="icon('game_pim')"></span></th>
+              {% endif %}
               <th :class="cls('season_gp')"  @click="sortBy('season_gp')"  style="text-align:center;color:var(--gray-400);" title="Games played (season)">GP<span class="sort-icon" x-text="icon('season_gp')"></span></th>
               <th :class="cls('season_g')"   @click="sortBy('season_g')"   style="text-align:center;color:var(--gray-400);" title="Goals (season)">G<span class="sort-icon" x-text="icon('season_g')"></span></th>
               <th :class="cls('season_a')"   @click="sortBy('season_a')"   style="text-align:center;color:var(--gray-400);" title="Assists (season)">A<span class="sort-icon" x-text="icon('season_a')"></span></th>
@@ -495,9 +497,11 @@ function eventsTable(goals, penalties) {
                   <td style="font-variant-numeric:tabular-nums;color:var(--gray-500);" x-text="p.jersey || '—'"></td>
                   <td style="font-size:.75rem;color:var(--gray-500);" x-text="p.position || '—'"></td>
                   <td><a :href="'/{{ locale }}/player/' + p.player_id" style="text-decoration:none;color:inherit;" x-text="p.player"></a></td>
+                  {% if game.game_stats_indexed %}
                   <td style="text-align:center;font-weight:700;" x-text="p.game_g ?? '—'"></td>
                   <td style="text-align:center;font-weight:700;" x-text="p.game_a ?? '—'"></td>
                   <td style="text-align:center;font-weight:700;" x-text="p.game_pim != null && p.game_pim > 0 ? p.game_pim + \"'\" : '—'"></td>
+                  {% endif %}
                   <td style="text-align:center;color:var(--gray-400);" x-text="p.season_gp ?? '—'"></td>
                   <td style="text-align:center;color:var(--gray-400);" x-text="p.season_g ?? '—'"></td>
                   <td style="text-align:center;color:var(--gray-400);" x-text="p.season_a ?? '—'"></td>
@@ -511,14 +515,16 @@ function eventsTable(goals, penalties) {
         <div x-data='sortTable({{ game.roster_away | tojson }}, "jersey", "asc")'>
           <div class="gd-roster-header">{{ game.away_team }}</div>
           <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-          <table class="gd-table" style="font-size:.8rem;min-width:420px;">
+          <table class="gd-table" style="font-size:.8rem;min-width:{% if game.game_stats_indexed %}420px{% else %}300px{% endif %};">
             <thead><tr>
               <th :class="cls('jersey')"     @click="sortBy('jersey')"     style="width:2rem;">#<span class="sort-icon" x-text="icon('jersey')"></span></th>
               <th :class="cls('position')"   @click="sortBy('position')"   style="width:3rem;">{{ t.table.pos }}<span class="sort-icon" x-text="icon('position')"></span></th>
               <th :class="cls('player')"     @click="sortBy('player')"     >{{ t.table.player }}<span class="sort-icon" x-text="icon('player')"></span></th>
+              {% if game.game_stats_indexed %}
               <th :class="cls('game_g')"     @click="sortBy('game_g')"     style="text-align:center;" title="Goals (game)">G&#9733;<span class="sort-icon" x-text="icon('game_g')"></span></th>
               <th :class="cls('game_a')"     @click="sortBy('game_a')"     style="text-align:center;" title="Assists (game)">A&#9733;<span class="sort-icon" x-text="icon('game_a')"></span></th>
               <th :class="cls('game_pim')"   @click="sortBy('game_pim')"   style="text-align:center;" title="PIM (game)">PIM&#9733;<span class="sort-icon" x-text="icon('game_pim')"></span></th>
+              {% endif %}
               <th :class="cls('season_gp')"  @click="sortBy('season_gp')"  style="text-align:center;color:var(--gray-400);" title="Games played (season)">GP<span class="sort-icon" x-text="icon('season_gp')"></span></th>
               <th :class="cls('season_g')"   @click="sortBy('season_g')"   style="text-align:center;color:var(--gray-400);" title="Goals (season)">G<span class="sort-icon" x-text="icon('season_g')"></span></th>
               <th :class="cls('season_a')"   @click="sortBy('season_a')"   style="text-align:center;color:var(--gray-400);" title="Assists (season)">A<span class="sort-icon" x-text="icon('season_a')"></span></th>
@@ -530,9 +536,11 @@ function eventsTable(goals, penalties) {
                   <td style="font-variant-numeric:tabular-nums;color:var(--gray-500);" x-text="p.jersey || '—'"></td>
                   <td style="font-size:.75rem;color:var(--gray-500);" x-text="p.position || '—'"></td>
                   <td><a :href="'/{{ locale }}/player/' + p.player_id" style="text-decoration:none;color:inherit;" x-text="p.player"></a></td>
+                  {% if game.game_stats_indexed %}
                   <td style="text-align:center;font-weight:700;" x-text="p.game_g ?? '—'"></td>
                   <td style="text-align:center;font-weight:700;" x-text="p.game_a ?? '—'"></td>
                   <td style="text-align:center;font-weight:700;" x-text="p.game_pim != null && p.game_pim > 0 ? p.game_pim + \"'\" : '—'"></td>
+                  {% endif %}
                   <td style="text-align:center;color:var(--gray-400);" x-text="p.season_gp ?? '—'"></td>
                   <td style="text-align:center;color:var(--gray-400);" x-text="p.season_g ?? '—'"></td>
                   <td style="text-align:center;color:var(--gray-400);" x-text="p.season_a ?? '—'"></td>
