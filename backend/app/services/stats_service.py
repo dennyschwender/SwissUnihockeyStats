@@ -2420,6 +2420,18 @@ def get_game_box_score(game_id: int) -> dict:
                 _stats_map[_pid]["a"]  += _sr.assists or 0
                 _stats_map[_pid]["pts"] += _sr.points or 0
 
+        # Detect whether player_game_stats has been indexed for this game.
+        # If the sum of goals across all game_players rows is 0 but the game
+        # score is non-zero, the per-player stats are just the lineup-indexer
+        # default (0) and haven't been populated yet → show None (→ "—").
+        _gp_goal_sum = sum(gp.goals or 0 for gp in gp_rows)
+        _actual_goals = (game.home_score or 0) + (game.away_score or 0) if game.home_score is not None else None
+        _game_stats_indexed = (
+            _actual_goals is None           # unscored game — don't know
+            or _actual_goals == 0           # 0-0 game — all zeros are correct
+            or _gp_goal_sum > 0             # at least one scorer found → indexed
+        )
+
         for gp in gp_rows:
             pl = session.query(Player).filter(Player.person_id == gp.player_id).first()
             name = (pl.full_name if pl else None) or f"Player {gp.player_id}"
@@ -2429,9 +2441,9 @@ def get_game_box_score(game_id: int) -> dict:
                 "position": gp.position or "",
                 "player": name,
                 "player_id": gp.player_id,
-                "game_g": gp.goals,            # None = not yet indexed (shows '—'), 0 = confirmed zero
-                "game_a": gp.assists,
-                "game_pim": gp.penalty_minutes,
+                "game_g":   gp.goals           if _game_stats_indexed else None,
+                "game_a":   gp.assists         if _game_stats_indexed else None,
+                "game_pim": gp.penalty_minutes if _game_stats_indexed else None,
                 "season_gp": _st.get("gp"),
                 "season_g": _st.get("g"),
                 "season_a": _st.get("a"),
