@@ -2498,6 +2498,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
                 "standings": [],
                 "standings_by_group": {},
                 "standings_by_phase": {},
+                "series_by_phase": {},
                 "topscorers": [],
                 "top_penalties": [],
                 "games": [],
@@ -2510,7 +2511,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             },
         )
 
-    standings = get_league_standings(league_id)
+    # standings computed after phase groups are mapped (below)
 
     # --- Season switcher: find the same league (by API id) across all seasons ---
     _all_seasons = get_all_seasons()
@@ -2535,10 +2536,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
     # -------------------------------------------------------------------------
 
     groups = league_data.get("groups", [])  # [{name, ids: [int]}]
-    standings_by_group = {
-        grp["name"]: get_league_standings(league_id, only_group_ids=grp["ids"])
-        for grp in groups
-    }
+    # standings_by_group computed below after phase groups are mapped
     # flat lookup: DB group_id → display name (for annotating game records)
     _group_id_to_name: dict[int | None, str] = {
         gid: grp["name"]
@@ -2581,11 +2579,99 @@ async def league_detail(request: Request, locale: str, league_id: int):
     _phase_to_group_ids: dict[str, list[int]] = {}
     for _gid, _ph in _group_id_to_phase.items():
         _phase_to_group_ids.setdefault(_ph, []).append(_gid)
-    standings_by_phase: dict[str, list[dict]] = {
-        _ph: get_league_standings(league_id, only_group_ids=_gids)
-        for _ph, _gids in _phase_to_group_ids.items()
-        if _ph != "regular"  # "regular" already served by _allStandings / standings_by_group
+    standings_by_phase: dict[str, list[dict]] = {}  # populated below (non-regular phases)
+
+    # --- Regular season standings (only regular-phase group IDs) ---
+    _regular_group_ids = _phase_to_group_ids.get("regular", [])
+    standings = get_league_standings(league_id, only_group_ids=_regular_group_ids if _regular_group_ids else None)
+
+    # Restrict standings_by_group to regular groups only
+    _regular_group_id_set = set(_regular_group_ids)
+    standings_by_group = {
+        grp["name"]: get_league_standings(
+            league_id, only_group_ids=[g for g in grp["ids"] if g in _regular_group_id_set] or grp["ids"]
+        )
+        for grp in groups
     }
+
+    # --- Series data per phase (playoff / playout) ---
+    from datetime import date as _date
+    from app.models.db_models import Team as _TmModel
+    series_by_phase: dict[str, list[dict]] = {}
+    for _sph, _sgids in _phase_to_group_ids.items():
+        if _sph not in ("playoff", "playout"):
+            continue
+        with db.session_scope() as _ssess:
+            _sgames = (
+                _ssess.query(Game)
+                .filter(Game.group_id.in_(_sgids))
+                .order_by(Game.game_date.asc())
+                .all()
+            )
+            _sti = {g.home_team_id for g in _sgames} | {g.away_team_id for g in _sgames}
+            _snm: dict[int, str] = {}
+            for _t in _ssess.query(_TmModel).filter(
+                _TmModel.id.in_(_sti), _TmModel.season_id == league_data["season_id"]
+            ).all():
+                _snm[_t.id] = _t.name or _t.text or f"Team {_t.id}"
+            # Fallback: find names from any season
+            _missing = _sti - _snm.keys()
+            if _missing:
+                for _t in _ssess.query(_TmModel).filter(_TmModel.id.in_(_missing), _TmModel.name.isnot(None)).all():
+                    _snm.setdefault(_t.id, _t.name)
+            # Group games by sorted team-pair
+            _pairs: dict[tuple, list] = {}
+            for _g in _sgames:
+                _ta = min(_g.home_team_id, _g.away_team_id)
+                _tb = max(_g.home_team_id, _g.away_team_id)
+                _pairs.setdefault((_ta, _tb), []).append(_g)
+            _series_list = []
+            for (_ta, _tb), _pgames in sorted(_pairs.items(), key=lambda x: _snm.get(x[0][0], "")):
+                _ta_wins = 0
+                _tb_wins = 0
+                _games_list = []
+                for _g in sorted(_pgames, key=lambda x: x.game_date or _date.min):
+                    _played = _g.home_score is not None
+                    if _played:
+                        _home_wins = _g.home_score > _g.away_score
+                        if _g.home_team_id == _ta:
+                            if _home_wins:
+                                _ta_wins += 1
+                            else:
+                                _tb_wins += 1
+                        else:
+                            if _home_wins:
+                                _tb_wins += 1
+                            else:
+                                _ta_wins += 1
+                    _games_list.append({
+                        "game_id": _g.id,
+                        "date": _g.game_date.strftime("%d.%m.%Y") if _g.game_date else "",
+                        "weekday": _g.game_date.strftime("%a") if _g.game_date else "",
+                        "home_team": _snm.get(_g.home_team_id, f"Team {_g.home_team_id}"),
+                        "away_team": _snm.get(_g.away_team_id, f"Team {_g.away_team_id}"),
+                        "home_team_id": _g.home_team_id,
+                        "away_team_id": _g.away_team_id,
+                        "home_score": _g.home_score,
+                        "away_score": _g.away_score,
+                        "played": _played,
+                    })
+                _series_list.append({
+                    "team_a_id": _ta,
+                    "team_b_id": _tb,
+                    "team_a_name": _snm.get(_ta, f"Team {_ta}"),
+                    "team_b_name": _snm.get(_tb, f"Team {_tb}"),
+                    "team_a_wins": _ta_wins,
+                    "team_b_wins": _tb_wins,
+                    "games": _games_list,
+                })
+            series_by_phase[_sph] = _series_list
+
+    # Standings per non-regular phase (for potential fallback table)
+    for _ph, _gids in _phase_to_group_ids.items():
+        if _ph != "regular":
+            standings_by_phase[_ph] = get_league_standings(league_id, only_group_ids=_gids)
+
     upcoming_games: list[dict] = []
     if group_ids_for_league:
         with db.session_scope() as sess:
@@ -2680,6 +2766,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             "standings": standings,
             "standings_by_group": standings_by_group,
             "standings_by_phase": standings_by_phase,
+            "series_by_phase": series_by_phase,
             "topscorers": topscorers,
             "top_penalties": top_penalties,
             "games": recent_games,
