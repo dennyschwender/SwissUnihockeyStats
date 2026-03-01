@@ -2755,6 +2755,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
                     "group_name": _group_id_to_name.get(g.group_id, ""),
                     "phase": _group_id_to_phase.get(g.group_id, "regular"),
                     "date": g.game_date.strftime("%Y-%m-%d") if g.game_date else "",
+                    "time": g.game_time or "",
                     "home_team": team_names.get(g.home_team_id, f"Team {g.home_team_id}"),
                     "away_team": team_names.get(g.away_team_id, f"Team {g.away_team_id}"),
                     "home_team_id": g.home_team_id,
