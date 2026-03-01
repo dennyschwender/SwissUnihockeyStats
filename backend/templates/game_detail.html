@@ -261,6 +261,8 @@ function cmp(a, b, d) {
   return a < b ? (d === 'asc' ? -1 : 1) : a > b ? (d === 'asc' ? 1 : -1) : 0;
 }
 
+const _ASC_FIRST = new Set(['jersey', 'position', 'player', 'period', 'time', 'type', 'team', 'score']);
+
 function sortTable(initialRows, defaultKey, defaultDir) {
   return {
     rows: initialRows,
@@ -273,7 +275,7 @@ function sortTable(initialRows, defaultKey, defaultDir) {
     },
     sortBy(k) {
       if (this.key === k) { this.dir = this.dir === 'asc' ? 'desc' : 'asc'; }
-      else { this.key = k; this.dir = 'asc'; }
+      else { this.key = k; this.dir = _ASC_FIRST.has(k) ? 'asc' : 'desc'; }
     },
     cls(k) { if (this.key !== k) return ''; return this.dir === 'asc' ? 'sort-asc' : 'sort-desc'; },
     icon(k) { if (this.key !== k) return '\u2195'; return this.dir === 'asc' ? '\u2191' : '\u2193'; }
@@ -303,7 +305,7 @@ function eventsTable(goals, penalties) {
     },
     sortBy(k) {
       if (this.key === k) { this.dir = this.dir === 'asc' ? 'desc' : 'asc'; }
-      else { this.key = k; this.dir = 'asc'; }
+      else { this.key = k; this.dir = _ASC_FIRST.has(k) ? 'asc' : 'desc'; }
     },
     cls(k) { if (this.key !== k) return ''; return this.dir === 'asc' ? 'sort-asc' : 'sort-desc'; },
     icon(k) { if (this.key !== k) return '\u2195'; return this.dir === 'asc' ? '\u2191' : '\u2193'; },
