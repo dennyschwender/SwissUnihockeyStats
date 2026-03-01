@@ -148,7 +148,8 @@
     "period_breakdown": "Riepilogo periodi",
     "h2h_title": "Scontri diretti",
     "no_h2h": "Nessun incontro precedente trovato.",
-    "form_title": "Forma recente"
+    "form_title": "Forma recente",
+    "pos_legend": "G = Portiere · D = Difensore · C = Centro · A = Ala"
   },
   "league_detail": {
     "tab_standings": "Classifica",

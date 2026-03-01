@@ -148,7 +148,8 @@
     "period_breakdown": "Perioden-Übersicht",
     "h2h_title": "Direktvergleich",
     "no_h2h": "Keine früheren Begegnungen gefunden.",
-    "form_title": "Aktuelle Form"
+    "form_title": "Aktuelle Form",
+    "pos_legend": "G = Torhüter · D = Verteidiger · C = Mitte · A = Stürmer"
   },
   "league_detail": {
     "tab_standings": "Tabelle",

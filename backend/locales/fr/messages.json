@@ -127,7 +127,9 @@
     "show_less": "Voir moins ▲",
     "show_all": "Voir tout"
   },
-  "team_tabs": {    "tab_standings": "Classement",    "tab_roster": "Effectif & Statistiques",
+  "team_tabs": {
+    "tab_standings": "Classement",
+    "tab_roster": "Effectif & Statistiques",
     "tab_results": "Résultats récents",
     "tab_upcoming": "À venir"
   },
@@ -146,7 +148,8 @@
     "period_breakdown": "Résumé par période",
     "h2h_title": "Face à face",
     "no_h2h": "Aucune rencontre précédente trouvée.",
-    "form_title": "Forme récente"
+    "form_title": "Forme récente",
+    "pos_legend": "G = Gardien · D = Défenseur · C = Centre · A = Ailier"
   },
   "league_detail": {
     "tab_standings": "Classement",

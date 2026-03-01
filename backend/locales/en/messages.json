@@ -148,7 +148,8 @@
     "period_breakdown": "Period Breakdown",
     "h2h_title": "Head to Head",
     "no_h2h": "No previous meetings found.",
-    "form_title": "Recent Form"
+    "form_title": "Recent Form",
+    "pos_legend": "G = Goalie · D = Defender · C = Centre · A = Winger"
   },
   "league_detail": {
     "tab_standings": "Standings",
