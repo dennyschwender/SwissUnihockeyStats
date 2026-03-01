@@ -115,6 +115,12 @@
       const order = ['regular', 'playoff', 'playout', 'promotion'];
       return uniq.sort((a, b) => order.indexOf(a) - order.indexOf(b));
     },
+    get availableResultsPhases() {
+      const all = _allGames.map(g => g.phase).filter(Boolean);
+      const uniq = [...new Set(all)];
+      const order = ['regular', 'playoff', 'playout', 'promotion'];
+      return uniq.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    },
     get availableUpcomingPhases() {
       const all = _allUpcoming.map(g => g.phase).filter(Boolean);
       const uniq = [...new Set(all)];
@@ -132,7 +138,7 @@
       <button @click="tab='penalties'" :class="tab==='penalties' ? 'league-tab active' : 'league-tab'">
         <span>🟥</span> {{ t.league_detail.tab_penalties }}
       </button>
-      <button @click="tab='results'" :class="tab==='results' ? 'league-tab active' : 'league-tab'">
+      <button @click="tab='results'; if (!availableResultsPhases.includes(Alpine.store('leagueFilter').phase) && availableResultsPhases.length) Alpine.store('leagueFilter').phase = availableResultsPhases[0]" :class="tab==='results' ? 'league-tab active' : 'league-tab'">
         <span>🎯</span> {{ t.league_detail.tab_results }}
       </button>
       <button @click="tab='upcoming'; if (!availableUpcomingPhases.includes(Alpine.store('leagueFilter').phase) && availableUpcomingPhases.length) Alpine.store('leagueFilter').phase = availableUpcomingPhases[0]" :class="tab==='upcoming' ? 'league-tab active' : 'league-tab'">
@@ -601,10 +607,9 @@
     <!-- RESULTS -->
     <div x-show="tab==='results'">
       <!-- Phase filter chips -->
-      <template x-if="availablePhases.length > 1">
+      <template x-if="availableResultsPhases.length > 1">
         <div style="display:flex;gap:.375rem;flex-wrap:wrap;margin-bottom:.85rem;">
-
-          <template x-for="ph in availablePhases" :key="ph">
+          <template x-for="ph in availableResultsPhases" :key="ph">
             <button @click="Alpine.store('leagueFilter').phase = ph"
               :class="['filter-chip', Alpine.store('leagueFilter').phase === ph && 'active']"
               x-text="_PHASE_LABELS[ph] || ph"></button>
