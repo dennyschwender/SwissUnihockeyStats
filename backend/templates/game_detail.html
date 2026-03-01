@@ -655,7 +655,7 @@ function eventsTable(goals, penalties) {
             <table class="gd-table" style="font-size:.8rem;min-width:320px;">
               <tbody>
                 {% for fg in home_combined %}
-                <tr x-show="flt === 'all'">
+                <tr x-show="flt === 'all'" style="cursor:pointer;" onclick="location.href='/{{ locale }}/game/{{ fg.game_id }}'">
                   <td style="color:var(--gray-400);white-space:nowrap;padding-right:.35rem;">{{ fg.date }}</td>
                   <td style="width:1.4rem;text-align:center;font-size:.68rem;color:var(--gray-400);white-space:nowrap;">{{ fg.home_away }}</td>
                   <td style="white-space:nowrap;"><a href="/{{ locale }}/team/{{ fg.opponent_id }}" style="text-decoration:none;color:inherit;">{{ fg.opponent }}</a></td>
@@ -665,7 +665,7 @@ function eventsTable(goals, penalties) {
                 </tr>
                 {% endfor %}
                 {% for fg in (game.home_h_form | sort(attribute='date', reverse=true)) %}
-                <tr x-show="flt === 'H'" x-cloak>
+                <tr x-show="flt === 'H'" x-cloak style="cursor:pointer;" onclick="location.href='/{{ locale }}/game/{{ fg.game_id }}'">
                   <td style="color:var(--gray-400);white-space:nowrap;padding-right:.35rem;">{{ fg.date }}</td>
                   <td style="width:1.4rem;text-align:center;font-size:.68rem;color:var(--gray-400);white-space:nowrap;">{{ fg.home_away }}</td>
                   <td style="white-space:nowrap;"><a href="/{{ locale }}/team/{{ fg.opponent_id }}" style="text-decoration:none;color:inherit;">{{ fg.opponent }}</a></td>
@@ -675,7 +675,7 @@ function eventsTable(goals, penalties) {
                 </tr>
                 {% endfor %}
                 {% for fg in (game.home_a_form | sort(attribute='date', reverse=true)) %}
-                <tr x-show="flt === 'A'" x-cloak>
+                <tr x-show="flt === 'A'" x-cloak style="cursor:pointer;" onclick="location.href='/{{ locale }}/game/{{ fg.game_id }}'">
                   <td style="color:var(--gray-400);white-space:nowrap;padding-right:.35rem;">{{ fg.date }}</td>
                   <td style="width:1.4rem;text-align:center;font-size:.68rem;color:var(--gray-400);white-space:nowrap;">{{ fg.home_away }}</td>
                   <td style="white-space:nowrap;"><a href="/{{ locale }}/team/{{ fg.opponent_id }}" style="text-decoration:none;color:inherit;">{{ fg.opponent }}</a></td>
@@ -715,7 +715,7 @@ function eventsTable(goals, penalties) {
             <table class="gd-table" style="font-size:.8rem;min-width:320px;">
               <tbody>
                 {% for fg in away_combined %}
-                <tr x-show="flt === 'all'">
+                <tr x-show="flt === 'all'" style="cursor:pointer;" onclick="location.href='/{{ locale }}/game/{{ fg.game_id }}'">
                   <td style="color:var(--gray-400);white-space:nowrap;padding-right:.35rem;">{{ fg.date }}</td>
                   <td style="width:1.4rem;text-align:center;font-size:.68rem;color:var(--gray-400);white-space:nowrap;">{{ fg.home_away }}</td>
                   <td style="white-space:nowrap;"><a href="/{{ locale }}/team/{{ fg.opponent_id }}" style="text-decoration:none;color:inherit;">{{ fg.opponent }}</a></td>
@@ -725,7 +725,7 @@ function eventsTable(goals, penalties) {
                 </tr>
                 {% endfor %}
                 {% for fg in (game.away_h_form | sort(attribute='date', reverse=true)) %}
-                <tr x-show="flt === 'H'" x-cloak>
+                <tr x-show="flt === 'H'" x-cloak style="cursor:pointer;" onclick="location.href='/{{ locale }}/game/{{ fg.game_id }}'">
                   <td style="color:var(--gray-400);white-space:nowrap;padding-right:.35rem;">{{ fg.date }}</td>
                   <td style="width:1.4rem;text-align:center;font-size:.68rem;color:var(--gray-400);white-space:nowrap;">{{ fg.home_away }}</td>
                   <td style="white-space:nowrap;"><a href="/{{ locale }}/team/{{ fg.opponent_id }}" style="text-decoration:none;color:inherit;">{{ fg.opponent }}</a></td>
@@ -735,7 +735,7 @@ function eventsTable(goals, penalties) {
                 </tr>
                 {% endfor %}
                 {% for fg in (game.away_a_form | sort(attribute='date', reverse=true)) %}
-                <tr x-show="flt === 'A'" x-cloak>
+                <tr x-show="flt === 'A'" x-cloak style="cursor:pointer;" onclick="location.href='/{{ locale }}/game/{{ fg.game_id }}'">
                   <td style="color:var(--gray-400);white-space:nowrap;padding-right:.35rem;">{{ fg.date }}</td>
                   <td style="width:1.4rem;text-align:center;font-size:.68rem;color:var(--gray-400);white-space:nowrap;">{{ fg.home_away }}</td>
                   <td style="white-space:nowrap;"><a href="/{{ locale }}/team/{{ fg.opponent_id }}" style="text-decoration:none;color:inherit;">{{ fg.opponent }}</a></td>
