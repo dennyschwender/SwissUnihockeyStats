@@ -582,7 +582,7 @@ function eventsTable(goals, penalties) {
         </tr></thead>
         <tbody>
           {% for hg in game.h2h_games %}
-          <tr>
+          <tr style="cursor:pointer;" onclick="location.href='/{{ locale }}/game/{{ hg.game_id }}'">
             <td style="color:var(--gray-400);white-space:nowrap;">{{ hg.date }}</td>
             <td style="text-align:right;white-space:nowrap;padding-right:.5rem;"><a href="/{{ locale }}/team/{{ hg.home_team_id }}" style="text-decoration:none;color:inherit;{% if hg.home_team_id == game.home_team_id %}font-weight:700;{% endif %}">{{ hg.home_team }}</a></td>
             <td style="text-align:center;font-weight:700;font-variant-numeric:tabular-nums;"><a href="/{{ locale }}/game/{{ hg.game_id }}" style="text-decoration:none;color:inherit;display:block;text-align:center;">{{ hg.home_score }}–{{ hg.away_score }}</a></td>
