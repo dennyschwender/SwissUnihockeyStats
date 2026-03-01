@@ -1509,6 +1509,39 @@ class DataIndexer:
         except Exception:
             pass
 
+        # Fetch game details (referees, spectators, precise venue) from /api/games/{id}
+        referee_1_val: str | None = None
+        referee_2_val: str | None = None
+        spectators_val: int | None = None
+        venue_val: str | None = None
+        try:
+            details = self.client.get_game_details(game_id)
+            _rows = (details.get("data", {}).get("regions") or [{}])[0].get("rows", [])
+            if _rows:
+                _cells = _rows[0].get("cells", [])
+                def _dcell(idx):
+                    if len(_cells) <= idx:
+                        return ""
+                    v = _cells[idx].get("text", "")
+                    return (v[0] if isinstance(v, list) else v or "").strip()
+                # Column layout from attribute_list:
+                # 0=home_logo 1=home_name 2=away_logo 3=away_name
+                # 4=result 5=date 6=time 7=location 8=first_referee 9=second_referee 10=spectators
+                _venue = _dcell(7)
+                if _venue:
+                    venue_val = _venue
+                _ref1 = _dcell(8)
+                if _ref1:
+                    referee_1_val = _ref1
+                _ref2 = _dcell(9)
+                if _ref2:
+                    referee_2_val = _ref2
+                _spec = _dcell(10)
+                if _spec and _spec.isdigit():
+                    spectators_val = int(_spec)
+        except Exception:
+            pass
+
         # ── 2. Parse / deduplicate (pure CPU, no I/O) ─────────────────────
         # Columns from /api/game_events/{id}:
         #   0 – clock time ("32:16", "")
@@ -1591,13 +1624,21 @@ class DataIndexer:
                 session.query(GameEvent).filter(GameEvent.game_id == game_id).delete()
                 session.flush()
 
-                # Update game status/score if we got a result
-                if game_is_finished:
-                    game_row = session.get(Game, game_id)
-                    if game_row:
+                # Update game status/score + meta info if we got a result
+                game_row = session.get(Game, game_id)
+                if game_row:
+                    if game_is_finished:
                         game_row.status = "finished"
                         game_row.home_score = home_score_val
                         game_row.away_score = away_score_val
+                    if venue_val:
+                        game_row.venue = venue_val
+                    if referee_1_val is not None:
+                        game_row.referee_1 = referee_1_val
+                    if referee_2_val is not None:
+                        game_row.referee_2 = referee_2_val
+                    if spectators_val is not None:
+                        game_row.spectators = spectators_val
 
                 count = 0
                 for ev in deduped:

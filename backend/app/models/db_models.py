@@ -201,6 +201,9 @@ class Game(Base):
     home_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     away_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     period: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    spectators: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    referee_1: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    referee_2: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     last_events_update: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
