@@ -1590,11 +1590,14 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             opp_ids.add(int(g.home_team_id) if int(g.away_team_id) == team_id else int(g.away_team_id))
 
         opp_names: dict[int, str] = {}
+        opp_logos: dict[int, str] = {}
         for t in session.query(Team).filter(
             Team.id.in_(opp_ids), Team.season_id == season_id
         ).all():
             if t.name is not None or t.text is not None:
                 opp_names[int(t.id)] = str(t.name or t.text)
+            if t.logo_url:
+                opp_logos[int(t.id)] = str(t.logo_url)
         # Cross-season fallback for nameless stubs
         missing_opp = {tid for tid in opp_ids if tid not in opp_names}
         if missing_opp:
@@ -1602,6 +1605,8 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                 Team.id.in_(missing_opp), Team.name.isnot(None)
             ).all():
                 opp_names[int(t.id)] = str(t.name)
+                if t.logo_url and int(t.id) not in opp_logos:
+                    opp_logos[int(t.id)] = str(t.logo_url)
 
         recent_games = []
         for g in recent_games_raw:
@@ -1616,6 +1621,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                     "date": g.game_date.strftime("%Y-%m-%d") if g.game_date else "",
                     "opponent_id": opp_id,
                     "opponent_name": opp_names.get(opp_id, f"Team {opp_id}"),
+                    "opponent_logo": opp_logos.get(opp_id, ""),
                     "home_away": "H" if is_home else "A",
                     "score": f"{my_score}:{opp_score}",
                     "result": result_label,
@@ -1644,6 +1650,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
         _result_data = {
             "id": team.id,
             "name": team.name or team.text or f"Team {team_id}",
+            "logo_url": team.logo_url or "",
             "season_id": season_id,
             "season_name": season_name,
             "league_id": team.league_id,
@@ -1689,9 +1696,12 @@ def _get_team_upcoming(session, team_id: int, season_id: int) -> list[dict]:
     )
     opp_ids = {g.home_team_id if g.away_team_id == team_id else g.away_team_id for g in uq}
     opp_names: dict[int, str] = {}
+    opp_logos: dict[int, str] = {}
     for t in session.query(Team).filter(Team.id.in_(opp_ids), Team.season_id == season_id).all():
         if t.name or t.text:
             opp_names[t.id] = t.name or t.text
+        if t.logo_url:
+            opp_logos[t.id] = t.logo_url
     result = []
     for g in uq:
         is_home = g.home_team_id == team_id
@@ -1704,6 +1714,7 @@ def _get_team_upcoming(session, team_id: int, season_id: int) -> list[dict]:
             "home_away": "H" if is_home else "A",
             "opponent_id": opp_id,
             "opponent_name": opp_names.get(opp_id, f"Team {opp_id}"),
+            "opponent_logo": opp_logos.get(opp_id, ""),
         })
     return result
 
@@ -2376,15 +2387,24 @@ def get_game_box_score(game_id: int) -> dict:
         if game is None:
             return {}
 
-        # Load team names
+        # Load team names + logos
+        _team_cache: dict[int, Team] = {}
+        def _get_team(tid: int):
+            if tid not in _team_cache:
+                _team_cache[tid] = session.query(Team).filter(
+                    Team.id == tid, Team.season_id == game.season_id,
+                ).first()
+            return _team_cache.get(tid)
+
         def _team_name(tid: int) -> str:
             if tid is None:
                 return "?"
-            t = session.query(Team).filter(
-                Team.id == tid,
-                Team.season_id == game.season_id,
-            ).first()
+            t = _get_team(tid)
             return (t.name if t else None) or f"Team {tid}"
+
+        def _team_logo(tid: int) -> str:
+            t = _get_team(tid)
+            return (t.logo_url if t else None) or ""
 
         home_name = _team_name(game.home_team_id)
         away_name = _team_name(game.away_team_id)
@@ -2844,6 +2864,8 @@ def get_game_box_score(game_id: int) -> dict:
             "away_team_id": game.away_team_id,
             "home_team": home_name,
             "away_team": away_name,
+            "home_team_logo": _team_logo(game.home_team_id),
+            "away_team_logo": _team_logo(game.away_team_id),
             "home_score": game.home_score,
             "away_score": game.away_score,
             "date": game.game_date.strftime("%Y-%m-%d") if game.game_date else "",
@@ -2971,16 +2993,21 @@ def get_recent_games(
         if not games_raw:
             return {"games": [], "total": total, "offset": offset, "limit": limit}
 
-        # Preload team names
+        # Preload team names and logos
         team_ids = {g.home_team_id for g in games_raw} | {g.away_team_id for g in games_raw}
         t_names: dict[int, str] = {}
+        t_logos: dict[int, str] = {}
         for t in session.query(Team).filter(Team.id.in_(team_ids), Team.season_id == season_id).all():
             if t.name or t.text:
                 t_names[t.id] = str(t.name or t.text or "")
+            if t.logo_url:
+                t_logos[t.id] = t.logo_url
         missing = {tid for tid in team_ids if tid not in t_names}
         if missing:
             for t in session.query(Team).filter(Team.id.in_(missing), Team.name.isnot(None)).all():
                 t_names.setdefault(t.id, str(t.name or ""))
+                if t.logo_url:
+                    t_logos.setdefault(t.id, t.logo_url)
 
         # Preload league labels per group
         group_ids = {g.group_id for g in games_raw if g.group_id}
@@ -3008,13 +3035,15 @@ def get_recent_games(
                 "date":         g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
                 "weekday":      g.game_date.strftime("%a") if g.game_date else "",
                 "time":         g.game_time or "",
-                "home_team":    t_names.get(g.home_team_id, f"Team {g.home_team_id}"),
-                "away_team":    t_names.get(g.away_team_id, f"Team {g.away_team_id}"),
-                "home_team_id": g.home_team_id,
-                "away_team_id": g.away_team_id,
-                "home_score":   g.home_score,
-                "away_score":   g.away_score,
-                "has_score":    g.home_score is not None,
-                "league_label": grp_label.get(g.group_id, "") if g.group_id else "",
+                "home_team":      t_names.get(g.home_team_id, f"Team {g.home_team_id}"),
+                "away_team":      t_names.get(g.away_team_id, f"Team {g.away_team_id}"),
+                "home_team_id":   g.home_team_id,
+                "away_team_id":   g.away_team_id,
+                "home_team_logo": t_logos.get(g.home_team_id, ""),
+                "away_team_logo": t_logos.get(g.away_team_id, ""),
+                "home_score":     g.home_score,
+                "away_score":     g.away_score,
+                "has_score":      g.home_score is not None,
+                "league_label":   grp_label.get(g.group_id, "") if g.group_id else "",
             })
         return {"games": result, "total": total, "offset": offset, "limit": limit}

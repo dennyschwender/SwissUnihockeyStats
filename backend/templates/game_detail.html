@@ -345,7 +345,10 @@ function eventsTable(goals, penalties) {
 
     <div class="gd-matchup">
       <div class="gd-team-row">
-        <a class="gd-team-name" href="/{{ locale }}/team/{{ game.home_team_id }}">{{ game.home_team }}</a>
+        <a class="gd-team-name" href="/{{ locale }}/team/{{ game.home_team_id }}" style="display:inline-flex;align-items:center;gap:.4rem;">
+          {% if game.home_team_logo %}<img src="{{ game.home_team_logo }}" alt="" style="width:2rem;height:2rem;object-fit:contain;flex-shrink:0;">{% endif %}
+          <span>{{ game.home_team }}</span>
+        </a>
         {% if game.home_record %}
         <div class="gd-team-record">{{ game.home_record.w }}W·{{ game.home_record.d }}D·{{ game.home_record.l }}L</div>
         {% endif %}
@@ -358,7 +361,10 @@ function eventsTable(goals, penalties) {
         {% endif %}
       </div>
       <div class="gd-team-row">
-        <a class="gd-team-name" href="/{{ locale }}/team/{{ game.away_team_id }}">{{ game.away_team }}</a>
+        <a class="gd-team-name" href="/{{ locale }}/team/{{ game.away_team_id }}" style="display:inline-flex;align-items:center;gap:.4rem;">
+          {% if game.away_team_logo %}<img src="{{ game.away_team_logo }}" alt="" style="width:2rem;height:2rem;object-fit:contain;flex-shrink:0;">{% endif %}
+          <span>{{ game.away_team }}</span>
+        </a>
         {% if game.away_record %}
         <div class="gd-team-record">{{ game.away_record.w }}W·{{ game.away_record.d }}D·{{ game.away_record.l }}L</div>
         {% endif %}

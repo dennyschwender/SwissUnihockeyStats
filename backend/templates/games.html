@@ -66,11 +66,17 @@
     <div class="game-row game-row--compact">
       <div class="game-col-time-only">{{ g.time or "–" }}</div>
       <div class="game-col-team game-col-team--right">
-        <a href="/{{ locale }}/team/{{ g.home_team_id }}" class="link-inherit">{{ g.home_team }}</a>
+        <a href="/{{ locale }}/team/{{ g.home_team_id }}" class="link-inherit" style="display:inline-flex;align-items:center;gap:.3rem;justify-content:flex-end;">
+          <span>{{ g.home_team }}</span>
+          {% if g.home_team_logo %}<img src="{{ g.home_team_logo }}" alt="" style="width:1.25rem;height:1.25rem;object-fit:contain;flex-shrink:0;">{% endif %}
+        </a>
       </div>
       <div class="game-col-vs">vs</div>
       <div class="game-col-team">
-        <a href="/{{ locale }}/team/{{ g.away_team_id }}" class="link-inherit">{{ g.away_team }}</a>
+        <a href="/{{ locale }}/team/{{ g.away_team_id }}" class="link-inherit" style="display:inline-flex;align-items:center;gap:.3rem;">
+          {% if g.away_team_logo %}<img src="{{ g.away_team_logo }}" alt="" style="width:1.25rem;height:1.25rem;object-fit:contain;flex-shrink:0;">{% endif %}
+          <span>{{ g.away_team }}</span>
+        </a>
       </div>
       <div class="game-col-league">{{ g.league_label }}</div>
     </div>
@@ -83,9 +89,15 @@
     <a href="/{{ locale }}/game/{{ g.game_id }}" class="game-row-link">
       <div class="game-row">
         <div class="game-col-date">{{ g.date }}</div>
-        <div class="game-col-team game-col-team--right">{{ g.home_team }}</div>
+        <div class="game-col-team game-col-team--right" style="display:inline-flex;align-items:center;gap:.3rem;justify-content:flex-end;">
+          <span>{{ g.home_team }}</span>
+          {% if g.home_team_logo %}<img src="{{ g.home_team_logo }}" alt="" style="width:1.25rem;height:1.25rem;object-fit:contain;flex-shrink:0;">{% endif %}
+        </div>
         <div class="game-col-score">{{ g.home_score }} : {{ g.away_score }}</div>
-        <div class="game-col-team">{{ g.away_team }}</div>
+        <div class="game-col-team" style="display:inline-flex;align-items:center;gap:.3rem;">
+          {% if g.away_team_logo %}<img src="{{ g.away_team_logo }}" alt="" style="width:1.25rem;height:1.25rem;object-fit:contain;flex-shrink:0;">{% endif %}
+          <span>{{ g.away_team }}</span>
+        </div>
         {% if g.time %}<div class="game-col-time">{{ g.time }}</div>{% endif %}
         <div class="game-col-league" style="font-size:.75rem;color:var(--gray-500);">{{ g.league_label }}</div>
       </div>
