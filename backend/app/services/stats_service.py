@@ -2429,9 +2429,9 @@ def get_game_box_score(game_id: int) -> dict:
                 "position": gp.position or "",
                 "player": name,
                 "player_id": gp.player_id,
-                "game_g": gp.goals or 0,
-                "game_a": gp.assists or 0,
-                "game_pim": gp.penalty_minutes or 0,
+                "game_g": gp.goals,            # None = not yet indexed (shows '—'), 0 = confirmed zero
+                "game_a": gp.assists,
+                "game_pim": gp.penalty_minutes,
                 "season_gp": _st.get("gp"),
                 "season_g": _st.get("g"),
                 "season_a": _st.get("a"),
