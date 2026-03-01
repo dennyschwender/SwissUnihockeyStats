@@ -32,6 +32,22 @@ from app.services.database import get_database_service
 # Helpers
 # ---------------------------------------------------------------------------
 
+# Compact position abbreviations used in the game roster table.
+_POS_ABBREV: dict[str, str] = {
+    "goalie":              "G",
+    "verteidiger":         "D",
+    "verteidigerin":       "D",
+    "stürmer":             "A",
+    "stürmerin":           "A",
+    "stürmer (mitte)":     "C",
+    "stürmerin (mitte)":   "C",
+    "stürmer (links)":     "A",
+    "stürmer (rechts)":    "A",
+    "stürmerin (links)":   "A",
+    "stürmerin (rechts)":  "A",
+}
+
+
 def _get_current_season_id(session) -> int:
     """Return the season id marked as highlighted (current), fallback to max."""
     row = session.query(Season).filter(Season.highlighted == True).first()  # noqa: E712
@@ -2448,7 +2464,7 @@ def get_game_box_score(game_id: int) -> dict:
             _st = (_home_stats_map if gp.is_home_team else _away_stats_map).get(gp.player_id, {})
             entry = {
                 "jersey": gp.jersey_number,
-                "position": gp.position or "",
+                "position": _POS_ABBREV.get((gp.position or "").lower(), gp.position or ""),
                 "player": name,
                 "player_id": gp.player_id,
                 "game_g":   gp.goals           if _game_stats_indexed else None,
