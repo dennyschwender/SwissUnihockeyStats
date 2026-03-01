@@ -1187,16 +1187,21 @@ class DataIndexer:
                             # --- home team ---
                             home_team_id = None
                             home_team_name = None
+                            home_logo_url = None
                             if len(cells) > 2:
                                 hl = cells[2].get("link", {})
                                 if hl.get("ids"):
                                     home_team_id = hl["ids"][0]
                                 t = cells[2].get("text", [])
                                 home_team_name = (t[0] if isinstance(t, list) else t) or None
+                            # cell[3] = home team logo image
+                            if len(cells) > 3:
+                                home_logo_url = cells[3].get("image", {}).get("url") or None
 
                             # --- away team ---
                             away_team_id = None
                             away_team_name = None
+                            away_logo_url = None
                             if len(cells) > 6:
                                 al = cells[6].get("link", {})
                                 if al.get("ids"):
@@ -1210,6 +1215,9 @@ class DataIndexer:
                                     away_team_id = al["ids"][0]
                                 t = cells[5].get("text", [])
                                 away_team_name = (t[0] if isinstance(t, list) else t) or None
+                            # cell[5] = away team logo image
+                            if len(cells) > 5:
+                                away_logo_url = cells[5].get("image", {}).get("url") or None
 
                             if not home_team_id or not away_team_id:
                                 continue
@@ -1236,14 +1244,19 @@ class DataIndexer:
                                         status = "finished"
 
                             # Ensure teams exist (create stubs if not in our DB)
-                            # and update names when available from the game row
+                            # and update names/logos when available from the game row
                             team_name_map = {
                                 home_team_id: home_team_name,
                                 away_team_id: away_team_name,
                             }
+                            team_logo_map = {
+                                home_team_id: home_logo_url,
+                                away_team_id: away_logo_url,
+                            }
                             for tid in (home_team_id, away_team_id):
                                 from app.models.db_models import Team
                                 tname = team_name_map.get(tid)
+                                tlogo = team_logo_map.get(tid)
                                 existing = session.get(Team, (tid, season_id))
                                 if not existing:
                                     stub = Team(
@@ -1253,16 +1266,20 @@ class DataIndexer:
                                         game_class=game_class,
                                         name=tname,
                                         text=tname,
+                                        logo_url=tlogo,
                                     )
                                     session.add(stub)
                                     try:
                                         session.flush()
                                     except Exception:
                                         session.rollback()
-                                elif tname and not existing.name:
-                                    # Backfill name on existing nameless stub
-                                    existing.name = tname
-                                    existing.text = tname
+                                else:
+                                    if tname and not existing.name:
+                                        # Backfill name on existing nameless stub
+                                        existing.name = tname
+                                        existing.text = tname
+                                    if tlogo and not existing.logo_url:
+                                        existing.logo_url = tlogo
 
                             # Upsert game
                             game = session.get(Game, game_id)
@@ -1517,6 +1534,8 @@ class DataIndexer:
         referee_2_val: str | None = None
         spectators_val: int | None = None
         venue_val: str | None = None
+        home_logo_val: str | None = None
+        away_logo_val: str | None = None
         try:
             details = self.client.get_game_details(game_id)
             _rows = (details.get("data", {}).get("regions") or [{}])[0].get("rows", [])
@@ -1530,6 +1549,10 @@ class DataIndexer:
                 # Column layout from attribute_list:
                 # 0=home_logo 1=home_name 2=away_logo 3=away_name
                 # 4=result 5=date 6=time 7=location 8=first_referee 9=second_referee 10=spectators
+                if len(_cells) > 0:
+                    home_logo_val = _cells[0].get("image", {}).get("url") or None
+                if len(_cells) > 2:
+                    away_logo_val = _cells[2].get("image", {}).get("url") or None
                 _venue = _dcell(7)
                 if _venue:
                     venue_val = _venue
@@ -1642,6 +1665,17 @@ class DataIndexer:
                         game_row.referee_2 = referee_2_val
                     if spectators_val is not None:
                         game_row.spectators = spectators_val
+                    # Backfill team logo URLs from game_details attribute_list
+                    from app.models.db_models import Team as _Team
+                    _season = game_row.season_id
+                    if home_logo_val and game_row.home_team_id:
+                        _ht = session.get(_Team, (game_row.home_team_id, _season))
+                        if _ht and not _ht.logo_url:
+                            _ht.logo_url = home_logo_val
+                    if away_logo_val and game_row.away_team_id:
+                        _at = session.get(_Team, (game_row.away_team_id, _season))
+                        if _at and not _at.logo_url:
+                            _at.logo_url = away_logo_val
 
                 count = 0
                 for ev in deduped:

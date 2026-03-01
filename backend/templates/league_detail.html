@@ -250,12 +250,20 @@
                 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
                   <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
                     <a :href="'/{{ locale }}/team/' + s.team_a_id"
-                       style="font-weight:600;font-size:1rem;color:var(--gray-900);text-decoration:none;"
-                       x-text="s.team_a_name"></a>
+                       style="display:flex;align-items:center;gap:.45rem;font-weight:600;font-size:1rem;color:var(--gray-900);text-decoration:none;">
+                      <template x-if="s.team_a_logo">
+                        <img :src="s.team_a_logo" :alt="s.team_a_name" style="width:1.5rem;height:1.5rem;object-fit:contain;flex-shrink:0;">
+                      </template>
+                      <span x-text="s.team_a_name"></span>
+                    </a>
                     <span style="font-size:.85rem;color:var(--gray-400);">vs</span>
                     <a :href="'/{{ locale }}/team/' + s.team_b_id"
-                       style="font-weight:600;font-size:1rem;color:var(--gray-900);text-decoration:none;"
-                       x-text="s.team_b_name"></a>
+                       style="display:flex;align-items:center;gap:.45rem;font-weight:600;font-size:1rem;color:var(--gray-900);text-decoration:none;">
+                      <template x-if="s.team_b_logo">
+                        <img :src="s.team_b_logo" :alt="s.team_b_name" style="width:1.5rem;height:1.5rem;object-fit:contain;flex-shrink:0;">
+                      </template>
+                      <span x-text="s.team_b_name"></span>
+                    </a>
                   </div>
                   <!-- Series score badge -->
                   <div style="display:flex;align-items:center;gap:.4rem;font-size:1.15rem;font-weight:700;">

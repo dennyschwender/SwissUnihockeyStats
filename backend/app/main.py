@@ -2614,15 +2614,20 @@ async def league_detail(request: Request, locale: str, league_id: int):
             )
             _sti = {g.home_team_id for g in _sgames} | {g.away_team_id for g in _sgames}
             _snm: dict[int, str] = {}
+            _slogo: dict[int, str] = {}
             for _t in _ssess.query(_TmModel).filter(
                 _TmModel.id.in_(_sti), _TmModel.season_id == league_data["season_id"]
             ).all():
                 _snm[_t.id] = _t.name or _t.text or f"Team {_t.id}"
+                if _t.logo_url:
+                    _slogo[_t.id] = _t.logo_url
             # Fallback: find names from any season
             _missing = _sti - _snm.keys()
             if _missing:
                 for _t in _ssess.query(_TmModel).filter(_TmModel.id.in_(_missing), _TmModel.name.isnot(None)).all():
                     _snm.setdefault(_t.id, _t.name)
+                    if _t.logo_url:
+                        _slogo.setdefault(_t.id, _t.logo_url)
             # Group games by sorted team-pair
             _pairs: dict[tuple, list] = {}
             for _g in _sgames:
@@ -2665,6 +2670,8 @@ async def league_detail(request: Request, locale: str, league_id: int):
                     "team_b_id": _tb,
                     "team_a_name": _snm.get(_ta, f"Team {_ta}"),
                     "team_b_name": _snm.get(_tb, f"Team {_tb}"),
+                    "team_a_logo": _slogo.get(_ta),
+                    "team_b_logo": _slogo.get(_tb),
                     "team_a_wins": _ta_wins,
                     "team_b_wins": _tb_wins,
                     "games": _games_list,
