@@ -92,6 +92,32 @@ def league_tier(league_id: int) -> int:
     return LEAGUE_TIERS.get(league_id, _DEFAULT_TIER)
 
 
+# ── Age-based TTL for game events / lineups ──────────────────────────────────
+# The older a game is, the less likely its data changes.  We poll very
+# frequently while a game is live, then back off aggressively once the
+# data is stable.  The overnight nightly run (scheduler tick) is the last
+# chance to pick up late-published data (e.g. best-player awards) before
+# the game is effectively frozen.
+#
+#   < 3 h since kickoff  →   5 min   (game may still be live)
+#   3 – 12 h             →   1 h     (just finished today)
+#   12 – 48 h            →   4 h     (overnight / recent — nightly batch covers this)
+#   ≥ 48 h               → 720 h     (data frozen — almost no re-index)
+def _game_events_ttl_hours(game_date: "datetime | None") -> float:
+    if game_date is None:
+        return 4.0  # safe default — treat as recently finished
+    now = datetime.now(timezone.utc)
+    gd  = game_date if game_date.tzinfo else game_date.replace(tzinfo=timezone.utc)
+    age = (now - gd).total_seconds() / 3600
+    if age < 3:
+        return 5 / 60      # 5 minutes — may still be live
+    if age < 12:
+        return 1.0         # 1 hour — just finished today
+    if age < 48:
+        return 4.0         # 4 hours — yesterday / very recent
+    return 720.0           # 30 days — effectively frozen
+
+
 class DataIndexer:
     """Hierarchical data indexer for Swiss Unihockey stats"""
     
@@ -1430,18 +1456,30 @@ class DataIndexer:
                 return 0
 
     def index_game_events(self, game_id: int, season_id: int,
-                          force: bool = False) -> int:
+                          force: bool = False,
+                          game_date: "datetime | None" = None) -> int:
         """Fetch and store events (goals, penalties) for a single finished game.
 
         API calls are made *before* the DB session is opened so that the
         write lock is held for the minimum possible time.
 
+        Args:
+            game_date: Kickoff datetime (UTC or naive).  When supplied the
+                       age-based TTL is computed directly; otherwise one cheap
+                       DB lookup is made to retrieve it.
+
         Returns:
             Number of events stored.
         """
         entity_id = f"game:{game_id}:events"
-        if not force and not self._should_update("game_events", entity_id, max_age_hours=168):  # 7 days
-            return 0
+        if not force:
+            if game_date is None:
+                with self.db_service.session_scope() as _s:
+                    _g = _s.get(Game, game_id)
+                    game_date = _g.game_date if _g else None
+            ttl = _game_events_ttl_hours(game_date)
+            if not self._should_update("game_events", entity_id, max_age_hours=ttl):
+                return 0
 
         # ── 1. Fetch from API (no DB lock held) ───────────────────────────
         try:
@@ -1586,17 +1624,29 @@ class DataIndexer:
                 return 0
 
     def index_game_lineup(self, game_id: int, season_id: int,
-                          force: bool = False) -> int:
+                          force: bool = False,
+                          game_date: "datetime | None" = None) -> int:
         """Fetch and store home + away lineups for a single finished game.
 
         Both API calls are made *before* the DB session is opened so that
         the write lock is held for the minimum possible time.
 
+        Args:
+            game_date: Kickoff datetime (UTC or naive).  When supplied the
+                       age-based TTL is computed directly; otherwise one cheap
+                       DB lookup is made to retrieve it.
+
         Returns number of GamePlayer rows inserted/updated.
         """
         entity_id = f"game:{game_id}:lineup"
-        if not force and not self._should_update("game_lineup", entity_id, max_age_hours=168):  # 7 days
-            return 0
+        if not force:
+            if game_date is None:
+                with self.db_service.session_scope() as _s:
+                    _g = _s.get(Game, game_id)
+                    game_date = _g.game_date if _g else None
+            ttl = _game_events_ttl_hours(game_date)
+            if not self._should_update("game_lineup", entity_id, max_age_hours=ttl):
+                return 0
 
         # ── 1. Fetch both lineups from API (no DB lock held) ──────────────
         # API: is_home=0 → HOME lineup, is_home=1 → AWAY lineup.
@@ -1899,15 +1949,15 @@ class DataIndexer:
             now = datetime.now(timezone.utc)
             with self.db_service.session_scope() as session:
                 past_ids = [
-                    (g.id, g.season_id)
+                    (g.id, g.season_id, g.game_date)
                     for g in session.query(Game).filter(
                         Game.season_id == season_id,
                         Game.game_date < now,
                     ).all()
                 ]
             logger.info(f"Fetching events for {len(past_ids)} past games...")
-            for game_id, sid in past_ids:
-                stats["events"] += self.index_game_events(game_id, sid, force=force)
+            for game_id, sid, gdate in past_ids:
+                stats["events"] += self.index_game_events(game_id, sid, force=force, game_date=gdate)
 
         logger.info(f"=== LEAGUES PATH complete === stats: {stats}")
         return stats

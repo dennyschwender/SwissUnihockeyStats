@@ -129,22 +129,27 @@ POLICIES: list[dict] = [
         "priority":    70,
         "run_at_hour": 3,
     },
-    # ── Daily live-data policies — game_events at 03:30, stats at 04:00 UTC ──
-    # game_events must run after the games list refresh (03:00) so new games
-    # added overnight are immediately indexed for events too.
-    # player_stats / player_game_stats run at 04:00 UTC, after game_events
-    # finishes, so G/A/PIM numbers are populated from the freshest event data.
+    # ── Live / recent game-events polling ────────────────────────────────────
+    # Runs every 10 minutes (no hour-snap) throughout the day so that:
+    #   • live games (< 3 h old)   are refreshed every ~5 min
+    #   • today's games (< 12 h)   are refreshed every ~1 h
+    #   • yesterday's games (<48 h) are refreshed every ~4 h
+    #   • older games (≥ 48 h)     are skipped immediately (720 h TTL)
+    # The per-game TTL is computed by _game_events_ttl_hours() inside
+    # index_game_events(); the scheduler just provides the trigger cadence.
+    # player_stats / player_game_stats still run at 04:00 UTC (after the
+    # overnight events pass) so G/A/PIM numbers reflect last night's games.
     {
         "name":        "game_events",
         "entity_type": "game_events",
-        "max_age":     timedelta(hours=24),
+        "max_age":     timedelta(minutes=10),
         "task":        "events",
         "scope":       "season",
         "label":       "Game events refresh",
         "priority":    80,
         "max_tier":    2,   # NLA + NLB + A-level youth only
         "current_only": True,
-        "run_at_hour": 3,
+        # no run_at_hour — runs throughout the day based on game ages
     },
     # ── Player season stats: cascade T1 → T2 → … → T6 ──────────────────────
     # current_only is NOT set: these run once for past seasons too (frozen after
