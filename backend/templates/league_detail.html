@@ -127,7 +127,7 @@
         <span>🟥</span> {{ t.league_detail.tab_penalties }}
       </button>
       <button @click="tab='results'" :class="tab==='results' ? 'league-tab active' : 'league-tab'">
-        <span>�</span> {{ t.league_detail.tab_results }}
+        <span>🎯</span> {{ t.league_detail.tab_results }}
       </button>
       <button @click="tab='upcoming'" :class="tab==='upcoming' ? 'league-tab active' : 'league-tab'">
         <span>📅</span> {{ t.league_detail.tab_upcoming }}
@@ -631,7 +631,7 @@
           </div>
           <span style="font-size:.8rem;color:var(--gray-400);white-space:nowrap;" x-text="filtered().length + ' / ' + allGames.length + ' results'"></span>
         </div>
-        <div style="display:flex;flex-direction:column;gap:.5rem;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:.5rem;">
           <template x-for="g in visible()" :key="g.game_id">
             <a :href="'/{{ locale }}/game/' + g.game_id" style="text-decoration:none;color:inherit;">
               <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;"
@@ -698,7 +698,7 @@
         </div>
       </template>
       <template x-if="shownUpcoming.length > 0">
-        <div style="display:flex;flex-direction:column;gap:.5rem;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:.5rem;">
           <template x-for="g in shownUpcoming" :key="g.game_id">
             <a :href="'/{{ locale }}/game/' + g.game_id" style="text-decoration:none;color:inherit;">
               <div style="display:flex;align-items:center;padding:.75rem 1rem;background:var(--card-bg,white);border:1px solid var(--gray-200);border-radius:.5rem;"
