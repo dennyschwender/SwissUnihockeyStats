@@ -2547,9 +2547,34 @@ async def league_detail(request: Request, locale: str, league_id: int):
     topscorers = get_league_top_scorers(league_id, limit=100)
     top_penalties = get_league_top_penalties(league_id, limit=100)
 
+    # Helper: map raw phase string → canonical category key
+    def _canonical_phase(phase_str: str | None) -> str:
+        if not phase_str or phase_str == "Regelsaison":
+            return "regular"
+        p = phase_str.lower()
+        if "playoff" in p or "superfinal" in p:
+            return "playoff"
+        if "playout" in p:
+            return "playout"
+        if "aufstieg" in p or "abstieg" in p or "qualifikation" in p:
+            return "promotion"
+        return "regular"
+
     # Upcoming (unscored) games for this league
     from app.services.stats_service import get_upcoming_games
     group_ids_for_league = [gid for grp in league_data.get("groups", []) for gid in grp["ids"]]
+
+    # Build group_id → canonical phase mapping for annotating game cards
+    _group_id_to_phase: dict[int, str] = {}
+    if group_ids_for_league:
+        with db.session_scope() as _phsess:
+            _phase_rows = (
+                _phsess.query(LeagueGroup.id, LeagueGroup.phase)
+                .filter(LeagueGroup.id.in_(group_ids_for_league))
+                .all()
+            )
+            for _pr in _phase_rows:
+                _group_id_to_phase[_pr.id] = _canonical_phase(_pr.phase)
     upcoming_games: list[dict] = []
     if group_ids_for_league:
         with db.session_scope() as sess:
@@ -2581,6 +2606,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
                 upcoming_games.append({
                     "game_id": g.id,
                     "group_name": _group_id_to_name.get(g.group_id, ""),
+                    "phase": _group_id_to_phase.get(g.group_id, "regular"),
                     "date": g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
                     "weekday": g.game_date.strftime("%a") if g.game_date else "",
                     "time": g.game_time or "",
@@ -2603,7 +2629,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
                     Game.home_score.isnot(None),
                 )
                 .order_by(Game.game_date.desc())
-                .limit(100)
+                .limit(300)
                 .all()
             )
             team_ids = set()
@@ -2621,6 +2647,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
                 recent_games.append({
                     "game_id": g.id,
                     "group_name": _group_id_to_name.get(g.group_id, ""),
+                    "phase": _group_id_to_phase.get(g.group_id, "regular"),
                     "date": g.game_date.strftime("%Y-%m-%d") if g.game_date else "",
                     "home_team": team_names.get(g.home_team_id, f"Team {g.home_team_id}"),
                     "away_team": team_names.get(g.away_team_id, f"Team {g.away_team_id}"),

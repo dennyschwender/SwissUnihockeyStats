@@ -50,10 +50,16 @@
     const _standingsByGrp  = {{ standings_by_group | tojson }};
     const _allGames        = {{ games | tojson }};
     const _allUpcoming     = {{ upcoming_games | tojson }};
+    const _PHASE_LABELS = {
+      regular: '🏒 Regular Season',
+      playoff: '🏆 Playoffs',
+      playout: '⬇️ Playouts',
+      promotion: '🔄 Promotion/Relegation',
+    };
     document.addEventListener('alpine:init', () => {
       // When the league has multiple groups, default to the first one.
       const defaultGroup = _leagueGroups.length > 1 ? _leagueGroups[0].name : 'all';
-      Alpine.store('leagueFilter', { group: defaultGroup });
+      Alpine.store('leagueFilter', { group: defaultGroup, phase: 'all' });
     });
   </script>
 
@@ -80,7 +86,16 @@
     },
     get shownUpcoming() {
       const ag = Alpine.store('leagueFilter').group;
-      return ag === 'all' ? _allUpcoming : _allUpcoming.filter(g => g.group_name === ag);
+      const ph = Alpine.store('leagueFilter').phase;
+      let r = ag === 'all' ? _allUpcoming : _allUpcoming.filter(g => g.group_name === ag);
+      if (ph !== 'all') r = r.filter(g => g.phase === ph);
+      return r;
+    },
+    get availablePhases() {
+      const all = [..._allGames, ..._allUpcoming].map(g => g.phase).filter(Boolean);
+      const uniq = [...new Set(all)];
+      const order = ['regular', 'playoff', 'playout', 'promotion'];
+      return uniq.sort((a, b) => order.indexOf(a) - order.indexOf(b));
     },
   }" x-cloak>
     <div class="league-tabs">
@@ -470,6 +485,18 @@
 
     <!-- RESULTS -->
     <div x-show="tab==='results'">
+      <!-- Phase filter chips -->
+      <template x-if="availablePhases.length > 1">
+        <div style="display:flex;gap:.375rem;flex-wrap:wrap;margin-bottom:.85rem;">
+          <button @click="Alpine.store('leagueFilter').phase = 'all'"
+            :class="['filter-chip', Alpine.store('leagueFilter').phase === 'all' && 'active']">All phases</button>
+          <template x-for="ph in availablePhases" :key="ph">
+            <button @click="Alpine.store('leagueFilter').phase = ph"
+              :class="['filter-chip', Alpine.store('leagueFilter').phase === ph && 'active']"
+              x-text="_PHASE_LABELS[ph] || ph"></button>
+          </template>
+        </div>
+      </template>
       <div x-data="resultsTable()">
         <!-- filter bar -->
         <div style="margin-bottom:.75rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;">
@@ -505,6 +532,8 @@
                 <span style="flex:1;font-weight:500;text-align:right;padding-right:.75rem;" x-text="g.home_team"></span>
                 <span style="width:70px;text-align:center;font-weight:700;font-size:1.1rem;" x-text="g.home_score + ' : ' + g.away_score"></span>
                 <span style="flex:1;font-weight:500;padding-left:.75rem;" x-text="g.away_team"></span>
+                <span x-show="g.phase && g.phase !== 'regular'" x-text="_PHASE_LABELS[g.phase] || g.phase"
+                  style="margin-left:.75rem;font-size:.7rem;padding:.15rem .45rem;border-radius:9999px;background:var(--gray-100);color:var(--gray-500);white-space:nowrap;"></span>
               </div>
             </a>
           </template>
@@ -524,14 +553,18 @@
             pageSize: 20,
             get teams() {
               const ag = Alpine.store('leagueFilter').group;
-              const gms = ag === 'all' ? this.allGames : this.allGames.filter(g => g.group_name === ag);
+              const ph = Alpine.store('leagueFilter').phase;
+              let gms = ag === 'all' ? this.allGames : this.allGames.filter(g => g.group_name === ag);
+              if (ph !== 'all') gms = gms.filter(g => g.phase === ph);
               const s = new Set();
               gms.forEach(g => { s.add(g.home_team); s.add(g.away_team); });
               return [...s].sort();
             },
             filtered() {
               const ag = Alpine.store('leagueFilter').group;
+              const ph = Alpine.store('leagueFilter').phase;
               let r = ag === 'all' ? this.allGames : this.allGames.filter(g => g.group_name === ag);
+              if (ph !== 'all') r = r.filter(g => g.phase === ph);
               const tf = this.teamFilter;
               if (tf.length) r = r.filter(g => tf.includes(g.home_team) || tf.includes(g.away_team));
               return r;
@@ -546,6 +579,18 @@
 
     <!-- UPCOMING -->
     <div x-show="tab==='upcoming'">
+      <!-- Phase filter chips -->
+      <template x-if="availablePhases.length > 1">
+        <div style="display:flex;gap:.375rem;flex-wrap:wrap;margin-bottom:.85rem;">
+          <button @click="Alpine.store('leagueFilter').phase = 'all'"
+            :class="['filter-chip', Alpine.store('leagueFilter').phase === 'all' && 'active']">All phases</button>
+          <template x-for="ph in availablePhases" :key="ph">
+            <button @click="Alpine.store('leagueFilter').phase = ph"
+              :class="['filter-chip', Alpine.store('leagueFilter').phase === ph && 'active']"
+              x-text="_PHASE_LABELS[ph] || ph"></button>
+          </template>
+        </div>
+      </template>
       <template x-if="shownUpcoming.length > 0">
         <div style="display:flex;flex-direction:column;gap:.5rem;">
           <template x-for="g in shownUpcoming" :key="g.game_id">
@@ -556,6 +601,8 @@
                 <span style="flex:1;font-weight:500;text-align:right;padding-right:.75rem;" x-text="g.home_team"></span>
                 <span style="width:50px;text-align:center;font-weight:400;font-size:.85rem;color:var(--gray-400);">vs</span>
                 <span style="flex:1;font-weight:500;padding-left:.75rem;" x-text="g.away_team"></span>
+                <span x-show="g.phase && g.phase !== 'regular'" x-text="_PHASE_LABELS[g.phase] || g.phase"
+                  style="margin-left:.75rem;font-size:.7rem;padding:.15rem .45rem;border-radius:9999px;background:var(--gray-100);color:var(--gray-500);white-space:nowrap;"></span>
               </div>
             </a>
           </template>
