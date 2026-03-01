@@ -35,8 +35,12 @@ from app.services.database import get_database_service
 # Compact position abbreviations used in the game roster table.
 _POS_ABBREV: dict[str, str] = {
     "goalie":              "G",
+    "torhüter":            "G",
+    "torhüterin":          "G",
+    "goalkeeper":          "G",
     "verteidiger":         "D",
     "verteidigerin":       "D",
+    "defender":            "D",
     "stürmer":             "A",
     "stürmerin":           "A",
     "stürmer (mitte)":     "C",
@@ -45,6 +49,11 @@ _POS_ABBREV: dict[str, str] = {
     "stürmer (rechts)":    "A",
     "stürmerin (links)":   "A",
     "stürmerin (rechts)":  "A",
+    "forward":             "A",
+    "center":              "C",
+    "attaquant":           "A",
+    "défenseur":           "D",
+    "gardien":             "G",
 }
 
 # Position values that are considered unknown / placeholder.

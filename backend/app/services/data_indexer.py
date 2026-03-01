@@ -102,7 +102,8 @@ def league_tier(league_id: int) -> int:
 #   < 3 h since kickoff  →   5 min   (game may still be live)
 #   3 – 12 h             →   1 h     (just finished today)
 #   12 – 48 h            →   4 h     (overnight / recent — nightly batch covers this)
-#   ≥ 48 h               → 720 h     (data frozen — almost no re-index)
+#   48 h – 7 d           → 168 h     (best player / referee data published late)
+#   ≥ 7 d                → 720 h     (data frozen — almost no re-index)
 def _game_events_ttl_hours(game_date: "datetime | None") -> float:
     if game_date is None:
         return 4.0  # safe default — treat as recently finished
@@ -115,6 +116,8 @@ def _game_events_ttl_hours(game_date: "datetime | None") -> float:
         return 1.0         # 1 hour — just finished today
     if age < 48:
         return 4.0         # 4 hours — yesterday / very recent
+    if age < 168:
+        return 168.0       # 7 days — picks up best player / referee data published late
     return 720.0           # 30 days — effectively frozen
 
 
