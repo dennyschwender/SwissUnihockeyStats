@@ -645,7 +645,7 @@ class Scheduler:
         record.started_at = _utcnow()
 
         try:
-            await self._submit(job_id, job.season, job.task, force=False, max_tier=job.max_tier)
+            await self._submit(job_id, job.season, job.task, False, job.max_tier)
             asyncio.create_task(
                 self._watch(job_id, record),
                 name=f"sched-watch-{job_id}",
@@ -814,7 +814,7 @@ class Scheduler:
             task=policy["task"],
             season=season,
             label=f"{policy['label']}{season_label}",
-            max_tier=self._policy_tiers.get(policy["name"], policy.get("max_tier", 7)),
+            max_tier=self._policy_tiers.get(policy["name"]) or policy.get("max_tier") or 7,
         )
         self._queue.append(job)
         logger.debug(
