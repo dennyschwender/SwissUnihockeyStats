@@ -42,7 +42,22 @@ logger = logging.getLogger(__name__)
 # The entity_type keys used in sync_status rows
 # Each entry: (entity_type_prefix, max_age_timedelta, task_name, scope)
 # scope: "global" = not per-season, "season" = repeat for each indexed season
+
+def _snap_to_hour(dt: datetime, hour: int) -> datetime:
+    """Return the earliest datetime >= dt whose UTC hour == hour and minutes/seconds == 0.
+
+    Used to pin nightly jobs to a fixed daily window instead of floating
+    'last_sync + max_age' anchors (which drift toward the middle of the day
+    when jobs are first run manually during the day).
+    """
+    candidate = dt.replace(hour=hour, minute=0, second=0, microsecond=0)
+    if candidate <= dt:
+        candidate += timedelta(days=1)
+    return candidate
 POLICIES: list[dict] = [
+    # ── Weekly / multi-day policies — run at 03:00 UTC ──────────────────────
+    # Snapped to 03:00 UTC (04:00–05:00 Swiss local) so nightly runs never
+    # drift into the afternoon and are always finished before evening games.
     {
         "name":        "seasons",
         "entity_type": "seasons",
@@ -51,6 +66,7 @@ POLICIES: list[dict] = [
         "scope":       "global",
         "label":       "Seasons refresh",
         "priority":    10,              # lower = higher prio
+        "run_at_hour": 3,
     },
     {
         "name":        "clubs",
@@ -60,6 +76,7 @@ POLICIES: list[dict] = [
         "scope":       "season",
         "label":       "Clubs refresh",
         "priority":    20,
+        "run_at_hour": 3,
     },
     {
         "name":        "teams",
@@ -69,6 +86,7 @@ POLICIES: list[dict] = [
         "scope":       "season",
         "label":       "Teams refresh",
         "priority":    30,
+        "run_at_hour": 3,
     },
     {
         "name":        "players",
@@ -79,6 +97,7 @@ POLICIES: list[dict] = [
         "label":       "Players refresh",
         "priority":    40,
         "max_tier":    3,   # NLA/L-UPL + NLB + 1.Liga (112 teams) — keeps daily runs fast
+        "run_at_hour": 3,
     },
     {
         "name":        "leagues",
@@ -88,6 +107,7 @@ POLICIES: list[dict] = [
         "scope":       "season",
         "label":       "Leagues refresh",
         "priority":    50,
+        "run_at_hour": 3,
     },
     {
         "name":        "league_groups",
@@ -97,6 +117,7 @@ POLICIES: list[dict] = [
         "scope":       "season",
         "label":       "League groups refresh",
         "priority":    60,
+        "run_at_hour": 3,
     },
     {
         "name":        "games",
@@ -106,7 +127,13 @@ POLICIES: list[dict] = [
         "scope":       "season",
         "label":       "Games refresh",
         "priority":    70,
+        "run_at_hour": 3,
     },
+    # ── Daily live-data policies — game_events at 03:30, stats at 04:00 UTC ──
+    # game_events must run after the games list refresh (03:00) so new games
+    # added overnight are immediately indexed for events too.
+    # player_stats / player_game_stats run at 04:00 UTC, after game_events
+    # finishes, so G/A/PIM numbers are populated from the freshest event data.
     {
         "name":        "game_events",
         "entity_type": "game_events",
@@ -117,11 +144,13 @@ POLICIES: list[dict] = [
         "priority":    80,
         "max_tier":    2,   # NLA + NLB + A-level youth only
         "current_only": True,
+        "run_at_hour": 3,
     },
     # ── Player season stats: cascade T1 → T2 → … → T6 ──────────────────────
     # current_only is NOT set: these run once for past seasons too (frozen after
     # first successful sync). Tiers beyond the players policy max_tier will find
     # 0 players and freeze immediately via the empty-tier stamp.
+    # run_at_hour=4: runs after game_events (03:xx) so stats reflect last night's games.
     {
         "name":        "player_stats_t1",
         "entity_type": "player_stats_t1",
@@ -132,6 +161,7 @@ POLICIES: list[dict] = [
         "priority":    85,
         "max_tier":    1,
         "fixed_tier":  True,
+        "run_at_hour": 4,
     },
     {
         "name":        "player_stats_t2",
@@ -144,6 +174,7 @@ POLICIES: list[dict] = [
         "max_tier":    2,
         "fixed_tier":  True,
         "requires":    "player_stats_t1",
+        "run_at_hour": 4,
     },
     {
         "name":        "player_stats_t3",
@@ -156,6 +187,7 @@ POLICIES: list[dict] = [
         "max_tier":    3,
         "fixed_tier":  True,
         "requires":    "player_stats_t2",
+        "run_at_hour": 4,
     },
     {
         "name":        "player_stats_t4",
@@ -168,6 +200,7 @@ POLICIES: list[dict] = [
         "max_tier":    4,
         "fixed_tier":  True,
         "requires":    "player_stats_t3",
+        "run_at_hour": 4,
     },
     {
         "name":        "player_stats_t5",
@@ -180,6 +213,7 @@ POLICIES: list[dict] = [
         "max_tier":    5,
         "fixed_tier":  True,
         "requires":    "player_stats_t4",
+        "run_at_hour": 4,
     },
     {
         "name":        "player_stats_t6",
@@ -192,9 +226,11 @@ POLICIES: list[dict] = [
         "max_tier":    6,
         "fixed_tier":  True,
         "requires":    "player_stats_t5",
+        "run_at_hour": 4,
     },
     # ── Per-game G/A/PIM: cascade T1 → T2 → … → T6 ──────────────────────────
     # current_only is NOT set: same rationale as player_stats above.
+    # run_at_hour=4: same reasoning — after game_events at 03:xx.
     {
         "name":        "player_game_stats_t1",
         "entity_type": "player_game_stats_t1",
@@ -205,6 +241,7 @@ POLICIES: list[dict] = [
         "priority":    86,
         "max_tier":    1,
         "fixed_tier":  True,
+        "run_at_hour": 4,
     },
     {
         "name":        "player_game_stats_t2",
@@ -217,6 +254,7 @@ POLICIES: list[dict] = [
         "max_tier":    2,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t1",
+        "run_at_hour": 4,
     },
     {
         "name":        "player_game_stats_t3",
@@ -229,6 +267,7 @@ POLICIES: list[dict] = [
         "max_tier":    3,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t2",
+        "run_at_hour": 4,
     },
     {
         "name":        "player_game_stats_t4",
@@ -241,6 +280,7 @@ POLICIES: list[dict] = [
         "max_tier":    4,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t3",
+        "run_at_hour": 4,
     },
     {
         "name":        "player_game_stats_t5",
@@ -253,6 +293,7 @@ POLICIES: list[dict] = [
         "max_tier":    5,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t4",
+        "run_at_hour": 4,
     },
     {
         "name":        "player_game_stats_t6",
@@ -265,6 +306,7 @@ POLICIES: list[dict] = [
         "max_tier":    6,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t5",
+        "run_at_hour": 4,
     },
 ]
 
@@ -754,6 +796,12 @@ class Scheduler:
             run_at = now + timedelta(seconds=policy["priority"])
         else:
             run_at = last_sync + policy["max_age"]
+            # Snap to nightly window if the policy requests it.
+            # This prevents daily jobs from drifting toward the afternoon when
+            # they were first manually triggered during daytime.  The snap only
+            # applies to auto-scheduled runs (not cold-start / first-ever sync).
+            if "run_at_hour" in policy:
+                run_at = _snap_to_hour(run_at, policy["run_at_hour"])
 
         self._enqueue(policy, season=season, run_at=run_at)
 
