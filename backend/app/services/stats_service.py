@@ -2580,7 +2580,7 @@ def get_game_box_score(game_id: int) -> dict:
             smap: dict[int, dict] = {}
             if not pids:
                 return smap
-            for _sr in (
+            all_rows = (
                 session.query(PlayerStatistics)
                 .filter(
                     PlayerStatistics.player_id.in_(pids),
@@ -2588,7 +2588,20 @@ def get_game_box_score(game_id: int) -> dict:
                     PlayerStatistics.team_name == team_name_filter,
                 )
                 .all()
-            ):
+            )
+            if not all_rows:
+                return smap
+            # Determine the dominant league_abbrev by majority vote (weighted by
+            # games_played) so that cup / second-team rows are excluded and only
+            # the league this game belongs to is counted.
+            from collections import Counter as _Counter
+            abbrev_votes: _Counter = _Counter()
+            for _row in all_rows:
+                abbrev_votes[_row.league_abbrev] += _row.games_played or 1
+            _league_abbrev = abbrev_votes.most_common(1)[0][0] if abbrev_votes else None
+            for _sr in all_rows:
+                if _league_abbrev and _sr.league_abbrev != _league_abbrev:
+                    continue
                 _pid = _sr.player_id
                 if _pid not in smap:
                     smap[_pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0}
