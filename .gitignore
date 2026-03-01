@@ -40,10 +40,6 @@ data/raw/*.csv
 data/processed/*.json
 data/processed/*.csv
 data/processed/*.parquet
-data/cache/clubs/*.json
-data/cache/general/*.json
-data/cache/leagues/*.json
-data/cache/teams/*.json
 
 # Logs
 *.log
@@ -79,10 +75,9 @@ data/scheduler_config.json
 docker-compose.override.yml
 .docker/
 
-# Docker volumes (keep structure, ignore content)
-data/cache/*.json
-data/cache/**/*.json
-!data/cache/.gitkeep
+# Cache directory — ignore all content, but keep directory structure via .gitkeep
+data/cache/**
+!data/cache/**/.gitkeep
 
 # Backend data directory (use root /data instead)
 backend/data/
