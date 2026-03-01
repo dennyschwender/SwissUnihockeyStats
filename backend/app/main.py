@@ -2497,6 +2497,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
                 "groups": [],
                 "standings": [],
                 "standings_by_group": {},
+                "standings_by_phase": {},
                 "topscorers": [],
                 "top_penalties": [],
                 "games": [],
@@ -2575,6 +2576,16 @@ async def league_detail(request: Request, locale: str, league_id: int):
             )
             for _pr in _phase_rows:
                 _group_id_to_phase[_pr.id] = _canonical_phase(_pr.phase)
+
+    # Compute standings per canonical phase (regular / playoff / playout / promotion)
+    _phase_to_group_ids: dict[str, list[int]] = {}
+    for _gid, _ph in _group_id_to_phase.items():
+        _phase_to_group_ids.setdefault(_ph, []).append(_gid)
+    standings_by_phase: dict[str, list[dict]] = {
+        _ph: get_league_standings(league_id, only_group_ids=_gids)
+        for _ph, _gids in _phase_to_group_ids.items()
+        if _ph != "regular"  # "regular" already served by _allStandings / standings_by_group
+    }
     upcoming_games: list[dict] = []
     if group_ids_for_league:
         with db.session_scope() as sess:
@@ -2668,6 +2679,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             "groups": groups,
             "standings": standings,
             "standings_by_group": standings_by_group,
+            "standings_by_phase": standings_by_phase,
             "topscorers": topscorers,
             "top_penalties": top_penalties,
             "games": recent_games,

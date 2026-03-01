@@ -48,6 +48,7 @@
     const _leagueGroups    = {{ groups | tojson }};
     const _allStandings    = {{ standings | tojson }};
     const _standingsByGrp  = {{ standings_by_group | tojson }};
+    const _standingsByPhase = {{ standings_by_phase | tojson }};
     const _allGames        = {{ games | tojson }};
     const _allUpcoming     = {{ upcoming_games | tojson }};
     const _PHASE_LABELS = {
@@ -69,7 +70,12 @@
     _playoutSpots: {{ playout_spots }},
     get shownStandings() {
       const ag = Alpine.store('leagueFilter').group;
+      const ph = Alpine.store('leagueFilter').phase;
+      if (ph !== 'all' && ph !== 'regular') return _standingsByPhase[ph] || [];
       return ag === 'all' ? _allStandings : (_standingsByGrp[ag] || []);
+    },
+    get standingsPhase() {
+      return Alpine.store('leagueFilter').phase;
     },
     playoffSpots(total) {
       if (this._playoffSpots > 0) return this._playoffSpots;
@@ -137,6 +143,18 @@
 
     <!-- STANDINGS -->
     <div x-show="tab==='standings'">
+      <!-- Phase filter chips -->
+      <template x-if="availablePhases.length > 1">
+        <div style="display:flex;gap:.375rem;flex-wrap:wrap;margin-bottom:.85rem;">
+          <button @click="Alpine.store('leagueFilter').phase = 'all'"
+            :class="['filter-chip', Alpine.store('leagueFilter').phase === 'all' && 'active']">All phases</button>
+          <template x-for="ph in availablePhases" :key="ph">
+            <button @click="Alpine.store('leagueFilter').phase = ph"
+              :class="['filter-chip', Alpine.store('leagueFilter').phase === ph && 'active']"
+              x-text="_PHASE_LABELS[ph] || ph"></button>
+          </template>
+        </div>
+      </template>
       <template x-if="shownStandings.length > 0">
         <div class="table-scroll">
           <table class="data-table">
@@ -156,7 +174,7 @@
             <tbody>
               <template x-for="row in shownStandings" :key="row.team_id">
                 <tr @click="window.location='/{{ locale }}/team/' + row.team_id"
-                  :style="'cursor:pointer;border-bottom:1px solid var(--gray-100);border-left:3px solid ' + (rowZone(row.rank, shownStandings.length) === 'playoff' ? '#16a34a' : rowZone(row.rank, shownStandings.length) === 'playout' ? '#dc2626' : 'transparent')"
+                  :style="'cursor:pointer;border-bottom:1px solid var(--gray-100);border-left:3px solid ' + ((standingsPhase === 'all' || standingsPhase === 'regular') && rowZone(row.rank, shownStandings.length) === 'playoff' ? '#16a34a' : (standingsPhase === 'all' || standingsPhase === 'regular') && rowZone(row.rank, shownStandings.length) === 'playout' ? '#dc2626' : 'transparent')"
                   onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
                   <td style="padding:.6rem .5rem;text-align:center;font-weight:600;color:var(--gray-500);" x-text="row.rank"></td>
                   <td style="padding:.6rem .75rem;font-weight:500;" x-text="row.team_name"></td>
@@ -174,8 +192,8 @@
           </table>
         </div>
       </template>
-      <!-- Zone legend -->
-      <template x-if="shownStandings.length > 0">
+      <!-- Zone legend — only meaningful for regular season -->
+      <template x-if="shownStandings.length > 0 && (standingsPhase === 'all' || standingsPhase === 'regular')">
         <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:.75rem;font-size:.78rem;color:var(--gray-500);">
           <span style="display:flex;align-items:center;gap:.35rem;">
             <span style="display:inline-block;width:.7rem;height:.7rem;border-radius:2px;background:#16a34a;"></span>
