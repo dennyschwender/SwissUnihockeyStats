@@ -531,14 +531,59 @@ async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
         counts = {}
         with db_service.engine.connect() as conn:
             # ── league_groups duplicates ─────────────────────────────────────
-            # Keep the row with the lowest id per (league_id, group_id).
-            r = conn.execute(_text(
-                "DELETE FROM league_groups "
-                "WHERE id NOT IN ("
-                "  SELECT MIN(id) FROM league_groups GROUP BY league_id, group_id"
-                ")"
-            ))
-            counts["league_groups"] = r.rowcount
+            # Keep the row with the lowest id per (league_id, group_id, phase).
+            # Rows that share (league_id, group_id) but differ in phase are
+            # intentional (phase-keyed groups) and must NOT be merged.
+            # NULLs are treated as equivalent via COALESCE.
+            #
+            # IMPORTANT: before deleting non-min rows, remap any games that
+            # reference them to the surviving (min) row — otherwise the FK
+            # constraint fails.
+            non_min_ids = [
+                r[0] for r in conn.execute(_text(
+                    "SELECT id FROM league_groups "
+                    "WHERE id NOT IN ("
+                    "  SELECT MIN(id) FROM league_groups "
+                    "  GROUP BY league_id, group_id, COALESCE(phase, '')"
+                    ")"
+                )).fetchall()
+            ]
+            if non_min_ids:
+                # Build old_id → new_id (min sibling) mapping
+                id_map_rows = conn.execute(_text(
+                    "SELECT id, league_id, group_id, COALESCE(phase,'') as ph FROM league_groups"
+                )).fetchall()
+                min_for: dict[tuple, int] = {}
+                for row_id, lid, gid, ph in id_map_rows:
+                    key = (lid, gid, ph)
+                    if key not in min_for or row_id < min_for[key]:
+                        min_for[key] = row_id
+                # Full lookup: every id → its min sibling
+                full_map: dict[int, tuple] = {}
+                for row_id, lid, gid, ph in id_map_rows:
+                    full_map[row_id] = (lid, gid, ph)
+                # Remap game.group_id for any games pointing at non-min rows
+                remapped = 0
+                for old_id in non_min_ids:
+                    key = full_map.get(old_id)
+                    if key is None:
+                        continue
+                    new_id = min_for[key]
+                    if new_id == old_id:
+                        continue
+                    r2 = conn.execute(
+                        _text("UPDATE games SET group_id=:new WHERE group_id=:old"),
+                        {"new": new_id, "old": old_id},
+                    )
+                    remapped += r2.rowcount
+                counts["games_remapped"] = remapped
+                # Now it's safe to delete
+                placeholders = ",".join(str(i) for i in non_min_ids)
+                r = conn.execute(_text(f"DELETE FROM league_groups WHERE id IN ({placeholders})"))
+                counts["league_groups"] = r.rowcount
+            else:
+                counts["league_groups"] = 0
+                counts["games_remapped"] = 0
 
             # ── game_events duplicates ───────────────────────────────────────
             # Keep the row with the lowest id per
@@ -569,10 +614,10 @@ async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
     try:
         result = await loop.run_in_executor(None, _cleanup)
         logger.info(
-            "Admin cleanup: removed %d league_group dups, %d game_event dups, "
-            "%d stale sync_status rows in %.2fs",
-            result["league_groups"], result["game_events"],
-            result["sync_status"], result["elapsed_s"],
+            "Admin cleanup: removed %d league_group dups (remapped %d games), "
+            "%d game_event dups, %d stale sync_status rows in %.2fs",
+            result["league_groups"], result.get("games_remapped", 0),
+            result["game_events"], result["sync_status"], result["elapsed_s"],
         )
         return {"ok": True, **result}
     except Exception as e:
