@@ -160,6 +160,16 @@ class DatabaseService:
             if "phase" not in lg_cols:
                 conn.execute(text("ALTER TABLE league_groups ADD COLUMN phase TEXT"))
 
+            # ── Add referee/spectator columns to games ───────────────────────
+            game_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(games)"))}
+            for col, typedef in [
+                ("spectators", "INTEGER"),
+                ("referee_1",  "VARCHAR(100)"),
+                ("referee_2",  "VARCHAR(100)"),
+            ]:
+                if col not in game_cols:
+                    conn.execute(text(f"ALTER TABLE games ADD COLUMN {col} {typedef}"))
+
             # ── Drop the now-unused player_id index on game_events ──────────
             # player_id is always NULL (API returns names, not IDs), so the
             # index only stored NULLs.
