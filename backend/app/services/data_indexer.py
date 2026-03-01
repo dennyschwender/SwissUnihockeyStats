@@ -1440,7 +1440,7 @@ class DataIndexer:
             Number of events stored.
         """
         entity_id = f"game:{game_id}:events"
-        if not force and not self._should_update("game_events", entity_id, max_age_hours=720):
+        if not force and not self._should_update("game_events", entity_id, max_age_hours=168):  # 7 days
             return 0
 
         # ── 1. Fetch from API (no DB lock held) ───────────────────────────
@@ -1595,7 +1595,7 @@ class DataIndexer:
         Returns number of GamePlayer rows inserted/updated.
         """
         entity_id = f"game:{game_id}:lineup"
-        if not force and not self._should_update("game_lineup", entity_id, max_age_hours=720):
+        if not force and not self._should_update("game_lineup", entity_id, max_age_hours=168):  # 7 days
             return 0
 
         # ── 1. Fetch both lineups from API (no DB lock held) ──────────────
