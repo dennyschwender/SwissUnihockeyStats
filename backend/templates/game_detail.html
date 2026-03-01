@@ -477,6 +477,7 @@ function eventsTable(goals, penalties) {
               {% if game.game_stats_indexed %}
               <th :class="cls('game_g')"     @click="sortBy('game_g')"     style="text-align:center;" title="Goals (game)">G&#9733;<span class="sort-icon" x-text="icon('game_g')"></span></th>
               <th :class="cls('game_a')"     @click="sortBy('game_a')"     style="text-align:center;" title="Assists (game)">A&#9733;<span class="sort-icon" x-text="icon('game_a')"></span></th>
+              <th :class="cls('game_pts')"   @click="sortBy('game_pts')"   style="text-align:center;" title="Points (game)">PTS&#9733;<span class="sort-icon" x-text="icon('game_pts')"></span></th>
               {% endif %}
               <th :class="cls('season_gp')"  @click="sortBy('season_gp')"  style="text-align:center;color:var(--gray-400);" title="Games played (season)">GP<span class="sort-icon" x-text="icon('season_gp')"></span></th>
               <th :class="cls('season_g')"   @click="sortBy('season_g')"   style="text-align:center;color:var(--gray-400);" title="Goals (season)">G<span class="sort-icon" x-text="icon('season_g')"></span></th>
@@ -492,6 +493,7 @@ function eventsTable(goals, penalties) {
                   {% if game.game_stats_indexed %}
                   <td style="text-align:center;font-weight:700;" x-text="p.game_g ?? '—'"></td>
                   <td style="text-align:center;font-weight:700;" x-text="p.game_a ?? '—'"></td>
+                  <td style="text-align:center;font-weight:700;" x-text="p.game_pts ?? '—'"></td>
                   {% endif %}
                   <td style="text-align:center;color:var(--gray-400);" x-text="p.season_gp ?? '—'"></td>
                   <td style="text-align:center;color:var(--gray-400);" x-text="p.season_g ?? '—'"></td>
@@ -514,6 +516,7 @@ function eventsTable(goals, penalties) {
               {% if game.game_stats_indexed %}
               <th :class="cls('game_g')"     @click="sortBy('game_g')"     style="text-align:center;" title="Goals (game)">G&#9733;<span class="sort-icon" x-text="icon('game_g')"></span></th>
               <th :class="cls('game_a')"     @click="sortBy('game_a')"     style="text-align:center;" title="Assists (game)">A&#9733;<span class="sort-icon" x-text="icon('game_a')"></span></th>
+              <th :class="cls('game_pts')"   @click="sortBy('game_pts')"   style="text-align:center;" title="Points (game)">PTS&#9733;<span class="sort-icon" x-text="icon('game_pts')"></span></th>
               {% endif %}
               <th :class="cls('season_gp')"  @click="sortBy('season_gp')"  style="text-align:center;color:var(--gray-400);" title="Games played (season)">GP<span class="sort-icon" x-text="icon('season_gp')"></span></th>
               <th :class="cls('season_g')"   @click="sortBy('season_g')"   style="text-align:center;color:var(--gray-400);" title="Goals (season)">G<span class="sort-icon" x-text="icon('season_g')"></span></th>
@@ -529,6 +532,7 @@ function eventsTable(goals, penalties) {
                   {% if game.game_stats_indexed %}
                   <td style="text-align:center;font-weight:700;" x-text="p.game_g ?? '—'"></td>
                   <td style="text-align:center;font-weight:700;" x-text="p.game_a ?? '—'"></td>
+                  <td style="text-align:center;font-weight:700;" x-text="p.game_pts ?? '—'"></td>
                   {% endif %}
                   <td style="text-align:center;color:var(--gray-400);" x-text="p.season_gp ?? '—'"></td>
                   <td style="text-align:center;color:var(--gray-400);" x-text="p.season_g ?? '—'"></td>

@@ -2503,7 +2503,7 @@ def get_game_box_score(game_id: int) -> dict:
                 "player_id": gp.player_id,
                 "game_g":   gp.goals           if _game_stats_indexed else None,
                 "game_a":   gp.assists         if _game_stats_indexed else None,
-                "game_pim": gp.penalty_minutes if _game_stats_indexed else None,
+                "game_pts": ((gp.goals or 0) + (gp.assists or 0)) if _game_stats_indexed else None,
                 "season_gp": _st.get("gp"),
                 "season_g": _st.get("g"),
                 "season_a": _st.get("a"),
