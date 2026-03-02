@@ -1292,9 +1292,15 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
         return {"ok": True, "policy_tiers": sched.get_policy_tiers()}
     if action == "clear_done":
         removed = sched.clear_done()
-        # Also purge manual jobs that are finished
+        # Purge only *manual* jobs that are finished.
+        # Scheduler-submitted jobs (j["scheduled"] == True) must NOT be removed
+        # here: _watch() polls _admin_jobs every 2 s and would interpret a
+        # missing entry as "job vanished", triggering an error + immediate
+        # re-queue → infinite job storm.  Those entries are already cleaned up
+        # automatically by _purge_expired_jobs (300 s TTL) after _watch exits.
         manual_removed = [jid for jid, j in list(_admin_jobs.items())
-                          if j.get("status") in ("done", "error", "stopped")]
+                          if j.get("status") in ("done", "error", "stopped")
+                          and not j.get("scheduled")]
         for jid in manual_removed:
             _admin_jobs.pop(jid, None)
         return {"ok": True, "removed": removed + len(manual_removed)}
