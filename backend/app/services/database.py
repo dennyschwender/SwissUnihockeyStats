@@ -233,9 +233,13 @@ class DatabaseService:
             # NOTE: ':events' in SQL text would be parsed by SQLAlchemy as a
             # bind parameter placeholder.  Pass it as an explicit bind value
             # instead, using :suffix, so the literal colon is handled safely.
+            # The last_sync guard makes this a true one-shot migration: rows
+            # written by the *new* scheduler (after 2026-03-02) won't be
+            # deleted again on subsequent container restarts.
             conn.execute(text("""
                 DELETE FROM sync_status
                 WHERE entity_type = 'game_events'
+                  AND last_sync < '2026-03-02 00:00:00'
                   AND entity_id IN (
                       SELECT 'game:' || g.id || :suffix
                       FROM games g
