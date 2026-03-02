@@ -1292,18 +1292,25 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
         return {"ok": True, "policy_tiers": sched.get_policy_tiers()}
     if action == "clear_done":
         removed = sched.clear_done()
-        # Purge only *manual* jobs that are finished.
-        # Scheduler-submitted jobs (j["scheduled"] == True) must NOT be removed
-        # here: _watch() polls _admin_jobs every 2 s and would interpret a
-        # missing entry as "job vanished", triggering an error + immediate
-        # re-queue → infinite job storm.  Those entries are already cleaned up
-        # automatically by _purge_expired_jobs (300 s TTL) after _watch exits.
-        manual_removed = [jid for jid, j in list(_admin_jobs.items())
-                          if j.get("status") in ("done", "error", "stopped")
-                          and not j.get("scheduled")]
-        for jid in manual_removed:
+        # Only protect entries whose _watch() coroutine is still active.
+        # _watch() polls _admin_jobs every 2 s; if the entry disappears before
+        # _watch() gets a chance to read "done", it counts 3 consecutive misses
+        # and marks the JobRecord as "error" → immediate re-queue → storm.
+        # Once _watch() has seen "done" and exited it sets the JobRecord to
+        # "done"/"error" — at that point removing the _admin_jobs entry is safe.
+        # We therefore protect only entries whose JobRecord is still running.
+        active_watch_ids = {
+            r.job_id for r in sched._history
+            if r.status in ("pending", "running")
+        }
+        finished_ids = [
+            jid for jid, j in list(_admin_jobs.items())
+            if j.get("status") in ("done", "error", "stopped")
+            and jid not in active_watch_ids
+        ]
+        for jid in finished_ids:
             _admin_jobs.pop(jid, None)
-        return {"ok": True, "removed": removed + len(manual_removed)}
+        return {"ok": True, "removed": removed + len(finished_ids)}
     if action == "trigger":
         policy = payload.get("policy")
         season = payload.get("season")
