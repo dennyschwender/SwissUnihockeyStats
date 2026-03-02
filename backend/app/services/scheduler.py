@@ -44,11 +44,12 @@ logger = logging.getLogger(__name__)
 # scope: "global" = not per-season, "season" = repeat for each indexed season
 
 def _snap_to_hour(dt: datetime, hour: int) -> datetime:
-    """Return the earliest datetime >= dt whose UTC hour == hour and minutes/seconds == 0.
+    """Return the earliest datetime > dt whose UTC hour == hour and minutes/seconds == 0.
 
-    Used to pin nightly jobs to a fixed daily window instead of floating
-    'last_sync + max_age' anchors (which drift toward the middle of the day
-    when jobs are first run manually during the day).
+    Used by nightly policies: pass last_sync as dt to get the very next
+    nightly window after that sync.  This guarantees a run the following
+    morning even when the last sync happened late in the evening, ensuring
+    late-night game results are always captured by morning.
     """
     candidate = dt.replace(hour=hour, minute=0, second=0, microsecond=0)
     if candidate <= dt:
@@ -800,13 +801,18 @@ class Scheduler:
             # run soon, staggered by priority to avoid thundering herd.
             run_at = now + timedelta(seconds=policy["priority"])
         else:
-            run_at = last_sync + policy["max_age"]
-            # Snap to nightly window if the policy requests it.
-            # This prevents daily jobs from drifting toward the afternoon when
-            # they were first manually triggered during daytime.  The snap only
-            # applies to auto-scheduled runs (not cold-start / first-ever sync).
             if "run_at_hour" in policy:
-                run_at = _snap_to_hour(run_at, policy["run_at_hour"])
+                # Snap to the next nightly window AFTER the last sync, not after
+                # last_sync + max_age.  Anchoring on max_age caused night-time
+                # manual syncs (e.g. 20:23) to skip the very next 03:00 window
+                # entirely because last_sync + max_age (e.g. next-day 20:23) was
+                # still past the only 03:00 candidate for that day → snapped to
+                # the morning two days later.  Snapping from last_sync instead
+                # always schedules the immediately following nightly window, which
+                # is what we want so late-evening games are indexed by morning.
+                run_at = _snap_to_hour(last_sync, policy["run_at_hour"])
+            else:
+                run_at = last_sync + policy["max_age"]
 
         self._enqueue(policy, season=season, run_at=run_at)
 
