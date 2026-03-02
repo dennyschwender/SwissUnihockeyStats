@@ -1565,6 +1565,17 @@ class DataIndexer:
                 _spec = _dcell(10)
                 if _spec and _spec.isdigit():
                     spectators_val = int(_spec)
+                # Fallback: extract score from result cell (cell[4]) when
+                # game_summary was unavailable (e.g. returns 404 for some games).
+                if not game_is_finished:
+                    _result = _dcell(4)
+                    if _result:
+                        import re as _re
+                        _m = _re.match(r'(\d+)\s*:\s*(\d+)', _result.strip())
+                        if _m:
+                            home_score_val = int(_m.group(1))
+                            away_score_val = int(_m.group(2))
+                            game_is_finished = True
         except Exception:
             pass
 
