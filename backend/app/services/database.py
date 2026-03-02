@@ -234,7 +234,7 @@ class DatabaseService:
                 DELETE FROM sync_status
                 WHERE entity_type = 'game_events'
                   AND entity_id IN (
-                      SELECT 'game:' || g.id || ':events'
+                      SELECT 'game:' || g.id || chr(58) || 'events'
                       FROM games g
                       WHERE g.status = 'finished'
                         AND g.period IS NULL
