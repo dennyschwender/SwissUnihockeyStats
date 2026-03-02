@@ -189,6 +189,16 @@ class SwissUnihockeyClient:
                 if self.use_cache:
                     self.cache.set(endpoint, params, data, category)
                 return data
+            except requests.exceptions.HTTPError as e:
+                # 4xx errors are client errors — retrying will never help.
+                # Raise immediately without wasting time on retries.
+                if e.response is not None and 400 <= e.response.status_code < 500:
+                    logger.warning(f"Client error {e.response.status_code} for {endpoint}, not retrying")
+                    raise
+                last_exc = e
+                logger.warning(f"Request failed (attempt {attempt+1}/{self.retry_attempts}): {e}")
+                if attempt < self.retry_attempts - 1:
+                    time.sleep(self.retry_delay * (attempt + 1))
             except requests.exceptions.RequestException as e:
                 last_exc = e
                 logger.warning(f"Request failed (attempt {attempt+1}/{self.retry_attempts}): {e}")
