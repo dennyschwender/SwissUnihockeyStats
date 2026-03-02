@@ -399,8 +399,10 @@ def _get_standings_from_api(session, league, only_group_ids: list[int] | None) -
                         "team_id":   team_id,
                         "team_name": team_name,
                         "gp":  gp,
-                        "w":   w + otw,   # total wins (reg + OT/SO)
-                        "l":   l + otl,   # total losses (reg + OT/SO)
+                        "w":   w,     # regulation wins
+                        "otw": otw,   # OT/SO wins
+                        "otl": otl,   # OT/SO losses
+                        "l":   l,     # regulation losses
                         "gf":  gf,
                         "ga":  ga,
                         "gd":  gf - ga,
@@ -483,8 +485,10 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
                     "team_id": team_id,
                     "team_name": team_name,
                     "gp": 0,
-                    "w": 0,
-                    "l": 0,
+                    "w": 0,    # regulation wins
+                    "otw": 0,  # OT/SO wins
+                    "otl": 0,  # OT/SO losses
+                    "l": 0,    # regulation losses
                     "gf": 0,
                     "ga": 0,
                     "pts": 0,
@@ -561,17 +565,25 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
             is_extra = g.period in ("OT", "SO")
 
             if hs > as_:
-                h["w"] += 1
-                h["pts"] += 2 if is_extra else 3
-                a["l"] += 1
                 if is_extra:
+                    h["otw"] += 1
+                    h["pts"] += 2
+                    a["otl"] += 1
                     a["pts"] += 1
+                else:
+                    h["w"] += 1
+                    h["pts"] += 3
+                    a["l"] += 1
             elif as_ > hs:
-                a["w"] += 1
-                a["pts"] += 2 if is_extra else 3
-                h["l"] += 1
                 if is_extra:
+                    a["otw"] += 1
+                    a["pts"] += 2
+                    h["otl"] += 1
                     h["pts"] += 1
+                else:
+                    a["w"] += 1
+                    a["pts"] += 3
+                    h["l"] += 1
             else:
                 # Tie – shouldn't happen in unihockey but handle it
                 h["pts"] += 1

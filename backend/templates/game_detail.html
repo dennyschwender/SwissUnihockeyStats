@@ -778,8 +778,10 @@ function eventsTable(goals, penalties) {
           <th style="width:2rem;text-align:center;">#</th>
           <th>{{ t.table.team }}</th>
           <th style="text-align:center;">GP</th>
-          <th style="text-align:center;">W</th>
-          <th style="text-align:center;">L</th>
+          <th style="text-align:center;" title="Regulation Wins">W</th>
+          <th style="text-align:center;" title="Overtime/Shootout Wins">OTW</th>
+          <th style="text-align:center;" title="Overtime/Shootout Losses">OTL</th>
+          <th style="text-align:center;" title="Regulation Losses">L</th>
           <th style="text-align:center;">GF</th>
           <th style="text-align:center;">GA</th>
           <th style="text-align:center;">GD</th>
@@ -792,6 +794,8 @@ function eventsTable(goals, penalties) {
             <td><a href="/{{ locale }}/team/{{ row.team_id }}" style="text-decoration:none;color:inherit;">{{ row.team_name }}</a></td>
             <td style="text-align:center;color:var(--gray-500);">{{ row.gp }}</td>
             <td style="text-align:center;color:var(--gray-500);">{{ row.w }}</td>
+            <td style="text-align:center;color:var(--gray-400);">{{ row.get('otw', 0) }}</td>
+            <td style="text-align:center;color:var(--gray-400);">{{ row.get('otl', 0) }}</td>
             <td style="text-align:center;color:var(--gray-500);">{{ row.l }}</td>
             <td style="text-align:center;color:var(--gray-500);">{{ row.gf }}</td>
             <td style="text-align:center;color:var(--gray-500);">{{ row.ga }}</td>

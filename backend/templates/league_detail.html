@@ -185,8 +185,10 @@
                 <th class="col-narrow" style="width:2.5rem;">#</th>
                 <th>{{ t.table.team }}</th>
                 <th class="col-narrow" title="Games Played">GP</th>
-                <th class="col-narrow" title="Wins">W</th>
-                <th class="col-narrow" title="Losses">L</th>
+                <th class="col-narrow" title="Wins (regulation)">W</th>
+                <th class="col-narrow" title="Overtime/Shootout Wins">OTW</th>
+                <th class="col-narrow" title="Overtime/Shootout Losses">OTL</th>
+                <th class="col-narrow" title="Losses (regulation)">L</th>
                 <th class="col-narrow" title="Goals For">GF</th>
                 <th class="col-narrow" title="Goals Against">GA</th>
                 <th style="padding:.6rem .5rem;text-align:center;" title="Goal Difference">GD</th>
@@ -202,6 +204,8 @@
                   <td style="padding:.6rem .75rem;font-weight:500;" x-text="row.team_name"></td>
                   <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gp"></td>
                   <td style="padding:.6rem .5rem;text-align:center;" x-text="row.w"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;color:var(--gray-400);" x-text="row.otw"></td>
+                  <td style="padding:.6rem .5rem;text-align:center;color:var(--gray-400);" x-text="row.otl"></td>
                   <td style="padding:.6rem .5rem;text-align:center;" x-text="row.l"></td>
                   <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gf"></td>
                   <td style="padding:.6rem .5rem;text-align:center;" x-text="row.ga"></td>
