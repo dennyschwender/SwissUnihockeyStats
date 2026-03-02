@@ -230,18 +230,21 @@ class DatabaseService:
             # them with the new code so the period is set correctly.
             # Only targets finished games from the last 40 days (current season
             # rounds still being replayed) where period is still NULL.
+            # NOTE: ':events' in SQL text would be parsed by SQLAlchemy as a
+            # bind parameter placeholder.  Pass it as an explicit bind value
+            # instead, using :suffix, so the literal colon is handled safely.
             conn.execute(text("""
                 DELETE FROM sync_status
                 WHERE entity_type = 'game_events'
                   AND entity_id IN (
-                      SELECT 'game:' || g.id || chr(58) || 'events'
+                      SELECT 'game:' || g.id || :suffix
                       FROM games g
                       WHERE g.status = 'finished'
                         AND g.period IS NULL
                         AND g.home_score IS NOT NULL
                         AND g.game_date >= date('now', '-40 days')
                   )
-            """))
+            """), {"suffix": ":events"})
 
             # ── Remove phantom future-season rows ────────────────────────────
             # index_seasons now skips seasons that haven't started yet, but any
