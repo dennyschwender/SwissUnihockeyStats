@@ -2479,16 +2479,27 @@ def get_game_box_score(game_id: int) -> dict:
             elif kind == "best_player":
                 # Resolve which side by team_id first, then by substring match
                 # (raw event team is club name; Team.name may add " II" etc.)
+                # Normalize whitespace before comparing so that API double-spaces
+                # (e.g. "Unihockey Langenthal  Aarwangen") don't cause mismatches.
+                import re as _re
+                def _norm(s: str) -> str:
+                    return _re.sub(r"\s+", " ", s).strip().lower()
+
                 if ev.team_id:
                     _is_home = ev.team_id == game.home_team_id
                 else:
-                    _tl_low = team_label.lower()
-                    _is_home = bool(
-                        _tl_low and (
-                            _tl_low in home_name.lower()
-                            or home_name.lower().startswith(_tl_low)
-                        )
-                    )
+                    _tl = _norm(team_label)
+                    _hn = _norm(home_name)
+                    _an = _norm(away_name)
+                    if _tl and (_tl in _hn or _hn.startswith(_tl)):
+                        _is_home = True
+                    elif _tl and (_tl in _an or _an.startswith(_tl)):
+                        _is_home = False
+                    else:
+                        # Fallback: unknown team — default to away so at least
+                        # the event still appears on the correct side if the
+                        # home best player was already resolved correctly.
+                        _is_home = False
                 best_players.append({"team": team_label, "player": player_name, "is_home": _is_home})
 
         # ── Deduplicate goals ────────────────────────────────────────────────
