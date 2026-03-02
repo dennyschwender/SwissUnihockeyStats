@@ -175,6 +175,35 @@ class DatabaseService:
             # index only stored NULLs.
             conn.execute(text("DROP INDEX IF EXISTS idx_event_player"))
 
+            # ── Fix Team.league_id values stored as DB PKs instead of API league_ids ──
+            # Some code paths wrote the leagues.id (auto-increment PK) into Team.league_id
+            # instead of leagues.league_id (the API league_id used by LEAGUE_TIERS).  This
+            # caused league_tier() to return wrong tiers (e.g. DB PK 14 → tier 3/B-youth
+            # when the real API league_id 6 → tier 6/4.Liga), leading to youth teams being
+            # included in the players job which only works for NLA/NLB.  Fix by re-deriving
+            # the API league_id from the game → league_group → league join wherever the
+            # stored value is not a valid API league_id.
+            conn.execute(text("""
+                UPDATE teams
+                SET league_id = (
+                    SELECT l.league_id
+                    FROM games g
+                    JOIN league_groups lg ON g.group_id = lg.id
+                    JOIN leagues l        ON lg.league_id = l.id
+                    WHERE (g.home_team_id = teams.id OR g.away_team_id = teams.id)
+                      AND g.season_id = teams.season_id
+                    LIMIT 1
+                )
+                WHERE teams.league_id IS NOT NULL
+                AND   teams.league_id NOT IN (SELECT DISTINCT league_id FROM leagues)
+                AND   EXISTS (
+                    SELECT 1 FROM games g
+                    JOIN league_groups lg ON g.group_id = lg.id
+                    WHERE (g.home_team_id = teams.id OR g.away_team_id = teams.id)
+                      AND g.season_id = teams.season_id
+                )
+            """))
+
             # ── Remove phantom future-season rows ────────────────────────────
             # index_seasons now skips seasons that haven't started yet, but any
             # already-created phantom rows (e.g. 2026/27 created in Feb 2026)

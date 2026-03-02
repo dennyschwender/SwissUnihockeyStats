@@ -97,7 +97,7 @@ POLICIES: list[dict] = [
         "scope":       "season",
         "label":       "Players refresh",
         "priority":    40,
-        "max_tier":    3,   # NLA/L-UPL + NLB + 1.Liga (112 teams) — keeps daily runs fast
+        "max_tier":    2,   # NLA/L-UPL + NLB only — /api/teams/{id}/players returns 400 for any lower league
         "run_at_hour": 3,
     },
     {
