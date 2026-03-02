@@ -427,6 +427,19 @@ footer {
   font-size: 1.25rem;
 }
 
+/* Search icon anchor inherits theme-toggle shape; fix link decoration */
+a.theme-toggle {
+  text-decoration: none;
+  color: var(--text-primary);
+}
+
+a.theme-toggle:hover {
+  background: var(--swiss-red);
+  border-color: var(--swiss-red);
+  color: var(--swiss-white);
+  transform: none;
+}
+
 .theme-toggle:hover {
   background: var(--swiss-red);
   border-color: var(--swiss-red);
@@ -709,6 +722,11 @@ html.dark-mode .universal-search-results {
   /* Hide header theme toggle on mobile — it moves inside the burger menu */
   #theme-toggle-btn {
     display: none;
+  }
+
+  /* Keep search icon visible on mobile in the header */
+  #search-icon-btn {
+    display: flex;
   }
 
   /* Mobile language switcher becomes visible inside hamburger menu */
