@@ -408,6 +408,49 @@ footer {
 
 
 /* ============================================
+   HEADER SEARCH DROPDOWN
+   ============================================ */
+
+.header-search-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: 360px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 24px var(--shadow-color);
+  z-index: 300;
+  padding: 0.5rem;
+  animation: fadeInDown 0.15s ease;
+}
+
+.header-search-panel.open {
+  display: block;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.header-search-panel .universal-search-results {
+  max-height: 320px;
+  overflow-y: auto;
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 960px) {
+  .header-search-panel {
+    width: calc(100vw - 2rem);
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+/* ============================================
    DARK MODE & THEME TOGGLE
    ============================================ */
 

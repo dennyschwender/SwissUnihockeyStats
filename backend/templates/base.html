@@ -121,9 +121,37 @@
                     </div>
                 </nav>
 
-                <!-- Search Icon (hidden on homepage) -->
+                <!-- Search Dropdown (hidden on homepage) -->
                 {% if request.url.path != '/' + locale %}
-                <a id="search-icon-btn" href="/{{ locale }}/search" class="theme-toggle" aria-label="Search" title="Search">🔍</a>
+                <div id="header-search-wrap" x-data="{ open: false, q: '' }" style="position:relative;">
+                  <button id="search-icon-btn"
+                          class="theme-toggle"
+                          @click="open = !open; if(open) $nextTick(() => $refs.searchInput.focus())"
+                          aria-label="Search"
+                          title="Search"
+                          :aria-expanded="open">🔍</button>
+
+                  <div class="header-search-panel" :class="{ 'open': open }" @click.outside="open = false">
+                    <div class="universal-search-bar" style="margin:0;">
+                      <div class="search-icon">🔍</div>
+                      <input
+                        x-ref="searchInput"
+                        x-model="q"
+                        type="text"
+                        name="q"
+                        :value="q"
+                        hx-get="/{{ locale }}/search"
+                        hx-trigger="keyup changed delay:300ms"
+                        hx-target="#header-search-results"
+                        hx-include="[name='q']"
+                        placeholder="Search players, teams, leagues…"
+                        class="universal-search-input"
+                        @keydown.escape="open = false; q = ''"
+                      >
+                    </div>
+                    <div id="header-search-results" class="universal-search-results"></div>
+                  </div>
+                </div>
                 {% endif %}
 
                 <!-- Theme Toggle -->
