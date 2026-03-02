@@ -1532,14 +1532,20 @@ class DataIndexer:
         game_is_finished = False
         home_score_val = None
         away_score_val = None
+        period_from_api: str | None = None
         try:
             summary = self.client.get_game_summary(game_id)
             title = summary.get("data", {}).get("title", "") or ""
             import re as _re
-            m = _re.search(r'(\d+):(\d+)', title)
+            m = _re.search(r'(\d+):(\d+)\s*(n\.V\.|n\.P\.)?', title, _re.I)
             if m:
                 home_score_val = int(m.group(1))
                 away_score_val = int(m.group(2))
+                _sfx = (m.group(3) or "").upper()
+                if "P" in _sfx:
+                    period_from_api = "SO"
+                elif "V" in _sfx:
+                    period_from_api = "OT"
                 game_is_finished = True
         except Exception:
             pass
@@ -1586,10 +1592,16 @@ class DataIndexer:
                     _result = _dcell(4)
                     if _result:
                         import re as _re
-                        _m = _re.match(r'(\d+)\s*:\s*(\d+)', _result.strip())
+                        _m = _re.match(r'(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?', _result.strip(), _re.I)
                         if _m:
                             home_score_val = int(_m.group(1))
                             away_score_val = int(_m.group(2))
+                            if not period_from_api:
+                                _sfx = (_m.group(3) or "").upper()
+                                if "P" in _sfx:
+                                    period_from_api = "SO"
+                                elif "V" in _sfx:
+                                    period_from_api = "OT"
                             game_is_finished = True
         except Exception:
             pass
@@ -1669,6 +1681,14 @@ class DataIndexer:
                 seen_other.add(key)
                 deduped.append(ev)
 
+        # Detect overtime: from explicit API suffix OR from goal events after 60:00
+        is_ot = (period_from_api is None) and any(
+            (ev.get("time") or "") >= "61:00"
+            and ev["event_type"].lower().startswith(("torschütze", "eigentor"))
+            for ev in deduped
+        )
+        new_period = period_from_api or ("OT" if is_ot else None)
+
         # ── 3. Write to DB (short critical section, no network I/O) ───────
         with self.db_service.session_scope() as session:
             try:
@@ -1683,6 +1703,8 @@ class DataIndexer:
                         game_row.status = "finished"
                         game_row.home_score = home_score_val
                         game_row.away_score = away_score_val
+                        if new_period:
+                            game_row.period = new_period
                     if venue_val:
                         game_row.venue = venue_val
                     if referee_1_val is not None:

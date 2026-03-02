@@ -204,6 +204,22 @@ class DatabaseService:
                 )
             """))
 
+            # ── Backfill game.period = 'OT' from indexed events ──────────────
+            # index_game_events now detects overtime from goal events at time≥61:00
+            # and sets game.period = 'OT'.  This backfill updates the ~950 already-
+            # indexed games where game_events contain an OT goal but period is NULL.
+            conn.execute(text("""
+                UPDATE games
+                SET period = 'OT'
+                WHERE period IS NULL
+                  AND status = 'finished'
+                  AND id IN (
+                      SELECT DISTINCT game_id FROM game_events
+                      WHERE time >= '61:00'
+                        AND event_type LIKE 'Torschütze%'
+                  )
+            """))
+
             # ── Remove phantom future-season rows ────────────────────────────
             # index_seasons now skips seasons that haven't started yet, but any
             # already-created phantom rows (e.g. 2026/27 created in Feb 2026)
