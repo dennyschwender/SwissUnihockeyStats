@@ -393,6 +393,10 @@ class DataIndexer:
         entity_id = f"season:{season_id}"
         if not force and not self._should_update("clubs", entity_id, max_age_hours=168):  # 7 days
             logger.debug(f"Clubs for season {season_id} recently synced, skipping")
+            # Still bump last_sync so the scheduler's _snap_to_hour advances to
+            # the *next* nightly window instead of replaying the same past date.
+            with self.db_service.session_scope() as _s:
+                self._mark_sync_complete(_s, "clubs", entity_id, 0)
             return 0
         
         logger.info(f"Indexing clubs for season {season_id}...")
@@ -932,6 +936,10 @@ class DataIndexer:
         entity_id = f"season:{season_id}"
         if not force and not self._should_update("leagues", entity_id, max_age_hours=168):
             logger.debug(f"Leagues for season {season_id} recently synced, skipping")
+            # Still bump last_sync so the scheduler's _snap_to_hour advances to
+            # the *next* nightly window instead of replaying the same past date.
+            with self.db_service.session_scope() as _s:
+                self._mark_sync_complete(_s, "leagues", entity_id, 0)
             return 0
 
         logger.info(f"Indexing leagues for season {season_id}...")
