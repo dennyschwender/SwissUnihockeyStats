@@ -220,6 +220,29 @@ class DatabaseService:
                   )
             """))
 
+            # ── Reset sync_status for recently-finished games with NULL period ─
+            # index_game_events can now detect OT from the game_summary title
+            # suffix "n.V." / "n.P." (added 2026-03-02).  Any games indexed
+            # *before* that change have period=NULL even when they were played
+            # in overtime, because the old code only used event timestamps ≥61:00
+            # which sometimes weren't present (absent goal events, corrupted rows).
+            # Deleting their sync_status rows forces the scheduler to re-index
+            # them with the new code so the period is set correctly.
+            # Only targets finished games from the last 40 days (current season
+            # rounds still being replayed) where period is still NULL.
+            conn.execute(text("""
+                DELETE FROM sync_status
+                WHERE entity_type = 'game_events'
+                  AND entity_id IN (
+                      SELECT 'game:' || g.id || ':events'
+                      FROM games g
+                      WHERE g.status = 'finished'
+                        AND g.period IS NULL
+                        AND g.home_score IS NOT NULL
+                        AND g.game_date >= date('now', '-40 days')
+                  )
+            """))
+
             # ── Remove phantom future-season rows ────────────────────────────
             # index_seasons now skips seasons that haven't started yet, but any
             # already-created phantom rows (e.g. 2026/27 created in Feb 2026)
