@@ -412,7 +412,6 @@ footer {
    ============================================ */
 
 .header-search-panel {
-  display: none;
   position: absolute;
   top: calc(100% + 0.5rem);
   right: 0;
@@ -424,10 +423,6 @@ footer {
   z-index: 300;
   padding: 0.5rem;
   animation: fadeInDown 0.15s ease;
-}
-
-.header-search-panel.open {
-  display: block;
 }
 
 @keyframes fadeInDown {

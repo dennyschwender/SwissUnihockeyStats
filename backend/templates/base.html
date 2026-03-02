@@ -123,7 +123,7 @@
 
                 <!-- Search Dropdown (hidden on homepage) -->
                 {% if request.url.path != '/' + locale %}
-                <div id="header-search-wrap" x-data="{ open: false, q: '' }" style="position:relative;">
+                <div id="header-search-wrap" x-data="{ open: false, q: '' }" style="position:relative;" @click.outside="open = false">
                   <button id="search-icon-btn"
                           class="theme-toggle"
                           @click="open = !open; if(open) $nextTick(() => $refs.searchInput.focus())"
@@ -131,7 +131,7 @@
                           title="Search"
                           :aria-expanded="open">🔍</button>
 
-                  <div class="header-search-panel" :class="{ 'open': open }" @click.outside="open = false">
+                  <div class="header-search-panel" x-show="open" style="display:none;">
                     <div class="universal-search-bar" style="margin:0;">
                       <div class="search-icon">🔍</div>
                       <input
