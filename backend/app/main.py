@@ -2590,17 +2590,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
                 .all()
             )
             for _pr in _phase_rows:
-                ph = _canonical_phase(_pr.phase)
-                # "Spielfortführung" groups are continuation rounds used for
-                # tie-breaking / promotion ordering after the regular season.
-                # Their phase column stores "Regelsaison" (same as the normal
-                # groups), so we must detect them by group *name* instead.
-                # Without this override they would be merged into the regular
-                # season standings and distort points / ranking.
-                _grp_name_lc = (_pr.name or "").lower()
-                if "spielfortführung" in _grp_name_lc or "spielfortfuhrung" in _grp_name_lc:
-                    ph = "promotion"
-                _group_id_to_phase[_pr.id] = ph
+                _group_id_to_phase[_pr.id] = _canonical_phase(_pr.phase)
 
     # Compute standings per canonical phase (regular / playoff / playout / promotion)
     _phase_to_group_ids: dict[str, list[int]] = {}
