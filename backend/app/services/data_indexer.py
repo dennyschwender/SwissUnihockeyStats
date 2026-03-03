@@ -1491,8 +1491,20 @@ class DataIndexer:
                 return count
 
             except Exception as e:
-                logger.error(f"Failed to index games for league {league_id}: {e}", exc_info=True)
-                self._mark_sync_failed(session, "games", entity_id, str(e))
+                # A 400 from the federation API means this league/game_class combo
+                # has no data (e.g. a playoff round that hasn't started yet).
+                # Mark it complete (count=0) so we don't retry every scheduler tick.
+                _resp = getattr(e, "response", None)
+                _status = getattr(_resp, "status_code", None) if _resp is not None else None
+                if _status == 400:
+                    logger.warning(
+                        f"League {league_id} game_class={game_class} group={group_name!r} "
+                        f"returned 400 — no data yet, skipping until next cycle"
+                    )
+                    self._mark_sync_complete(session, "games", entity_id, 0)
+                else:
+                    logger.error(f"Failed to index games for league {league_id}: {e}", exc_info=True)
+                    self._mark_sync_failed(session, "games", entity_id, str(e))
                 return 0
 
     def index_game_events(self, game_id: int, season_id: int,
@@ -1825,6 +1837,7 @@ class DataIndexer:
                 }
 
                 count = 0
+                inserted_player_ids: set[int] = set()  # guard against duplicate rows in no_autoflush block
                 with session.no_autoflush:
                     for is_home_flag in (1, 0):
                         team_id = away_team_id if is_home_flag else home_team_id
@@ -1887,9 +1900,12 @@ class DataIndexer:
                                     )
                                     continue
 
-                                existing_gp = session.query(GamePlayer).filter_by(
-                                    game_id=game_id, player_id=player_id
-                                ).first()
+                                existing_gp = (
+                                    player_id in inserted_player_ids
+                                    or session.query(GamePlayer).filter_by(
+                                        game_id=game_id, player_id=player_id
+                                    ).first()
+                                )
                                 if not existing_gp:
                                     _saved = existing_stats.get(player_id, (None, None, None))
                                     gp = GamePlayer(
@@ -1906,6 +1922,7 @@ class DataIndexer:
                                         last_updated=datetime.now(timezone.utc),
                                     )
                                     session.add(gp)
+                                    inserted_player_ids.add(player_id)
                                     count += 1
 
                 session.commit()
