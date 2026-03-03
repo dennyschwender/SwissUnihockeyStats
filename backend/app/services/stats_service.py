@@ -1626,7 +1626,13 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             opp_id = int(g.away_team_id) if is_home else int(g.home_team_id)
             my_score = int(g.home_score or 0) if is_home else int(g.away_score or 0)
             opp_score = int(g.away_score or 0) if is_home else int(g.home_score or 0)
-            result_label = "W" if my_score > opp_score else ("L" if my_score < opp_score else "T")
+            _is_extra = g.period in ("OT", "SO")
+            if my_score > opp_score:
+                result_label = "OTW" if _is_extra else "W"
+            elif my_score < opp_score:
+                result_label = "OTL" if _is_extra else "L"
+            else:
+                result_label = "T"
             recent_games.append(
                 {
                     "game_id": g.id,
@@ -1930,10 +1936,11 @@ def get_player_detail(person_id: int) -> dict:
             if g.home_score is not None and g.away_score is not None:
                 my_score = g.home_score if is_home else g.away_score
                 opp_score = g.away_score if is_home else g.home_score
+                _is_extra = g.period in ("OT", "SO")
                 if my_score > opp_score:
-                    result_label = "W"
+                    result_label = "OTW" if _is_extra else "W"
                 elif my_score < opp_score:
-                    result_label = "L"
+                    result_label = "OTL" if _is_extra else "L"
                 else:
                     result_label = "D"
                 score_str = f"{my_score}–{opp_score}"

@@ -2618,12 +2618,47 @@ async def league_detail(request: Request, locale: str, league_id: int):
 
     # Restrict standings_by_group to regular groups only
     _regular_group_id_set = set(_regular_group_ids)
-    standings_by_group = {
-        grp["name"]: get_league_standings(
-            league_id, only_group_ids=[g for g in grp["ids"] if g in _regular_group_id_set] or grp["ids"]
-        )
-        for grp in groups
+
+    # Detect "Spielfortführung" groups (replayed/delayed games) and merge them into
+    # the corresponding main group instead of showing them as a separate filter chip.
+    _spielfort_names: set[str] = {grp["name"] for grp in groups if "spielfort" in grp["name"].lower()}
+    _spielfort_gids: set[int] = {
+        gid for grp in groups if grp["name"] in _spielfort_names
+        for gid in grp["ids"] if gid in _regular_group_id_set
     }
+    _grp_extra: dict[str, set[int]] = {}
+    if _spielfort_gids:
+        from sqlalchemy import or_ as _or_sf
+        with db.session_scope() as _sfsess:
+            _sf_rows = _sfsess.query(Game.home_team_id, Game.away_team_id).filter(
+                Game.group_id.in_(_spielfort_gids)
+            ).all()
+            _sf_teams = {r.home_team_id for r in _sf_rows} | {r.away_team_id for r in _sf_rows}
+            for _grp in groups:
+                if _grp["name"] in _spielfort_names:
+                    continue
+                _base_ids = [g for g in _grp["ids"] if g in _regular_group_id_set and g not in _spielfort_gids]
+                if not _base_ids:
+                    continue
+                _has = _sfsess.query(Game.id).filter(
+                    Game.group_id.in_(_base_ids),
+                    _or_sf(Game.home_team_id.in_(_sf_teams), Game.away_team_id.in_(_sf_teams))
+                ).first()
+                if _has:
+                    _grp_extra.setdefault(_grp["name"], set()).update(_spielfort_gids)
+
+    # Build per-group standings; Spielfortführung entries are folded into their
+    # parent group and excluded from the filter chips.
+    _display_groups = [grp for grp in groups if grp["name"] not in _spielfort_names]
+    standings_by_group: dict[str, list[dict]] = {}
+    for grp in groups:
+        if grp["name"] in _spielfort_names:
+            continue
+        _base = [g for g in grp["ids"] if g in _regular_group_id_set and g not in _spielfort_gids]
+        _all_ids = list(set(_base) | _grp_extra.get(grp["name"], set()))
+        standings_by_group[grp["name"]] = get_league_standings(
+            league_id, only_group_ids=_all_ids or grp["ids"]
+        )
 
     # --- Series data per phase (playoff / playout) ---
     from datetime import date as _date
@@ -2818,7 +2853,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             "locale": locale,
             "t": get_translations(locale),
             "league": league_data,
-            "groups": groups,
+            "groups": _display_groups,
             "standings": standings,
             "standings_by_group": standings_by_group,
             "standings_by_phase": standings_by_phase,

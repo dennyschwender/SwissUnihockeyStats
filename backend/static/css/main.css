@@ -2380,13 +2380,17 @@ html.dark-mode .filter-bar {
   min-width: 2rem;
 }
 
-.result-badge--W { background: #dcfce7; color: #15803d; }
-.result-badge--L { background: #fee2e2; color: #b91c1c; }
-.result-badge--D { background: #f3f4f6; color: #374151; }
+.result-badge--W   { background: #dcfce7; color: #15803d; }
+.result-badge--OTW { background: #d1fae5; color: #059669; }
+.result-badge--OTL { background: #fef3c7; color: #b45309; }
+.result-badge--L   { background: #fee2e2; color: #b91c1c; }
+.result-badge--D   { background: #f3f4f6; color: #374151; }
 
-.result-text--W { font-weight: 700; color: #16a34a; }
-.result-text--L { font-weight: 700; color: #dc2626; }
-.result-text--D { font-weight: 700; color: var(--gray-500); }
+.result-text--W   { font-weight: 700; color: #16a34a; }
+.result-text--OTW { font-weight: 700; color: #059669; }
+.result-text--OTL { font-weight: 700; color: #b45309; }
+.result-text--L   { font-weight: 700; color: #dc2626; }
+.result-text--D   { font-weight: 700; color: var(--gray-500); }
 
 /* Home / Away badge */
 .ha-badge {
