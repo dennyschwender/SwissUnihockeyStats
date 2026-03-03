@@ -219,7 +219,6 @@ class DatabaseService:
                         AND event_type LIKE 'Torschütze%'
                   )
             """))
-
             # ── Reset sync_status for recently-finished games with NULL period ─
             # index_game_events can now detect OT from the game_summary title
             # suffix "n.V." / "n.P." (added 2026-03-02).  Any games indexed
@@ -228,14 +227,16 @@ class DatabaseService:
             # which sometimes weren't present (absent goal events, corrupted rows).
             # Deleting their sync_status rows forces the scheduler to re-index
             # them with the new code so the period is set correctly.
-            # Only targets finished games from the last 40 days (current season
-            # rounds still being replayed) where period is still NULL.
             # NOTE: ':events' in SQL text would be parsed by SQLAlchemy as a
             # bind parameter placeholder.  Pass it as an explicit bind value
             # instead, using :suffix, so the literal colon is handled safely.
             # The last_sync guard makes this a true one-shot migration: rows
             # written by the *new* scheduler (after 2026-03-02) won't be
             # deleted again on subsequent container restarts.
+            # Scoped to season_id=2025 (current season) to avoid re-queuing
+            # ~30k historical games from prior seasons — the initial version
+            # used game_date >= '-40 days' which missed earlier rounds of the
+            # current season (Sep–Jan games were 44–156 days old, just outside).
             conn.execute(text("""
                 DELETE FROM sync_status
                 WHERE entity_type = 'game_events'
@@ -246,10 +247,9 @@ class DatabaseService:
                       WHERE g.status = 'finished'
                         AND g.period IS NULL
                         AND g.home_score IS NOT NULL
-                        AND g.game_date >= date('now', '-40 days')
+                        AND g.season_id = 2025
                   )
             """), {"suffix": ":events"})
-
             # ── Remove phantom future-season rows ────────────────────────────
             # index_seasons now skips seasons that haven't started yet, but any
             # already-created phantom rows (e.g. 2026/27 created in Feb 2026)
