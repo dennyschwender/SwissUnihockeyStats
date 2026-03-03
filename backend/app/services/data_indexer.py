@@ -227,7 +227,7 @@ class DataIndexer:
                     .filter(
                         SyncStatus.entity_type == entity_type,
                         SyncStatus.entity_id.in_(entity_ids),
-                        SyncStatus.sync_status == "success",
+                        SyncStatus.sync_status == "completed",
                         SyncStatus.last_sync > cutoff,
                     )
                     .all()
