@@ -117,7 +117,7 @@ def _game_events_ttl_hours(game_date: "datetime | None") -> float:
     if age < 48:
         return 4.0         # 4 hours — yesterday / very recent
     if age < 168:
-        return 168.0       # 7 days — picks up best player / referee data published late
+        return 24.0        # 1 day — officials add best players / referees within 24-48h
     return 720.0           # 30 days — effectively frozen
 
 
