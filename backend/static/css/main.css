@@ -1825,6 +1825,12 @@ html.dark-mode .search-input {
   flex-shrink: 0;
 }
 
+.game-col-result {
+  width: 2.5rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
 /* Narrow "vs" column in schedule */
 .game-col-vs {
   width: 36px;

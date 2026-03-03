@@ -239,7 +239,8 @@
               {% if g.opponent_logo %}<img src="{{ g.opponent_logo }}" alt="" style="width:1.25rem;height:1.25rem;object-fit:contain;flex-shrink:0;">{% endif %}
               {{ g.opponent_name }}
             </span>
-            <span class="game-col-score">{{ g.score }} <span class="result-badge result-badge--{{ g.result }}">{{ g.result }}</span></span>
+            <span class="game-col-score">{{ g.score }}</span>
+            <span class="game-col-result"><span class="result-badge result-badge--{{ g.result }}">{{ g.result }}</span></span>
           </div>
         </a>
         {% endfor %}
