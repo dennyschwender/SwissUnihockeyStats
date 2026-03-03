@@ -1815,7 +1815,8 @@ function switchTab(name) {
   const btn   = document.getElementById('tabBtn-' + name);
   if (panel) panel.classList.add('active');
   if (btn)   btn.classList.add('active');
-  // Trigger lazy loads on first visit
+  // Trigger lazy loads on first visit / refresh on re-visit
+  if (name === 'settings') { loadScheduler(); loadRenderingFilters(); }
   if (name === 'db')     loadDbInfo();
   if (name === 'system') loadSystemStats(true);
 }
