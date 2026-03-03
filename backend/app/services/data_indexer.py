@@ -838,6 +838,11 @@ class DataIndexer:
             entity_id   = f"season:{season_id}"
 
         if not force and not self._should_update(entity_type, entity_id, max_age_hours=24):
+            # Bump last_sync so the scheduler's _snap_to_hour advances to the
+            # *next* nightly window instead of replaying the same past window
+            # every tick (mirrors the same fix in index_leagues).
+            with self.db_service.session_scope() as _s:
+                self._mark_sync_complete(_s, entity_type, entity_id, 0)
             return 0
 
         tier_lbl = f" (tier {exact_tier} only)" if exact_tier else ""
@@ -2241,6 +2246,11 @@ class DataIndexer:
             entity_id   = f"season_game_stats:{season_id}"
 
         if not force and not self._should_update(entity_type, entity_id, max_age_hours=4):
+            # Bump last_sync so the scheduler's _snap_to_hour advances to the
+            # *next* nightly window instead of replaying the same past window
+            # every tick (mirrors the same fix in index_leagues).
+            with self.db_service.session_scope() as _s:
+                self._mark_sync_complete(_s, entity_type, entity_id, 0)
             return 0
 
         with self.db_service.session_scope() as session:
