@@ -71,8 +71,10 @@ async def lifespan(app: FastAPI):
 
     _sched_task = None  # initialise before try so shutdown block can always reference it
 
+    # ── 1. Database init & data preload ────────────────────────────────────────────
+    # Separated so that SQLite lock contention on parallel gunicorn worker
+    # startup does not prevent the scheduler from initialising (step 2).
     try:
-        # Initialize database
         logger.info("🗄️ Initializing database...")
         from app.services.database import get_database_service
         db_service = get_database_service()
@@ -84,24 +86,37 @@ async def lifespan(app: FastAPI):
         _stale = _DI().cleanup_stale_sync_status()
         if _stale:
             logger.warning(f"⚠️ Reset {_stale} stale in_progress sync row(s) to failed")
-        
+
         # Preload common data (leagues, popular teams) into memory cache
         await preload_common_data()  # Loads leagues and popular teams
         logger.info("✓ Common data preloaded")
-        
+
         # Note: Use manage.py to trigger database indexing:
         # python manage.py index-clubs-path --season 2025
 
-        # Start background scheduler
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize DB/data: {e}")
+        logger.warning("⚠️ App will start but some data may be stale or missing")
+
+    # ── 2. Scheduler (always starts, even if DB init failed above) ───────────────────────────
+    # With gunicorn multi-worker, the DB-init block can raise
+    # "database is locked" for some workers.  Keeping the scheduler in its own
+    # try ensures every worker has a Scheduler instance ->
+    # no 503 on /admin/api/scheduler endpoints.
+    try:
         from app.services.scheduler import init_scheduler
         _sched_instance = init_scheduler(_admin_jobs, _submit_job)
         _sched_task = asyncio.create_task(
             _sched_instance.run(), name="scheduler"
         )
         logger.info("✓ Scheduler started")
+    except Exception as e:
+        logger.error(f"❌ Failed to start scheduler: {e}")
 
+    # ── 3. Admin PIN hash & stats pre-warm ───────────────────────────────────────────
+    try:
         # Pre-compute admin PIN hash (pbkdf2_hmac 100k rounds, ~1-2 s on Pi ARM)
-        # in an executor so it doesn’t block the event loop.  Awaited here to
+        # in an executor so it doesn't block the event loop.  Awaited here to
         # ensure it finishes BEFORE the stats-cache task starts, avoiding a
         # concurrent thread-pool race (Python 3.14 + SQLite segfault).
         # Guard against a second lifespan startup (e.g. nested TestClient in tests)
@@ -120,8 +135,7 @@ async def lifespan(app: FastAPI):
             logger.info("✓ Admin stats pre-warm scheduled")
 
     except Exception as e:
-        logger.error(f"❌ Failed to initialize application: {e}")
-        logger.warning("⚠️ App will start but may have issues")
+        logger.error(f"❌ Failed during warm-up: {e}")
 
     yield
 
