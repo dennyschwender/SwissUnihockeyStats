@@ -173,9 +173,6 @@
       },
       icon(col) { return this.sortCol === col ? (this.sortAsc ? ' ↑' : ' ↓') : ''; }
     }">
-      {% if team.roster_source == 'games' %}
-      <p style="font-size:.8rem;color:var(--gray-500);margin-bottom:.75rem;">⚠️ Official roster not yet indexed — showing players seen in recorded game lineups.</p>
-      {% endif %}
       {% if team.roster %}
       <div style="margin-bottom:.75rem;">
         <input x-model="q" type="search" placeholder="Search name or position…"
