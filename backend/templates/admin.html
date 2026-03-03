@@ -1019,7 +1019,9 @@ function buildSeasonFreshSummary(sid) {
   if (!relevant.length) return '';
   // Exclude FROZEN rows — past seasons are intentionally frozen by the scheduler
   // once indexed (data doesn't change), so they should never appear as warnings.
-  const active = relevant.filter(v => v.status !== 'FROZEN');
+  // Exclude game_events — its 10-minute TTL means it is almost always stale
+  // between scheduler runs; its live status is visible in the diag table.
+  const active = relevant.filter(v => v.status !== 'FROZEN' && v.entity_type !== 'game_events');
   const neverCount = active.filter(v => v.status === 'NEVER_SYNCED').length;
   const staleCount = active.filter(v => v.status === 'STALE').length;
   if (neverCount)
