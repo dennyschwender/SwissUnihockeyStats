@@ -2296,6 +2296,7 @@ html.dark-mode .filter-bar {
   border-bottom: 2px solid var(--gray-200);
   margin-bottom: 1.5rem;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
