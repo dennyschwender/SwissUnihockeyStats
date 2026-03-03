@@ -52,23 +52,29 @@ class CacheManager:
     def _save_metadata(self):
         """Atomically persist metadata to disk using a temp file + rename.
 
-        Uses a lock to:
-        - Snapshot self.metadata before json.dump to avoid "dictionary changed
-          size during iteration" when concurrent set() calls mutate it, and
-        - Serialize the tmp→metadata.json rename so two threads don't both
-          write metadata.tmp and race on os.rename (the second would get ENOENT
-          because the first already moved the file away).
+        Uses a per-call unique tmp filename (PID + thread id) so that concurrent
+        gunicorn worker *processes* each write their own tmp file and never race
+        on the same path.  Within a process the threading.Lock still serialises
+        the in-memory snapshot and the final rename.
+
+        Pattern:
+          1. snapshot self.metadata under lock (avoids "dict changed size" error)
+          2. write to a process+thread-unique tmp file (no cross-process collision)
+          3. atomic replace tmp → metadata.json (POSIX guarantee; last writer wins)
         """
         try:
-            tmp = self.metadata_file.with_suffix(".tmp")
             with self._lock:
-                snapshot = dict(self.metadata)  # shallow copy, safe to dump outside lock
+                snapshot = dict(self.metadata)  # shallow copy under lock
+            # Unique tmp path per call: avoids ENOENT race when multiple
+            # gunicorn workers all try to rename the same metadata.tmp file.
+            tmp = self.metadata_file.with_name(
+                f"metadata.{os.getpid()}.{threading.get_ident()}.tmp"
+            )
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(snapshot, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())
-            with self._lock:
-                tmp.replace(self.metadata_file)  # atomic on POSIX; serialised to avoid ENOENT race
+            tmp.replace(self.metadata_file)  # atomic on POSIX
         except Exception as e:
             logger.error(f"Failed to save cache metadata: {e}")
 
