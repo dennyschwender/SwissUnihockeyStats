@@ -236,24 +236,23 @@ POLICIES: list[dict] = [
     },
     # ── Per-game G/A/PIM: cascade T1 → T2 → … → T6 ──────────────────────────
     # current_only is NOT set: same rationale as player_stats above.
-    # max_age=12h (no run_at_hour): runs every 12 hours so federation data
-    # entered in the afternoon (best players, per-game scorer lists) is picked
-    # up the same day instead of waiting until next morning's 04:00 run.
+    # run_at_hour=4: runs after game_events (03:xx) so stats reflect last night's games.
     {
         "name":        "player_game_stats_t1",
         "entity_type": "player_game_stats_t1",
-        "max_age":     timedelta(hours=12),
+        "max_age":     timedelta(hours=24),
         "task":        "player_game_stats",
         "scope":       "season",
         "label":       "Per-game G/A/PIM \u2013 T1 (NLA/L-UPL)",
         "priority":    86,
         "max_tier":    1,
         "fixed_tier":  True,
+        "run_at_hour": 4,
     },
     {
         "name":        "player_game_stats_t2",
         "entity_type": "player_game_stats_t2",
-        "max_age":     timedelta(hours=12),
+        "max_age":     timedelta(hours=24),
         "task":        "player_game_stats",
         "scope":       "season",
         "label":       "Per-game G/A/PIM \u2013 T2 (NLB)",
@@ -261,11 +260,12 @@ POLICIES: list[dict] = [
         "max_tier":    2,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t1",
+        "run_at_hour": 4,
     },
     {
         "name":        "player_game_stats_t3",
         "entity_type": "player_game_stats_t3",
-        "max_age":     timedelta(hours=12),
+        "max_age":     timedelta(hours=24),
         "task":        "player_game_stats",
         "scope":       "season",
         "label":       "Per-game G/A/PIM \u2013 T3 (1.Liga)",
@@ -273,11 +273,12 @@ POLICIES: list[dict] = [
         "max_tier":    3,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t2",
+        "run_at_hour": 4,
     },
     {
         "name":        "player_game_stats_t4",
         "entity_type": "player_game_stats_t4",
-        "max_age":     timedelta(hours=12),
+        "max_age":     timedelta(hours=24),
         "task":        "player_game_stats",
         "scope":       "season",
         "label":       "Per-game G/A/PIM \u2013 T4 (2.Liga)",
@@ -285,11 +286,12 @@ POLICIES: list[dict] = [
         "max_tier":    4,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t3",
+        "run_at_hour": 4,
     },
     {
         "name":        "player_game_stats_t5",
         "entity_type": "player_game_stats_t5",
-        "max_age":     timedelta(hours=12),
+        "max_age":     timedelta(hours=24),
         "task":        "player_game_stats",
         "scope":       "season",
         "label":       "Per-game G/A/PIM \u2013 T5 (3.Liga)",
@@ -297,11 +299,12 @@ POLICIES: list[dict] = [
         "max_tier":    5,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t4",
+        "run_at_hour": 4,
     },
     {
         "name":        "player_game_stats_t6",
         "entity_type": "player_game_stats_t6",
-        "max_age":     timedelta(hours=12),
+        "max_age":     timedelta(hours=24),
         "task":        "player_game_stats",
         "scope":       "season",
         "label":       "Per-game G/A/PIM \u2013 T6 (4./5.Liga, Regional)",
@@ -309,6 +312,7 @@ POLICIES: list[dict] = [
         "max_tier":    6,
         "fixed_tier":  True,
         "requires":    "player_game_stats_t5",
+        "run_at_hour": 4,
     },
 ]
 
