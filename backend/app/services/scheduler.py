@@ -789,10 +789,11 @@ class Scheduler:
         if not is_current_season and last_sync is None:
             last_attempt = _last_attempt_for(session, policy["entity_type"], season)
             if last_attempt is not None:
-                # Coerce to timezone-aware if needed
-                if hasattr(last_attempt, 'tzinfo') and last_attempt.tzinfo is None:
-                    from datetime import timezone as _tz
-                    last_attempt = last_attempt.replace(tzinfo=_tz.utc)
+                # Normalize to naive UTC to match _utcnow() (which is naive).
+                # DB rows written with datetime.now(timezone.utc) may be
+                # returned as offset-aware by SQLAlchemy on some backends.
+                if last_attempt.tzinfo is not None:
+                    last_attempt = last_attempt.replace(tzinfo=None)
                 if (now - last_attempt) < policy["max_age"]:
                     return  # back off until max_age expires
 
