@@ -1809,6 +1809,19 @@ class DataIndexer:
         # ── 2. Write to DB (short critical section, no network I/O) ───────
         with self.db_service.session_scope() as session:
             try:
+                # Force SQLite to upgrade from a deferred read-transaction to a
+                # write-transaction BEFORE we read existing_stats.  Without this,
+                # a concurrent index_player_game_stats commit can slip in between
+                # our read and our DELETE+INSERT, causing the freshly written
+                # goals/assists to be wiped when we restore from the stale
+                # existing_stats snapshot.  A no-op UPDATE is enough to acquire
+                # the write lock in SQLite WAL mode.
+                from sqlalchemy import text as _sa_text
+                session.execute(_sa_text(
+                    "UPDATE sync_status SET sync_status=sync_status WHERE 1=0"
+                ))
+                session.flush()
+
                 # Preserve any G/A/PIM already populated by player_game_stats
                 # before wiping the lineup (re-index must not lose scored data).
                 existing_stats: dict[int, tuple] = {
