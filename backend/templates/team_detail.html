@@ -234,13 +234,12 @@
         <a href="/{{ locale }}/game/{{ g.game_id }}" class="game-row-link">
           <div class="game-row game-row--compact">
             <span class="game-col-date">{{ g.date }}</span>
-            <span class="result-badge result-badge--{{ g.result }}">{{ g.result }}</span>
             <span class="ha-badge ha-badge--{{ g.home_away }}">{{ g.home_away }}</span>
             <span class="game-col-team" style="display:inline-flex;align-items:center;gap:.3rem;">
               {% if g.opponent_logo %}<img src="{{ g.opponent_logo }}" alt="" style="width:1.25rem;height:1.25rem;object-fit:contain;flex-shrink:0;">{% endif %}
               {{ g.opponent_name }}
             </span>
-            <span class="game-col-score">{{ g.score }}</span>
+            <span class="game-col-score">{{ g.score }} <span class="result-badge result-badge--{{ g.result }}">{{ g.result }}</span></span>
           </div>
         </a>
         {% endfor %}
