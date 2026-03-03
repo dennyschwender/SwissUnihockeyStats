@@ -438,12 +438,31 @@ class Scheduler:
         except OSError as exc:
             logger.warning("[scheduler] could not save config: %s", exc)
 
+    def _reload_config(self):
+        """Re-read config fields from disk without touching queue/job state.
+
+        Called by getters so that all gunicorn worker processes return
+        the latest saved values, even if another worker handled the POST
+        that changed them.  The Scheduler's running state (queue, history,
+        _enabled) is NOT changed here — only the admin-controlled knobs.
+        """
+        try:
+            with open(_CONFIG_PATH) as f:
+                data = json.load(f)
+            self._min_season = data.get("min_season", None)
+            self._excluded_seasons = data.get("excluded_seasons", [])
+            self._max_concurrent = max(1, int(data.get("max_concurrent", 2)))
+            self._policy_tiers = data.get("policy_tiers", {})
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass  # keep current in-memory values on read failure
+
     # ── public ────────────────────────────────────────────────────────────────
 
     def stop(self):
         self._running = False
 
     def get_season_filter(self) -> dict:
+        self._reload_config()
         return {
             "min_season": self._min_season,
             "excluded_seasons": sorted(self._excluded_seasons),
@@ -467,6 +486,7 @@ class Scheduler:
         Extra per-task keys (player_stats, game_lineups, player_game_stats) are
         appended at the end so they show up in the Settings tier table.
         """
+        self._reload_config()
         result = {
             p["name"]: self._policy_tiers.get(p["name"], p.get("max_tier", 7))
             for p in POLICIES

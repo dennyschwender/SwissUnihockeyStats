@@ -39,14 +39,17 @@ _DATA_DIR = Path(_settings.DATABASE_PATH).parent
 _CONFIG_PATH = _DATA_DIR / "rendering_config.json"
 
 _lock = threading.Lock()
-_cache: dict[str, list] | None = None
 
 
 def _load() -> dict[str, list]:
-    """Load from disk (or return defaults if file is missing / invalid)."""
-    global _cache
-    if _cache is not None:
-        return _cache
+    """Load from disk on every call.
+
+    No in-memory cache: with gunicorn multi-worker each process has its own
+    address space.  Caching would cause workers that didn't handle the POST
+    to keep serving stale values, making the admin UI oscillate between the
+    old and new settings.  The config file is tiny (~200 B) so disk reads
+    are negligible.
+    """
     try:
         with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
             raw: dict[str, Any] = json.load(f)
@@ -56,16 +59,13 @@ def _load() -> dict[str, list]:
             if not isinstance(val, list):
                 val = default_val
             cfg[key] = val
-        _cache = cfg
-        return _cache
+        return cfg
     except FileNotFoundError:
         _save_to_disk(_DEFAULT_CONFIG)
-        _cache = dict(_DEFAULT_CONFIG)
-        return _cache
+        return dict(_DEFAULT_CONFIG)
     except Exception as exc:
         logger.warning("rendering_config: failed to load %s: %s — using defaults", _CONFIG_PATH, exc)
-        _cache = dict(_DEFAULT_CONFIG)
-        return _cache
+        return dict(_DEFAULT_CONFIG)
 
 
 def _save_to_disk(cfg: dict[str, list]) -> None:
@@ -87,7 +87,6 @@ def get_config() -> dict[str, list]:
 
 def set_config(new_cfg: dict[str, list]) -> dict[str, list]:
     """Validate, persist, and return the updated config."""
-    global _cache
     validated: dict[str, list] = {}
     for key in _DEFAULT_CONFIG:
         val = new_cfg.get(key, [])
@@ -96,7 +95,6 @@ def set_config(new_cfg: dict[str, list]) -> dict[str, list]:
         validated[key] = val
     with _lock:
         _save_to_disk(validated)
-        _cache = validated
     return dict(validated)
 
 
