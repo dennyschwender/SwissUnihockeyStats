@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import os
+import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -37,6 +38,7 @@ class CacheManager:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.metadata_file = self.cache_dir / "metadata.json"
         self.metadata = self._load_metadata()
+        self._lock = threading.Lock()  # guards metadata mutations and tmp rename
 
     def _load_metadata(self) -> Dict[str, Any]:
         if self.metadata_file.exists():
@@ -48,14 +50,25 @@ class CacheManager:
         return {}
 
     def _save_metadata(self):
-        """Atomically persist metadata to disk using a temp file + rename."""
+        """Atomically persist metadata to disk using a temp file + rename.
+
+        Uses a lock to:
+        - Snapshot self.metadata before json.dump to avoid "dictionary changed
+          size during iteration" when concurrent set() calls mutate it, and
+        - Serialize the tmp→metadata.json rename so two threads don't both
+          write metadata.tmp and race on os.rename (the second would get ENOENT
+          because the first already moved the file away).
+        """
         try:
             tmp = self.metadata_file.with_suffix(".tmp")
+            with self._lock:
+                snapshot = dict(self.metadata)  # shallow copy, safe to dump outside lock
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(self.metadata, f, indent=2)
+                json.dump(snapshot, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())
-            tmp.replace(self.metadata_file)  # atomic on POSIX
+            with self._lock:
+                tmp.replace(self.metadata_file)  # atomic on POSIX; serialised to avoid ENOENT race
         except Exception as e:
             logger.error(f"Failed to save cache metadata: {e}")
 
@@ -102,13 +115,14 @@ class CacheManager:
         try:
             with open(cache_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
-            self.metadata[cache_key] = {
-                "endpoint": endpoint,
-                "params": params,
-                "category": category,
-                "cached_at": datetime.now().isoformat(),
-                "ttl": ttl or self._determine_ttl(endpoint),
-            }
+            with self._lock:
+                self.metadata[cache_key] = {
+                    "endpoint": endpoint,
+                    "params": params,
+                    "category": category,
+                    "cached_at": datetime.now().isoformat(),
+                    "ttl": ttl or self._determine_ttl(endpoint),
+                }
             self._save_metadata()
         except Exception as e:
             logger.error(f"Failed to write cache: {e}")
@@ -119,12 +133,14 @@ class CacheManager:
             if category_dir.exists():
                 for file in category_dir.glob("*.json"):
                     file.unlink()
-            self.metadata = {k: v for k, v in self.metadata.items() if v.get("category") != category}
+            with self._lock:
+                self.metadata = {k: v for k, v in self.metadata.items() if v.get("category") != category}
         else:
             for file in self.cache_dir.glob("**/*.json"):
                 if file.name != "metadata.json":
                     file.unlink()
-            self.metadata = {}
+            with self._lock:
+                self.metadata = {}
         self._save_metadata()
 
     def get_stats(self) -> Dict[str, Any]:
