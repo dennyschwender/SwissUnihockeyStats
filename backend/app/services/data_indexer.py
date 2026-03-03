@@ -1692,7 +1692,13 @@ class DataIndexer:
             and ev["event_type"].lower().startswith(("torschütze", "eigentor"))
             for ev in deduped
         )
-        new_period = period_from_api or ("OT" if is_ot else None)
+        # Detect SO: from explicit API suffix OR from "Penaltyschiessen" event type
+        is_so = (period_from_api is None) and any(
+            ev["event_type"].lower() == "penaltyschiessen"
+            for ev in deduped
+        )
+        # SO supersedes OT if both are detected (game went OT then SO)
+        new_period = period_from_api or ("SO" if is_so else ("OT" if is_ot else None))
 
         # ── 3. Write to DB (short critical section, no network I/O) ───────
         with self.db_service.session_scope() as session:
