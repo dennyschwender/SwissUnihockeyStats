@@ -1809,29 +1809,17 @@ class DataIndexer:
         # ── 2. Write to DB (short critical section, no network I/O) ───────
         with self.db_service.session_scope() as session:
             try:
-                # Force SQLite to upgrade from a deferred read-transaction to a
-                # write-transaction BEFORE we read existing_stats.  Without this,
-                # a concurrent index_player_game_stats commit can slip in between
-                # our read and our DELETE+INSERT, causing the freshly written
-                # goals/assists to be wiped when we restore from the stale
-                # existing_stats snapshot.  A no-op UPDATE is enough to acquire
-                # the write lock in SQLite WAL mode.
-                from sqlalchemy import text as _sa_text
-                session.execute(_sa_text(
-                    "UPDATE sync_status SET sync_status=sync_status WHERE 1=0"
-                ))
-                session.flush()
-
-                # Preserve any G/A/PIM already populated by player_game_stats
-                # before wiping the lineup (re-index must not lose scored data).
-                existing_stats: dict[int, tuple] = {
-                    gp.player_id: (gp.goals, gp.assists, gp.penalty_minutes)
-                    for gp in session.query(GamePlayer).filter(GamePlayer.game_id == game_id).all()
-                    if gp.goals is not None or gp.assists is not None or gp.penalty_minutes is not None
+                # Build the set of player_ids already stored for this game.
+                # We do NOT pre-read goals/assists/penalty_minutes here.
+                # The update strategy below never touches those columns for
+                # existing rows, eliminating the race condition with
+                # index_player_game_stats that would otherwise wipe freshly
+                # written stats (old approach: read-snapshot → delete-all →
+                # re-insert from snapshot).
+                existing_player_ids: set[int] = {
+                    r[0] for r in session.query(GamePlayer.player_id)
+                    .filter(GamePlayer.game_id == game_id).all()
                 }
-                # Delete stale lineup so re-indexing is idempotent
-                session.query(GamePlayer).filter(GamePlayer.game_id == game_id).delete()
-                session.flush()
 
                 game_row = session.get(Game, game_id)
                 if game_row is None:
@@ -1850,93 +1838,118 @@ class DataIndexer:
                 }
 
                 count = 0
-                inserted_player_ids: set[int] = set()  # guard against duplicate rows in no_autoflush block
-                with session.no_autoflush:
-                    for is_home_flag in (1, 0):
-                        team_id = away_team_id if is_home_flag else home_team_id
-                        resp = lineup_raw.get(is_home_flag, {})
+                new_player_ids: set[int] = set()  # player_ids seen in the new lineup
 
-                        regions = resp.get("data", {}).get("regions", [])
-                        for region in regions:
-                            for row in region.get("rows", []):
-                                cells = row.get("cells", [])
-                                if not cells:
-                                    continue
+                for is_home_flag in (1, 0):
+                    team_id = away_team_id if is_home_flag else home_team_id
+                    resp = lineup_raw.get(is_home_flag, {})
 
-                                def _txt(cell):
-                                    v = cell.get("text", "")
-                                    return (v[0] if isinstance(v, list) and v
-                                            else (v if not isinstance(v, list) else "")) or ""
+                    regions = resp.get("data", {}).get("regions", [])
+                    for region in regions:
+                        for row in region.get("rows", []):
+                            cells = row.get("cells", [])
+                            if not cells:
+                                continue
 
-                                jersey_raw = _txt(cells[0]) if len(cells) > 0 else ""
-                                position   = _txt(cells[1]) if len(cells) > 1 else None
-                                player_raw = cells[2] if len(cells) > 2 else {}
+                            def _txt(cell):
+                                v = cell.get("text", "")
+                                return (v[0] if isinstance(v, list) and v
+                                        else (v if not isinstance(v, list) else "")) or ""
 
-                                # Extract player_id from link
-                                player_id = None
-                                link = player_raw.get("link", {})
-                                if link:
-                                    ids = link.get("ids", [])
-                                    if ids:
-                                        player_id = ids[0]
+                            jersey_raw = _txt(cells[0]) if len(cells) > 0 else ""
+                            position   = _txt(cells[1]) if len(cells) > 1 else None
+                            player_raw = cells[2] if len(cells) > 2 else {}
 
-                                jersey = None
-                                try:
-                                    jersey = int(jersey_raw)
-                                except (ValueError, TypeError):
-                                    pass
+                            # Extract player_id from link
+                            player_id = None
+                            link = player_raw.get("link", {})
+                            if link:
+                                ids = link.get("ids", [])
+                                if ids:
+                                    player_id = ids[0]
 
-                                if player_id is None:
-                                    continue
+                            jersey = None
+                            try:
+                                jersey = int(jersey_raw)
+                            except (ValueError, TypeError):
+                                pass
 
-                                # Auto-create a player stub if not yet in the table
-                                if player_id not in valid_players:
-                                    player_name = _txt(player_raw)
-                                    parts = player_name.split(" ", 1)
-                                    stub = _Player(
-                                        person_id=player_id,
-                                        first_name=parts[0] if parts else None,
-                                        last_name=parts[1] if len(parts) > 1 else None,
-                                        full_name=player_name or f"Player {player_id}",
-                                        name_normalized=(player_name or "").lower(),
-                                        last_updated=datetime.now(timezone.utc),
-                                    )
-                                    session.add(stub)
-                                    valid_players.add(player_id)
-                                    logger.debug(
-                                        f"Lineup: created player stub {player_id} '{player_name}'"
-                                    )
+                            if player_id is None:
+                                continue
 
-                                if (team_id, season_id) not in valid_teams:
-                                    logger.debug(
-                                        f"Lineup skip: team ({team_id},{season_id}) not in teams table"
-                                    )
-                                    continue
+                            # Skip duplicates within this lineup response
+                            if player_id in new_player_ids:
+                                continue
 
-                                existing_gp = (
-                                    player_id in inserted_player_ids
-                                    or session.query(GamePlayer).filter_by(
-                                        game_id=game_id, player_id=player_id
-                                    ).first()
+                            # Auto-create a player stub if not yet in the table
+                            if player_id not in valid_players:
+                                player_name = _txt(player_raw)
+                                parts = player_name.split(" ", 1)
+                                stub = _Player(
+                                    person_id=player_id,
+                                    first_name=parts[0] if parts else None,
+                                    last_name=parts[1] if len(parts) > 1 else None,
+                                    full_name=player_name or f"Player {player_id}",
+                                    name_normalized=(player_name or "").lower(),
+                                    last_updated=datetime.now(timezone.utc),
                                 )
-                                if not existing_gp:
-                                    _saved = existing_stats.get(player_id, (None, None, None))
-                                    gp = GamePlayer(
-                                        game_id=game_id,
-                                        player_id=player_id,
-                                        team_id=team_id,
-                                        season_id=season_id,
-                                        is_home_team=not bool(is_home_flag),  # flag=0→home, flag=1→away
-                                        jersey_number=jersey,
-                                        position=str(position)[:50] if position else None,
-                                        goals=_saved[0],            # restore previous stats if any
-                                        assists=_saved[1],           # NULL = not yet fetched
-                                        penalty_minutes=_saved[2],
-                                        last_updated=datetime.now(timezone.utc),
-                                    )
-                                    session.add(gp)
-                                    inserted_player_ids.add(player_id)
-                                    count += 1
+                                session.add(stub)
+                                valid_players.add(player_id)
+                                logger.debug(
+                                    f"Lineup: created player stub {player_id} '{player_name}'"
+                                )
+
+                            if (team_id, season_id) not in valid_teams:
+                                logger.debug(
+                                    f"Lineup skip: team ({team_id},{season_id}) not in teams table"
+                                )
+                                continue
+
+                            new_player_ids.add(player_id)
+
+                            pos_str = str(position)[:50] if position else None
+                            is_home = not bool(is_home_flag)  # flag=0→home, flag=1→away
+
+                            if player_id in existing_player_ids:
+                                # UPDATE lineup fields only — goals/assists/penalty_minutes
+                                # are managed exclusively by index_player_game_stats and
+                                # must never be reset here (avoids the read-snapshot race).
+                                session.query(GamePlayer).filter_by(
+                                    game_id=game_id, player_id=player_id
+                                ).update({
+                                    "team_id":       team_id,
+                                    "season_id":     season_id,
+                                    "is_home_team":  is_home,
+                                    "jersey_number": jersey,
+                                    "position":      pos_str,
+                                    "last_updated":  datetime.now(timezone.utc),
+                                })
+                            else:
+                                # INSERT new player row — goals/assists/pim start as NULL
+                                # (index_player_game_stats will fill them on its next run).
+                                gp = GamePlayer(
+                                    game_id=game_id,
+                                    player_id=player_id,
+                                    team_id=team_id,
+                                    season_id=season_id,
+                                    is_home_team=is_home,
+                                    jersey_number=jersey,
+                                    position=pos_str,
+                                    goals=None,
+                                    assists=None,
+                                    penalty_minutes=None,
+                                    last_updated=datetime.now(timezone.utc),
+                                )
+                                session.add(gp)
+                                count += 1
+
+                # Remove players who are no longer in the federation's lineup
+                removed_ids = existing_player_ids - new_player_ids
+                if removed_ids:
+                    session.query(GamePlayer).filter(
+                        GamePlayer.game_id == game_id,
+                        GamePlayer.player_id.in_(removed_ids),
+                    ).delete(synchronize_session=False)
 
                 session.commit()
                 self._mark_sync_complete(session, "game_lineup", entity_id, count)
