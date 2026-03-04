@@ -3272,12 +3272,14 @@ async def games_page(
 @app.get("/{locale}/game/{game_id}", response_class=HTMLResponse)
 async def game_detail(request: Request, locale: str, game_id: int):
     """Game detail page — box score from DB"""
-    from app.services.stats_service import get_game_box_score
+    from app.services.stats_service import get_game_box_score, get_playoff_series_for_game
 
     box = get_game_box_score(game_id)
     error_message = None
     if not box:
         error_message = f"Game {game_id} not found in database."
+
+    playoff_series = get_playoff_series_for_game(game_id) if box else None
 
     return templates.TemplateResponse(
         request,
@@ -3287,6 +3289,7 @@ async def game_detail(request: Request, locale: str, game_id: int):
             "t": get_translations(locale),
             "game": box,
             "error_message": error_message,
+            "playoff_series": playoff_series,
         },
     )
 

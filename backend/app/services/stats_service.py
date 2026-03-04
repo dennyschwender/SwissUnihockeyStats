@@ -2932,6 +2932,157 @@ def get_game_box_score(game_id: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 7b. Playoff series data for a single game
+# ---------------------------------------------------------------------------
+
+def _canonical_phase(phase_str: str | None) -> str:
+    """Normalise a raw phase string to one of: regular / playoff / playout / promotion."""
+    if not phase_str or phase_str == "Regelsaison":
+        return "regular"
+    p = phase_str.lower()
+    if "playoff" in p or "superfinal" in p:
+        return "playoff"
+    if "playout" in p:
+        return "playout"
+    if "aufstieg" in p or "abstieg" in p or "qualifikation" in p:
+        return "promotion"
+    return "regular"
+
+
+def get_playoff_series_for_game(game_id: int) -> dict | None:
+    """Return all series in the same playoff/playout phase as *game_id*.
+
+    Returns a dict with keys:
+      - ``series_list``: list of series dicts (same format as league_detail series_by_phase)
+      - ``phase_display``: the raw phase string for the UI (e.g. "Playoff Viertelfinals")
+
+    Returns *None* if the game is not in a playoff/playout group or has no group.
+    """
+    from datetime import date as _date
+
+    db = get_database_service()
+    with db.session_scope() as session:
+        game = session.query(Game).filter(Game.id == game_id).first()
+        if not game or not game.group_id:
+            return None
+
+        group = session.query(LeagueGroup).filter(LeagueGroup.id == game.group_id).first()
+        if not group:
+            return None
+
+        canonical = _canonical_phase(group.phase)
+        if canonical not in ("playoff", "playout"):
+            return None
+
+        phase_display: str = group.phase or canonical.capitalize()
+        league_fk_id: int = group.league_id  # FK to leagues.id row
+
+        # All LeagueGroup rows in the same League with the same canonical phase
+        sibling_groups = (
+            session.query(LeagueGroup)
+            .filter(LeagueGroup.league_id == league_fk_id)
+            .all()
+        )
+        phase_group_ids = [
+            g.id for g in sibling_groups if _canonical_phase(g.phase) == canonical
+        ]
+        if not phase_group_ids:
+            return None
+
+        # All games in this phase
+        phase_games = (
+            session.query(Game)
+            .filter(Game.group_id.in_(phase_group_ids))
+            .order_by(Game.game_date.asc())
+            .all()
+        )
+        if not phase_games:
+            return None
+
+        # Build team name/logo maps
+        all_team_ids = {g.home_team_id for g in phase_games} | {g.away_team_id for g in phase_games}
+        _snm: dict[int, str] = {}
+        _slogo: dict[int, str | None] = {}
+        for _t in session.query(Team).filter(
+            Team.id.in_(all_team_ids), Team.season_id == game.season_id
+        ).all():
+            _snm[_t.id] = _t.name or _t.text or f"Team {_t.id}"
+            if _t.logo_url:
+                _slogo[_t.id] = _t.logo_url
+        _missing = all_team_ids - _snm.keys()
+        if _missing:
+            for _t in session.query(Team).filter(
+                Team.id.in_(_missing), Team.name.isnot(None)
+            ).all():
+                _snm.setdefault(_t.id, _t.name)
+                if _t.logo_url:
+                    _slogo.setdefault(_t.id, _t.logo_url)
+
+        # Group by sorted team-pair key; determine team_a/team_b from first game
+        _pairs: dict[tuple, list] = {}
+        for _g in phase_games:
+            _key = tuple(sorted([_g.home_team_id, _g.away_team_id]))
+            _pairs.setdefault(_key, []).append(_g)
+
+        current_pair = tuple(sorted([game.home_team_id, game.away_team_id]))
+
+        series_list: list[dict] = []
+        for _key, _pgames in sorted(_pairs.items(), key=lambda x: _snm.get(x[0][0] if isinstance(x[0], tuple) else x[0], "")):
+            _sorted = sorted(_pgames, key=lambda x: x.game_date or _date.min)
+            _first_g = _sorted[0]
+            _ta = _first_g.home_team_id
+            _tb = _first_g.away_team_id
+            _ta_wins = _tb_wins = 0
+            _games_list: list[dict] = []
+            for _g in _sorted:
+                _played = _g.home_score is not None
+                if _played:
+                    _home_wins = _g.home_score > _g.away_score
+                    if _g.home_team_id == _ta:
+                        if _home_wins:
+                            _ta_wins += 1
+                        else:
+                            _tb_wins += 1
+                    else:
+                        if _home_wins:
+                            _tb_wins += 1
+                        else:
+                            _ta_wins += 1
+                _games_list.append({
+                    "game_id": _g.id,
+                    "date": _g.game_date.strftime("%d.%m.%Y") if _g.game_date else "",
+                    "weekday": _g.game_date.strftime("%a") if _g.game_date else "",
+                    "home_team": _snm.get(_g.home_team_id, f"Team {_g.home_team_id}"),
+                    "away_team": _snm.get(_g.away_team_id, f"Team {_g.away_team_id}"),
+                    "home_team_id": _g.home_team_id,
+                    "away_team_id": _g.away_team_id,
+                    "home_score": _g.home_score,
+                    "away_score": _g.away_score,
+                    "played": _played,
+                    "is_current": _g.id == game_id,
+                })
+            series_list.append({
+                "team_a_id": _ta,
+                "team_b_id": _tb,
+                "team_a_name": _snm.get(_ta, f"Team {_ta}"),
+                "team_b_name": _snm.get(_tb, f"Team {_tb}"),
+                "team_a_logo": _slogo.get(_ta),
+                "team_b_logo": _slogo.get(_tb),
+                "team_a_rank": None,
+                "team_b_rank": None,
+                "team_a_wins": _ta_wins,
+                "team_b_wins": _tb_wins,
+                "games": _games_list,
+                "is_current_series": _key == current_pair,
+            })
+
+        return {
+            "series_list": series_list,
+            "phase_display": phase_display,
+        }
+
+
+# ---------------------------------------------------------------------------
 # 8. Games list page
 # ---------------------------------------------------------------------------
 
