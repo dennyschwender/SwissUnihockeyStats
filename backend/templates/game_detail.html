@@ -248,6 +248,10 @@
   /* Empty state */
   .gd-empty { text-align:center; padding:3rem 1rem; color:var(--gray-400); }
   .gd-empty-icon { font-size:2.25rem; margin-bottom:.5rem; }
+
+  /* Playoff series grid: 2 cols >= 640px, 1 col below */
+  .playoff-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:1rem; align-items:start; }
+  @media (max-width:640px) { .playoff-grid { grid-template-columns:1fr; } }
 </style>
 
 <script>
@@ -832,7 +836,7 @@ function eventsTable(goals, penalties) {
         <a href="/{{ locale }}/league/{{ game.league_db_id }}" style="font-size:.8rem;color:var(--swiss-red);text-decoration:none;font-weight:500;">View full bracket →</a>
         {% endif %}
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem;align-items:start;">
+      <div class="playoff-grid">
         <template x-for="s in seriesData" :key="s.team_a_id + '-' + s.team_b_id">
           <div :style="'background:var(--card-bg,white);border:' + (s.is_current_series ? '2px solid var(--swiss-red)' : '1px solid var(--gray-200)') + ';border-radius:.75rem;overflow:hidden;box-shadow:' + (s.is_current_series ? '0 2px 8px rgba(220,38,38,.15)' : '0 1px 3px rgba(0,0,0,.06)') + ';'">
             <!-- Series header -->
