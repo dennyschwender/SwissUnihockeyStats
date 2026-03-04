@@ -963,6 +963,9 @@ class DataIndexer:
                 entries = leagues_data.get("entries", [])
 
                 count = 0
+                # Stage by (league_id, game_class) to handle duplicate API entries
+                # within the same response without hitting the UNIQUE constraint.
+                staged: dict[tuple, League] = {}
                 for entry in entries:
                     context = entry.get("set_in_context", {})
                     league_id = context.get("league")
@@ -970,13 +973,14 @@ class DataIndexer:
                     if not league_id or not game_class:
                         continue
 
-                    league = session.query(League).filter(
+                    key = (league_id, game_class)
+                    league = staged.get(key) or session.query(League).filter(
                         League.season_id == season_id,
                         League.league_id == league_id,
                         League.game_class == game_class
                     ).first()
 
-                    if not league:
+                    if league is None:
                         league = League(
                             season_id=season_id,
                             league_id=league_id,
@@ -988,6 +992,7 @@ class DataIndexer:
                     league.text = entry.get("text", "")
                     league.mode = context.get("mode")
                     league.last_updated = datetime.now(timezone.utc)
+                    staged[key] = league
                     count += 1
 
                 session.commit()
@@ -1000,6 +1005,7 @@ class DataIndexer:
                 # If this is a past season that already has leagues indexed, treat
                 # the API failure as non-fatal and mark completed so the scheduler
                 # doesn't re-queue it every tick (the API may no longer serve old data).
+                session.rollback()
                 existing = session.query(League).filter(
                     League.season_id == season_id
                 ).count()
