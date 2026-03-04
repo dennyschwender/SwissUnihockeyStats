@@ -413,7 +413,8 @@ function eventsTable(goals, penalties) {
 
   {% if playoff_series %}
   <!-- Playoff Series Widget -->
-  <div style="margin-bottom:2rem;" x-data="{ seriesData: {{ playoff_series.series_list | tojson }} }">
+  <script>const _playoffSeries = {{ playoff_series.series_list | tojson }};</script>
+  <div style="margin-bottom:2rem;" x-data="{ seriesData: _playoffSeries }">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
       <h2 style="font-size:1rem;font-weight:700;margin:0;color:var(--gray-700);">🏆 {{ playoff_series.phase_display }}</h2>
       {% if game.league_db_id %}
