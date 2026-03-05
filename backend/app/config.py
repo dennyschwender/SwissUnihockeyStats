@@ -4,7 +4,7 @@ Application configuration using Pydantic Settings
 from pathlib import Path
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import AnyHttpUrl, field_validator
+from pydantic import AnyHttpUrl, field_validator, model_validator
 
 # Resolve the project-level data directory regardless of CWD.
 # config.py lives at  <project>/backend/app/config.py  → data is at <project>/data/
@@ -60,7 +60,25 @@ class Settings(BaseSettings):
     # Admin protection
     ADMIN_PIN: str = "1234"          # Override via env: ADMIN_PIN=yourpin
     SESSION_SECRET: str = "change-me-in-production-use-random-32-chars"
-    
+
+    _INSECURE_SECRET = "change-me-in-production-use-random-32-chars"
+    _INSECURE_PIN    = "1234"
+
+    @model_validator(mode="after")
+    def check_production_secrets(self) -> "Settings":
+        if not self.DEBUG:
+            if self.SESSION_SECRET == self._INSECURE_SECRET:
+                raise ValueError(
+                    "SESSION_SECRET must be changed from the default in production. "
+                    "Set the SESSION_SECRET environment variable to a random 32+ character string."
+                )
+            if self.ADMIN_PIN == self._INSECURE_PIN:
+                raise ValueError(
+                    "ADMIN_PIN must be changed from the default '1234' in production. "
+                    "Set the ADMIN_PIN environment variable."
+                )
+        return self
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
 

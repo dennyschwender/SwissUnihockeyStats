@@ -142,8 +142,6 @@ class Player(Base):
     last_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     full_name: Mapped[Optional[str]] = mapped_column(String(200))
     year_of_birth: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
-    
     # For search optimization
     name_normalized: Mapped[Optional[str]] = mapped_column(String(200))  # Lowercase for case-insensitive search
     last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)

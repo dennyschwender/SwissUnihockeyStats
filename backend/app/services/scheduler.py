@@ -969,9 +969,11 @@ def _last_sync_for(session, entity_type: str, season: int | None):
          ))
 
     if season is not None:
-        # entity_id is like "clubs:2025" or just "2025" — match both patterns
+        # entity_id is stored as "clubs:2025" or just "2025".
+        # Use exact-match alternatives to avoid season 202 matching 2025.
         q = q.filter(
-            SyncStatus.entity_id.like(f"%{season}%")
+            (SyncStatus.entity_id == str(season)) |
+            SyncStatus.entity_id.like(f"%:{season}")
         )
 
     row = q.order_by(SyncStatus.last_sync.desc()).first()
@@ -991,7 +993,10 @@ def _last_attempt_for(session, entity_type: str, season: int | None):
          .filter(SyncStatus.entity_type == entity_type))
 
     if season is not None:
-        q = q.filter(SyncStatus.entity_id.like(f"%{season}%"))
+        q = q.filter(
+            (SyncStatus.entity_id == str(season)) |
+            SyncStatus.entity_id.like(f"%:{season}")
+        )
 
     row = q.order_by(SyncStatus.last_sync.desc()).first()
     return row[0] if row else None

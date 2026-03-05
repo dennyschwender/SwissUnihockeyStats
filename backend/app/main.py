@@ -26,6 +26,7 @@ from app.lib.i18n import get_translations, get_locale_from_path, DEFAULT_LOCALE
 from app.services.swissunihockey import get_swissunihockey_client
 from app.services.data_cache import preload_common_data, preload_data, get_cached_teams, get_cached_leagues, get_cached_clubs
 from app.services import rendering_config as _rcfg
+from app.services.season_utils import get_current_season as _get_current_season_impl
 
 # Configure logging
 logging.basicConfig(
@@ -41,24 +42,8 @@ STATIC_DIR = BASE_DIR / "static"
 
 
 def get_current_season() -> int:
-    """
-    Get the current Swiss Unihockey season year.
-    Prefers the season flagged as highlighted in the DB.
-    Falls back to date-based detection if DB is unavailable or no season is flagged.
-    """
-    try:
-        from app.services.database import get_database_service
-        from app.models.db_models import Season as _Season
-        db = get_database_service()
-        with db.session_scope() as session:
-            row = session.query(_Season.id).filter(_Season.highlighted == True).first()
-            if row:
-                return row[0]
-    except Exception:
-        pass
-    # Date-based fallback: Sep-Dec → current year, Jan-Aug → previous year
-    now = datetime.now()
-    return now.year if now.month >= 9 else now.year - 1
+    """Re-export from season_utils for backwards compatibility."""
+    return _get_current_season_impl()
 
 
 @asynccontextmanager
@@ -180,14 +165,21 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 # Setup Jinja2 templates
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
-# Configure CORS
-app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET, session_cookie="admin_session")
+# Configure session middleware with CSRF mitigations (SameSite=lax, HTTPS-only in prod)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SESSION_SECRET,
+    session_cookie="admin_session",
+    same_site="lax",
+    https_only=not settings.DEBUG,
+)
+# Configure CORS — restrict to specific methods and headers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[str(o) for o in settings.BACKEND_CORS_ORIGINS],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # Include API router (JSON endpoints)
@@ -220,133 +212,131 @@ _ADMIN_PIN_HASH: str = _pin_hash(settings.ADMIN_PIN)
 
 _ADMIN_TOKEN_KEY = "admin_authed"
 
+# ---------------------------------------------------------------------------
+# Login rate limiting (in-memory, per client IP)
+# ---------------------------------------------------------------------------
+_LOGIN_MAX_ATTEMPTS = 10
+_LOGIN_WINDOW_SECS  = 300  # 5 minutes
+_login_attempts: dict = {}  # ip -> (count, window_start)
+
+
+def _check_login_rate_limit(ip: str) -> bool:
+    """Return True if the IP has exceeded the login attempt limit."""
+    now = time.time()
+    entry = _login_attempts.get(ip)
+    if entry is None:
+        _login_attempts[ip] = (1, now)
+        return False
+    count, window_start = entry
+    if now - window_start > _LOGIN_WINDOW_SECS:
+        _login_attempts[ip] = (1, now)
+        return False
+    if count >= _LOGIN_MAX_ATTEMPTS:
+        return True
+    _login_attempts[ip] = (count + 1, window_start)
+    return False
+
+
+def _reset_login_rate_limit(ip: str) -> None:
+    """Clear rate-limit state after a successful login."""
+    _login_attempts.pop(ip, None)
+
+
 def require_admin(request: Request):
     """FastAPI dependency — raises exception caught by handler below if not logged in."""
     if request.session.get(_ADMIN_TOKEN_KEY) != _ADMIN_PIN_HASH:
         raise _AdminNotAuthenticated()
 
 
-# DEBUG endpoints — admin-only
-@app.get("/debug/player-index")
-async def debug_player_index(_: None = Depends(require_admin)):
-    """Debug endpoint to see player index status"""
-    from app.services.data_cache import get_data_cache
-    cache = get_data_cache()
-    
-    player_count = len(cache._players)
-    game_count = len(cache._games)
-    indexed = cache._players_indexed
-    
-    sample_players = list(cache._players.values())[:5] if cache._players else []
-    
-    return {
-        "players_indexed": indexed,
-        "player_count": player_count,
-        "game_count": game_count,
-        "sample_players": sample_players
-    }
-
-
-@app.get("/debug/force-reindex")
-async def debug_force_reindex(_: None = Depends(require_admin)):
-    """Force player reindexing and return detailed logs"""
-    from app.services.data_cache import get_data_cache
-    import logging
-    
-    cache = get_data_cache()
-    
-    # Try to index with detailed logging
-    try:
-        players_teams = await cache.index_players_from_teams()
-        players_games = await cache.index_players_from_games()
-        
+# DEBUG endpoints — only registered when DEBUG=True, admin-only
+if settings.DEBUG:
+    @app.get("/debug/player-index")
+    async def debug_player_index(_: None = Depends(require_admin)):
+        """Debug endpoint to see player index status."""
+        from app.services.data_cache import get_data_cache
+        cache = get_data_cache()
         return {
-            "success": True,
-            "players_from_teams": players_teams,
-            "players_from_games": players_games,
-            "total_players": len(cache._players),
-            "sample": list(cache._players.values())[:3]
-        }
-    except Exception as e:
-        logger.error(f"Reindex failed: {e}", exc_info=True)
-        return {
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "players_indexed": cache._players_indexed,
+            "player_count": len(cache._players),
+            "game_count": len(cache._games),
+            "sample_players": list(cache._players.values())[:5],
         }
 
-
-@app.get("/debug/test-games-fetch")
-async def debug_test_games_fetch(_: None = Depends(require_admin)):
-    """Debug endpoint to test various API endpoints"""
-    client = get_swissunihockey_client()
-    from app.services.data_cache import get_data_cache
-    cache = get_data_cache()
-    
-    results = {}
-    
-    # Test NEW endpoint: Team players
-    await cache.load_leagues()
-    if cache._leagues:
-        first_league = cache._leagues[0]
+    @app.get("/debug/force-reindex")
+    async def debug_force_reindex(_: None = Depends(require_admin)):
+        """Force player reindexing and return detailed logs."""
+        from app.services.data_cache import get_data_cache
+        cache = get_data_cache()
         try:
-            teams_data = client.get_teams(
-                league=first_league.get("id"),
-                game_class=first_league.get("game_classes", [{}])[0].get("id", 11),
-                mode="1",
-                season=2025
-            )
-            
-            teams = []
-            if isinstance(teams_data, dict):
-                if "data" in teams_data:
-                    regions = teams_data.get("data", {}).get("regions", [])
-                    if regions:
-                        teams = regions[0].get("rows", [])
-                elif "entries" in teams_data:
-                    teams = teams_data["entries"]
-            
-            if teams:
-                team_id = teams[0].get("id")
-                team_name = teams[0].get("text", "")
-                
-                # Try NEW endpoint: /api/teams/:team_id/players
-                try:
-                    players_data = client.get_team_players(team_id)
-                    results["team_players"] = {
-                        "success": True,
-                        "team_id": team_id,
-                        "team_name": team_name,
-                        "data_type": str(type(players_data)),
-                        "has_data": bool(players_data),
-                        "raw_data": players_data  # Include full raw data
-                    }
-                except Exception as e:
-                    results["team_players"] = {"success": False, "team_id": team_id, "error": str(e)}
+            players_teams = await cache.index_players_from_teams()
+            players_games = await cache.index_players_from_games()
+            return {
+                "success": True,
+                "players_from_teams": players_teams,
+                "players_from_games": players_games,
+                "total_players": len(cache._players),
+            }
         except Exception as e:
-            results["team_players"] = {"success": False, "error": str(e)}
-    
-    # Test NEW games endpoint with mode=list
-    try:
-        games_data = client.get_games(
-            mode="list",
-            season=2025,
-            league=1,
-            game_class=11
-        )
-        results["games_mode_list"] = {
-            "success": True,
-            "data_type": str(type(games_data)),
-            "has_data": bool(games_data)
-        }
-        if isinstance(games_data, dict):
-            results["games_mode_list"]["keys"] = list(games_data.keys())
-            if "entries" in games_data:
-                results["games_mode_list"]["game_count"] = len(games_data["entries"])
-    except Exception as e:
-        results["games_mode_list"] = {"success": False, "error": str(e)}
-    
-    return results
+            logger.error("Reindex failed: %s", e, exc_info=True)
+            return {"success": False, "error": "Reindex failed — see server logs"}
+
+    @app.get("/debug/test-games-fetch")
+    async def debug_test_games_fetch(_: None = Depends(require_admin)):
+        """Debug endpoint to test various API endpoints."""
+        client = get_swissunihockey_client()
+        from app.services.data_cache import get_data_cache
+        cache = get_data_cache()
+
+        results = {}
+        current_season = get_current_season()
+
+        # Test endpoint: Team players
+        await cache.load_leagues()
+        if cache._leagues:
+            first_league = cache._leagues[0]
+            try:
+                teams_data = client.get_teams(
+                    league=first_league.get("id"),
+                    game_class=first_league.get("game_classes", [{}])[0].get("id", 11),
+                    mode="1",
+                    season=current_season,
+                )
+                teams = []
+                if isinstance(teams_data, dict):
+                    if "data" in teams_data:
+                        regions = teams_data.get("data", {}).get("regions", [])
+                        if regions:
+                            teams = regions[0].get("rows", [])
+                    elif "entries" in teams_data:
+                        teams = teams_data["entries"]
+                if teams:
+                    team_id = teams[0].get("id")
+                    team_name = teams[0].get("text", "")
+                    try:
+                        players_data = client.get_team_players(team_id)
+                        results["team_players"] = {
+                            "success": True,
+                            "team_id": team_id,
+                            "team_name": team_name,
+                            "has_data": bool(players_data),
+                        }
+                    except Exception as e:
+                        results["team_players"] = {"success": False, "team_id": team_id, "error": str(e)}
+            except Exception as e:
+                results["team_players"] = {"success": False, "error": str(e)}
+
+        # Test games endpoint
+        try:
+            games_data = client.get_games(mode="list", season=current_season, league=1, game_class=11)
+            results["games_mode_list"] = {
+                "success": True,
+                "has_data": bool(games_data),
+                "game_count": len(games_data.get("entries", [])) if isinstance(games_data, dict) else 0,
+            }
+        except Exception as e:
+            results["games_mode_list"] = {"success": False, "error": str(e)}
+
+        return results
 
 
 # ============================================================================
@@ -372,9 +362,18 @@ async def admin_login_page(request: Request):
 
 @app.post("/admin/login")
 async def admin_login_submit(request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    if _check_login_rate_limit(client_ip):
+        return templates.TemplateResponse(
+            request,
+            "admin_login.html",
+            {"error": "Too many login attempts. Please wait a few minutes."},
+            status_code=429,
+        )
     form = await request.form()
     pin  = str(form.get("pin", "")).strip()
     if hmac.compare_digest(_pin_hash(pin), _ADMIN_PIN_HASH):
+        _reset_login_rate_limit(client_ip)
         request.session[_ADMIN_TOKEN_KEY] = _ADMIN_PIN_HASH
         return RedirectResponse("/admin", status_code=302)
     return templates.TemplateResponse(
@@ -1053,6 +1052,9 @@ async def admin_start_indexing(payload: dict, _: None = Depends(require_admin)):
                         f"Enable \"Force\" to override."
                     ),
                 )
+
+    # Prune old finished jobs before adding a new one
+    _purge_expired_jobs()
 
     job_id = str(uuid.uuid4())[:8]
     _started_at = datetime.now(timezone.utc).isoformat()

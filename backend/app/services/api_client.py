@@ -80,7 +80,7 @@ class CacheManager:
 
     def _get_cache_key(self, endpoint: str, params: Optional[Dict] = None) -> str:
         param_str = str(sorted(params.items())) if params else ""
-        return hashlib.md5(f"{endpoint}:{param_str}".encode()).hexdigest()
+        return hashlib.sha256(f"{endpoint}:{param_str}".encode()).hexdigest()
 
     def _get_cache_path(self, cache_key: str, category: str = "general") -> Path:
         category_dir = self.cache_dir / category

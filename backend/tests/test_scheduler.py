@@ -244,5 +244,124 @@ class TestSchedulerPersistence:
         assert hasattr(scheduler, '_save_state')
 
 
+class TestSeasonFiltering:
+    """Unit tests for _season_filtered logic (no DB needed)."""
+
+    def _make_scheduler_bare(self):
+        from app.services.scheduler import Scheduler
+        with patch("app.services.scheduler.Scheduler._load_state", return_value=True):
+            sched = Scheduler.__new__(Scheduler)
+            sched._min_season = None
+            sched._excluded_seasons = []
+            sched._max_concurrent = 2
+            sched._policy_tiers = {}
+            sched._enabled = True
+            sched._cold_start = False
+            sched._queue = []
+            sched._history = []
+            sched._running = False
+        return sched
+
+    def test_no_filter_allows_all_seasons(self):
+        sched = self._make_scheduler_bare()
+        assert sched._season_filtered(2024) is False
+        assert sched._season_filtered(2025) is False
+
+    def test_min_season_blocks_older_seasons(self):
+        sched = self._make_scheduler_bare()
+        sched._min_season = 2024
+        assert sched._season_filtered(2023) is True
+        assert sched._season_filtered(2024) is False
+
+    def test_excluded_seasons_blocks_listed_seasons(self):
+        sched = self._make_scheduler_bare()
+        sched._excluded_seasons = [2022, 2023]
+        assert sched._season_filtered(2022) is True
+        assert sched._season_filtered(2024) is False
+
+    def test_none_season_never_filtered(self):
+        """Global-scope jobs (season=None) must never be filtered."""
+        sched = self._make_scheduler_bare()
+        sched._min_season = 2030
+        sched._excluded_seasons = [2025]
+        assert sched._season_filtered(None) is False
+
+
+class TestSnapToHour:
+    """Unit tests for _snap_to_hour helper."""
+
+    def test_snap_forward_same_day(self):
+        from app.services.scheduler import _snap_to_hour
+        dt = datetime(2025, 3, 5, 1, 30, 0)
+        result = _snap_to_hour(dt, 3)
+        assert result == datetime(2025, 3, 5, 3, 0, 0)
+
+    def test_snap_wraps_to_next_day_when_past_hour(self):
+        from app.services.scheduler import _snap_to_hour
+        dt = datetime(2025, 3, 5, 4, 0, 0)
+        result = _snap_to_hour(dt, 3)
+        assert result == datetime(2025, 3, 6, 3, 0, 0)
+
+    def test_snap_exactly_on_hour_moves_to_next_day(self):
+        from app.services.scheduler import _snap_to_hour
+        dt = datetime(2025, 3, 5, 3, 0, 0)
+        result = _snap_to_hour(dt, 3)
+        assert result == datetime(2025, 3, 6, 3, 0, 0)
+
+
+class TestPoliciesStructure:
+    """Validate POLICIES data structure completeness."""
+
+    def test_all_policies_have_required_fields(self):
+        from app.services.scheduler import POLICIES
+        required = {"name", "entity_type", "max_age", "task", "scope", "label", "priority"}
+        for p in POLICIES:
+            missing = required - p.keys()
+            assert not missing, f"Policy '{p.get('name')}' missing fields: {missing}"
+
+    def test_policy_scopes_are_valid(self):
+        from app.services.scheduler import POLICIES
+        for p in POLICIES:
+            assert p["scope"] in {"global", "season"}, \
+                f"Policy {p['name']} has invalid scope {p['scope']}"
+
+    def test_policy_priorities_are_positive(self):
+        from app.services.scheduler import POLICIES
+        for p in POLICIES:
+            assert p["priority"] > 0, f"Policy {p['name']} has non-positive priority"
+
+
+class TestClearDone:
+    """Unit tests for clear_done helper."""
+
+    def _make_scheduler_with_history(self):
+        from app.services.scheduler import Scheduler, JobRecord
+        with patch("app.services.scheduler.Scheduler._load_state", return_value=True):
+            sched = Scheduler.__new__(Scheduler)
+            sched._min_season = None
+            sched._excluded_seasons = []
+            sched._max_concurrent = 2
+            sched._policy_tiers = {}
+            sched._enabled = True
+            sched._cold_start = False
+            sched._queue = []
+            sched._running = False
+        now = datetime.now()
+        sched._history = [
+            JobRecord("a1", "clubs", "clubs", 2025, "done",    now, now, now),
+            JobRecord("b2", "teams", "teams", 2025, "running", now, now, None),
+            JobRecord("c3", "games", "games", 2025, "error",   now, now, now),
+        ]
+        return sched
+
+    def test_clear_done_removes_finished_jobs(self):
+        sched = self._make_scheduler_with_history()
+        removed = sched.clear_done()
+        assert removed == 2  # done + error
+        remaining = sched.get_history()
+        assert len(remaining) == 1
+        assert remaining[0]["status"] == "running"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

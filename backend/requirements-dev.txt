@@ -5,6 +5,7 @@
 pytest>=7.4.4
 pytest-asyncio>=0.23.4
 pytest-cov>=4.1.0
+pytest-mock>=3.12.0       # provides mocker fixture for easy mocking
 httpx>=0.26.0             # required by fastapi.testclient.TestClient
 
 # Code Quality

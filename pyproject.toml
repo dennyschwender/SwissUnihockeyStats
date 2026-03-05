@@ -7,23 +7,19 @@ name = "swissunihockey"
 version = "0.1.0"
 description = "Python client for SwissUnihockey API - Access Swiss floorball statistics"
 readme = "README.md"
-authors = [
-    {name = "Your Name", email = "your.email@example.com"}
-]
 license = {text = "MIT"}
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 keywords = ["swissunihockey", "floorball", "api", "statistics", "sports"]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
@@ -32,24 +28,17 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.4",
     "pytest-cov>=4.1.0",
-    "black>=23.0.0",
-    "flake8>=6.1.0",
-    "mypy>=1.0.0",
+    "pytest-mock>=3.12.0",
+    "black>=24.0.0",
+    "flake8>=7.0.0",
+    "mypy>=1.8.0",
 ]
 data = [
     "pandas>=2.0.0",
     "numpy>=1.24.0",
 ]
-web = [
-    "flask>=3.0.0",
-]
-
-[project.urls]
-Homepage = "https://github.com/YOUR_USERNAME/swissunihockey"
-Documentation = "https://github.com/YOUR_USERNAME/swissunihockey#readme"
-"Bug Tracker" = "https://github.com/YOUR_USERNAME/swissunihockey/issues"
-"Source Code" = "https://github.com/YOUR_USERNAME/swissunihockey"
 
 [tool.setuptools]
 packages = ["api"]
@@ -71,16 +60,13 @@ extend-exclude = '''
 '''
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["backend/tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
     "--verbose",
     "--strict-markers",
-    "--cov=api",
-    "--cov-report=term-missing",
-    "--cov-report=html",
 ]
 
 [tool.mypy]
