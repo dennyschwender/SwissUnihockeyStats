@@ -2193,16 +2193,17 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
     filtered_clubs = filtered_clubs[:50]  # Limit results
     
     # Return partial HTML for htmx — same card structure as the full clubs listing
+    import html as _html
     from urllib.parse import quote_plus
     cards = ""
     for club in filtered_clubs:
         club_name = club.get("text", "Unknown")
         region = club.get("region") or club.get("set_in_context", {}).get("region", "")
         href = f"/{locale}/teams?club={quote_plus(club_name)}"
-        region_html = f'<p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">📍 {region}</p>' if region else ""
+        region_html = f'<p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">📍 {_html.escape(region)}</p>' if region else ""
         cards += (
-            f'<div class="card" onclick="window.location=\'{href}\'" style="cursor: pointer;">'
-            f'<h3 style="margin: 0;">{club_name}</h3>'
+            f'<div class="card" onclick="window.location=\'{_html.escape(href, quote=True)}\'" style="cursor: pointer;">'
+            f'<h3 style="margin: 0;">{_html.escape(club_name)}</h3>'
             f'{region_html}'
             f'</div>'
         )
@@ -3000,6 +3001,7 @@ async def teams_search(request: Request, locale: str, q: str = "", sort: str = "
             for t in all_teams[:200]
         ]
 
+    import html as _html
     cat_colors = {"Men": "#3b82f6", "Women": "#ec4899", "Mixed": "#8b5cf6"}
 
     if not teams:
@@ -3009,12 +3011,12 @@ async def teams_search(request: Request, locale: str, q: str = "", sort: str = "
     html = f'<div class="teams-list-meta">{len(teams)} team{"s" if len(teams) != 1 else ""}</div><div class="{list_class}">'
     for team in teams:
         team_id   = team.get("id", "")
-        name      = team.get("text", "")
+        name      = _html.escape(team.get("text", ""))
         category  = team.get("category") or ""
-        league    = team.get("league_name") or ""
-        season_nm = team.get("season_name") or ""
+        league    = _html.escape(team.get("league_name") or "")
+        season_nm = _html.escape(team.get("season_name") or "")
         cat_color = cat_colors.get(category, "var(--gray-400)")
-        cat_label = category or "\u2014"
+        cat_label = _html.escape(category) if category else "\u2014"
         season_span = f'<span class="teams-list-season">{season_nm}</span>' if all_seasons else ""
         html += (
             f'<a href="/{locale}/team/{team_id}" class="teams-list-row">'
@@ -3153,9 +3155,10 @@ async def search_players(request: Request, locale: str, q: str = ""):
         )
 
         if not player_rows:
+            import html as _html
             return HTMLResponse(
                 f'<p style="text-align:center;padding:1.5rem;color:var(--gray-500);font-size:.875rem">'
-                f"No players found for <em>{q}</em></p>"
+                f"No players found for <em>{_html.escape(q)}</em></p>"
             )
 
         # Fetch most recent stats row per player to get team + league info
@@ -3306,6 +3309,7 @@ async def universal_search(request: Request, locale: str, q: str = ""):
     if not q or len(q) < 2:
         return HTMLResponse('<div class="search-results"><p style="text-align:center;padding:2rem;color:var(--gray-500)">Enter at least 2 characters to search…</p></div>')
 
+    import html as _html
     from app.services.database import get_database_service
     from app.models.db_models import Player, Team, League
     from sqlalchemy import or_
@@ -3323,7 +3327,7 @@ async def universal_search(request: Request, locale: str, q: str = ""):
         if players:
             html_parts.append('<div class="search-category"><h3>🏒 Players</h3><div class="search-items">')
             for pl in players:
-                name = pl.full_name or f"Player {pl.person_id}"
+                name = _html.escape(pl.full_name or f"Player {pl.person_id}")
                 html_parts.append(
                     f'<div class="search-item" onclick="window.location.href=\'/{locale}/player/{pl.person_id}\'">'
                     f'<strong>{name}</strong></div>'
@@ -3363,8 +3367,8 @@ async def universal_search(request: Request, locale: str, q: str = ""):
         if unique_teams_rows:
             html_parts.append('<div class="search-category"><h3>👥 Teams</h3><div class="search-items">')
             for t, lg in unique_teams_rows:
-                tname = t.name or t.text or f"Team {t.id}"
-                lgname = (lg.name or lg.text or "") if lg else ""
+                tname = _html.escape(t.name or t.text or f"Team {t.id}")
+                lgname = _html.escape((lg.name or lg.text or "") if lg else "")
                 subtitle = f'<span class="search-item-subtitle">{lgname}</span>' if lgname else ""
                 html_parts.append(
                     f'<div class="search-item" onclick="window.location.href=\'/{locale}/team/{t.id}\'">'
@@ -3390,7 +3394,7 @@ async def universal_search(request: Request, locale: str, q: str = ""):
         if unique_leagues:
             html_parts.append('<div class="search-category"><h3>🏆 Leagues</h3><div class="search-items">')
             for lg in unique_leagues:
-                lgname = lg.name or lg.text or f"League {lg.id}"
+                lgname = _html.escape(lg.name or lg.text or f"League {lg.id}")
                 html_parts.append(
                     f'<div class="search-item" onclick="window.location.href=\'/{locale}/league/{lg.id}\'">'
                     f'<strong>{lgname}</strong></div>'
@@ -3398,7 +3402,8 @@ async def universal_search(request: Request, locale: str, q: str = ""):
             html_parts.append('</div></div>')
 
     if not html_parts:
-        return HTMLResponse('<div class="search-results"><p style="text-align:center;padding:2rem;color:var(--gray-500)">No results found for <em>' + q + '</em></p></div>')
+        import html as _html
+        return HTMLResponse('<div class="search-results"><p style="text-align:center;padding:2rem;color:var(--gray-500)">No results found for <em>' + _html.escape(q) + '</em></p></div>')
 
     return HTMLResponse('<div class="search-results">' + "".join(html_parts) + '</div>')
 
@@ -3438,21 +3443,61 @@ async def contact_page(request: Request, locale: str, sent: str = ""):
 @app.post("/{locale}/contact", response_class=HTMLResponse)
 async def contact_submit(request: Request, locale: str):
     """Handle contact form submission and send email"""
+    import re
     import smtplib
-    import html
     from email.message import EmailMessage
-    from fastapi import Form as FastAPIForm
+
+    # Rate-limit: reuse the same in-memory store as the admin login limiter.
+    _CONTACT_MAX = 5
+    _CONTACT_WINDOW = 300  # 5 minutes
+    client_ip = request.client.host if request.client else "unknown"
+    contact_key = f"contact:{client_ip}"
+    now = time.time()
+    entry = _login_attempts.get(contact_key)
+    if entry is None:
+        _login_attempts[contact_key] = (1, now)
+    else:
+        count, window_start = entry
+        if now - window_start > _CONTACT_WINDOW:
+            _login_attempts[contact_key] = (1, now)
+        elif count >= _CONTACT_MAX:
+            return templates.TemplateResponse(
+                request,
+                "contact.html",
+                {
+                    "locale": locale,
+                    "t": get_translations(locale),
+                    "success": False,
+                    "error": True,
+                    "form_name": "",
+                    "form_email": "",
+                    "form_subject": "",
+                    "form_message": "",
+                },
+                status_code=429,
+            )
+        else:
+            _login_attempts[contact_key] = (count + 1, window_start)
 
     form = await request.form()
     name = str(form.get("name", "")).strip()
-    email = str(form.get("email", "")).strip()
+    email_addr = str(form.get("email", "")).strip()
     subject = str(form.get("subject", "")).strip() or "Contact form message"
     message = str(form.get("message", "")).strip()
+
+    # Strip newlines from header fields to prevent email header injection
+    _strip_nl = lambda s: re.sub(r"[\r\n]", " ", s)
+    name = _strip_nl(name)
+    email_addr = _strip_nl(email_addr)
+    subject = _strip_nl(subject)
+
+    # Basic email format check
+    _email_re = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
     t = get_translations(locale)
 
     # Basic validation
-    if not name or not email or not message:
+    if not name or not email_addr or not message or not _email_re.match(email_addr):
         return templates.TemplateResponse(
             request,
             "contact.html",
@@ -3462,7 +3507,7 @@ async def contact_submit(request: Request, locale: str):
                 "success": False,
                 "error": True,
                 "form_name": name,
-                "form_email": email,
+                "form_email": email_addr,
                 "form_subject": subject,
                 "form_message": message,
             }
@@ -3472,12 +3517,12 @@ async def contact_submit(request: Request, locale: str):
     if settings.SMTP_HOST and settings.CONTACT_EMAIL:
         try:
             msg = EmailMessage()
-            msg["Subject"] = f"[SwissUnihockey Contact] {html.escape(subject)}"
+            msg["Subject"] = f"[SwissUnihockey Contact] {subject}"
             msg["From"] = settings.SMTP_USER or settings.CONTACT_EMAIL
             msg["To"] = settings.CONTACT_EMAIL
-            msg["Reply-To"] = email
+            msg["Reply-To"] = email_addr
             msg.set_content(
-                f"Name: {name}\nEmail: {email}\n\n{message}"
+                f"Name: {name}\nEmail: {email_addr}\n\n{message}"
             )
             with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
                 server.starttls()
@@ -3495,7 +3540,7 @@ async def contact_submit(request: Request, locale: str):
                     "success": False,
                     "error": True,
                     "form_name": name,
-                    "form_email": email,
+                    "form_email": email_addr,
                     "form_subject": subject,
                     "form_message": message,
                 }
