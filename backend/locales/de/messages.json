@@ -114,7 +114,7 @@
     "section_intro_title": "Einleitung",
     "section_intro_text": "SwissUnihockey Stats ('wir', 'uns', 'unser') respektiert Ihre Privatsphäre. Diese Erklärung beschreibt, welche Daten wir bei der Nutzung dieser Website erheben und wie wir sie verwenden.",
     "section_data_title": "Erhobene Daten",
-    "section_data_text": "Wir erheben nur die mindest notwendigen Daten für den Betrieb des Dienstes:",
+    "section_data_text": "Wir erheben nur die mindestnotwendigen Daten für den Betrieb des Dienstes:",
     "data_item_logs": "Server-Zugriffsprotokolle (IP-Adresse, Browsertyp, besuchte Seiten) – werden bis zu 30 Tage für Sicherheits- und Debugging-Zwecke gespeichert.",
     "data_item_contact": "Kontaktformular-Einsendungen (Name, E-Mail-Adresse, Nachricht) – werden ausschliesslich zur Beantwortung Ihrer Anfrage verwendet.",
     "data_item_cookies": "Ein Session-Cookie für den Admin-Bereich und Ihre Sprach-/Theme-Präferenz im localStorage – keine Tracking-Cookies.",
