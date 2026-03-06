@@ -61,6 +61,13 @@ class Settings(BaseSettings):
     ADMIN_PIN: str = "1234"          # Override via env: ADMIN_PIN=yourpin
     SESSION_SECRET: str = "change-me-in-production-use-random-32-chars"
 
+    # Contact form email (SMTP)
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    CONTACT_EMAIL: str = ""          # Recipient address for contact form submissions
+
     _INSECURE_SECRET = "change-me-in-production-use-random-32-chars"
     _INSECURE_PIN    = "1234"
 

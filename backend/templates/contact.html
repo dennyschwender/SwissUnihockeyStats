@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t.contact.title }} - {{ t.common.app_name }}{% endblock %}
+{% block description %}{{ t.contact.meta_description }}{% endblock %}
+
+{% block content %}
+<div class="hero fade-in">
+    <h1>{{ t.contact.title }}</h1>
+    <p>{{ t.contact.subtitle }}</p>
+</div>
+
+<div class="card" style="max-width: 640px; margin: 2rem auto;">
+    {% if success %}
+    <div class="alert alert-success" style="background: var(--color-success-bg, #d1fae5); color: var(--color-success-text, #065f46); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+        {{ t.contact.success_message }}
+    </div>
+    {% endif %}
+    {% if error %}
+    <div class="alert alert-error" style="background: var(--color-error-bg, #fee2e2); color: var(--color-error-text, #991b1b); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+        {{ t.contact.error_message }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/{{ locale }}/contact" style="display: flex; flex-direction: column; gap: 1.25rem;">
+        <div>
+            <label for="name" style="display: block; font-weight: 600; margin-bottom: 0.4rem;">
+                {{ t.contact.field_name }} <span style="color: var(--color-primary, #e11d48);">*</span>
+            </label>
+            <input
+                type="text"
+                id="name"
+                name="name"
+                required
+                maxlength="120"
+                value="{{ form_name or '' }}"
+                placeholder="{{ t.contact.placeholder_name }}"
+                style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid var(--border-color, #d1d5db); border-radius: 0.5rem; font-size: 1rem; background: var(--bg-input, #fff); color: var(--text-primary, #111);"
+            >
+        </div>
+
+        <div>
+            <label for="email" style="display: block; font-weight: 600; margin-bottom: 0.4rem;">
+                {{ t.contact.field_email }} <span style="color: var(--color-primary, #e11d48);">*</span>
+            </label>
+            <input
+                type="email"
+                id="email"
+                name="email"
+                required
+                maxlength="254"
+                value="{{ form_email or '' }}"
+                placeholder="{{ t.contact.placeholder_email }}"
+                style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid var(--border-color, #d1d5db); border-radius: 0.5rem; font-size: 1rem; background: var(--bg-input, #fff); color: var(--text-primary, #111);"
+            >
+        </div>
+
+        <div>
+            <label for="subject" style="display: block; font-weight: 600; margin-bottom: 0.4rem;">
+                {{ t.contact.field_subject }}
+            </label>
+            <input
+                type="text"
+                id="subject"
+                name="subject"
+                maxlength="200"
+                value="{{ form_subject or '' }}"
+                placeholder="{{ t.contact.placeholder_subject }}"
+                style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid var(--border-color, #d1d5db); border-radius: 0.5rem; font-size: 1rem; background: var(--bg-input, #fff); color: var(--text-primary, #111);"
+            >
+        </div>
+
+        <div>
+            <label for="message" style="display: block; font-weight: 600; margin-bottom: 0.4rem;">
+                {{ t.contact.field_message }} <span style="color: var(--color-primary, #e11d48);">*</span>
+            </label>
+            <textarea
+                id="message"
+                name="message"
+                required
+                rows="6"
+                maxlength="4000"
+                placeholder="{{ t.contact.placeholder_message }}"
+                style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid var(--border-color, #d1d5db); border-radius: 0.5rem; font-size: 1rem; background: var(--bg-input, #fff); color: var(--text-primary, #111); resize: vertical;"
+            >{{ form_message or '' }}</textarea>
+        </div>
+
+        <button
+            type="submit"
+            class="btn btn-primary"
+            style="align-self: flex-start; padding: 0.65rem 1.75rem; background: var(--color-primary, #e11d48); color: #fff; border: none; border-radius: 0.5rem; font-size: 1rem; font-weight: 600; cursor: pointer;"
+        >
+            {{ t.contact.submit }}
+        </button>
+    </form>
+</div>
+{% endblock %}
