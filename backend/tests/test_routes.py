@@ -146,3 +146,39 @@ class TestDebugEndpointsHidden:
         for path in ["/debug/player-index", "/debug/force-reindex"]:
             r = client.get(path, follow_redirects=False)
             assert r.status_code != 200, f"{path} returned 200 without auth"
+
+
+class TestContactAndPrivacyRoutes:
+    def test_contact_page_returns_html(self, client):
+        r = client.get("/en/contact")
+        assert r.status_code == 200
+        assert b"html" in r.content.lower()
+
+    def test_privacy_page_returns_html(self, client):
+        r = client.get("/en/privacy")
+        assert r.status_code == 200
+        assert b"html" in r.content.lower()
+
+    def test_contact_submit_missing_fields_returns_form(self, client):
+        r = client.post(
+            "/en/contact",
+            data={"name": "", "email": "", "subject": "", "message": ""},
+        )
+        assert r.status_code == 200
+        assert b"html" in r.content.lower()
+
+    def test_contact_submit_invalid_email_returns_form(self, client):
+        r = client.post(
+            "/en/contact",
+            data={"name": "Test User", "email": "notanemail", "subject": "Hi", "message": "Hello"},
+        )
+        assert r.status_code == 200
+
+    def test_contact_submit_valid_redirects(self, client):
+        r = client.post(
+            "/en/contact",
+            data={"name": "Test User", "email": "user@example.com", "subject": "Hi", "message": "Hello world"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        assert "/en/contact" in r.headers.get("location", "")

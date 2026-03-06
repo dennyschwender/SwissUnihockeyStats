@@ -7,10 +7,14 @@ from contextlib import asynccontextmanager
 import asyncio
 import hashlib
 import hmac
+import html
+import re
+import smtplib
 import time
 import uuid
 import logging
 import traceback
+from email.message import EmailMessage
 from typing import Optional
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -240,6 +244,31 @@ def _check_login_rate_limit(ip: str) -> bool:
 def _reset_login_rate_limit(ip: str) -> None:
     """Clear rate-limit state after a successful login."""
     _login_attempts.pop(ip, None)
+
+
+# ---------------------------------------------------------------------------
+# Contact form rate limiting (in-memory, per client IP)
+# ---------------------------------------------------------------------------
+_CONTACT_MAX_SUBMISSIONS = 5
+_CONTACT_WINDOW_SECS = 3600  # 1 hour
+_contact_attempts: dict = {}  # ip -> (count, window_start)
+
+
+def _check_contact_rate_limit(ip: str) -> bool:
+    """Return True if the IP has exceeded the contact form submission limit."""
+    now = time.time()
+    entry = _contact_attempts.get(ip)
+    if entry is None:
+        _contact_attempts[ip] = (1, now)
+        return False
+    count, window_start = entry
+    if now - window_start > _CONTACT_WINDOW_SECS:
+        _contact_attempts[ip] = (1, now)
+        return False
+    if count >= _CONTACT_MAX_SUBMISSIONS:
+        return True
+    _contact_attempts[ip] = (count + 1, window_start)
+    return False
 
 
 def require_admin(request: Request):
@@ -3438,21 +3467,30 @@ async def contact_page(request: Request, locale: str, sent: str = ""):
 @app.post("/{locale}/contact", response_class=HTMLResponse)
 async def contact_submit(request: Request, locale: str):
     """Handle contact form submission and send email"""
-    import smtplib
-    import html
-    from email.message import EmailMessage
-    from fastapi import Form as FastAPIForm
+    client_ip = request.client.host if request.client else "unknown"
+    if _check_contact_rate_limit(client_ip):
+        raise HTTPException(status_code=429, detail="Too many requests")
 
     form = await request.form()
     name = str(form.get("name", "")).strip()
-    email = str(form.get("email", "")).strip()
+    email_val = str(form.get("email", "")).strip()
     subject = str(form.get("subject", "")).strip() or "Contact form message"
     message = str(form.get("message", "")).strip()
 
     t = get_translations(locale)
 
-    # Basic validation
-    if not name or not email or not message:
+    # Enforce field length limits and validate email format
+    valid = (
+        name
+        and email_val
+        and message
+        and len(name) <= 120
+        and len(email_val) <= 254
+        and len(subject) <= 200
+        and len(message) <= 4000
+        and re.match(r'^[^@\r\n]+@[^@\r\n]+\.[^@\r\n]+$', email_val)
+    )
+    if not valid:
         return templates.TemplateResponse(
             request,
             "contact.html",
@@ -3462,28 +3500,37 @@ async def contact_submit(request: Request, locale: str):
                 "success": False,
                 "error": True,
                 "form_name": name,
-                "form_email": email,
+                "form_email": email_val,
                 "form_subject": subject,
                 "form_message": message,
             }
         )
 
+    # Strip newlines to prevent email header injection
+    safe_subject = subject.replace('\r', '').replace('\n', '')
+    safe_email = email_val.replace('\r', '').replace('\n', '')
+
     # Send email if SMTP is configured
     if settings.SMTP_HOST and settings.CONTACT_EMAIL:
         try:
             msg = EmailMessage()
-            msg["Subject"] = f"[SwissUnihockey Contact] {html.escape(subject)}"
+            msg["Subject"] = f"[SwissUnihockey Contact] {html.escape(safe_subject)}"
             msg["From"] = settings.SMTP_USER or settings.CONTACT_EMAIL
             msg["To"] = settings.CONTACT_EMAIL
-            msg["Reply-To"] = email
+            msg["Reply-To"] = safe_email
             msg.set_content(
-                f"Name: {name}\nEmail: {email}\n\n{message}"
+                f"Name: {name}\nEmail: {email_val}\n\n{message}"
             )
-            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-                server.starttls()
-                if settings.SMTP_USER and settings.SMTP_PASSWORD:
-                    server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-                server.send_message(msg)
+
+            def _send_email() -> None:
+                with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+                    server.starttls()
+                    if settings.SMTP_USER and settings.SMTP_PASSWORD:
+                        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                    server.send_message(msg)
+
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, _send_email)
         except Exception as exc:
             logger.error(f"Contact form email failed: {exc}")
             return templates.TemplateResponse(
@@ -3495,14 +3542,13 @@ async def contact_submit(request: Request, locale: str):
                     "success": False,
                     "error": True,
                     "form_name": name,
-                    "form_email": email,
+                    "form_email": email_val,
                     "form_subject": subject,
                     "form_message": message,
                 }
             )
 
-    from fastapi.responses import RedirectResponse as _Redirect
-    return _Redirect(url=f"/{locale}/contact?sent=1", status_code=303)
+    return RedirectResponse(url=f"/{locale}/contact?sent=1", status_code=303)
 
 
 @app.get("/{locale}/privacy", response_class=HTMLResponse)
@@ -3514,6 +3560,7 @@ async def privacy_page(request: Request, locale: str):
         {
             "locale": locale,
             "t": get_translations(locale),
+            "privacy_last_updated": "2026-03-06",
         }
     )
 
