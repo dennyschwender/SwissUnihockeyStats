@@ -253,6 +253,9 @@ _CONTACT_MAX_SUBMISSIONS = 5
 _CONTACT_WINDOW_SECS = 3600  # 1 hour
 _contact_attempts: dict = {}  # ip -> (count, window_start)
 
+# Privacy policy "last updated" date — update this when the policy changes.
+PRIVACY_POLICY_LAST_UPDATED = "2026-03-06"
+
 
 def _check_contact_rate_limit(ip: str) -> bool:
     """Return True if the IP has exceeded the contact form submission limit."""
@@ -3468,16 +3471,30 @@ async def contact_page(request: Request, locale: str, sent: str = ""):
 async def contact_submit(request: Request, locale: str):
     """Handle contact form submission and send email"""
     client_ip = request.client.host if request.client else "unknown"
+    t = get_translations(locale)
+
     if _check_contact_rate_limit(client_ip):
-        raise HTTPException(status_code=429, detail="Too many requests")
+        return templates.TemplateResponse(
+            request,
+            "contact.html",
+            {
+                "locale": locale,
+                "t": t,
+                "success": False,
+                "error": True,
+                "form_name": "",
+                "form_email": "",
+                "form_subject": "",
+                "form_message": "",
+            },
+            status_code=429,
+        )
 
     form = await request.form()
     name = str(form.get("name", "")).strip()
     email_val = str(form.get("email", "")).strip()
     subject = str(form.get("subject", "")).strip() or "Contact form message"
     message = str(form.get("message", "")).strip()
-
-    t = get_translations(locale)
 
     # Enforce field length limits and validate email format
     valid = (
@@ -3514,7 +3531,7 @@ async def contact_submit(request: Request, locale: str):
     if settings.SMTP_HOST and settings.CONTACT_EMAIL:
         try:
             msg = EmailMessage()
-            msg["Subject"] = f"[SwissUnihockey Contact] {html.escape(safe_subject)}"
+            msg["Subject"] = f"[SwissUnihockey Contact] {safe_subject}"
             msg["From"] = settings.SMTP_USER or settings.CONTACT_EMAIL
             msg["To"] = settings.CONTACT_EMAIL
             msg["Reply-To"] = safe_email
@@ -3560,7 +3577,7 @@ async def privacy_page(request: Request, locale: str):
         {
             "locale": locale,
             "t": get_translations(locale),
-            "privacy_last_updated": "2026-03-06",
+            "privacy_last_updated": PRIVACY_POLICY_LAST_UPDATED,
         }
     )
 

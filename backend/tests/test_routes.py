@@ -182,3 +182,18 @@ class TestContactAndPrivacyRoutes:
         )
         assert r.status_code == 303
         assert "/en/contact" in r.headers.get("location", "")
+
+    def test_contact_submit_rate_limited_after_limit_exceeded(self, client):
+        # Send enough requests to guarantee hitting the per-IP limit (5/hour).
+        # Some prior POST tests in this class may already have consumed slots,
+        # so 6 additional submissions always reaches the cap regardless of order.
+        last_response = None
+        for _ in range(6):
+            last_response = client.post(
+                "/en/contact",
+                data={"name": "Test User", "email": "user@example.com", "subject": "Hi", "message": "Hello world"},
+                follow_redirects=False,
+            )
+        assert last_response is not None
+        assert last_response.status_code == 429
+        assert b"html" in last_response.content.lower()
