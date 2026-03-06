@@ -3416,6 +3416,108 @@ async def favorites_page(request: Request, locale: str):
     )
 
 
+@app.get("/{locale}/contact", response_class=HTMLResponse)
+async def contact_page(request: Request, locale: str, sent: str = ""):
+    """Contact page"""
+    return templates.TemplateResponse(
+        request,
+        "contact.html",
+        {
+            "locale": locale,
+            "t": get_translations(locale),
+            "success": sent == "1",
+            "error": False,
+            "form_name": "",
+            "form_email": "",
+            "form_subject": "",
+            "form_message": "",
+        }
+    )
+
+
+@app.post("/{locale}/contact", response_class=HTMLResponse)
+async def contact_submit(request: Request, locale: str):
+    """Handle contact form submission and send email"""
+    import smtplib
+    import html
+    from email.message import EmailMessage
+    from fastapi import Form as FastAPIForm
+
+    form = await request.form()
+    name = str(form.get("name", "")).strip()
+    email = str(form.get("email", "")).strip()
+    subject = str(form.get("subject", "")).strip() or "Contact form message"
+    message = str(form.get("message", "")).strip()
+
+    t = get_translations(locale)
+
+    # Basic validation
+    if not name or not email or not message:
+        return templates.TemplateResponse(
+            request,
+            "contact.html",
+            {
+                "locale": locale,
+                "t": t,
+                "success": False,
+                "error": True,
+                "form_name": name,
+                "form_email": email,
+                "form_subject": subject,
+                "form_message": message,
+            }
+        )
+
+    # Send email if SMTP is configured
+    if settings.SMTP_HOST and settings.CONTACT_EMAIL:
+        try:
+            msg = EmailMessage()
+            msg["Subject"] = f"[SwissUnihockey Contact] {html.escape(subject)}"
+            msg["From"] = settings.SMTP_USER or settings.CONTACT_EMAIL
+            msg["To"] = settings.CONTACT_EMAIL
+            msg["Reply-To"] = email
+            msg.set_content(
+                f"Name: {name}\nEmail: {email}\n\n{message}"
+            )
+            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+                server.starttls()
+                if settings.SMTP_USER and settings.SMTP_PASSWORD:
+                    server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                server.send_message(msg)
+        except Exception as exc:
+            logger.error(f"Contact form email failed: {exc}")
+            return templates.TemplateResponse(
+                request,
+                "contact.html",
+                {
+                    "locale": locale,
+                    "t": t,
+                    "success": False,
+                    "error": True,
+                    "form_name": name,
+                    "form_email": email,
+                    "form_subject": subject,
+                    "form_message": message,
+                }
+            )
+
+    from fastapi.responses import RedirectResponse as _Redirect
+    return _Redirect(url=f"/{locale}/contact?sent=1", status_code=303)
+
+
+@app.get("/{locale}/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request, locale: str):
+    """Privacy policy page"""
+    return templates.TemplateResponse(
+        request,
+        "privacy.html",
+        {
+            "locale": locale,
+            "t": get_translations(locale),
+        }
+    )
+
+
 # ============================================================================
 # Error Handlers
 # ============================================================================

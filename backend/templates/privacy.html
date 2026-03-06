@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t.privacy.title }} - {{ t.common.app_name }}{% endblock %}
+{% block description %}{{ t.privacy.meta_description }}{% endblock %}
+
+{% block content %}
+<div class="hero fade-in">
+    <h1>{{ t.privacy.title }}</h1>
+    <p>{{ t.privacy.last_updated }}: 2026-01-01</p>
+</div>
+
+<div class="card" style="max-width: 800px; margin: 2rem auto; line-height: 1.75;">
+
+    <h2>{{ t.privacy.section_intro_title }}</h2>
+    <p>{{ t.privacy.section_intro_text }}</p>
+
+    <h2>{{ t.privacy.section_data_title }}</h2>
+    <p>{{ t.privacy.section_data_text }}</p>
+    <ul>
+        <li>{{ t.privacy.data_item_logs }}</li>
+        <li>{{ t.privacy.data_item_contact }}</li>
+        <li>{{ t.privacy.data_item_cookies }}</li>
+    </ul>
+
+    <h2>{{ t.privacy.section_usage_title }}</h2>
+    <p>{{ t.privacy.section_usage_text }}</p>
+    <ul>
+        <li>{{ t.privacy.usage_item_service }}</li>
+        <li>{{ t.privacy.usage_item_contact }}</li>
+        <li>{{ t.privacy.usage_item_improve }}</li>
+    </ul>
+
+    <h2>{{ t.privacy.section_cookies_title }}</h2>
+    <p>{{ t.privacy.section_cookies_text }}</p>
+
+    <h2>{{ t.privacy.section_storage_title }}</h2>
+    <p>{{ t.privacy.section_storage_text }}</p>
+
+    <h2>{{ t.privacy.section_third_party_title }}</h2>
+    <p>{{ t.privacy.section_third_party_text }}</p>
+
+    <h2>{{ t.privacy.section_rights_title }}</h2>
+    <p>{{ t.privacy.section_rights_text }}</p>
+    <ul>
+        <li>{{ t.privacy.rights_item_access }}</li>
+        <li>{{ t.privacy.rights_item_delete }}</li>
+        <li>{{ t.privacy.rights_item_object }}</li>
+    </ul>
+
+    <h2>{{ t.privacy.section_contact_title }}</h2>
+    <p>{{ t.privacy.section_contact_text }} <a href="/{{ locale }}/contact">{{ t.footer.contact }}</a>.</p>
+
+    <h2>{{ t.privacy.section_changes_title }}</h2>
+    <p>{{ t.privacy.section_changes_text }}</p>
+
+</div>
+{% endblock %}
