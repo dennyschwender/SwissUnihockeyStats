@@ -1903,14 +1903,21 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                     effective_tier = max(league_tier(lid) for lid in _db_lids)
 
             with db_service.session_scope() as s:
-                # Join Game → League to filter by tier
+                # Join Game → League to filter by tier.
+                # Also include games with NULL game_date that are finished or
+                # already have a score — these were played but date parsing failed.
+                from sqlalchemy import or_
                 rows = (
                     s.query(Game.id, Game.season_id, _League.league_id)
                     .join(LeagueGroup, Game.group_id == LeagueGroup.id, isouter=True)
                     .join(_League, LeagueGroup.league_id == _League.id, isouter=True)
                     .filter(
                         Game.season_id == season,
-                        Game.game_date < _now,
+                        or_(
+                            Game.game_date < _now,
+                            Game.home_score.isnot(None),   # scored but date missing
+                            Game.status == "finished",     # finished but date missing
+                        ),
                     )
                     .all()
                 )

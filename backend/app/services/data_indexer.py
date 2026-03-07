@@ -1198,11 +1198,13 @@ class DataIndexer:
                             game_date = None
                             game_time_str = None
                             if date_text:
-                                try:
-                                    game_date = datetime.strptime(date_text.strip(), "%d.%m.%Y %H:%M")
-                                    game_time_str = game_date.strftime("%H:%M")
-                                except ValueError:
-                                    pass
+                                for _fmt in ("%d.%m.%Y %H:%M", "%d.%m.%y %H:%M"):
+                                    try:
+                                        game_date = datetime.strptime(date_text.strip(), _fmt)
+                                        game_time_str = game_date.strftime("%H:%M")
+                                        break
+                                    except ValueError:
+                                        pass
 
                             # --- venue ---
                             venue = None
