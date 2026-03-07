@@ -189,6 +189,36 @@ app.add_middleware(
 # Include API router (JSON endpoints)
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+# ── Request-pressure tracking ──────────────────────────────────────────────
+# Counts how many non-health/non-static HTTP requests are currently in flight.
+# The background indexer checks this and yields CPU between batches so that
+# frontend page loads are never starved by indexing work.
+_active_requests: int = 0
+
+
+@app.middleware("http")
+async def _request_pressure_middleware(request: Request, call_next):
+    global _active_requests
+    path = request.url.path
+    # Skip health checks and static assets — they don't need scheduling priority
+    if not path.startswith("/static/") and path != "/health":
+        _active_requests += 1
+        try:
+            return await call_next(request)
+        finally:
+            _active_requests -= 1
+    return await call_next(request)
+
+
+async def _backoff_if_busy():
+    """Pause the indexer briefly when frontend requests are in flight.
+
+    Called between batch items in _run() so that page requests always
+    get a free event-loop turn while the background indexer is running.
+    """
+    if _active_requests > 0:
+        await asyncio.sleep(0.5)
+
 
 @app.exception_handler(_AdminNotAuthenticated)
 async def _admin_not_auth_handler(request: Request, exc: _AdminNotAuthenticated):
@@ -1680,6 +1710,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             teams_n = 0
             team_id_list = []
             for i, (cid, cname) in enumerate(club_list, 1):
+                await _backoff_if_busy()
                 cnt, tids = await asyncio.to_thread(indexer.index_teams_for_club, cid, season, force=force)
                 teams_n += cnt
                 team_id_list.extend(tids)
@@ -1708,6 +1739,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             push("info", f"Indexing players for {total} teams (tier ≤ {effective_tier_p}{auto_lbl_p})...")
             players_n = 0
             for i, tid in enumerate(team_id_list, 1):
+                await _backoff_if_busy()
                 players_n += await asyncio.to_thread(indexer.index_players_for_team, tid, season, force=force)
                 set_progress(35 + int(i / total * 25) if total else 60)
             stats["players"] = players_n
@@ -1748,6 +1780,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             push("info", f"Indexing lineups for {total_gl} games (tier ≤ {effective_tier_gl})...")
             lineup_n2 = 0
             for i, gid in enumerate(game_ids_gl, 1):
+                await _backoff_if_busy()
                 lineup_n2 += max(0, await asyncio.to_thread(indexer.index_game_lineup, gid, season, force=force))
                 set_progress(int(i / total_gl * 95) if total_gl else 99)
             stats["game_lineups"] = lineup_n2
@@ -1788,6 +1821,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             groups_n = 0
             push("info", f"Indexing groups for {total} leagues...")
             for i, (ldb, lid, gc) in enumerate(lg_list, 1):
+                await _backoff_if_busy()
                 groups_n += await asyncio.to_thread(indexer.index_groups_for_league, ldb, season, lid, gc, force=force)
                 set_progress(62 + int(i / total * 13))
             stats["league_groups"] = groups_n
@@ -1821,6 +1855,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             # Process in small batches so the event loop stays responsive
             _GAMES_BATCH = 2
             for batch_start in range(0, max(total, 1), _GAMES_BATCH):
+                await _backoff_if_busy()
                 batch = work[batch_start:batch_start + _GAMES_BATCH]
                 batch_results = await asyncio.gather(
                     *(asyncio.to_thread(
@@ -1913,6 +1948,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             # stays responsive for admin API requests between batches.
             _EV_BATCH = 2
             for batch_start in range(0, max(total, 1), _EV_BATCH):
+                await _backoff_if_busy()
                 batch = finished[batch_start:batch_start + _EV_BATCH]
                 batch_results = await asyncio.gather(
                     *(asyncio.gather(
@@ -2738,7 +2774,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
                 _pairs.setdefault(_key, []).append(_g)
             _series_list = []
             for _key, _pgames in sorted(_pairs.items(), key=lambda x: _snm.get(x[0], "")):
-                _sorted_pgames = sorted(_pgames, key=lambda x: x.game_date or _date.min)
+                _sorted_pgames = sorted(_pgames, key=lambda x: x.game_date or datetime.min)
                 _first_g = _sorted_pgames[0]
                 _ta = _first_g.home_team_id   # home of game 1 = team A
                 _tb = _first_g.away_team_id   # away of game 1 = team B
