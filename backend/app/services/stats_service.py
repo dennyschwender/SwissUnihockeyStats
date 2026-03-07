@@ -3028,7 +3028,7 @@ def get_playoff_series_for_game(game_id: int) -> dict | None:
 
         series_list: list[dict] = []
         for _key, _pgames in sorted(_pairs.items(), key=lambda x: _snm.get(x[0][0] if isinstance(x[0], tuple) else x[0], "")):
-            _sorted = sorted(_pgames, key=lambda x: x.game_date or _date.min)
+            _sorted = sorted(_pgames, key=lambda x: x.game_date or datetime.min)
             _first_g = _sorted[0]
             _ta = _first_g.home_team_id
             _tb = _first_g.away_team_id
