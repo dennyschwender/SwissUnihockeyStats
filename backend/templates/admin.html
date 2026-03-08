@@ -282,6 +282,38 @@
       .tab-content { padding: .75rem .5rem; }
       .totals-bar { padding: .5rem .75rem; }
     }
+
+    /* ── DB Health section ── */
+    .health-section {
+      background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+      padding: 1rem; margin-top: 1.25rem;
+    }
+    .health-section .section-title { margin-bottom: .75rem; }
+    .health-meta { font-size: .78rem; color: #8b949e; margin-bottom: .75rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    .health-meta strong { color: #c9d1d9; }
+    .repair-btn {
+      background: #21262d; border: 1px solid #30363d; color: #c9d1d9;
+      border-radius: 6px; padding: .3rem .8rem; font-size: .78rem; cursor: pointer;
+      margin-left: auto;
+    }
+    .repair-btn:hover { background: #30363d; }
+    .repair-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .health-table { width: 100%; border-collapse: collapse; font-size: .78rem; margin-bottom: .75rem; }
+    .health-table th { text-align: left; color: #6e7681; font-weight: 600; padding: .3rem .5rem; border-bottom: 1px solid #21262d; }
+    .health-table td { padding: .3rem .5rem; border-bottom: 1px solid #161b22; }
+    .health-table a { color: #58a6ff; text-decoration: none; }
+    .health-table a:hover { text-decoration: underline; }
+    .collapsible-header {
+      cursor: pointer; user-select: none; display: flex; align-items: center;
+      gap: .5rem; font-size: .78rem; font-weight: 600; color: #8b949e;
+      padding: .4rem 0; border-bottom: 1px solid #21262d; margin-bottom: .5rem;
+    }
+    .collapsible-header:hover { color: #c9d1d9; }
+    .collapsible-chevron { font-size: .65rem; transition: transform .2s; }
+    .collapsible-chevron.open { transform: rotate(90deg); }
+    .collapsible-body { display: none; }
+    .collapsible-body.open { display: block; }
+    .health-empty { color: #3fb950; font-size: .78rem; padding: .3rem 0; }
   </style>
 </head>
 <body>
@@ -660,6 +692,112 @@
             Deletes all data (games, players, leagues, clubs, stats) for the selected season(s). This cannot be undone.<br>
             Use <strong>Preview</strong> or check <strong>Dry run</strong> first to see what would be deleted.
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DB Health ───────────────────────────────────────────────── -->
+    <div class="health-section" x-data="healthPanel()" x-init="load()">
+      <p class="section-title">DB Health</p>
+
+      <div class="health-meta">
+        <span>Last repair: <strong x-text="lastRun || 'never'"></strong></span>
+        <span>Rows fixed: <strong x-text="lastFixed"></strong></span>
+        <button class="repair-btn" :disabled="running" @click="runRepair()">
+          <span x-show="!running">Run repair now</span>
+          <span x-show="running">Running…</span>
+        </button>
+      </div>
+
+      <template x-if="error">
+        <div style="color:#f85149;font-size:.78rem;margin-bottom:.5rem" x-text="error"></div>
+      </template>
+
+      <!-- Games with events but no lineup -->
+      <div>
+        <div class="collapsible-header" @click="toggle('lineup')">
+          <span class="collapsible-chevron" :class="{open: open.lineup}">▶</span>
+          Games with events but no lineup
+          <span style="margin-left:auto;color:#d29922;font-weight:700" x-text="gamesNoLineup.length"></span>
+        </div>
+        <div class="collapsible-body" :class="{open: open.lineup}">
+          <template x-if="gamesNoLineup.length === 0">
+            <div class="health-empty">✓ None</div>
+          </template>
+          <template x-if="gamesNoLineup.length > 0">
+            <table class="health-table">
+              <thead><tr><th>Game</th><th>Date</th><th>Season</th><th>Events</th></tr></thead>
+              <tbody>
+                <template x-for="g in gamesNoLineup" :key="g.game_id">
+                  <tr>
+                    <td><a :href="'/en/game/' + g.game_id" target="_blank" x-text="g.game_id"></a></td>
+                    <td x-text="g.game_date || '—'"></td>
+                    <td x-text="g.season_id"></td>
+                    <td x-text="g.event_count"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+        </div>
+      </div>
+
+      <!-- Roster gaps -->
+      <div>
+        <div class="collapsible-header" @click="toggle('roster')">
+          <span class="collapsible-chevron" :class="{open: open.roster}">▶</span>
+          Roster gaps (game players not in team roster)
+          <span style="margin-left:auto;color:#d29922;font-weight:700" x-text="rosterGaps.length"></span>
+        </div>
+        <div class="collapsible-body" :class="{open: open.roster}">
+          <template x-if="rosterGaps.length === 0">
+            <div class="health-empty">✓ None</div>
+          </template>
+          <template x-if="rosterGaps.length > 0">
+            <table class="health-table">
+              <thead><tr><th>Team ID</th><th>Season</th><th>In Games</th><th>In Roster</th><th>Gap</th></tr></thead>
+              <tbody>
+                <template x-for="g in rosterGaps" :key="g.team_id + '-' + g.season_id">
+                  <tr>
+                    <td x-text="g.team_id"></td>
+                    <td x-text="g.season_id"></td>
+                    <td x-text="g.game_player_count"></td>
+                    <td x-text="g.roster_count"></td>
+                    <td x-text="g.delta"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+        </div>
+      </div>
+
+      <!-- Unresolved player stats -->
+      <div>
+        <div class="collapsible-header" @click="toggle('stats')">
+          <span class="collapsible-chevron" :class="{open: open.stats}">▶</span>
+          Unresolved player stats (null team_id or game_class)
+          <span style="margin-left:auto;color:#d29922;font-weight:700" x-text="unresolvedStats.length"></span>
+        </div>
+        <div class="collapsible-body" :class="{open: open.stats}">
+          <template x-if="unresolvedStats.length === 0">
+            <div class="health-empty">✓ None</div>
+          </template>
+          <template x-if="unresolvedStats.length > 0">
+            <table class="health-table">
+              <thead><tr><th>Player</th><th>Team Name</th><th>League</th><th>Season</th></tr></thead>
+              <tbody>
+                <template x-for="s in unresolvedStats" :key="s.player_id + '-' + s.season_id + '-' + s.league_abbrev">
+                  <tr>
+                    <td x-text="s.player_id"></td>
+                    <td x-text="s.team_name || '—'"></td>
+                    <td x-text="s.league_abbrev || '—'"></td>
+                    <td x-text="s.season_id"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
         </div>
       </div>
     </div>
@@ -2123,6 +2261,62 @@ setInterval(loadStats, 30000);
 setInterval(loadScheduler, 3000);
 setInterval(loadDbInfo, 30000);
 setInterval(loadSystemStats, 5000);
+
+/* ── DB Health panel (Alpine.js) ── */
+function healthPanel() {
+  return {
+    lastRun: null,
+    lastFixed: 0,
+    gamesNoLineup: [],
+    rosterGaps: [],
+    unresolvedStats: [],
+    running: false,
+    error: null,
+    open: { lineup: false, roster: false, stats: false },
+
+    async load() {
+      try {
+        const r = await fetch('/admin/api/repair-report');
+        const d = await r.json();
+        if (d.ok) {
+          this.lastRun = d.last_run ? new Date(d.last_run).toLocaleString() : null;
+          this.lastFixed = d.last_fixed;
+          this.gamesNoLineup = d.games_no_lineup;
+          this.rosterGaps = d.roster_gaps;
+          this.unresolvedStats = d.unresolved_stats;
+        }
+      } catch (e) {
+        this.error = 'Failed to load health report';
+      }
+    },
+
+    async runRepair() {
+      this.running = true;
+      this.error = null;
+      try {
+        const r = await fetch('/admin/api/repair', { method: 'POST' });
+        const d = await r.json();
+        if (d.ok) {
+          this.lastFixed = d.total_fixed;
+          this.lastRun = new Date().toLocaleString();
+          this.gamesNoLineup = d.games_no_lineup;
+          this.rosterGaps = d.roster_gaps;
+          this.unresolvedStats = d.unresolved_stats;
+        } else {
+          this.error = d.detail || 'Repair failed';
+        }
+      } catch (e) {
+        this.error = 'Repair request failed';
+      } finally {
+        this.running = false;
+      }
+    },
+
+    toggle(key) {
+      this.open[key] = !this.open[key];
+    },
+  };
+}
 </script>
 </body>
 </html>
