@@ -223,6 +223,7 @@
     display:inline-flex; align-items:center; justify-content:center;
     border-radius:.3rem; font-size:.72rem; font-weight:700;
     text-decoration:none; color:white;
+    vertical-align:middle;
   }
   .gd-form-badge--W   { background:#16a34a; }
   .gd-form-badge--OTW { background:#059669; }
@@ -529,7 +530,7 @@ function gameTimeline(events, totalSeconds) {
 
   {% if game.timeline_events %}
   <div class="tl-wrap"
-       x-data="gameTimeline({{ game.timeline_events | tojson }}, {{ game.total_seconds }})"
+       x-data='gameTimeline({{ game.timeline_events | tojson }}, {{ game.total_seconds }})'
        @click.outside="tooltip = null">
     <div class="tl-heading">Timeline</div>
 
@@ -949,7 +950,7 @@ function gameTimeline(events, totalSeconds) {
     <div class="gd-tabpanel" x-show="tab === 'table'">
       {% if game.group_standings %}
       <h3 style="font-size:.85rem;font-weight:700;margin:0 0 1rem;color:var(--gray-600);text-transform:uppercase;letter-spacing:.05em;">
-        🏆 {{ game.league_name }}{% if game.group_name %} – {{ game.group_name }}{% endif %}{% if game.phase and game.phase != 'Regelsaison' %} – {{ game.phase }}{% endif %}
+        🏆 {{ game.league_name }} – Regelsaison
       </h3>
       <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
       <table class="gd-table" style="min-width:420px;">

@@ -2824,10 +2824,45 @@ def get_game_box_score(game_id: int) -> dict:
             or _gp_goal_sum > 0             # at least one scorer found → indexed
         )
 
+        # When game_players rows have all-zero goals despite a scored game,
+        # derive G/A per player from the goals events (player field format:
+        # "F. Lastname" or "F. Lastname (A. Assistname)").
+        _ev_goals: dict[str, int] = defaultdict(int)
+        _ev_assists: dict[str, int] = defaultdict(int)
+        if not _game_stats_indexed and goals:
+            _SCORER_SPLIT = re.compile(r'^(.+?)(?:\s*\((.+?)\))?\s*$')
+            for _g in goals:
+                _ps = (_g.get("player") or "").strip()
+                if not _ps:
+                    continue
+                _m = _SCORER_SPLIT.match(_ps)
+                if _m:
+                    _scorer = _m.group(1).strip()
+                    _assists_raw = _m.group(2) or ""
+                    if _scorer:
+                        _ev_goals[_scorer] += 1
+                    for _ast in [a.strip() for a in _assists_raw.split(",") if a.strip()]:
+                        _ev_assists[_ast] += 1
+
+        def _abbrev_name(full: str) -> str:
+            """'Firstname Lastname' → 'F. Lastname' for event-name matching."""
+            parts = full.split()
+            return f"{parts[0][0]}. {parts[-1]}" if len(parts) >= 2 else full
+
         for gp in gp_rows:
             pl = session.query(Player).filter(Player.person_id == gp.player_id).first()
             name = (pl.full_name if pl else None) or f"Player {gp.player_id}"
             _st = (_home_stats_map if gp.is_home_team else _away_stats_map).get(gp.player_id, {})
+
+            # Try to fill game stats from events when GamePlayer data is empty
+            if not _game_stats_indexed and _ev_goals:
+                _abbrev = _abbrev_name(name)
+                _gg = _ev_goals.get(_abbrev, 0)
+                _ga = _ev_assists.get(_abbrev, 0)
+            else:
+                _gg = gp.goals if _game_stats_indexed else None
+                _ga = gp.assists if _game_stats_indexed else None
+
             entry = {
                 "jersey": gp.jersey_number,
                 "position": _POS_ABBREV.get(
@@ -2836,9 +2871,9 @@ def get_game_box_score(game_id: int) -> dict:
                 ),
                 "player": name,
                 "player_id": gp.player_id,
-                "game_g":   gp.goals           if _game_stats_indexed else None,
-                "game_a":   gp.assists         if _game_stats_indexed else None,
-                "game_pts": ((gp.goals or 0) + (gp.assists or 0)) if _game_stats_indexed else None,
+                "game_g":   _gg,
+                "game_a":   _ga,
+                "game_pts": ((_gg or 0) + (_ga or 0)) if (_gg is not None or _ga is not None) else None,
                 "season_gp": _st.get("gp"),
                 "season_g": _st.get("g"),
                 "season_a": _st.get("a"),
@@ -2848,6 +2883,13 @@ def get_game_box_score(game_id: int) -> dict:
                 roster_home.append(entry)
             else:
                 roster_away.append(entry)
+
+        # Mark as indexed if we derived at least one stat from events
+        if not _game_stats_indexed and _ev_goals:
+            _game_stats_indexed = any(
+                (p.get("game_g") or 0) + (p.get("game_a") or 0) > 0
+                for p in roster_home + roster_away
+            )
 
         # ── Head-to-head ─────────────────────────────────────────────────────
         from sqlalchemy import or_ as _or2
@@ -3012,6 +3054,23 @@ def get_game_box_score(game_id: int) -> dict:
             goals, penalties, home_name, away_name
         )
 
+        def _get_regular_season_standings(db_session, league_id, group_id, phase):
+            """For playoff/playout games, show the regular-season standings instead."""
+            if not league_id:
+                return []
+            canonical = _canonical_phase(phase)
+            if canonical == "regular":
+                # Already a regular-season game — use own group
+                return get_league_standings(league_id, only_group_ids=[group_id] if group_id else None)
+            # Find the Regelsaison group for the same league
+            reg_group = (
+                db_session.query(LeagueGroup)
+                .filter(LeagueGroup.league_id == league_id, LeagueGroup.phase == "Regelsaison")
+                .first()
+            )
+            use_id = reg_group.id if reg_group else group_id
+            return get_league_standings(league_id, only_group_ids=[use_id] if use_id else None)
+
         return {
             "game_id": game_id,
             "season_id": game.season_id,
@@ -3050,7 +3109,7 @@ def get_game_box_score(game_id: int) -> dict:
             "game_summary": game_summary,
             "home_record": home_record,
             "away_record": away_record,
-            "group_standings": get_league_standings(_db_league_id, only_group_ids=[_db_group_id] if _db_group_id is not None else None) if _db_league_id else [],
+            "group_standings": _get_regular_season_standings(session, _db_league_id, _db_group_id, _phase),
             "group_name": _group_name,
             "phase": _phase,
             "league_name": _league_name,
