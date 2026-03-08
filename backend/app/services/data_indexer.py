@@ -1599,6 +1599,20 @@ class DataIndexer:
                     home_logo_val = _cells[0].get("image", {}).get("url") or None
                 if len(_cells) > 2:
                     away_logo_val = _cells[2].get("image", {}).get("url") or None
+                # Parse date/time from cells 5 and 6 to backfill null game_date
+                _date_str = _dcell(5)
+                _time_str = _dcell(6)
+                if _date_str:
+                    _dt_str = f"{_date_str} {_time_str}".strip()
+                    for _fmt in ("%d.%m.%Y %H:%M", "%d.%m.%y %H:%M", "%d.%m.%Y", "%d.%m.%y"):
+                        try:
+                            venue_val_date = datetime.strptime(_dt_str, _fmt)
+                            break
+                        except ValueError:
+                            venue_val_date = None
+                else:
+                    venue_val_date = None
+
                 _venue = _dcell(7)
                 if _venue:
                     venue_val = _venue
@@ -1736,6 +1750,9 @@ class DataIndexer:
                         game_row.away_score = away_score_val
                         if new_period:
                             game_row.period = new_period
+                    if game_row.game_date is None and venue_val_date:
+                        game_row.game_date = venue_val_date
+                        game_row.game_time = venue_val_date.strftime("%H:%M")
                     if venue_val:
                         game_row.venue = venue_val
                     if referee_1_val is not None:
