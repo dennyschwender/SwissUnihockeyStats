@@ -100,3 +100,38 @@ def test_goal_percentage_period3():
     assert total == 3600
     # Period 3 starts at 2400s → pct = 2400/3600*100 ≈ 66.67%
     assert abs(events[0]["pct"] - (2400 / 3600 * 100)) < 0.01
+
+
+from app.services.database import DatabaseService
+from sqlalchemy import text
+
+
+def _make_db_with_finished_game():
+    svc = DatabaseService("sqlite:///:memory:")
+    svc.initialize()
+    with svc.session_scope() as session:
+        session.execute(text("INSERT INTO seasons (id) VALUES (2025)"))
+        session.execute(text("INSERT INTO clubs (id, season_id) VALUES (1, 2025)"))
+        session.execute(text("INSERT INTO teams (id, season_id, club_id, name) VALUES (1, 2025, 1, 'Home FC')"))
+        session.execute(text("INSERT INTO teams (id, season_id, club_id, name) VALUES (2, 2025, 1, 'Away FC')"))
+        session.execute(text("""
+            INSERT INTO games (id, season_id, home_team_id, away_team_id, home_score, away_score, status)
+            VALUES (999, 2025, 1, 2, 2, 1, 'finished')
+        """))
+        session.execute(text("""
+            INSERT INTO game_events (game_id, event_type, period, time)
+            VALUES (999, 'Torschütze 1:0 Meier', 1, '10:00')
+        """))
+    return svc
+
+
+def test_box_score_includes_timeline_keys(monkeypatch):
+    svc = _make_db_with_finished_game()
+    import app.services.database as db_module
+    monkeypatch.setattr(db_module, "_db_service", svc)
+    from app.services.stats_service import get_game_box_score
+    box = get_game_box_score(999)
+    assert "timeline_events" in box
+    assert "total_seconds" in box
+    assert isinstance(box["timeline_events"], list)
+    assert box["total_seconds"] in (3600, 4200)

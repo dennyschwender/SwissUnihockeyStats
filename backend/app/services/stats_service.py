@@ -2986,6 +2986,10 @@ def get_game_box_score(game_id: int) -> dict:
             game.group.league.name or game.group.league.text or ""
         ) if (game.group and game.group.league) else ""
 
+        _timeline_events, _total_seconds = build_timeline_events(
+            goals, penalties, home_name, away_name
+        )
+
         return {
             "game_id": game_id,
             "season_id": game.season_id,
@@ -3028,6 +3032,8 @@ def get_game_box_score(game_id: int) -> dict:
             "group_name": _group_name,
             "phase": _phase,
             "league_name": _league_name,
+            "timeline_events":   _timeline_events,
+            "total_seconds":     _total_seconds,
         }
 
 
