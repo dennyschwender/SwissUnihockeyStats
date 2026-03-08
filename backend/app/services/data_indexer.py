@@ -45,6 +45,125 @@ def _phase_from_slider_text(slider_text: str) -> str:
     if _re.match(r'Runde\s+\d+$', label, _re.IGNORECASE):
         return "Regelsaison"
     return label or "Regelsaison"
+
+
+def _parse_game_rows(regions: list) -> list[dict]:
+    """Parse raw API regions into a list of game dicts (pure, no DB access).
+
+    Each returned dict has the keys:
+        game_id, game_date, game_time_str, venue,
+        home_team_id, home_team_name, home_logo_url,
+        away_team_id, away_team_name, away_logo_url,
+        home_score, away_score, status, period
+    """
+    import re as _re
+    games: list[dict] = []
+    for region in regions:
+        for row in region.get("rows", []):
+            cells = row.get("cells", [])
+            if not cells:
+                continue
+
+            # --- game_id (from date cell link) ---
+            date_cell = cells[0] if cells else {}
+            link = date_cell.get("link", {})
+            if not link.get("ids"):
+                continue
+            game_id = link["ids"][0]
+
+            # --- date / time ---
+            game_date = None
+            game_time_str = None
+            date_text = date_cell.get("text", "")
+            if isinstance(date_text, list):
+                date_text = date_text[0] if date_text else ""
+            if date_text:
+                for fmt in ("%d.%m.%Y %H:%M", "%d.%m.%y %H:%M"):
+                    try:
+                        game_date = datetime.strptime(date_text.strip(), fmt)
+                        game_time_str = game_date.strftime("%H:%M")
+                        break
+                    except ValueError:
+                        pass
+
+            # --- venue ---
+            venue = None
+            if len(cells) > 1:
+                v = cells[1].get("text", [])
+                venue = (v[0] if isinstance(v, list) else v) or None
+
+            # --- home team (cells[2] = name/link, cells[3] = logo) ---
+            home_team_id = None
+            home_team_name = None
+            home_logo_url = None
+            if len(cells) > 2:
+                hl = cells[2].get("link", {})
+                if hl.get("ids"):
+                    home_team_id = hl["ids"][0]
+                t = cells[2].get("text", [])
+                home_team_name = (t[0] if isinstance(t, list) else t) or None
+            if len(cells) > 3:
+                home_logo_url = cells[3].get("image", {}).get("url") or None
+
+            # --- away team (cells[6] preferred; cells[5] fallback; logo at cells[5]) ---
+            away_team_id = None
+            away_team_name = None
+            away_logo_url = None
+            if len(cells) > 6:
+                al = cells[6].get("link", {})
+                if al.get("ids"):
+                    away_team_id = al["ids"][0]
+                t = cells[6].get("text", [])
+                away_team_name = (t[0] if isinstance(t, list) else t) or None
+            elif len(cells) > 5:
+                al = cells[5].get("link", {})
+                if al.get("ids"):
+                    away_team_id = al["ids"][0]
+                t = cells[5].get("text", [])
+                away_team_name = (t[0] if isinstance(t, list) else t) or None
+            if len(cells) > 5:
+                away_logo_url = cells[5].get("image", {}).get("url") or None
+
+            if not home_team_id or not away_team_id:
+                continue
+
+            # --- score / status (cell[7]) ---
+            home_score = None
+            away_score = None
+            status = "scheduled"
+            period = None
+            if len(cells) > 7:
+                score_text = cells[7].get("text", ["-"])
+                score_text = score_text[0] if isinstance(score_text, list) else score_text
+                if score_text and score_text not in ("-", ""):
+                    m = _re.match(r'(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?',
+                                  score_text.strip(), _re.I)
+                    if m:
+                        home_score = int(m.group(1))
+                        away_score = int(m.group(2))
+                        sfx = (m.group(3) or "").upper()
+                        period = "SO" if "P" in sfx else ("OT" if "V" in sfx else None)
+                        status = "finished"
+
+            games.append({
+                "game_id": game_id,
+                "game_date": game_date,
+                "game_time_str": game_time_str,
+                "venue": venue,
+                "home_team_id": home_team_id,
+                "home_team_name": home_team_name,
+                "home_logo_url": home_logo_url,
+                "away_team_id": away_team_id,
+                "away_team_name": away_team_name,
+                "away_logo_url": away_logo_url,
+                "home_score": home_score,
+                "away_score": away_score,
+                "status": status,
+                "period": period,
+            })
+    return games
+
+
 # Note: the API groups all A-level youth under league_id 13 (U14A/U16A/U18A/U21A),
 # all B-level under 14, all C-level under 15 — sub-categories cannot be split further.
 #
@@ -1113,397 +1232,75 @@ class DataIndexer:
             f"season {season_id} group={group_name!r}"
         )
 
-        with self.db_service.session_scope() as session:
-            try:
-                base_kwargs: dict = dict(season=season_id, league=league_id, game_class=game_class, mode="list")
-                if group_name:
-                    base_kwargs["group"] = group_name
+        # ── Phase 1: Fetch all rounds from API (no DB session held) ──────────
+        # All network I/O happens here so the SQLite write lock is not acquired
+        # until Phase 2.  See index_game_events() for the same pattern.
+        base_kwargs: dict = dict(season=season_id, league=league_id,
+                                 game_class=game_class, mode="list")
+        if group_name:
+            base_kwargs["group"] = group_name
 
-                # Walk slider pages in both directions to collect all rounds:
-                # - backwards (latest → first) via slider.prev
-                # - forwards  (latest → last)  via slider.next (captures future rounds)
-                count = 0
-                visited_rounds: set = set()
-                round_id = None  # None = start from the latest (current) round
-                forward_start_round = None  # will be set from first response's next link
+        # collected = list of {"phase": str, "games": list[dict]}
+        collected: list[dict] = []
+        visited_rounds: set = set()
+        forward_start_round = None
 
-                # Per-phase LeagueGroup cache: maps "league_db_id:group_name:phase" → LeagueGroup.id
-                # Avoids repeated DB lookups for the same phase within one indexing run.
-                _phase_group_cache: dict[str, int] = {}
+        try:
+            # Backward pass: current round → first round via slider.prev
+            round_id = None  # None = API returns the current (latest) round
+            while True:
+                call_kwargs = {**base_kwargs}
+                if round_id is not None:
+                    call_kwargs["round"] = round_id
 
-                def _get_or_create_phase_group(phase: str) -> int:
-                    """Return the PK of the LeagueGroup for (league, group_name, phase).
-                    Creates a new row when none exists yet.
-                    """
-                    cache_key = f"{league_db_id}:{group_name or ''}:{phase}"
-                    if cache_key in _phase_group_cache:
-                        return _phase_group_cache[cache_key]
-                    _gk = abs(hash(cache_key)) % (10 ** 9)
-                    _grp = session.query(LeagueGroup).filter(
-                        LeagueGroup.league_id == league_db_id,
-                        LeagueGroup.group_id == _gk,
-                    ).first()
-                    if not _grp:
-                        _grp = LeagueGroup(
-                            league_id=league_db_id,
-                            group_id=_gk,
-                            name=group_name or "",
-                            text=group_name or "",
-                            phase=phase,
-                        )
-                        session.add(_grp)
-                        session.flush()
-                    elif not _grp.phase:
-                        _grp.phase = phase
-                    _phase_group_cache[cache_key] = _grp.id
-                    return _grp.id
+                games_data = self.client.get_games(**call_kwargs)
+                d = games_data.get("data", {})
+                slider = d.get("slider", {})
 
-                while True:
-                    call_kwargs = {**base_kwargs}
-                    if round_id is not None:
-                        call_kwargs["round"] = round_id
+                if round_id is None and forward_start_round is None:
+                    forward_start_round = (
+                        (slider.get("next") or {}).get("set_in_context", {}).get("round")
+                    )
 
-                    games_data = self.client.get_games(**call_kwargs)
-                    d = games_data.get("data", {})
-                    slider = d.get("slider", {})
-
-                    # On the very first call, capture the forward starting point
-                    if round_id is None and forward_start_round is None:
-                        forward_start_round = (slider.get("next") or {}).get("set_in_context", {}).get("round")
-                    regions = d.get("regions", [])
-                    # Route games to the correct per-phase LeagueGroup
-                    _current_phase = _phase_from_slider_text(slider.get("text", ""))
-                    _effective_group_id = _get_or_create_phase_group(_current_phase)
-
-                    for region in regions:
-                        for row in region.get("rows", []):
-                            cells = row.get("cells", [])
-                            if not cells:
-                                continue
-
-                            # --- game_id ---
-                            game_id = None
-                            date_cell = cells[0] if len(cells) > 0 else {}
-                            link = date_cell.get("link", {})
-                            if link.get("ids"):
-                                game_id = link["ids"][0]
-                            if not game_id:
-                                continue
-
-                            # --- date/time ---
-                            date_text = ""
-                            if date_cell.get("text"):
-                                date_text = date_cell["text"][0] if isinstance(date_cell["text"], list) else date_cell["text"]
-
-                            game_date = None
-                            game_time_str = None
-                            if date_text:
-                                for _fmt in ("%d.%m.%Y %H:%M", "%d.%m.%y %H:%M"):
-                                    try:
-                                        game_date = datetime.strptime(date_text.strip(), _fmt)
-                                        game_time_str = game_date.strftime("%H:%M")
-                                        break
-                                    except ValueError:
-                                        pass
-
-                            # --- venue ---
-                            venue = None
-                            if len(cells) > 1:
-                                v = cells[1].get("text", [])
-                                venue = (v[0] if isinstance(v, list) else v) or None
-
-                            # --- home team ---
-                            home_team_id = None
-                            home_team_name = None
-                            home_logo_url = None
-                            if len(cells) > 2:
-                                hl = cells[2].get("link", {})
-                                if hl.get("ids"):
-                                    home_team_id = hl["ids"][0]
-                                t = cells[2].get("text", [])
-                                home_team_name = (t[0] if isinstance(t, list) else t) or None
-                            # cell[3] = home team logo image
-                            if len(cells) > 3:
-                                home_logo_url = cells[3].get("image", {}).get("url") or None
-
-                            # --- away team ---
-                            away_team_id = None
-                            away_team_name = None
-                            away_logo_url = None
-                            if len(cells) > 6:
-                                al = cells[6].get("link", {})
-                                if al.get("ids"):
-                                    away_team_id = al["ids"][0]
-                                t = cells[6].get("text", [])
-                                away_team_name = (t[0] if isinstance(t, list) else t) or None
-                            elif len(cells) > 5:
-                                # fallback: some rows have logo at 5, team at 6
-                                al = cells[5].get("link", {})
-                                if al.get("ids"):
-                                    away_team_id = al["ids"][0]
-                                t = cells[5].get("text", [])
-                                away_team_name = (t[0] if isinstance(t, list) else t) or None
-                            # cell[5] = away team logo image
-                            if len(cells) > 5:
-                                away_logo_url = cells[5].get("image", {}).get("url") or None
-
-                            if not home_team_id or not away_team_id:
-                                continue
-
-                            # --- score / status ---
-                            home_score = None
-                            away_score = None
-                            status = "scheduled"
-                            period = None
-                            # Score is at cell[7] ("Resultat" column);
-                            # cell[4] is just the "-" separator between logos.
-                            if len(cells) > 7:
-                                score_text = cells[7].get("text", ["-"])
-                                score_text = score_text[0] if isinstance(score_text, list) else score_text
-                                if score_text and score_text not in ("-", ""):
-                                    import re as _re
-                                    # Handles "3:2", "3:2 n.V." (OT), "3:2 n.P." (SO)
-                                    _m = _re.match(r'(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?', score_text.strip(), _re.I)
-                                    if _m:
-                                        home_score = int(_m.group(1))
-                                        away_score = int(_m.group(2))
-                                        _sfx = (_m.group(3) or "").upper()
-                                        period = "SO" if "P" in _sfx else ("OT" if "V" in _sfx else None)
-                                        status = "finished"
-
-                            # Ensure teams exist (create stubs if not in our DB)
-                            # and update names/logos when available from the game row
-                            team_name_map = {
-                                home_team_id: home_team_name,
-                                away_team_id: away_team_name,
-                            }
-                            team_logo_map = {
-                                home_team_id: home_logo_url,
-                                away_team_id: away_logo_url,
-                            }
-                            for tid in (home_team_id, away_team_id):
-                                from app.models.db_models import Team
-                                tname = team_name_map.get(tid)
-                                tlogo = team_logo_map.get(tid)
-                                existing = session.get(Team, (tid, season_id))
-                                if not existing:
-                                    stub = Team(
-                                        id=tid,
-                                        season_id=season_id,
-                                        league_id=league_id,
-                                        game_class=game_class,
-                                        name=tname,
-                                        text=tname,
-                                        logo_url=tlogo,
-                                    )
-                                    session.add(stub)
-                                    try:
-                                        session.flush()
-                                    except Exception:
-                                        session.rollback()
-                                else:
-                                    if tname and not existing.name:
-                                        # Backfill name on existing nameless stub
-                                        existing.name = tname
-                                        existing.text = tname
-                                    if tlogo and not existing.logo_url:
-                                        existing.logo_url = tlogo
-
-                            # Upsert game
-                            game = session.get(Game, game_id)
-                            if not game:
-                                game = Game(
-                                    id=game_id,
-                                    season_id=season_id,
-                                    group_id=_effective_group_id,
-                                    home_team_id=home_team_id,
-                                    away_team_id=away_team_id,
-                                )
-                                session.add(game)
-                                try:
-                                    session.flush()
-                                except IntegrityError:
-                                    # Another concurrent job beat us to this game_id
-                                    session.rollback()
-                                    game = session.get(Game, game_id)
-                                    if not game:
-                                        continue  # can't proceed without the row
-
-                            game.game_date = game_date
-                            game.game_time = game_time_str
-                            game.venue = venue
-                            game.group_id = _effective_group_id
-                            # Only overwrite score/status when the API returned a real
-                            # result; never clobber an existing stored score with None
-                            # (this prevents re-indexing from wiping completed games).
-                            if home_score is not None:
-                                game.home_score = home_score
-                                game.away_score = away_score
-                                game.status = status
-                                if period:
-                                    game.period = period
-                            elif game.status != "finished":
-                                game.status = status
-                            game.last_updated = datetime.now(timezone.utc)
-                            count += 1
-
-                    # Advance to the previous round via the slider
-                    visited_rounds.add(round_id)
-                    prev_round = (slider.get("prev") or {}).get("set_in_context", {}).get("round")
-                    if prev_round is None or prev_round in visited_rounds:
-                        break  # reached the first round (no more prev)
-                    round_id = prev_round
-
-                # Now walk forward from the initial "next" to pick up future rounds
-                round_id = forward_start_round
-                while round_id and round_id not in visited_rounds:
-                    call_kwargs = {**base_kwargs, "round": round_id}
-                    games_data = self.client.get_games(**call_kwargs)
-                    d = games_data.get("data", {})
-                    slider = d.get("slider", {})
-                    regions = d.get("regions", [])
-                    _current_phase = _phase_from_slider_text(slider.get("text", ""))
-                    _effective_group_id = _get_or_create_phase_group(_current_phase)
-
-                    for region in regions:
-                        for row in region.get("rows", []):
-                            cells = row.get("cells", [])
-                            if not cells:
-                                continue
-
-                            game_id = None
-                            date_cell = cells[0] if len(cells) > 0 else {}
-                            link = date_cell.get("link", {})
-                            if link.get("ids"):
-                                game_id = link["ids"][0]
-                            if not game_id:
-                                continue
-
-                            # Parse date/time, venue, teams, score — reuse same logic
-                            # For future games score will be None (scheduled)
-                            game_date, game_time_str, venue = None, None, None
-                            date_texts = date_cell.get("text", [])
-                            date_text = date_texts[0] if isinstance(date_texts, list) else date_texts
-                            if date_text:
-                                from datetime import datetime as _dt
-                                for fmt in ("%d.%m.%Y %H:%M", "%d.%m.%y %H:%M"):
-                                    try:
-                                        parsed = _dt.strptime(date_text.strip(), fmt)
-                                        game_date = parsed
-                                        game_time_str = parsed.strftime("%H:%M")
-                                        break
-                                    except ValueError:
-                                        pass
-
-                            if len(cells) > 1:
-                                v = cells[1].get("text", "")
-                                venue = (v[0] if isinstance(v, list) else v) or None
-
-                            home_team_id, away_team_id = None, None
-                            home_team_name, away_team_name = None, None
-                            if len(cells) > 2:
-                                hl = cells[2].get("link", {})
-                                if hl.get("ids"):
-                                    home_team_id = hl["ids"][0]
-                                t = cells[2].get("text", [])
-                                home_team_name = (t[0] if isinstance(t, list) else t) or None
-                            if len(cells) > 6:
-                                al = cells[6].get("link", {})
-                                if al.get("ids"):
-                                    away_team_id = al["ids"][0]
-                                t = cells[6].get("text", [])
-                                away_team_name = (t[0] if isinstance(t, list) else t) or None
-
-                            if not home_team_id or not away_team_id:
-                                continue
-
-                            home_score, away_score, status, period = None, None, "scheduled", None
-                            if len(cells) > 7:
-                                score_text = cells[7].get("text", ["-"])
-                                score_text = score_text[0] if isinstance(score_text, list) else score_text
-                                if score_text and score_text != "-":
-                                    import re as _re
-                                    # Handles "3:2", "3:2 n.V." (OT), "3:2 n.P." (SO)
-                                    _m = _re.match(r'(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?', score_text.strip(), _re.I)
-                                    if _m:
-                                        home_score = int(_m.group(1))
-                                        away_score = int(_m.group(2))
-                                        _sfx = (_m.group(3) or "").upper()
-                                        period = "SO" if "P" in _sfx else ("OT" if "V" in _sfx else None)
-                                        status = "finished"
-
-                            for tid in (home_team_id, away_team_id):
-                                from app.models.db_models import Team
-                                tname = {home_team_id: home_team_name, away_team_id: away_team_name}.get(tid)
-                                existing = session.get(Team, (tid, season_id))
-                                if not existing:
-                                    stub = Team(id=tid, season_id=season_id, league_id=league_id,
-                                                game_class=game_class, name=tname, text=tname)
-                                    session.add(stub)
-                                    try:
-                                        session.flush()
-                                    except Exception:
-                                        session.rollback()
-                                else:
-                                    # Backfill name if missing
-                                    if tname and not existing.name:
-                                        existing.name = tname
-                                        existing.text = tname
-                                    # Backfill league_id / game_class if not yet set
-                                    # (teams indexed via clubs path never get these)
-                                    if not existing.league_id:
-                                        existing.league_id = league_id
-                                    if not existing.game_class:
-                                        existing.game_class = game_class
-
-                            game = session.get(Game, game_id)
-                            if not game:
-                                game = Game(id=game_id, season_id=season_id, group_id=_effective_group_id,
-                                            home_team_id=home_team_id, away_team_id=away_team_id)
-                                session.add(game)
-                                try:
-                                    session.flush()
-                                except IntegrityError:
-                                    session.rollback()
-                                    game = session.get(Game, game_id)
-                                    if not game:
-                                        continue
-
-                            game.game_date = game_date
-                            game.game_time = game_time_str
-                            game.venue = venue
-                            game.group_id = _effective_group_id
-                            if home_score is not None:
-                                game.home_score = home_score
-                                game.away_score = away_score
-                                game.status = status
-                                if period:
-                                    game.period = period
-                            elif game.status != "finished":
-                                game.status = status
-                            game.last_updated = datetime.now(timezone.utc)
-                            count += 1
-
-                    visited_rounds.add(round_id)
-                    next_round = (slider.get("next") or {}).get("set_in_context", {}).get("round")
-                    if not next_round or next_round in visited_rounds:
-                        break
-                    round_id = next_round
-
-                session.commit()
-                self._mark_sync_complete(session, "games", entity_id, count)
-                logger.info(
-                    f"✓ Indexed {count} games for league {league_id} "
-                    f"group={group_name!r} ({len(visited_rounds)} rounds)"
+                collected.append({
+                    "phase": _phase_from_slider_text(slider.get("text", "")),
+                    "games": _parse_game_rows(d.get("regions", [])),
+                })
+                visited_rounds.add(round_id)
+                prev_round = (
+                    (slider.get("prev") or {}).get("set_in_context", {}).get("round")
                 )
-                return count
+                if prev_round is None or prev_round in visited_rounds:
+                    break
+                round_id = prev_round
 
-            except Exception as e:
-                # A 400 from the federation API means this league/game_class combo
-                # has no data (e.g. a playoff round that hasn't started yet).
-                # Mark it complete (count=0) so we don't retry every scheduler tick.
-                _resp = getattr(e, "response", None)
-                _status = getattr(_resp, "status_code", None) if _resp is not None else None
+            # Forward pass: capture future rounds via slider.next
+            round_id = forward_start_round
+            while round_id and round_id not in visited_rounds:
+                call_kwargs = {**base_kwargs, "round": round_id}
+                games_data = self.client.get_games(**call_kwargs)
+                d = games_data.get("data", {})
+                slider = d.get("slider", {})
+
+                collected.append({
+                    "phase": _phase_from_slider_text(slider.get("text", "")),
+                    "games": _parse_game_rows(d.get("regions", [])),
+                })
+                visited_rounds.add(round_id)
+                next_round = (
+                    (slider.get("next") or {}).get("set_in_context", {}).get("round")
+                )
+                if not next_round or next_round in visited_rounds:
+                    break
+                round_id = next_round
+
+        except Exception as e:
+            # A 400 from the federation API means this league/game_class combo
+            # has no data (e.g. a playoff round that hasn't started yet).
+            # Mark it complete (count=0) so we don't retry every scheduler tick.
+            _resp = getattr(e, "response", None)
+            _status = getattr(_resp, "status_code", None) if _resp is not None else None
+            with self.db_service.session_scope() as session:
                 if _status == 400:
                     logger.warning(
                         f"League {league_id} game_class={game_class} group={group_name!r} "
@@ -1511,9 +1308,132 @@ class DataIndexer:
                     )
                     self._mark_sync_complete(session, "games", entity_id, 0)
                 else:
-                    logger.error(f"Failed to index games for league {league_id}: {e}", exc_info=True)
+                    logger.error(
+                        f"Failed to index games for league {league_id}: {e}", exc_info=True
+                    )
                     self._mark_sync_failed(session, "games", entity_id, str(e))
-                return 0
+            return 0
+
+        # ── Phase 2: Write all collected data in a single short session ───────
+        with self.db_service.session_scope() as session:
+            # Per-phase LeagueGroup cache: maps cache_key → LeagueGroup.id
+            _phase_group_cache: dict[str, int] = {}
+
+            def _get_or_create_phase_group(phase: str) -> int:
+                cache_key = f"{league_db_id}:{group_name or ''}:{phase}"
+                if cache_key in _phase_group_cache:
+                    return _phase_group_cache[cache_key]
+                _gk = abs(hash(cache_key)) % (10 ** 9)
+                _grp = session.query(LeagueGroup).filter(
+                    LeagueGroup.league_id == league_db_id,
+                    LeagueGroup.group_id == _gk,
+                ).first()
+                if not _grp:
+                    _grp = LeagueGroup(
+                        league_id=league_db_id,
+                        group_id=_gk,
+                        name=group_name or "",
+                        text=group_name or "",
+                        phase=phase,
+                    )
+                    session.add(_grp)
+                    session.flush()
+                elif not _grp.phase:
+                    _grp.phase = phase
+                _phase_group_cache[cache_key] = _grp.id
+                return _grp.id
+
+            count = 0
+            for round_data in collected:
+                effective_group_id = _get_or_create_phase_group(round_data["phase"])
+                for g in round_data["games"]:
+                    game_id = g["game_id"]
+                    home_team_id = g["home_team_id"]
+                    away_team_id = g["away_team_id"]
+                    team_name_map = {
+                        home_team_id: g["home_team_name"],
+                        away_team_id: g["away_team_name"],
+                    }
+                    team_logo_map = {
+                        home_team_id: g["home_logo_url"],
+                        away_team_id: g["away_logo_url"],
+                    }
+
+                    # Ensure team stubs exist
+                    for tid in (home_team_id, away_team_id):
+                        tname = team_name_map.get(tid)
+                        tlogo = team_logo_map.get(tid)
+                        existing = session.get(Team, (tid, season_id))
+                        if not existing:
+                            stub = Team(
+                                id=tid,
+                                season_id=season_id,
+                                league_id=league_id,
+                                game_class=game_class,
+                                name=tname,
+                                text=tname,
+                                logo_url=tlogo,
+                            )
+                            session.add(stub)
+                            try:
+                                session.flush()
+                            except Exception:
+                                session.rollback()
+                        else:
+                            if tname and not existing.name:
+                                existing.name = tname
+                                existing.text = tname
+                            if tlogo and not existing.logo_url:
+                                existing.logo_url = tlogo
+                            if not existing.league_id:
+                                existing.league_id = league_id
+                            if not existing.game_class:
+                                existing.game_class = game_class
+
+                    # Upsert game
+                    game = session.get(Game, game_id)
+                    if not game:
+                        game = Game(
+                            id=game_id,
+                            season_id=season_id,
+                            group_id=effective_group_id,
+                            home_team_id=home_team_id,
+                            away_team_id=away_team_id,
+                        )
+                        session.add(game)
+                        try:
+                            session.flush()
+                        except IntegrityError:
+                            # Concurrent job inserted this game_id first
+                            session.rollback()
+                            game = session.get(Game, game_id)
+                            if not game:
+                                continue
+
+                    game.game_date = g["game_date"]
+                    game.game_time = g["game_time_str"]
+                    game.venue = g["venue"]
+                    game.group_id = effective_group_id
+                    # Only overwrite score/status when the API returned a real result;
+                    # never clobber an existing stored score with None.
+                    if g["home_score"] is not None:
+                        game.home_score = g["home_score"]
+                        game.away_score = g["away_score"]
+                        game.status = g["status"]
+                        if g["period"]:
+                            game.period = g["period"]
+                    elif game.status != "finished":
+                        game.status = g["status"]
+                    game.last_updated = datetime.now(timezone.utc)
+                    count += 1
+
+            session.commit()
+            self._mark_sync_complete(session, "games", entity_id, count)
+            logger.info(
+                f"✓ Indexed {count} games for league {league_id} "
+                f"group={group_name!r} ({len(visited_rounds)} rounds)"
+            )
+            return count
 
     def index_game_events(self, game_id: int, season_id: int,
                           force: bool = False,
