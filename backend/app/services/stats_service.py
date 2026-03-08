@@ -2826,7 +2826,8 @@ def get_game_box_score(game_id: int) -> dict:
 
         # When game_players rows have all-zero goals despite a scored game,
         # derive G/A per player from the goals events (player field format:
-        # "F. Lastname" or "F. Lastname (A. Assistname)").
+        # "Ab. Lastname" or "Ab. Lastname (Cd. Assistname)").
+        # The abbreviation may use 1 or more letters of the first name.
         _ev_goals: dict[str, int] = defaultdict(int)
         _ev_assists: dict[str, int] = defaultdict(int)
         if not _game_stats_indexed and goals:
@@ -2844,10 +2845,17 @@ def get_game_box_score(game_id: int) -> dict:
                     for _ast in [a.strip() for a in _assists_raw.split(",") if a.strip()]:
                         _ev_assists[_ast] += 1
 
-        def _abbrev_name(full: str) -> str:
-            """'Firstname Lastname' → 'F. Lastname' for event-name matching."""
-            parts = full.split()
-            return f"{parts[0][0]}. {parts[-1]}" if len(parts) >= 2 else full
+        def _ev_name_matches(ev_abbrev: str, full_name: str) -> bool:
+            """Match 'Ar. Gropengiesser' against 'Aris Gropengiesser'.
+            The event prefix may use 1+ letters of the first name."""
+            parts = ev_abbrev.split(". ", 1)
+            if len(parts) != 2:
+                return ev_abbrev.lower() == full_name.lower()
+            ev_prefix, ev_last = parts[0].lower(), parts[1].strip().lower()
+            fp = full_name.split()
+            if len(fp) < 2:
+                return False
+            return fp[-1].lower() == ev_last and fp[0].lower().startswith(ev_prefix)
 
         for gp in gp_rows:
             pl = session.query(Player).filter(Player.person_id == gp.player_id).first()
@@ -2856,9 +2864,8 @@ def get_game_box_score(game_id: int) -> dict:
 
             # Try to fill game stats from events when GamePlayer data is empty
             if not _game_stats_indexed and _ev_goals:
-                _abbrev = _abbrev_name(name)
-                _gg = _ev_goals.get(_abbrev, 0)
-                _ga = _ev_assists.get(_abbrev, 0)
+                _gg = sum(g for k, g in _ev_goals.items() if _ev_name_matches(k, name))
+                _ga = sum(a for k, a in _ev_assists.items() if _ev_name_matches(k, name))
             else:
                 _gg = gp.goals if _game_stats_indexed else None
                 _ga = gp.assists if _game_stats_indexed else None
