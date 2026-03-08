@@ -2277,8 +2277,8 @@ class DataIndexer:
             return 0
 
         updated = 0
-        with self.db_service.session_scope() as session:
-            try:
+        try:
+            with self.db_service.session_scope() as session:
                 for game_id, (goals, assists, pim) in game_stats.items():
                     n = (
                         session.query(GamePlayer)
@@ -2289,11 +2289,10 @@ class DataIndexer:
                         .update({"goals": goals, "assists": assists, "penalty_minutes": pim})
                     )
                     updated += n or 0
-                session.commit()
                 if updated:
                     self._mark_sync_complete(session, "player_game_stats", entity_id, updated)
-            except Exception as exc:
-                logger.error("Failed updating game stats for player %s: %s", player_id, exc, exc_info=True)
+        except Exception as exc:
+            logger.error("Failed updating game stats for player %s: %s", player_id, exc, exc_info=True)
         return updated
 
     def index_player_game_stats_for_season(

@@ -62,9 +62,9 @@ class DatabaseService:
             @event.listens_for(self.engine, "connect")
             def set_sqlite_pragma(dbapi_conn, connection_record):
                 cursor = dbapi_conn.cursor()
+                cursor.execute("PRAGMA busy_timeout=30000") # wait up to 30s for locks (must be first)
                 cursor.execute("PRAGMA foreign_keys=ON")
                 cursor.execute("PRAGMA journal_mode=WAL")   # concurrent readers + writer
-                cursor.execute("PRAGMA busy_timeout=30000") # wait up to 30s for locks
                 cursor.close()
         else:
             # PostgreSQL or other database
