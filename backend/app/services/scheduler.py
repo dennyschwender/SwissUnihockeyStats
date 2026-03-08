@@ -314,6 +314,20 @@ POLICIES: list[dict] = [
         "requires":    "player_game_stats_t5",
         "run_at_hour": 4,
     },
+
+    # ── Nightly DB repair ─────────────────────────────────────────────────
+    # Runs at 03:30 UTC — after nightly indexing jobs (03:00) so repairs
+    # catch anything they left behind.  Global scope: no season argument.
+    {
+        "name":        "repair",
+        "entity_type": "repair",
+        "max_age":     timedelta(hours=24),
+        "task":        "repair",
+        "scope":       "global",
+        "label":       "Nightly DB repair",
+        "priority":    90,
+        "run_at_hour": 3,
+    },
 ]
 
 # How often the scheduler wakes up (seconds)

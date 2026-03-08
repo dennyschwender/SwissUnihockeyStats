@@ -365,3 +365,13 @@ class TestClearDone:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
+
+
+def test_repair_policy_exists():
+    """Repair policy must be present and configured as a global nightly job."""
+    from app.services.scheduler import POLICIES
+    policy = next((p for p in POLICIES if p["name"] == "repair"), None)
+    assert policy is not None, "repair policy missing from POLICIES"
+    assert policy["scope"] == "global"
+    assert policy["task"] == "repair"
+    assert policy.get("run_at_hour") == 3

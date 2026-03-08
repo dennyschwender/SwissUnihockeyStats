@@ -53,6 +53,12 @@ class TestAdminIndexingAPI:
         r = admin_client.post("/admin/api/index", json={"season": 2025, "task": "events", "force": False, "max_tier": 2})
         assert r.status_code == 200
 
+    def test_repair_task_is_recognised(self, admin_client):
+        r = admin_client.post("/admin/api/index", json={"season": 0, "task": "repair"})
+        assert r.status_code == 200
+        data = r.json()
+        assert "job_id" in data
+
 
 class TestAdminSeasonAPI:
     def test_set_current_season_unknown_returns_404(self, admin_client):

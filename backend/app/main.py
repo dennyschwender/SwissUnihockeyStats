@@ -1056,6 +1056,7 @@ _TASK_META = {
     "team_names":        "Backfill Team Names (from rankings API)",
     "leagues_path":      "Index Leagues Path (leagues + groups + games)",
     "full":              "Full Index (clubs path + leagues path + lineups + game stats)",
+    "repair":            "DB Repair",
 }
 
 # Minimum minutes before the same (task, season) can be re-triggered without force=True.
@@ -1664,9 +1665,11 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
     try:
         from app.services.data_indexer import get_data_indexer
         from app.services.database import get_database_service
+        from app.services.repair_service import get_repair_service
         from app.models.db_models import Club, Team, League, Game
-        indexer    = get_data_indexer()
-        db_service = get_database_service()
+        indexer        = get_data_indexer()
+        db_service     = get_database_service()
+        repair_service = get_repair_service()
 
         stats: dict = {}
 
@@ -1975,6 +1978,21 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             push("ok", f"Game events: {events_n}  Lineups: {lineup_n}")
             # Season-level sentinel: game_events entity_ids are "game:{id}:events" (no season year)
             await asyncio.to_thread(indexer.record_season_sync, "game_events", season, events_n)
+
+        # ── DB REPAIR ──────────────────────────────────────────────────────
+        if task == "repair":
+            push("info", "Running nightly DB repair...")
+            result = await asyncio.to_thread(repair_service.run_nightly)
+            stats.update(result)
+            push("ok", (
+                f"Repair complete: {result['total_fixed']} rows fixed "
+                f"(stuck={result['stuck_in_progress']}, "
+                f"dates={result['null_game_dates']}, "
+                f"events={result['missing_events']}, "
+                f"period={result['null_period_fixed']}, "
+                f"failed={result['stale_failed']})"
+            ))
+            set_progress(100)
 
         job["stats"]    = stats
         job["progress"] = 100
