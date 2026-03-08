@@ -1701,14 +1701,16 @@ function renderScheduler(d) {
     queueEl.innerHTML = '<div style="padding:.5rem 1rem;font-size:.75rem;color:#6e7681">Queue empty.</div>';
   } else {
     queueEl.innerHTML = d.queue.map(j => `
-<div class="task-row" style="grid-template-columns:180px 1fr 110px auto">
+<div class="task-row">
   <span class="task-name">${j.policy}</span>
   <div class="task-counts">
     ${j.season ? `<span class="count-pill has-data">S${j.season}</span>` : '<span class="count-pill">global</span>'}
     <span class="count-pill" title="${j.run_at.replace('T',' ').replace('Z',' UTC')}">${fmtRunAt(j.run_at)}</span>
+    <span class="count-pill${j.due_in_s < 120 ? ' has-data' : ''}" title="${j.run_at.replace('T',' ').replace('Z',' UTC')}">${fmtDue(j.due_in_s)}</span>
   </div>
-  <span class="count-pill${j.due_in_s < 120 ? ' has-data' : ''}" title="${j.run_at.replace('T',' ').replace('Z',' UTC')}">${fmtDue(j.due_in_s)}</span>
-  <button class="btn btn-sm btn-orange" onclick="schedTrigger('${j.policy}',${j.season||'null'})">▶ Now</button>
+  <div class="task-btns">
+    <button class="btn btn-sm btn-orange" onclick="schedTrigger('${j.policy}',${j.season||'null'})">▶ Now</button>
+  </div>
 </div>`).join('');
   }
 
