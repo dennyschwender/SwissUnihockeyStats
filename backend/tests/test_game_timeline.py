@@ -102,6 +102,13 @@ def test_goal_percentage_period3():
     assert abs(events[0]["pct"] - (2400 / 3600 * 100)) < 0.01
 
 
+def test_shootout_goal_pinned_at_right_edge():
+    goals = [{"period": "SO", "time": "00:00", "team": "Home", "player": "Winner", "score": "4:3 SO", "own_goal": False}]
+    events, total = build_timeline_events(goals, [], "Home", "Away")
+    assert total == 4200
+    assert events[0]["pct"] == 100.0
+
+
 from app.services.database import DatabaseService
 from sqlalchemy import text
 

@@ -2400,19 +2400,18 @@ _PERIOD_OFFSETS: dict[int | str, int] = {1: 0, 2: 1200, 3: 2400, "OT": 3600}
 
 
 def _period_offset(period) -> int:
-    """Return absolute offset in seconds for a given period.
-
-    Accepts period as int or str. Any period > 3 or the string "OT"
-    maps to the "OT" key (offset 3600).
-    """
-    if isinstance(period, str) and period.upper() == "OT":
-        return _PERIOD_OFFSETS.get("OT", 0)
+    """Return the start offset in seconds for a period number or label."""
+    if isinstance(period, str):
+        key = period.upper()
+        if key in ("OT", "SO"):
+            return _PERIOD_OFFSETS["OT"]
     try:
         p = int(period)
-        key: int | str = "OT" if p > 3 else p
-        return _PERIOD_OFFSETS.get(key, 0)
+        return _PERIOD_OFFSETS.get(p if p <= 3 else "OT", 0)
     except (TypeError, ValueError):
         return 0
+
+
 _REGULAR_DURATION = 3600   # 60 minutes in seconds
 _OT_DURATION      = 4200   # 70 minutes in seconds (10-min OT)
 
@@ -2441,8 +2440,16 @@ def build_timeline_events(
       - events is sorted by pct ascending
       - total_seconds is 3600 (regular) or 4200 (OT present)
     """
-    has_ot = any(_period_offset(g.get("period")) == 3600 for g in goals) or \
-             any(_period_offset(p.get("period")) == 3600 for p in penalties)
+    def _is_ot_period(period) -> bool:
+        if isinstance(period, str) and period.upper() in ("OT", "SO"):
+            return True
+        try:
+            return int(period) > 3
+        except (TypeError, ValueError):
+            return False
+
+    has_ot = any(_is_ot_period(g.get("period")) for g in goals) or \
+             any(_is_ot_period(p.get("period")) for p in penalties)
     total_seconds = _OT_DURATION if has_ot else _REGULAR_DURATION
 
     def _team_side(team_label: str) -> str:
@@ -2460,6 +2467,9 @@ def build_timeline_events(
     for i, g in enumerate(goals):
         abs_s = _period_offset(g.get("period")) + _parse_time_seconds(g.get("time", ""))
         pct = min(100.0, max(0.0, abs_s / total_seconds * 100))
+        # Shootout events are pinned at the right edge
+        if isinstance(g.get("period"), str) and g["period"].upper() == "SO":
+            pct = 100.0
         team = g.get("team", "")
         player = g.get("player", "") or ""
         label = f"GOAL - {g.get('time', '')} — {team}"
@@ -2476,6 +2486,9 @@ def build_timeline_events(
     for i, p in enumerate(penalties):
         abs_s = _period_offset(p.get("period")) + _parse_time_seconds(p.get("time", ""))
         pct = min(100.0, max(0.0, abs_s / total_seconds * 100))
+        # Shootout events are pinned at the right edge
+        if isinstance(p.get("period"), str) and p["period"].upper() == "SO":
+            pct = 100.0
         team = p.get("team", "")
         player = p.get("player", "") or ""
         minutes = p.get("minutes", 0)
