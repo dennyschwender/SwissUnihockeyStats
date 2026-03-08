@@ -2396,6 +2396,109 @@ def _period_from_time(time_str: str) -> str | None:
         return None
 
 
+_PERIOD_OFFSETS: dict = {1: 0, 2: 1200, 3: 2400, "OT": 3600}
+_REGULAR_DURATION = 3600   # 60 minutes in seconds
+_OT_DURATION      = 4200   # 70 minutes in seconds (10-min OT)
+
+
+def _parse_time_seconds(time_str: str) -> int:
+    """Parse 'MM:SS' into total seconds. Returns 0 on bad input."""
+    parts = (time_str or "").split(":")
+    if len(parts) == 2:
+        try:
+            return int(parts[0]) * 60 + int(parts[1])
+        except ValueError:
+            pass
+    return 0
+
+
+def build_timeline_events(
+    goals: list,
+    penalties: list,
+    home_name: str,
+    away_name: str,
+) -> tuple:
+    """
+    Convert goals/penalties into timeline event dicts with percentage positions.
+
+    Returns (events, total_seconds) where:
+      - events is sorted by pct ascending
+      - total_seconds is 3600 (regular) or 4200 (OT present)
+    """
+    def _is_ot(period) -> bool:
+        if isinstance(period, str) and period.upper() == "OT":
+            return True
+        try:
+            return int(period) > 3
+        except (TypeError, ValueError):
+            return False
+
+    has_ot = any(_is_ot(g.get("period")) for g in goals) or \
+             any(_is_ot(p.get("period")) for p in penalties)
+    total_seconds = _OT_DURATION if has_ot else _REGULAR_DURATION
+
+    def _period_key(period):
+        if isinstance(period, str) and period.upper() == "OT":
+            return "OT"
+        try:
+            p = int(period)
+            return "OT" if p > 3 else p
+        except (TypeError, ValueError):
+            return 1
+
+    def _abs_seconds(period, time_str: str) -> int:
+        key = _period_key(period)
+        offset = _PERIOD_OFFSETS.get(key, 0)
+        return offset + _parse_time_seconds(time_str)
+
+    def _team_side(team_label: str) -> str:
+        if team_label == home_name:
+            return "home"
+        if team_label == away_name:
+            return "away"
+        return "unknown"
+
+    events: list = []
+
+    for i, g in enumerate(goals):
+        abs_s = _abs_seconds(g.get("period"), g.get("time", ""))
+        pct = abs_s / total_seconds * 100
+        team = g.get("team", "")
+        player = g.get("player", "") or ""
+        label = f"GOAL - {g.get('time', '')} — {team}"
+        if player:
+            label += f" · {player}"
+        events.append({
+            "id":        f"goal-{i}",
+            "kind":      "goal",
+            "team_side": _team_side(team),
+            "pct":       round(pct, 4),
+            "label":     label,
+        })
+
+    for i, p in enumerate(penalties):
+        abs_s = _abs_seconds(p.get("period"), p.get("time", ""))
+        pct = abs_s / total_seconds * 100
+        team = p.get("team", "")
+        player = p.get("player", "") or ""
+        minutes = p.get("minutes", 0)
+        infraction = p.get("infraction", "") or ""
+        label = f"PEN - {p.get('time', '')} — {team}"
+        if player:
+            label += f" · {player}"
+        label += f" ({minutes} min, {infraction})" if infraction else f" ({minutes} min)"
+        events.append({
+            "id":        f"pen-{i}",
+            "kind":      "penalty",
+            "team_side": _team_side(team),
+            "pct":       round(pct, 4),
+            "label":     label,
+        })
+
+    events.sort(key=lambda e: e["pct"])
+    return events, total_seconds
+
+
 def get_game_box_score(game_id: int) -> dict:
     """
     Parse game_events for a game and return a structured box score dict.
