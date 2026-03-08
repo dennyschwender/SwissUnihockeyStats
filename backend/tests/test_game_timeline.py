@@ -76,6 +76,10 @@ def test_events_sorted_by_pct():
     ]
     events, _ = build_timeline_events(goals, [], "Home", "Away")
     assert events[0]["pct"] < events[1]["pct"]
+    # Period 1, 5:00 = 300s → 300/3600*100 ≈ 8.33%
+    assert abs(events[0]["pct"] - (300 / 3600 * 100)) < 0.01
+    # Period 3, 1:00 = 2460s → 2460/3600*100 ≈ 68.33%
+    assert abs(events[1]["pct"] - (2460 / 3600 * 100)) < 0.01
 
 
 def test_missing_time_handled():
@@ -88,3 +92,11 @@ def test_goal_with_assist_in_label():
     goals = [{"period": 1, "time": "12:00", "team": "Home", "player": "Smith (Assist: Jones)", "score": "1:0", "own_goal": False}]
     events, _ = build_timeline_events(goals, [], "Home", "Away")
     assert "Smith (Assist: Jones)" in events[0]["label"]
+
+
+def test_goal_percentage_period3():
+    goals = [{"period": 3, "time": "00:00", "team": "Home", "player": "X", "score": "1:0", "own_goal": False}]
+    events, total = build_timeline_events(goals, [], "Home", "Away")
+    assert total == 3600
+    # Period 3 starts at 2400s → pct = 2400/3600*100 ≈ 66.67%
+    assert abs(events[0]["pct"] - (2400 / 3600 * 100)) < 0.01

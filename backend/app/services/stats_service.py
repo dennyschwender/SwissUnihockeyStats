@@ -2396,7 +2396,23 @@ def _period_from_time(time_str: str) -> str | None:
         return None
 
 
-_PERIOD_OFFSETS: dict = {1: 0, 2: 1200, 3: 2400, "OT": 3600}
+_PERIOD_OFFSETS: dict[int | str, int] = {1: 0, 2: 1200, 3: 2400, "OT": 3600}
+
+
+def _period_offset(period) -> int:
+    """Return absolute offset in seconds for a given period.
+
+    Accepts period as int or str. Any period > 3 or the string "OT"
+    maps to the "OT" key (offset 3600).
+    """
+    if isinstance(period, str) and period.upper() == "OT":
+        return _PERIOD_OFFSETS.get("OT", 0)
+    try:
+        p = int(period)
+        key: int | str = "OT" if p > 3 else p
+        return _PERIOD_OFFSETS.get(key, 0)
+    except (TypeError, ValueError):
+        return 0
 _REGULAR_DURATION = 3600   # 60 minutes in seconds
 _OT_DURATION      = 4200   # 70 minutes in seconds (10-min OT)
 
@@ -2413,11 +2429,11 @@ def _parse_time_seconds(time_str: str) -> int:
 
 
 def build_timeline_events(
-    goals: list,
-    penalties: list,
+    goals: list[dict],
+    penalties: list[dict],
     home_name: str,
     away_name: str,
-) -> tuple:
+) -> tuple[list[dict], int]:
     """
     Convert goals/penalties into timeline event dicts with percentage positions.
 
@@ -2425,31 +2441,9 @@ def build_timeline_events(
       - events is sorted by pct ascending
       - total_seconds is 3600 (regular) or 4200 (OT present)
     """
-    def _is_ot(period) -> bool:
-        if isinstance(period, str) and period.upper() == "OT":
-            return True
-        try:
-            return int(period) > 3
-        except (TypeError, ValueError):
-            return False
-
-    has_ot = any(_is_ot(g.get("period")) for g in goals) or \
-             any(_is_ot(p.get("period")) for p in penalties)
+    has_ot = any(_period_offset(g.get("period")) == 3600 for g in goals) or \
+             any(_period_offset(p.get("period")) == 3600 for p in penalties)
     total_seconds = _OT_DURATION if has_ot else _REGULAR_DURATION
-
-    def _period_key(period):
-        if isinstance(period, str) and period.upper() == "OT":
-            return "OT"
-        try:
-            p = int(period)
-            return "OT" if p > 3 else p
-        except (TypeError, ValueError):
-            return 1
-
-    def _abs_seconds(period, time_str: str) -> int:
-        key = _period_key(period)
-        offset = _PERIOD_OFFSETS.get(key, 0)
-        return offset + _parse_time_seconds(time_str)
 
     def _team_side(team_label: str) -> str:
         if team_label == home_name:
@@ -2458,11 +2452,14 @@ def build_timeline_events(
             return "away"
         return "unknown"
 
-    events: list = []
+    events: list[dict] = []
 
+    # own_goal is intentionally not used here: stats_service already assigned
+    # the correct team label (the team that benefited from the own goal),
+    # so team_side classification is correct without special-casing.
     for i, g in enumerate(goals):
-        abs_s = _abs_seconds(g.get("period"), g.get("time", ""))
-        pct = abs_s / total_seconds * 100
+        abs_s = _period_offset(g.get("period")) + _parse_time_seconds(g.get("time", ""))
+        pct = min(100.0, max(0.0, abs_s / total_seconds * 100))
         team = g.get("team", "")
         player = g.get("player", "") or ""
         label = f"GOAL - {g.get('time', '')} — {team}"
@@ -2477,8 +2474,8 @@ def build_timeline_events(
         })
 
     for i, p in enumerate(penalties):
-        abs_s = _abs_seconds(p.get("period"), p.get("time", ""))
-        pct = abs_s / total_seconds * 100
+        abs_s = _period_offset(p.get("period")) + _parse_time_seconds(p.get("time", ""))
+        pct = min(100.0, max(0.0, abs_s / total_seconds * 100))
         team = p.get("team", "")
         player = p.get("player", "") or ""
         minutes = p.get("minutes", 0)
