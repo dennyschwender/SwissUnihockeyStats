@@ -2440,16 +2440,21 @@ def build_timeline_events(
       - events is sorted by pct ascending
       - total_seconds is 3600 (regular) or 4200 (OT present)
     """
-    def _is_ot_period(period) -> bool:
+    def _is_ot_period(period, time_str: str = "") -> bool:
         if isinstance(period, str) and period.upper() in ("OT", "SO"):
             return True
         try:
             return int(period) > 3
         except (TypeError, ValueError):
-            return False
+            pass
+        # period=None means the time is an absolute game clock — derive from time
+        if period is None and time_str:
+            derived = _period_from_time(time_str)
+            return derived is not None and derived.upper() in ("OT", "PS")
+        return False
 
-    has_ot = any(_is_ot_period(g.get("period")) for g in goals) or \
-             any(_is_ot_period(p.get("period")) for p in penalties)
+    has_ot = any(_is_ot_period(g.get("period"), g.get("time", "")) for g in goals) or \
+             any(_is_ot_period(p.get("period"), p.get("time", "")) for p in penalties)
     total_seconds = _OT_DURATION if has_ot else _REGULAR_DURATION
 
     def _team_side(team_label: str) -> str:
@@ -2558,7 +2563,11 @@ def get_game_box_score(game_id: int) -> dict:
             ev_type = ev.event_type or ""
             kind = _classify_event(ev_type)
             time_str = raw.get("time") or ev.time or ""
-            period = ev.period or _period_from_time(time_str)
+            # Keep ev.period as-is for timeline events: None means the time is an
+            # absolute game clock, so build_timeline_events must NOT add a period
+            # offset.  Use the derived period only for period_markers (display only).
+            period = ev.period
+            derived_period = period or _period_from_time(time_str)
 
             # Determine team label
             team_label = raw.get("team", "")
@@ -2606,7 +2615,7 @@ def get_game_box_score(game_id: int) -> dict:
                 )
 
             elif kind == "period":
-                period_markers.append({"time": time_str, "label": ev_type, "period": period})
+                period_markers.append({"time": time_str, "label": ev_type, "period": derived_period})
 
             elif kind == "best_player":
                 # Resolve which side by team_id first, then by substring match

@@ -109,6 +109,28 @@ def test_shootout_goal_pinned_at_right_edge():
     assert events[0]["pct"] == 100.0
 
 
+def test_absolute_time_no_double_offset():
+    """When period=None (as stored in DB), time is absolute clock — no period offset should be added.
+
+    35:45 absolute = 2145s.  If the bug were present: _period_from_time("35:45")="2" →
+    _period_offset("2")=1200 + 2145 = 3345s (pct≈92.9%).  Fixed: offset=0 → 2145s (pct≈59.6%).
+    """
+    goals = [{"period": None, "time": "35:45", "team": "Home", "player": "X", "score": "1:0", "own_goal": False}]
+    events, total = build_timeline_events(goals, [], "Home", "Away")
+    assert total == 3600
+    expected_pct = 2145 / 3600 * 100
+    assert abs(events[0]["pct"] - expected_pct) < 0.01
+
+
+def test_ot_detected_from_absolute_time_when_period_none():
+    """OT must extend total_seconds even when period=None (derived from absolute time)."""
+    goals = [{"period": None, "time": "65:00", "team": "Home", "player": "X", "score": "4:3", "own_goal": False}]
+    events, total = build_timeline_events(goals, [], "Home", "Away")
+    assert total == 4200
+    expected_pct = 3900 / 4200 * 100
+    assert abs(events[0]["pct"] - expected_pct) < 0.01
+
+
 from app.services.database import DatabaseService
 from sqlalchemy import text
 
