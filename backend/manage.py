@@ -611,5 +611,54 @@ def search_players(query: str):
                 click.echo(f"      → {tp.team.name if tp.team else 'Unknown Team'}")
 
 
+@cli.command()
+def repair():
+    """Run conservative DB repairs and print a health summary.
+
+    Fixes:
+      - Stuck in_progress sync_status rows (crashed workers)
+      - Games with null game_date (queues re-index)
+      - Finished games with zero events (queues re-index)
+      - Null period detectable from existing events
+      - Stale failed sync_status rows blocking retries
+
+    Also prints counts of suspicious games (no-lineup, roster gaps,
+    unresolved player stats) for investigation.
+    """
+    from app.services.repair_service import get_repair_service
+
+    click.echo("Running DB repair...")
+    svc = get_repair_service()
+    result = svc.run_nightly()
+
+    click.echo("\n=== Repair complete ===")
+    click.echo(f"  Stuck in_progress reset : {result['stuck_in_progress']}")
+    click.echo(f"  Null game_date queued   : {result['null_game_dates']}")
+    click.echo(f"  Missing events queued   : {result['missing_events']}")
+    click.echo(f"  Null period fixed       : {result['null_period_fixed']}")
+    click.echo(f"  Stale failed cleared    : {result['stale_failed']}")
+    click.echo(f"  ─────────────────────────────")
+    click.echo(f"  Total rows fixed        : {result['total_fixed']}")
+
+    click.echo("\n=== Suspicious Games (report only) ===")
+
+    no_lineup = svc.report_games_no_lineup()
+    click.echo(f"  Games with events but no lineup : {len(no_lineup)}")
+    for g in no_lineup[:5]:
+        click.echo(f"    game {g['game_id']}  date={g['game_date']}  events={g['event_count']}")
+    if len(no_lineup) > 5:
+        click.echo(f"    ... and {len(no_lineup) - 5} more")
+
+    gaps = svc.report_roster_gaps()
+    click.echo(f"  Teams with roster gaps          : {len(gaps)}")
+    for g in gaps[:5]:
+        click.echo(f"    team {g['team_id']} s={g['season_id']}  game={g['game_player_count']} roster={g['roster_count']}")
+
+    unresolved = svc.report_unresolved_stats()
+    click.echo(f"  Unresolved player stats rows    : {len(unresolved)}")
+
+    click.echo("\nDone.")
+
+
 if __name__ == "__main__":
     cli()
