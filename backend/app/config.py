@@ -86,7 +86,13 @@ class Settings(BaseSettings):
                 )
         return self
 
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    model_config = SettingsConfigDict(
+        # Absolute path so .env is found regardless of the CWD uvicorn is run from.
+        # Locally: backend/app/config.py → parent.parent = backend/ → backend/.env
+        # Docker:  /app/app/config.py    → parent.parent = /app/    → /app/.env
+        env_file=str(Path(__file__).parent.parent / ".env"),
+        case_sensitive=True,
+    )
 
 
 # Global settings instance
