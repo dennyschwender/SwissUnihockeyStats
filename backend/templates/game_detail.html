@@ -460,7 +460,7 @@ function eventsTable(goals, penalties) {
             <th :class="cls('score')" @click="sortBy('score')">{{ t.table.score_penalty }}<span class="sort-icon" x-text="icon('score')"></span></th>
           </tr></thead>
           <tbody>
-            <template x-for="(e, i) in sorted" :key="e.type + e.time + e.team + (e.player || '')">
+            <template x-for="(e, i) in sorted" :key="e.type + '|' + e.time + '|' + e.team + '|' + (e.player || '') + '|' + (e.minutes || '') + '|' + (e.score || '')">
               <tr :class="(e.type === 'penalty' ? 'gd-row-penalty' : '') + (isPeriodStart(i) && i > 0 ? ' gd-row-period-start' : '')">
                 <td x-text="e.period || '—'"></td>
                 <td x-text="e.time || '—'"></td>
