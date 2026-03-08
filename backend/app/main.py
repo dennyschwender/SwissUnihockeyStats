@@ -700,6 +700,52 @@ async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
         return {"ok": False, "detail": str(e)}
 
 
+@app.post("/admin/api/repair")
+async def admin_repair(_: None = Depends(require_admin)):
+    """Run conservative DB repairs immediately and return summary + health report."""
+    from app.services.repair_service import get_repair_service
+    try:
+        svc = get_repair_service()
+        result = await asyncio.to_thread(svc.run_nightly)
+        result["ok"] = True
+        result["games_no_lineup"] = svc.report_games_no_lineup()
+        result["roster_gaps"] = svc.report_roster_gaps()
+        result["unresolved_stats"] = svc.report_unresolved_stats()
+        return result
+    except Exception as exc:
+        logger.error("admin_repair failed: %s", exc, exc_info=True)
+        return {"ok": False, "detail": str(exc)}
+
+
+@app.get("/admin/api/repair-report")
+async def admin_repair_report(_: None = Depends(require_admin)):
+    """Return the health report (read-only, no fixes applied)."""
+    from app.services.repair_service import get_repair_service
+    from app.models.db_models import SyncStatus
+    try:
+        svc = get_repair_service()
+        db = svc.db_service
+        last_run = None
+        last_fixed = 0
+        with db.session_scope() as session:
+            row = session.query(SyncStatus).filter_by(
+                entity_type="repair", entity_id="all"
+            ).first()
+            if row:
+                last_run = row.last_sync.isoformat() if row.last_sync else None
+                last_fixed = row.records_synced or 0
+        return {
+            "ok": True,
+            "last_run": last_run,
+            "last_fixed": last_fixed,
+            "games_no_lineup": svc.report_games_no_lineup(),
+            "roster_gaps": svc.report_roster_gaps(),
+            "unresolved_stats": svc.report_unresolved_stats(),
+        }
+    except Exception as exc:
+        return {"ok": False, "detail": str(exc)}
+
+
 @app.get("/admin/api/system")
 async def admin_api_system(_: None = Depends(require_admin)):
     """Return system / container performance metrics for the admin System tab."""

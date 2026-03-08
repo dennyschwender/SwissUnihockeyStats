@@ -60,6 +60,29 @@ class TestAdminIndexingAPI:
         assert "job_id" in data
 
 
+class TestAdminRepairEndpoint:
+    def test_repair_endpoint_requires_auth(self, client):
+        r = client.post("/admin/api/repair", follow_redirects=False)
+        assert r.status_code in (401, 403, 302)
+
+    def test_repair_endpoint_returns_ok(self, admin_client):
+        r = admin_client.post("/admin/api/repair")
+        assert r.status_code == 200
+        data = r.json()
+        assert data.get("ok") is True
+        assert "total_fixed" in data
+        assert "stuck_in_progress" in data
+        assert "null_game_dates" in data
+
+    def test_repair_endpoint_includes_reports(self, admin_client):
+        r = admin_client.post("/admin/api/repair")
+        data = r.json()
+        assert "games_no_lineup" in data
+        assert "roster_gaps" in data
+        assert "unresolved_stats" in data
+        assert isinstance(data["games_no_lineup"], list)
+
+
 class TestAdminSeasonAPI:
     def test_set_current_season_unknown_returns_404(self, admin_client):
         r = admin_client.post("/admin/api/season/9999999/set-current")
