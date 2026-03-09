@@ -114,16 +114,6 @@ POLICIES: list[dict] = [
         "run_at_hour": 3,
     },
     {
-        "name":        "league_groups",
-        "entity_type": "league_groups",
-        "max_age":     timedelta(days=7),
-        "task":        "groups",
-        "scope":       "season",
-        "label":       "League groups refresh",
-        "priority":    60,
-        "run_at_hour": 3,
-    },
-    {
         "name":        "games",
         "entity_type": "games",
         "max_age":     timedelta(days=7),
@@ -131,6 +121,17 @@ POLICIES: list[dict] = [
         "scope":       "season",
         "label":       "Games refresh",
         "priority":    70,
+        "run_at_hour": 3,
+    },
+    {
+        "name":        "game_lineups",
+        "entity_type": "game_lineups",
+        "max_age":     timedelta(hours=24),
+        "task":        "game_lineups",
+        "scope":       "season",
+        "label":       "Game lineups refresh",
+        "priority":    75,      # runs after games (70), before game_events (80)
+        "max_tier":    2,       # NLA + NLB + A-level only, mirrors game_events
         "run_at_hour": 3,
     },
     # ── Live / recent game-events polling ────────────────────────────────────
@@ -492,7 +493,6 @@ class Scheduler:
     # dropdowns and are displayed in the Settings tier editor.
     _EXTRA_TIER_DEFAULTS: dict[str, int] = {
         "player_stats":      3,
-        "game_lineups":      3,
         "player_game_stats": 3,
     }
 
@@ -929,6 +929,17 @@ class Scheduler:
             asyncio.create_task(self._deferred_tick(delay=8))
 
         for job in to_launch:
+            if job.task == "repair" and self._count_running() > 0:
+                # Other jobs are still running — defer repair by 30 minutes so
+                # VACUUM doesn't acquire an exclusive lock while writers are active.
+                deferred_run_at = now + timedelta(minutes=30)
+                job.run_at = deferred_run_at
+                self._queue.append(job)
+                logger.info(
+                    "[scheduler] deferred repair by 30min (%d job(s) still running)",
+                    self._count_running(),
+                )
+                continue
             await self._launch(job)
 
     async def _deferred_tick(self, delay: int = 8):
