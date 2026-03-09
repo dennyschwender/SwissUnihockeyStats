@@ -8,6 +8,8 @@ import asyncio
 import hashlib
 import hmac
 import html
+import json
+import os
 import re
 import smtplib
 import time
@@ -104,6 +106,11 @@ async def lifespan(app: FastAPI):
 
     # ── 3. Admin PIN hash & stats pre-warm ───────────────────────────────────────────
     try:
+        # Restore cooldown timestamps so manual jobs can't be double-triggered
+        # right after a deploy.
+        _load_cooldowns()
+        logger.info("✓ Job cooldowns loaded")
+
         # Pre-compute admin PIN hash (pbkdf2_hmac 100k rounds, ~1-2 s on Pi ARM)
         # in an executor so it doesn't block the event loop.  Awaited here to
         # ensure it finishes BEFORE the stats-cache task starts, avoiding a
@@ -1149,6 +1156,56 @@ _TASK_COOLDOWN_MINS: dict[str, int] = {
 _job_last_done: dict[tuple[str, int], datetime] = {}
 
 
+def _load_cooldowns() -> None:
+    """Populate _job_last_done from scheduler_config.json on startup."""
+    global _job_last_done
+    try:
+        from app.services.scheduler import _CONFIG_PATH
+        with open(_CONFIG_PATH) as f:
+            data = json.load(f)
+        raw = data.get("cooldowns", {})
+        # raw keys are "task:season" strings, values are ISO datetime strings
+        result = {}
+        for key_str, dt_str in raw.items():
+            parts = key_str.split(":", 1)
+            if len(parts) != 2:
+                continue
+            try:
+                task_k = parts[0]
+                season_k = int(parts[1])
+                dt_k = datetime.fromisoformat(dt_str)
+                result[(task_k, season_k)] = dt_k
+            except (ValueError, TypeError):
+                continue
+        _job_last_done = result
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        pass  # startup without file is fine
+
+
+def _persist_cooldowns() -> None:
+    """Write _job_last_done to the cooldowns section of scheduler_config.json."""
+    try:
+        from app.services.scheduler import _CONFIG_PATH
+        # Read-modify-write to avoid clobbering scheduler's own keys
+        try:
+            with open(_CONFIG_PATH) as f:
+                data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            data = {}
+        data["cooldowns"] = {
+            f"{task}:{season}": dt.isoformat()
+            for (task, season), dt in _job_last_done.items()
+        }
+        tmp = _CONFIG_PATH + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(data, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, _CONFIG_PATH)
+    except OSError as exc:
+        logger.warning("Could not persist cooldowns: %s", exc)
+
+
 @app.post("/admin/api/index")
 async def admin_start_indexing(payload: dict, _: None = Depends(require_admin)):
     """Start a background indexing job.
@@ -2083,6 +2140,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             job["finished_at"] = now_utc.isoformat()
             if job.get("status") == "done":
                 _job_last_done[(task, season)] = now_utc
+                _persist_cooldowns()
         _admin_tasks.pop(job_id, None)
 
 
