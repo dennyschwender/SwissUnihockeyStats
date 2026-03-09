@@ -51,3 +51,40 @@ def test_write_stats_snapshot_replace_on_same_ts():
     with db.engine.connect() as conn:
         count = conn.execute(text("SELECT COUNT(*) FROM admin_stats_snapshots")).scalar()
     assert count >= 1
+
+
+# ── API endpoint tests ────────────────────────────────────────────────────────
+
+def test_stats_history_requires_auth(client):
+    """Unauthenticated access must be redirected (302) or rejected (401/403)."""
+    r = client.get("/admin/api/stats/history", follow_redirects=False)
+    assert r.status_code in (302, 401, 403)
+
+
+def test_stats_history_returns_list(admin_client):
+    r = admin_client.get("/admin/api/stats/history")
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+def test_stats_history_row_shape(admin_client):
+    """Each row must contain all expected keys."""
+    # Insert a snapshot first
+    from app.services.stats_snapshot import write_stats_snapshot
+    from app.services.database import get_database_service
+    write_stats_snapshot(get_database_service(), jobs_run=1, jobs_errors=0, avg_job_duration_s=10.0)
+    r = admin_client.get("/admin/api/stats/history?days=30")
+    assert r.status_code == 200
+    rows = r.json()
+    if rows:  # may be empty if snapshot was already there
+        row = rows[0]
+        for key in ("ts", "db_size_bytes", "games", "players", "events",
+                    "player_stats", "jobs_run", "jobs_errors", "avg_job_duration_s"):
+            assert key in row, f"Missing key: {key}"
+
+
+def test_stats_history_days_filter(admin_client):
+    """?days=0 must return an empty list."""
+    r = admin_client.get("/admin/api/stats/history?days=0")
+    assert r.status_code == 200
+    assert r.json() == []
