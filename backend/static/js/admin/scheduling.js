@@ -1,5 +1,5 @@
 // backend/static/js/admin/scheduling.js
-import { fetchJSON, poll } from './utils.js';
+import { fetchJSON } from './utils.js';
 
 /* =======================================================
    Shared state
@@ -189,7 +189,7 @@ setInterval(() => {
 
 async function clearDoneJobs() {
   // Remove finished entries from server history so they don't come back on the next poll
-  await fetch('/admin/api/scheduler', {
+  await fetchJSON('/admin/api/scheduler', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({action: 'clear_done'})
@@ -205,8 +205,8 @@ async function clearDoneJobs() {
 }
 
 async function stopJob(job_id) {
-  const r = await fetch('/admin/api/jobs/' + job_id, { method: 'DELETE' });
-  const d = await r.json();
+  const d = await fetchJSON('/admin/api/jobs/' + job_id, { method: 'DELETE' });
+  if (!d) return;
   if (d.ok) {
     window.log('warn', '\u25a0 Job ' + job_id + ' stopped');
     if (window.jobs[job_id]) window.jobs[job_id].status = 'stopped';
@@ -439,21 +439,21 @@ function renderScheduler(d) {
 }
 
 async function schedSetEnabled(v) {
-  const r = await fetch('/admin/api/scheduler', {
+  const data = await fetchJSON('/admin/api/scheduler', {
     method:  'POST',
     headers: {'Content-Type':'application/json'},
     body:    JSON.stringify({action: v ? 'enable' : 'disable'}),
   });
-  if (r.ok) await loadScheduler();
+  if (data) await loadScheduler();
 }
 
 async function schedTrigger(policy, season) {
-  const r = await fetch('/admin/api/scheduler', {
+  const d = await fetchJSON('/admin/api/scheduler', {
     method:  'POST',
     headers: {'Content-Type':'application/json'},
     body:    JSON.stringify({action:'trigger', policy, season}),
   });
-  const d = await r.json();
+  if (!d) return;
   if (d.ok) {
     window.log('info', '\u25b6 scheduler trigger: ' + policy + ' S' + season + '  job=' + d.job_id);
     // Register the newly-launched job in the active jobs panel and start polling
@@ -505,9 +505,8 @@ async function loadSchedDiag() {
   tbody.innerHTML = '<tr><td colspan="6" style="padding:.75rem 1rem;color:#6e7681;text-align:center">Loading\u2026</td></tr>';
   errEl.style.display = 'none';
   try {
-    const r = await fetch('/admin/api/scheduler-diag');
-    if (!r.ok) { errEl.style.display=''; errEl.textContent='HTTP '+r.status; return; }
-    const d = await r.json();
+    const d = await fetchJSON('/admin/api/scheduler-diag');
+    if (!d) { errEl.style.display=''; errEl.textContent='Request failed'; return; }
     if (!d.ok) { errEl.style.display=''; errEl.textContent=d.error||'unknown error'; return; }
 
     const rows = d.rows || [];
@@ -569,6 +568,5 @@ Object.assign(window, {
   clearDoneJobs, stopJob, schedSetEnabled, loadSchedDiag,
   renderActivityTable, registerJob, schedTrigger,
 });
-window.pollJob = pollJob;
 
 export { loadScheduler, pollJob };

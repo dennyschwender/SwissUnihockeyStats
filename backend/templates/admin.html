@@ -340,7 +340,7 @@ import { loadScheduler, pollJob } from '/static/js/admin/scheduling.js';
 ═══════════════════════════════════════════════════════ */
 // Per-task tier defaults — updated from scheduler policy_tiers on load
 let _defaultTiers = { clubs: 6, teams: 6, leagues: 5, groups: 5, games: 3, events: 2, players: 2, player_stats: 2, game_lineups: 3, player_game_stats: 2 };
-let _settingsDirty = false;   // true when user has unsaved edits in the Settings panel
+window._settingsDirty = false;   // true when user has unsaved edits in the Settings panel
 
 const fmt = n => (n == null ? '—' : Number(n).toLocaleString('de-CH'));
 
@@ -361,7 +361,7 @@ function clearLog() {
   document.getElementById('log-box').textContent = '';
 }
 
-function schedMarkDirty() { _settingsDirty = true; }
+function schedMarkDirty() { window._settingsDirty = true; }
 
 async function schedSaveFilter() {
   const rawMin = document.getElementById('sched-min-season').value.trim();
@@ -384,7 +384,7 @@ async function schedSaveFilter() {
     body: JSON.stringify({action: 'max_concurrent', value: max_concurrent}),
   });
   if (r1.ok && r2.ok) {
-    _settingsDirty = false;
+    window._settingsDirty = false;
     log('info', `✓ Scheduler settings saved — min: ${min_season ?? 'none'}, excluded: ${excluded_seasons.join(', ') || 'none'}, max concurrent: ${max_concurrent}`);
     await loadScheduler();
   } else {
@@ -401,7 +401,7 @@ async function schedClearFilter() {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({action: 'max_concurrent', value: 2}),
   });
-  _settingsDirty = false;
+  window._settingsDirty = false;
   log('info', '✓ Scheduler settings cleared (max concurrent reset to 2)');
   await loadScheduler();
 }
@@ -483,7 +483,7 @@ async function schedSaveTiers() {
     body: JSON.stringify({action: 'policy_tiers', tiers}),
   });
   if (r.ok) {
-    _settingsDirty = false;
+    window._settingsDirty = false;
     log('info', '✓ Policy tier limits saved');
     await loadScheduler();
   } else {
