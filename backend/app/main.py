@@ -144,6 +144,7 @@ async def lifespan(app: FastAPI):
             sched.stop()
         if _sched_task and not _sched_task.done():
             _sched_task.cancel()
+        _persist_cooldowns()
     except Exception as e:
         logger.error(f"Error stopping scheduler: {e}")
     try:
@@ -1158,7 +1159,6 @@ _job_last_done: dict[tuple[str, int], datetime] = {}
 
 def _load_cooldowns() -> None:
     """Populate _job_last_done from scheduler_config.json on startup."""
-    global _job_last_done
     try:
         from app.services.scheduler import _CONFIG_PATH
         with open(_CONFIG_PATH) as f:
@@ -1177,7 +1177,7 @@ def _load_cooldowns() -> None:
                 result[(task_k, season_k)] = dt_k
             except (ValueError, TypeError):
                 continue
-        _job_last_done = result
+        _job_last_done.update(result)
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         pass  # startup without file is fine
 
