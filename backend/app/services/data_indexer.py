@@ -944,7 +944,6 @@ class DataIndexer:
             season_label = season_row.text if season_row and season_row.text else str(season_id)
             staged: dict[tuple, PlayerStatistics] = {}
             count, _api_err = self._upsert_player_stats_from_api(player_id, season_id, season_label, session, staged)
-            session.commit()
             if count:
                 self._mark_sync_complete(session, "player_stats_one", entity_id, count)
         return count
