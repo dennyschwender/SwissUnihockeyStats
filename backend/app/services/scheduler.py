@@ -930,6 +930,17 @@ class Scheduler:
             asyncio.create_task(self._deferred_tick(delay=8))
 
         for job in to_launch:
+            if job.task == "repair" and self._count_running() > 0:
+                # Other jobs are still running — defer repair by 30 minutes so
+                # VACUUM doesn't acquire an exclusive lock while writers are active.
+                deferred_run_at = now + timedelta(minutes=30)
+                job.run_at = deferred_run_at
+                self._queue.append(job)
+                logger.info(
+                    "[scheduler] deferred repair by 30min (%d job(s) still running)",
+                    self._count_running(),
+                )
+                continue
             await self._launch(job)
 
     async def _deferred_tick(self, delay: int = 8):
