@@ -20,23 +20,7 @@
   </div>
 </div>
 
-<!-- ── totals bar (always visible) ── -->
-<div class="totals-bar">
-  <div class="totals">
-    <div class="chip"><strong id="t-seasons">—</strong> seasons</div>
-    <div class="chip" title="Unique clubs (distinct API club IDs across all seasons)"><strong id="t-clubs">—</strong> clubs</div>
-    <div class="chip" title="Unique teams (distinct API team IDs across all seasons)"><strong id="t-teams">—</strong> teams</div>
-    <div class="chip"><strong id="t-players">—</strong> players</div>
-    <div class="chip"><strong id="t-tp">—</strong> roster entries</div>
-    <div class="chip"><strong id="t-pstats">—</strong> player stats</div>
-    <div class="chip" title="Unique league types (distinct API league IDs across all seasons)"><strong id="t-leagues">—</strong> leagues</div>
-    <div class="chip" title="Unique groups (distinct API group IDs across all seasons)"><strong id="t-groups">—</strong> groups</div>
-    <div class="chip"><strong id="t-games">—</strong> games</div>
-    <div class="chip"><strong id="t-gp">—</strong> lineups</div>
-    <div class="chip"><strong id="t-events">—</strong> events</div>
-    <div class="chip" id="db-size-chip" title="DB size — click to open Database tab" onclick="switchTab('db')" style="cursor:pointer"><strong id="t-db-size">—</strong> DB</div>
-  </div>
-</div>
+{% include "admin/_stats_bar.html" %}
 
 <!-- ── tab navigation ── -->
 <div class="tab-bar">
@@ -70,18 +54,14 @@ import { loadRenderingFilters } from '/static/js/admin/settings.js';
 import { loadDbInfo } from '/static/js/admin/database.js';
 import { loadSystemStats } from '/static/js/admin/system.js';
 
-/* ═══════════════════════════════════════════════════════
-   Globals
-═══════════════════════════════════════════════════════ */
+/* ── Globals ── */
 // Per-task tier defaults — updated from scheduler policy_tiers on load
 let _defaultTiers = { clubs: 6, teams: 6, leagues: 5, groups: 5, games: 3, events: 2, players: 2, player_stats: 2, game_lineups: 3, player_game_stats: 2 };
 window._settingsDirty = false;   // true when user has unsaved edits in the Settings panel
 
 const fmt = n => (n == null ? '—' : Number(n).toLocaleString('de-CH'));
 
-/* ═══════════════════════════════════════════════════════
-   Log
-═══════════════════════════════════════════════════════ */
+/* ── Log ── */
 function log(level, msg) {
   const box  = document.getElementById('log-box');
   if (box.textContent === 'Ready.') box.textContent = '';
@@ -96,6 +76,7 @@ function clearLog() {
   document.getElementById('log-box').textContent = '';
 }
 
+/* ── Tab switching ── */
 function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -108,38 +89,6 @@ function switchTab(name) {
   if (name === 'db')     loadDbInfo();
   if (name === 'system') loadSystemStats(true);
 }
-
-/* ═══════════════════════════════════════════════════════
-   Window exports for ES module interop
-   (seasons.js and stats.js reference these via window.*)
-═══════════════════════════════════════════════════════ */
-window.fmt = fmt;
-window.log = log;
-window.loadStats = loadStats;
-window._defaultTiers = _defaultTiers;
-window.healthPanel = healthPanel;
-// scheduling.js exports: registerJob, renderActivityTable, pollJob, schedSetEnabled,
-// loadSchedDiag, clearDoneJobs, stopJob, schedTrigger, and _activitySyncRows property
-
-// Expose onclick-targeted functions to global scope (required for ES module scripts)
-// Note: settings.js, database.js, system.js export their own window.* assignments.
-Object.assign(window, {
-  switchTab, clearLog,
-  loadScheduler,
-});
-
-/* ═══════════════════════════════════════════════════════
-   Boot
-═══════════════════════════════════════════════════════ */
-loadStats();
-loadScheduler();
-loadRenderingFilters();
-// Stagger DB info so it doesn't contend with stats at boot
-setTimeout(loadDbInfo, 2000);
-setInterval(loadStats, 30000);
-setInterval(loadScheduler, 10000);
-setInterval(loadDbInfo, 30000);
-setInterval(loadSystemStats, 15000);
 
 /* ── DB Health panel (Alpine.js) ── */
 function healthPanel() {
@@ -196,6 +145,28 @@ function healthPanel() {
     },
   };
 }
+
+/* ── Window exports ── */
+window.fmt = fmt;
+window.log = log;
+window.loadStats = loadStats;
+window._defaultTiers = _defaultTiers;
+window.healthPanel = healthPanel;
+Object.assign(window, {
+  switchTab, clearLog,
+  loadScheduler,
+});
+
+/* ── Boot ── */
+loadStats();
+loadScheduler();
+loadRenderingFilters();
+// Stagger DB info so it doesn't contend with stats at boot
+setTimeout(loadDbInfo, 2000);
+poll(loadStats, 30000);
+poll(loadScheduler, 10000);
+poll(loadDbInfo, 30000);
+poll(loadSystemStats, 15000);
 </script>
 </body>
 </html>
