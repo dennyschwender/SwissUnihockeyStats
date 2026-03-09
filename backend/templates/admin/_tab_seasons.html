@@ -1,0 +1,166 @@
+  <div class="tab-panel active" id="tab-cleanup">
+
+    <p class="section-title">Seasons</p>
+    <div class="season-card">
+      <div class="season-header" onclick="toggleEl('seasons-wrapper','seasons-chv')">
+        <span class="season-year" style="font-size:.85rem">Seasons</span>
+        <button class="btn btn-sm" id="pull-seasons-btn" onclick="event.stopPropagation();pullSeasons()" title="Fetch seasons list from API">↻ Pull Seasons</button>
+        <span class="chevron open" id="seasons-chv">▶</span>
+      </div>
+      <div class="season-body open" id="seasons-wrapper">
+        <div id="seasons-container" style="padding:.5rem 0">
+          <div style="color:#6e7681;font-size:.8rem;padding:.5rem 1rem">Loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:1.25rem">
+      <p class="section-title" style="color:#f85149">&#9888; Danger Zone</p>
+      <div class="season-card" style="border-color:#3d1f1f">
+        <div class="season-header" onclick="toggleEl('purge-body','purge-chv')" style="background:#1a1010">
+          <span class="season-year" style="font-size:.85rem;color:#f85149">Purge Seasons</span>
+          <span style="font-size:.72rem;color:#8b949e;margin-left:.5rem">Permanently delete all data for a season range</span>
+          <span class="chevron" id="purge-chv" style="margin-left:auto">▶</span>
+        </div>
+        <div class="season-body" id="purge-body">
+          <div class="quick-row" style="gap:.75rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
+            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap">Season ID:</label>
+            <input id="purge-season" type="number" min="1996" max="2100" placeholder="e.g. 2022"
+              style="width:80px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+
+            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Mode:</label>
+            <select id="purge-mode"
+              style="background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+              <option value="exact">exact — only that season</option>
+              <option value="older">older — seasons &lt; ID</option>
+              <option value="older-or-equal">older-or-equal — seasons ≤ ID</option>
+              <option value="newer">newer — seasons &gt; ID</option>
+              <option value="newer-or-equal">newer-or-equal — seasons ≥ ID</option>
+            </select>
+
+            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">
+              <input type="checkbox" id="purge-dry-run" style="margin-right:3px">
+              Dry run (preview only)
+            </label>
+          </div>
+
+          <div class="quick-row" style="gap:.5rem">
+            <button class="btn btn-sm" onclick="runPurge(true)" style="background:#1e3a1e;border-color:#238636;color:#3fb950">&#128269; Preview</button>
+            <button class="btn btn-sm btn-red" onclick="runPurge(false)">&#128465; Purge</button>
+          </div>
+
+          <div style="font-size:.7rem;color:#6e7681;margin-top:.5rem;line-height:1.5">
+            Deletes all data (games, players, leagues, clubs, stats) for the selected season(s). This cannot be undone.<br>
+            Use <strong>Preview</strong> or check <strong>Dry run</strong> first to see what would be deleted.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DB Health ───────────────────────────────────────────────── -->
+    <div class="health-section" x-data="healthPanel()" x-init="load()">
+      <p class="section-title">DB Health</p>
+
+      <div class="health-meta">
+        <span>Last repair: <strong x-text="lastRun || 'never'"></strong></span>
+        <span>Rows fixed: <strong x-text="lastFixed"></strong></span>
+        <button class="repair-btn" :disabled="running" @click="runRepair()">
+          <span x-show="!running">Run repair now</span>
+          <span x-show="running">Running…</span>
+        </button>
+      </div>
+
+      <template x-if="error">
+        <div style="color:#f85149;font-size:.78rem;margin-bottom:.5rem" x-text="error"></div>
+      </template>
+
+      <!-- Games with events but no lineup -->
+      <div>
+        <div class="collapsible-header" @click="toggle('lineup')">
+          <span class="collapsible-chevron" :class="{open: open.lineup}">▶</span>
+          Games with events but no lineup
+          <span style="margin-left:auto;color:#d29922;font-weight:700" x-text="gamesNoLineup.length"></span>
+        </div>
+        <div class="collapsible-body" :class="{open: open.lineup}">
+          <template x-if="gamesNoLineup.length === 0">
+            <div class="health-empty">✓ None</div>
+          </template>
+          <template x-if="gamesNoLineup.length > 0">
+            <table class="health-table">
+              <thead><tr><th>Game</th><th>Date</th><th>Season</th><th>Events</th></tr></thead>
+              <tbody>
+                <template x-for="g in gamesNoLineup" :key="g.game_id">
+                  <tr>
+                    <td><a :href="'/en/game/' + g.game_id" target="_blank" x-text="g.game_id"></a></td>
+                    <td x-text="g.game_date || '—'"></td>
+                    <td x-text="g.season_id"></td>
+                    <td x-text="g.event_count"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+        </div>
+      </div>
+
+      <!-- Roster gaps -->
+      <div>
+        <div class="collapsible-header" @click="toggle('roster')">
+          <span class="collapsible-chevron" :class="{open: open.roster}">▶</span>
+          Roster gaps (game players not in team roster)
+          <span style="margin-left:auto;color:#d29922;font-weight:700" x-text="rosterGaps.length"></span>
+        </div>
+        <div class="collapsible-body" :class="{open: open.roster}">
+          <template x-if="rosterGaps.length === 0">
+            <div class="health-empty">✓ None</div>
+          </template>
+          <template x-if="rosterGaps.length > 0">
+            <table class="health-table">
+              <thead><tr><th>Team ID</th><th>Season</th><th>In Games</th><th>In Roster</th><th>Gap</th></tr></thead>
+              <tbody>
+                <template x-for="g in rosterGaps" :key="g.team_id + '-' + g.season_id">
+                  <tr>
+                    <td x-text="g.team_id"></td>
+                    <td x-text="g.season_id"></td>
+                    <td x-text="g.game_player_count"></td>
+                    <td x-text="g.roster_count"></td>
+                    <td x-text="g.delta"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+        </div>
+      </div>
+
+      <!-- Unresolved player stats -->
+      <div>
+        <div class="collapsible-header" @click="toggle('stats')">
+          <span class="collapsible-chevron" :class="{open: open.stats}">▶</span>
+          Unresolved player stats (null team_id or game_class)
+          <span style="margin-left:auto;color:#d29922;font-weight:700" x-text="unresolvedStats.length"></span>
+        </div>
+        <div class="collapsible-body" :class="{open: open.stats}">
+          <template x-if="unresolvedStats.length === 0">
+            <div class="health-empty">✓ None</div>
+          </template>
+          <template x-if="unresolvedStats.length > 0">
+            <table class="health-table">
+              <thead><tr><th>Player</th><th>Team Name</th><th>League</th><th>Season</th></tr></thead>
+              <tbody>
+                <template x-for="s in unresolvedStats" :key="s.player_id + '-' + s.season_id + '-' + s.league_abbrev">
+                  <tr>
+                    <td x-text="s.player_id"></td>
+                    <td x-text="s.team_name || '—'"></td>
+                    <td x-text="s.league_abbrev || '—'"></td>
+                    <td x-text="s.season_id"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+        </div>
+      </div>
+    </div>
+
+  </div>

@@ -328,173 +328,7 @@
 
   </div>
 
-  <!-- ══ Tab: Seasons ══ -->
-  <div class="tab-panel active" id="tab-cleanup">
-
-    <p class="section-title">Seasons</p>
-    <div class="season-card">
-      <div class="season-header" onclick="toggleEl('seasons-wrapper','seasons-chv')">
-        <span class="season-year" style="font-size:.85rem">Seasons</span>
-        <button class="btn btn-sm" id="pull-seasons-btn" onclick="event.stopPropagation();pullSeasons()" title="Fetch seasons list from API">↻ Pull Seasons</button>
-        <span class="chevron open" id="seasons-chv">▶</span>
-      </div>
-      <div class="season-body open" id="seasons-wrapper">
-        <div id="seasons-container" style="padding:.5rem 0">
-          <div style="color:#6e7681;font-size:.8rem;padding:.5rem 1rem">Loading…</div>
-        </div>
-      </div>
-    </div>
-
-    <div style="margin-top:1.25rem">
-      <p class="section-title" style="color:#f85149">&#9888; Danger Zone</p>
-      <div class="season-card" style="border-color:#3d1f1f">
-        <div class="season-header" onclick="toggleEl('purge-body','purge-chv')" style="background:#1a1010">
-          <span class="season-year" style="font-size:.85rem;color:#f85149">Purge Seasons</span>
-          <span style="font-size:.72rem;color:#8b949e;margin-left:.5rem">Permanently delete all data for a season range</span>
-          <span class="chevron" id="purge-chv" style="margin-left:auto">▶</span>
-        </div>
-        <div class="season-body" id="purge-body">
-          <div class="quick-row" style="gap:.75rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
-            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap">Season ID:</label>
-            <input id="purge-season" type="number" min="1996" max="2100" placeholder="e.g. 2022"
-              style="width:80px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
-
-            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Mode:</label>
-            <select id="purge-mode"
-              style="background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
-              <option value="exact">exact — only that season</option>
-              <option value="older">older — seasons &lt; ID</option>
-              <option value="older-or-equal">older-or-equal — seasons ≤ ID</option>
-              <option value="newer">newer — seasons &gt; ID</option>
-              <option value="newer-or-equal">newer-or-equal — seasons ≥ ID</option>
-            </select>
-
-            <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">
-              <input type="checkbox" id="purge-dry-run" style="margin-right:3px">
-              Dry run (preview only)
-            </label>
-          </div>
-
-          <div class="quick-row" style="gap:.5rem">
-            <button class="btn btn-sm" onclick="runPurge(true)" style="background:#1e3a1e;border-color:#238636;color:#3fb950">&#128269; Preview</button>
-            <button class="btn btn-sm btn-red" onclick="runPurge(false)">&#128465; Purge</button>
-          </div>
-
-          <div style="font-size:.7rem;color:#6e7681;margin-top:.5rem;line-height:1.5">
-            Deletes all data (games, players, leagues, clubs, stats) for the selected season(s). This cannot be undone.<br>
-            Use <strong>Preview</strong> or check <strong>Dry run</strong> first to see what would be deleted.
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── DB Health ───────────────────────────────────────────────── -->
-    <div class="health-section" x-data="healthPanel()" x-init="load()">
-      <p class="section-title">DB Health</p>
-
-      <div class="health-meta">
-        <span>Last repair: <strong x-text="lastRun || 'never'"></strong></span>
-        <span>Rows fixed: <strong x-text="lastFixed"></strong></span>
-        <button class="repair-btn" :disabled="running" @click="runRepair()">
-          <span x-show="!running">Run repair now</span>
-          <span x-show="running">Running…</span>
-        </button>
-      </div>
-
-      <template x-if="error">
-        <div style="color:#f85149;font-size:.78rem;margin-bottom:.5rem" x-text="error"></div>
-      </template>
-
-      <!-- Games with events but no lineup -->
-      <div>
-        <div class="collapsible-header" @click="toggle('lineup')">
-          <span class="collapsible-chevron" :class="{open: open.lineup}">▶</span>
-          Games with events but no lineup
-          <span style="margin-left:auto;color:#d29922;font-weight:700" x-text="gamesNoLineup.length"></span>
-        </div>
-        <div class="collapsible-body" :class="{open: open.lineup}">
-          <template x-if="gamesNoLineup.length === 0">
-            <div class="health-empty">✓ None</div>
-          </template>
-          <template x-if="gamesNoLineup.length > 0">
-            <table class="health-table">
-              <thead><tr><th>Game</th><th>Date</th><th>Season</th><th>Events</th></tr></thead>
-              <tbody>
-                <template x-for="g in gamesNoLineup" :key="g.game_id">
-                  <tr>
-                    <td><a :href="'/en/game/' + g.game_id" target="_blank" x-text="g.game_id"></a></td>
-                    <td x-text="g.game_date || '—'"></td>
-                    <td x-text="g.season_id"></td>
-                    <td x-text="g.event_count"></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </template>
-        </div>
-      </div>
-
-      <!-- Roster gaps -->
-      <div>
-        <div class="collapsible-header" @click="toggle('roster')">
-          <span class="collapsible-chevron" :class="{open: open.roster}">▶</span>
-          Roster gaps (game players not in team roster)
-          <span style="margin-left:auto;color:#d29922;font-weight:700" x-text="rosterGaps.length"></span>
-        </div>
-        <div class="collapsible-body" :class="{open: open.roster}">
-          <template x-if="rosterGaps.length === 0">
-            <div class="health-empty">✓ None</div>
-          </template>
-          <template x-if="rosterGaps.length > 0">
-            <table class="health-table">
-              <thead><tr><th>Team ID</th><th>Season</th><th>In Games</th><th>In Roster</th><th>Gap</th></tr></thead>
-              <tbody>
-                <template x-for="g in rosterGaps" :key="g.team_id + '-' + g.season_id">
-                  <tr>
-                    <td x-text="g.team_id"></td>
-                    <td x-text="g.season_id"></td>
-                    <td x-text="g.game_player_count"></td>
-                    <td x-text="g.roster_count"></td>
-                    <td x-text="g.delta"></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </template>
-        </div>
-      </div>
-
-      <!-- Unresolved player stats -->
-      <div>
-        <div class="collapsible-header" @click="toggle('stats')">
-          <span class="collapsible-chevron" :class="{open: open.stats}">▶</span>
-          Unresolved player stats (null team_id or game_class)
-          <span style="margin-left:auto;color:#d29922;font-weight:700" x-text="unresolvedStats.length"></span>
-        </div>
-        <div class="collapsible-body" :class="{open: open.stats}">
-          <template x-if="unresolvedStats.length === 0">
-            <div class="health-empty">✓ None</div>
-          </template>
-          <template x-if="unresolvedStats.length > 0">
-            <table class="health-table">
-              <thead><tr><th>Player</th><th>Team Name</th><th>League</th><th>Season</th></tr></thead>
-              <tbody>
-                <template x-for="s in unresolvedStats" :key="s.player_id + '-' + s.season_id + '-' + s.league_abbrev">
-                  <tr>
-                    <td x-text="s.player_id"></td>
-                    <td x-text="s.team_name || '—'"></td>
-                    <td x-text="s.league_abbrev || '—'"></td>
-                    <td x-text="s.season_id"></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </template>
-        </div>
-      </div>
-    </div>
-
-  </div>
+  {% include "admin/_tab_seasons.html" %}
 
   <!-- ══ Tab: System ══ -->
   <div class="tab-panel" id="tab-system">
@@ -571,7 +405,11 @@
 
 </div><!-- /tab-content -->
 
-<script>
+<script type="module">
+import { poll } from '/static/js/admin/utils.js';
+import { loadStats } from '/static/js/admin/stats.js';
+import '/static/js/admin/seasons.js';
+
 /* ═══════════════════════════════════════════════════════
    Globals
 ═══════════════════════════════════════════════════════ */
@@ -580,404 +418,10 @@ const jobs = {};  // job_id → job object
 let _defaultTiers = { clubs: 6, teams: 6, leagues: 5, groups: 5, games: 3, events: 2, players: 2, player_stats: 2, game_lineups: 3, player_game_stats: 2 };
 let _activitySyncRows = [];   // last sync_status snapshot (DB-backed)
 let _activityHistRows = [];   // last scheduler history snapshot (in-memory)
-let _freshnessMap     = {};   // "entity_type:season" → diag row (from scheduler-diag)
-let _seasonFilter     = { min_season: null, excluded_seasons: [] };
 let _settingsDirty    = false;   // true when user has unsaved edits in the Settings panel
-
-/* task name → entity_type (matches scheduler POLICIES) */
-const TASK_TO_ENTITY = {
-  clubs: 'clubs', teams: 'teams', players: 'players',
-  player_stats: 'player_stats', game_lineups: 'game_lineups',
-  player_game_stats: 'player_game_stats',
-  leagues: 'leagues', groups: 'league_groups', games: 'games', events: 'game_events',
-};
 
 const fmt = n => (n == null ? '—' : Number(n).toLocaleString('de-CH'));
 
-/* ═══════════════════════════════════════════════════════
-   Stats
-═══════════════════════════════════════════════════════ */
-async function loadStats() {
-  try {
-    const [statsR, diagR] = await Promise.all([
-      fetch('/admin/api/stats'),
-      fetch('/admin/api/scheduler-diag').catch(() => null),
-    ]);
-    if (!statsR.ok) throw new Error('HTTP ' + statsR.status);
-    const d = await statsR.json();
-
-    // Update freshness map + season filter (best-effort, don’t block stats on failure)
-    if (diagR && diagR.ok) {
-      try {
-        const diagD = await diagR.json();
-        if (diagD.ok) {
-          _freshnessMap = {};
-          for (const row of diagD.rows || []) {
-            if (row.season) _freshnessMap[`${row.entity_type}:${row.season}`] = row;
-          }
-          if (diagD.season_filter) _seasonFilter = diagD.season_filter;
-        }
-      } catch (_) {}
-    }
-
-    const t = d.totals || {};
-    document.getElementById('t-seasons').textContent = fmt(t.seasons);
-    document.getElementById('t-clubs'  ).textContent = fmt(t.clubs);
-    document.getElementById('t-teams'  ).textContent = fmt(t.teams);
-    document.getElementById('t-players').textContent = fmt(t.players);
-    document.getElementById('t-tp'     ).textContent = fmt(t.team_players);    document.getElementById('t-pstats' ).textContent = fmt(t.player_stats);    document.getElementById('t-leagues').textContent = fmt(t.leagues);
-    document.getElementById('t-groups' ).textContent = fmt(t.league_groups);
-    document.getElementById('t-games'  ).textContent = fmt(t.games);
-    document.getElementById('t-gp'     ).textContent = fmt(t.game_players);
-    document.getElementById('t-events' ).textContent = fmt(t.game_events);
-
-    const visibleSeasons = (d.by_season || []).filter(s => !isSeasonFiltered(s.season_id));
-    renderSeasons(visibleSeasons);
-    _activitySyncRows = d.sync_status || [];
-    renderActivityTable();
-
-    document.getElementById('refresh-ts').textContent =
-      'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
-  } catch(e) {
-    log('error', 'Stats load failed: ' + e.message);
-  }
-}
-
-/* ═══════════════════════════════════════════════════════
-   Season accordion
-═══════════════════════════════════════════════════════ */
-function renderSeasons(seasons) {
-  const container = document.getElementById('seasons-container');
-
-  // preserve open state across re-renders
-  const open = new Set(
-    [...container.querySelectorAll('.season-body.open')]
-      .map(el => el.dataset.sid)
-  );
-
-  container.innerHTML = seasons.map(s =>
-    buildSeasonCard(s, open.has(String(s.season_id)))
-  ).join('');
-}
-
-function buildSeasonCard(s, isOpen) {
-  const sid  = s.season_id;
-  const year = `${sid}/${String(sid + 1).slice(-2)}`;
-
-  const summaryChips = [
-    schip(s.clubs,         'clubs'),
-    schip(s.teams,         'teams'),
-    schip(s.team_players,  'players'),
-    schip(s.player_stats,  'stats'),
-    schip(s.leagues,       'leagues'),
-    schip(s.league_groups, 'groups'),
-    schip(s.games,         'games'),
-    schip(s.game_players,  'lineups'),
-    schip(s.game_events,   'events'),
-  ].join('');
-
-  return `
-<div class="season-card${s.is_current ? ' current-season' : ''}">
-  <div class="season-header" onclick="toggleSeason(${sid})">
-    <span class="season-year">${year}${s.is_current ? ' <span class="current-badge">&#9733; current</span>' : ''}</span>
-    <div class="season-chips">${summaryChips}${buildCompletenessChip(s)}${buildSeasonFreshSummary(sid)}</div>
-    <span class="chevron${isOpen ? ' open' : ''}" id="chv-${sid}">▶</span>
-  </div>
-  <div class="season-body${isOpen ? ' open' : ''}" id="sbody-${sid}" data-sid="${sid}">
-
-    <div class="task-group-label">Clubs Path</div>
-    ${trowTier(sid,'clubs',   'Clubs',                 [p(s.clubs,'clubs')])}
-    ${trowTier(sid,'teams',   'Teams (per club)',       [p(s.clubs,'clubs'),       p(s.teams,'teams')])}
-    ${trowTier(sid,'players',          'Players (per team)',        [p(s.teams,'teams'),          p(s.team_players,'roster')])}
-    ${trowTier(sid,'player_stats',      'Player Statistics',         [p(s.team_players,'roster'),  p(s.player_stats,'stats')])}
-    ${trowTier(sid,'game_lineups',      'Game Lineups',              [p(s.games,'games'),          p(s.game_players,'lineups')])}
-    ${trowTier(sid,'player_game_stats', 'Player Game Stats (G/A/PIM)',[p(s.game_players,'lineups'), p(s.player_stats,'stats')])}
-
-    <div class="task-group-label">Leagues Path</div>
-    ${trowTier(sid,'leagues', 'Leagues',                [p(s.leagues,'leagues')])}
-    ${trowTier(sid,'groups',  'League Groups',          [p(s.leagues,'leagues'),   p(s.league_groups,'groups')])}
-    ${trowTier(sid,'games',   'Games (per league)',     [p(s.league_groups,'groups'), p(s.games,'games')])}
-    ${trowEvents(sid, s)}
-
-    <div class="quick-row">
-      <button class="btn btn-blue btn-sm"  onclick="triggerIndex(${sid},'clubs_path',  forceFor(${sid}))">▶ Clubs Path</button>
-      <button class="btn btn-blue btn-sm"  onclick="triggerIndex(${sid},'leagues_path',forceFor(${sid}))">▶ Leagues Path</button>
-      <button class="btn btn-green btn-sm" onclick="triggerIndex(${sid},'full',        forceFor(${sid}))">&#9889; Full Season</button>
-      <button class="btn btn-sm ${s.is_current ? 'btn-red' : 'btn-yellow'}" onclick="setCurrentSeason(${sid}, ${s.is_current})" title="${s.is_current ? 'Remove current-season flag' : 'Mark as current season — future seasons will be skipped during indexing'}">${s.is_current ? '&#9733; Unset Current' : '&#9734; Set as Current'}</button>
-      <button class="btn btn-red btn-sm"   onclick="deleteLayer(${sid},'all')">&#128465; Delete Season</button>
-      <label>
-        <input type="checkbox" id="force-${sid}">
-        Force re-index
-      </label>
-    </div>
-  </div>
-</div>`;
-}
-
-function schip(n, label) {
-  const cls = n > 0 ? 'ok' : 'empty';
-  return `<span class="s-chip ${cls}">${fmt(n)} ${label}</span>`;
-}
-function p(n, label) {
-  const cls = n > 0 ? ' has-data' : '';
-  return `<span class="count-pill${cls}">${fmt(n)} ${label}</span>`;
-}
-const _TIER_LABELS = [
-  [1,'T1 \u2014 NLA/L-UPL only'],
-  [2,'T2 \u2014 + NLB, U21A/U18A/U16A'],
-  [3,'T3 \u2014 + 1. Liga, U21B/U18B/U16B'],
-  [4,'T4 \u2014 + 2. Liga, U21C/U18C/U16C'],
-  [5,'T5 \u2014 + 3. Liga, U21D'],
-  [6,'T6 \u2014 All (+ 4./5. Liga, Regional, Cups)'],
-  [7,'T7 \u2014 Everything'],
-];
-function _tierOpts(task) {
-  const def = _defaultTiers[task] ?? 2;
-  return _TIER_LABELS.map(([v,lbl]) => `<option value="${v}"${v===def?' selected':''}>${lbl}</option>`).join('');
-}
-function trow(sid, task, name, counts, extraCls = '') {
-  return `
-<div class="task-row">
-  <span class="task-name">${name}</span>
-  <div class="task-counts">${counts.join('')}${freshnessBadge(sid, task)}</div>
-  <div class="task-btns">
-    <button class="btn btn-sm ${extraCls}" onclick="triggerIndex(${sid},'${task}',forceFor(${sid}))">▶ Index</button>
-    <button class="btn btn-sm btn-red" onclick="deleteLayer(${sid},'${task}')" title="Delete ${name} data for this season">&#128465;</button>
-  </div>
-</div>`;
-}
-function trowTier(sid, task, name, counts) {
-  return `
-<div class="task-row">
-  <span class="task-name">${name}</span>
-  <div class="task-counts">${counts.join('')}${freshnessBadge(sid, task)}
-    <select id="tier-${task}-${sid}" class="tier-select" title="Max league tier">${_tierOpts(task)}</select>
-  </div>
-  <div class="task-btns">
-    <button class="btn btn-sm" onclick="triggerIndexTiered(${sid},'${task}',forceFor(${sid}))">▶ Index</button>
-    <button class="btn btn-sm btn-red" onclick="deleteLayer(${sid},'${task}')" title="Delete ${name} data for this season">&#128465;</button>
-  </div>
-</div>`;
-}
-function trowEvents(sid, s) {
-  const tierOptions = _TIER_LABELS.map(([v, lbl]) => `<option value="${v}"${v===_defaultTiers.events?' selected':''}>${lbl}</option>`).join('');
-  return `
-<div class="task-row">
-  <span class="task-name">Game Events (finished)</span>
-  <div class="task-counts">
-    ${p(s.games,'games')} ${p(s.game_events,'events')}${freshnessBadge(sid, 'events')}
-    <select id="tier-events-${sid}" class="tier-select" title="Max league tier to fetch events for">
-      ${tierOptions}
-    </select>
-  </div>
-  <div class="task-btns">
-    <button class="btn btn-sm" onclick="triggerIndexEvents(${sid},forceFor(${sid}))">&#9654; Index</button>
-    <button class="btn btn-sm btn-red" onclick="deleteLayer(${sid},'events')" title="Delete Game Events data for this season">&#128465;</button>
-  </div>
-</div>`;
-}
-function forceFor(sid) {
-  const cb = document.getElementById('force-' + sid);
-  return cb ? cb.checked : false;
-}
-
-function toggleSeason(sid) {
-  document.getElementById('sbody-' + sid).classList.toggle('open');
-  document.getElementById('chv-'   + sid).classList.toggle('open');
-}
-
-/* ═══════════════════════════════════════════════════════
-   Season filter + freshness helpers
-═══════════════════════════════════════════════════════ */
-function isSeasonFiltered(sid) {
-  if (_seasonFilter.min_season != null && sid < _seasonFilter.min_season) return true;
-  if ((_seasonFilter.excluded_seasons || []).includes(sid)) return true;
-  return false;
-}
-
-function freshnessBadge(sid, task) {
-  const entityType = TASK_TO_ENTITY[task] || task;
-  let row = _freshnessMap[`${entityType}:${sid}`];
-  // Scheduler tracks some tasks per-tier (e.g. player_stats_t1…t6) — fall back to any tier variant
-  if (!row) {
-    for (let t = 1; t <= 6 && !row; t++) row = _freshnessMap[`${entityType}_t${t}:${sid}`];
-  }
-  if (!row) return '';
-  const skipRow = row.current_only && !row.is_current;
-  if (skipRow) return '<span class="fresh-badge skip" title="Past season — not auto-scheduled">past</span>';
-  const cls = row.status === 'FRESH' ? 'ok' : (row.status === 'NEVER_SYNCED' ? 'fail' : 'warn');
-  const lbl = row.status === 'FRESH' ? '✓ fresh' : (row.status === 'NEVER_SYNCED' ? '⚠ never' : '⚡ stale');
-  const maxAgeStr = row.max_age_h >= 24 ? `${Math.round(row.max_age_h / 24)}d` : `${row.max_age_h}h`;
-  const tip = `Next: ${row.next_run} · max age: ${maxAgeStr}`;
-  return `<span class="fresh-badge ${cls}" title="${tip}">${lbl}</span>`
-       + `<span class="next-run-pill" title="${tip}">${row.next_run}</span>`;
-}
-
-function buildCompletenessChip(s) {
-  // Layers we expect to be > 0 for a fully-indexed season, with friendly labels.
-  // game_events is omitted — it's optional (only indexed for top tiers).
-  const layers = [
-    [s.clubs,        'clubs'],
-    [s.leagues,      'leagues'],
-    [s.league_groups,'groups'],
-    [s.teams,        'teams'],
-    [s.games,        'games'],
-    [s.team_players, 'roster'],
-    [s.game_players, 'lineups'],
-    [s.player_stats, 'player stats'],
-  ];
-  const missing = layers.filter(([n]) => !n || n === 0).map(([, lbl]) => lbl);
-  const total   = layers.length;
-  const done    = total - missing.length;
-
-  if (missing.length === total)
-    return `<span class="s-chip empty" title="No data indexed yet">⬜ empty</span>`;
-  if (missing.length === 0)
-    return `<span class="s-chip ok" title="All ${total} data layers indexed">✅ complete</span>`;
-
-  const tip = `Missing: ${missing.join(', ')}`;
-  const pct = Math.round(done / total * 100);
-  const cls = missing.length <= 2 ? 'warn' : '';
-  return `<span class="s-chip ${cls}" title="${tip}">📊 ${done}/${total} layers (${pct}%)</span>`;
-}
-
-function buildSeasonFreshSummary(sid) {
-  const relevant = Object.entries(_freshnessMap)
-    .filter(([k]) => k.endsWith(':' + sid))
-    .map(([, v]) => v)
-    .filter(v => !(v.current_only && !v.is_current));
-  if (!relevant.length) return '';
-  // Exclude FROZEN rows — past seasons are intentionally frozen by the scheduler
-  // once indexed (data doesn't change), so they should never appear as warnings.
-  // Exclude game_events — its 10-minute TTL means it is almost always stale
-  // between scheduler runs; its live status is visible in the diag table.
-  const active = relevant.filter(v => v.status !== 'FROZEN' && v.entity_type !== 'game_events');
-  const neverCount = active.filter(v => v.status === 'NEVER_SYNCED').length;
-  const staleCount = active.filter(v => v.status === 'STALE').length;
-  if (neverCount)
-    return `<span class="s-chip" style="background:#2d1214;color:#f85149;border-color:#da3633" title="${neverCount} data type(s) never synced">⚠ ${neverCount} never synced</span>`;
-  if (staleCount)
-    return `<span class="s-chip warn" title="${staleCount} data type(s) stale">⚡ ${staleCount} stale</span>`;
-  return `<span class="s-chip ok" title="All data types fresh">✓ all fresh</span>`;
-}
-
-/* ═══════════════════════════════════════════════════════
-   Trigger + poll
-═══════════════════════════════════════════════════════ */
-async function setCurrentSeason(sid, isCurrent) {
-  if (isCurrent) {
-    if (!confirm(`Remove the "current season" flag from ${sid}/${String(sid+1).slice(-2)}?`)) return;
-  }
-  try {
-    const r = await fetch(`/admin/api/season/${sid}/set-current`, { method: 'POST' });
-    const d = await r.json();
-    if (!r.ok) { log('error', 'Failed: ' + (d.detail || JSON.stringify(d))); return; }
-    log('ok', `★ Season ${sid}/${String(sid+1).slice(-2)} marked as current`);
-    loadStats();
-  } catch(e) {
-    log('error', 'Request error: ' + e.message);
-  }
-}
-async function pullSeasons() {
-  const btn = document.getElementById('pull-seasons-btn');
-  if (btn) btn.disabled = true;
-  log('info', '↻ Fetching seasons list from API…');
-  try {
-    const r = await fetch('/admin/api/index', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ season: 0, task: 'seasons', force: true }),
-    });
-    const d = await r.json();
-    if (!r.ok) { log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
-    log('info', `Job ${d.job_id} queued — ${d.label}`);
-    registerJob(d);
-    // Refresh stats once job completes so season list updates
-    setTimeout(loadStats, 3000);
-  } catch(e) {
-    log('error', 'Request error: ' + e.message);
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-async function triggerIndex(season, task, force) {
-  log('info', `▶ season=${season}  task=${task}  force=${force}`);
-  try {
-    const r = await fetch('/admin/api/index', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ season, task, force: !!force }),
-    });
-    const d = await r.json();
-    if (r.status === 429) { log('warn', '⏳ ' + d.detail); return; }
-    if (!r.ok) { log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
-    log('info', `Job ${d.job_id} queued — ${d.label}`);
-    registerJob(d);
-  } catch(e) {
-    log('error', 'Request error: ' + e.message);
-  }
-}
-async function triggerIndexTiered(season, task, force) {
-  const sel = document.getElementById(`tier-${task}-${season}`);
-  const max_tier = sel ? parseInt(sel.value, 10) : (_defaultTiers[task] ?? 7);
-  const tierLabel = sel ? sel.options[sel.selectedIndex].text : 'auto';
-  log('info', `▶ season=${season}  task=${task}  force=${force}  tier≤${max_tier} (${tierLabel})`);
-  try {
-    const r = await fetch('/admin/api/index', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ season, task, force: !!force, max_tier }),
-    });
-    const d = await r.json();
-    if (r.status === 429) { log('warn', '⏳ ' + d.detail); return; }
-    if (!r.ok) { log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
-    log('info', `Job ${d.job_id} queued — ${d.label}`);
-    registerJob(d);
-  } catch(e) {
-    log('error', 'Request error: ' + e.message);
-  }
-}
-async function triggerIndexEvents(season, force) {
-  const sel = document.getElementById('tier-events-' + season);
-  const max_tier = sel ? parseInt(sel.value, 10) : 7;
-  const tierLabel = sel ? sel.options[sel.selectedIndex].text : 'all';
-  log('info', `\u25b6 season=${season}  task=events  force=${force}  tier\u2264${max_tier} (${tierLabel})`);
-  try {
-    const r = await fetch('/admin/api/index', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ season, task: 'events', force: !!force, max_tier }),
-    });
-    const d = await r.json();
-    if (r.status === 429) { log('warn', '⏳ ' + d.detail); return; }
-    if (!r.ok) { log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
-    log('info', `Job ${d.job_id} queued \u2014 ${d.label}`);
-    registerJob(d);
-  } catch(e) {
-    log('error', 'Request error: ' + e.message);
-  }
-}
-const _LAYER_LABELS = {
-  events: 'Game Events', games: 'Games', groups: 'League Groups',
-  leagues: 'Leagues', player_stats: 'Player Statistics',
-  players: 'Players (roster)', teams: 'Teams', clubs: 'Clubs', all: 'ALL data',
-};
-async function deleteLayer(season, layer) {
-  const label = _LAYER_LABELS[layer] || layer;
-  const year  = `${season}/${String(season + 1).slice(-2)}`;
-  if (!confirm(`Delete ${label} for season ${year}?\n\nThis cannot be undone.`)) return;
-  log('warn', `🗑 Deleting ${label} for season ${year}…`);
-  try {
-    const r = await fetch(`/admin/api/season/${season}?layer=${layer}`, { method: 'DELETE' });
-    const d = await r.json();
-    if (!r.ok) { log('error', 'Delete failed: ' + (d.detail || JSON.stringify(d))); return; }
-    const total = Object.values(d.deleted || {}).reduce((a, b) => a + b, 0);
-    log('info', `✓ Deleted ${total} rows (${Object.entries(d.deleted || {}).map(([k,v])=>`${k}:${v}`).join(', ')})`);
-    await loadStats();   // refresh counts
-  } catch(e) {
-    log('error', 'Request error: ' + e.message);
-  }
-}
 
 function registerJob(data) {
   const startedAt = data.started_at ? new Date(data.started_at).getTime() : Date.now();
@@ -1568,48 +1012,6 @@ async function schedTrigger(policy, season) {
   }
 }
 
-/* ═══════════════════════════════════════════════════════
-   Purge seasons
-═══════════════════════════════════════════════════════ */
-async function runPurge(forcePreview) {
-  const seasonVal = document.getElementById('purge-season').value.trim();
-  const mode      = document.getElementById('purge-mode').value;
-  const dryRun    = forcePreview || document.getElementById('purge-dry-run').checked;
-
-  if (!seasonVal || isNaN(parseInt(seasonVal, 10))) {
-    log('error', 'Purge: please enter a valid season ID.');
-    return;
-  }
-  const season = parseInt(seasonVal, 10);
-  const modeLabels = {
-    'exact': `only ${season}`,
-    'older': `all seasons < ${season}`,
-    'older-or-equal': `all seasons ≤ ${season}`,
-    'newer': `all seasons > ${season}`,
-    'newer-or-equal': `all seasons ≥ ${season}`,
-  };
-
-  if (!dryRun) {
-    if (!confirm(`⚠ PERMANENTLY DELETE all data for ${modeLabels[mode]}?\n\nThis cannot be undone. Consider running Preview first.`)) return;
-  }
-
-  log(dryRun ? 'info' : 'warn', `${dryRun ? '🔍 Previewing' : '🗑 Purging'} ${modeLabels[mode]}…`);
-
-  try {
-    const r = await fetch('/admin/api/purge', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ season, mode, dry_run: dryRun }),
-    });
-    const d = await r.json();
-    if (!r.ok) { log('error', 'Purge rejected: ' + (d.detail || JSON.stringify(d))); return; }
-    log('info', `Job ${d.job_id} queued — ${d.label}`);
-    registerJob(d);
-  } catch(e) {
-    log('error', 'Purge request error: ' + e.message);
-  }
-}
-
 function fmtDue(secs) {
   if (secs <= 0)    return 'due now';
   if (secs < 60)    return `${secs}s`;
@@ -1651,11 +1053,6 @@ function switchTab(name) {
   if (name === 'settings') { loadScheduler(); loadRenderingFilters(); }
   if (name === 'db')     loadDbInfo();
   if (name === 'system') loadSystemStats(true);
-}
-
-function toggleEl(bodyId, chevId) {
-  document.getElementById(bodyId).classList.toggle('open');
-  document.getElementById(chevId).classList.toggle('open');
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1942,6 +1339,24 @@ async function runCleanup() {
     btn.textContent = '🗑️ Cleanup Duplicates';
   }
 }
+
+/* ═══════════════════════════════════════════════════════
+   Window exports for ES module interop
+   (seasons.js and stats.js reference these via window.*)
+═══════════════════════════════════════════════════════ */
+window.fmt = fmt;
+window.log = log;
+window.loadStats = loadStats;
+window.registerJob = registerJob;
+window.renderActivityTable = renderActivityTable;
+window._defaultTiers = _defaultTiers;
+// _activitySyncRows is read by renderActivityTable via closure;
+// stats.js writes it via window._activitySyncRows setter below.
+Object.defineProperty(window, '_activitySyncRows', {
+  get() { return _activitySyncRows; },
+  set(v) { _activitySyncRows = v; },
+  configurable: true,
+});
 
 /* ═══════════════════════════════════════════════════════
    Boot
