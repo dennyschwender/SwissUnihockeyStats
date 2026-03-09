@@ -15,6 +15,7 @@ def test_game_lineups_policy_exists():
 
 def test_game_lineups_policy_shape():
     p = _policy("game_lineups")
+    assert p["entity_type"] == "game_lineups"
     assert p["priority"] == 75
     assert p["task"] == "game_lineups"
     assert p["scope"] == "season"
