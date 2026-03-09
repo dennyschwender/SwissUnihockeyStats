@@ -493,7 +493,6 @@ class Scheduler:
     # dropdowns and are displayed in the Settings tier editor.
     _EXTRA_TIER_DEFAULTS: dict[str, int] = {
         "player_stats":      3,
-        "game_lineups":      3,
         "player_game_stats": 3,
     }
 
