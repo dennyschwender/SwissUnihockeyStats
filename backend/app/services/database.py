@@ -272,6 +272,21 @@ class DatabaseService:
                 if col not in player_cols:
                     conn.execute(text(f"ALTER TABLE players ADD COLUMN {col} {typedef}"))
 
+            # ── Create admin_stats_snapshots if it doesn't exist ─────────────
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS admin_stats_snapshots (
+                    ts                 DATETIME PRIMARY KEY,
+                    db_size_bytes      INTEGER,
+                    games              INTEGER,
+                    players            INTEGER,
+                    events             INTEGER,
+                    player_stats       INTEGER,
+                    jobs_run           INTEGER,
+                    jobs_errors        INTEGER,
+                    avg_job_duration_s REAL
+                )
+            """))
+
             conn.commit()
             logger.debug("SQLite migrations applied")
     
