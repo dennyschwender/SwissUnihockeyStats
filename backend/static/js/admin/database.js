@@ -115,5 +115,5 @@ async function runCleanup() {
   }
 }
 
-Object.assign(window, { runVacuum, runCleanup, clearDbLog });
+Object.assign(window, { runVacuum, runCleanup, clearDbLog, loadDbInfo });
 export { loadDbInfo };
