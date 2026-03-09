@@ -135,19 +135,6 @@ function _tierOpts(task) {
     return '<option value="' + pair[0] + '"' + (pair[0] === def ? ' selected' : '') + '>' + pair[1] + '</option>';
   }).join('');
 }
-function trow(sid, task, name, counts, extraCls) {
-  extraCls = extraCls || '';
-  return (
-    '\n<div class="task-row">' +
-    '\n  <span class="task-name">' + name + '</span>' +
-    '\n  <div class="task-counts">' + counts.join('') + freshnessBadge(sid, task) + '</div>' +
-    '\n  <div class="task-btns">' +
-    '\n    <button class="btn btn-sm ' + extraCls + '" onclick="triggerIndex(' + sid + ',\'' + task + '\',forceFor(' + sid + '))">&#9654; Index</button>' +
-    '\n    <button class="btn btn-sm btn-red" onclick="deleteLayer(' + sid + ',\'' + task + '\')" title="Delete ' + name + ' data for this season">&#128465;</button>' +
-    '\n  </div>' +
-    '\n</div>'
-  );
-}
 function trowTier(sid, task, name, counts) {
   return (
     '\n<div class="task-row">' +
@@ -395,4 +382,3 @@ Object.assign(window, {
   triggerIndexTiered, triggerIndexEvents, deleteLayer,
   pullSeasons, runPurge, toggleEl,
 });
-export { renderSeasons };
