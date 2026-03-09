@@ -5,12 +5,9 @@ from app.services.scheduler import POLICIES
 
 
 def _policy(name: str) -> dict:
-    return next(p for p in POLICIES if p["name"] == name)
-
-
-def test_game_lineups_policy_exists():
-    names = [p["name"] for p in POLICIES]
-    assert "game_lineups" in names
+    p = next((p for p in POLICIES if p["name"] == name), None)
+    assert p is not None, f"Policy {name!r} not found in POLICIES"
+    return p
 
 
 def test_game_lineups_policy_shape():
