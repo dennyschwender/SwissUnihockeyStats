@@ -133,6 +133,17 @@ POLICIES: list[dict] = [
         "priority":    70,
         "run_at_hour": 3,
     },
+    {
+        "name":        "game_lineups",
+        "entity_type": "game_lineups",
+        "max_age":     timedelta(hours=24),
+        "task":        "game_lineups",
+        "scope":       "season",
+        "label":       "Game lineups refresh",
+        "priority":    75,      # runs after games (70), before game_events (80)
+        "max_tier":    2,       # NLA + NLB + A-level only, mirrors game_events
+        "run_at_hour": 3,
+    },
     # ── Live / recent game-events polling ────────────────────────────────────
     # Runs every 10 minutes (no hour-snap) throughout the day so that:
     #   • live games (< 3 h old)   are refreshed every ~5 min
