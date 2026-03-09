@@ -1,5 +1,5 @@
 // backend/static/js/admin/seasons.js
-import { fetchJSON, logLine } from './utils.js';
+import { fetchJSON } from './utils.js';
 
 /* =======================================================
    Module-level state (seasons tab owns these)
@@ -268,94 +268,68 @@ async function setCurrentSeason(sid, isCurrent) {
   if (isCurrent) {
     if (!confirm('Remove the "current season" flag from ' + sid + '/' + String(sid+1).slice(-2) + '?')) return;
   }
-  try {
-    const r = await fetch('/admin/api/season/' + sid + '/set-current', { method: 'POST' });
-    const d = await r.json();
-    if (!r.ok) { window.log('error', 'Failed: ' + (d.detail || JSON.stringify(d))); return; }
-    window.log('ok', '\u2605 Season ' + sid + '/' + String(sid+1).slice(-2) + ' marked as current');
-    window.loadStats();
-  } catch(e) {
-    window.log('error', 'Request error: ' + e.message);
-  }
+  const d = await fetchJSON('/admin/api/season/' + sid + '/set-current', { method: 'POST' });
+  if (!d) { window.log('error', 'Failed: set-current request failed'); return; }
+  window.log('ok', '\u2605 Season ' + sid + '/' + String(sid+1).slice(-2) + ' marked as current');
+  window.loadStats();
 }
 async function pullSeasons() {
   const btn = document.getElementById('pull-seasons-btn');
   if (btn) btn.disabled = true;
   window.log('info', '\u21bb Fetching seasons list from API\u2026');
   try {
-    const r = await fetch('/admin/api/index', {
+    const d = await fetchJSON('/admin/api/index', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ season: 0, task: 'seasons', force: true }),
     });
-    const d = await r.json();
-    if (!r.ok) { window.log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
+    if (!d) { window.log('error', 'Rejected: pull-seasons request failed'); return; }
     window.log('info', 'Job ' + d.job_id + ' queued \u2014 ' + d.label);
     window.registerJob(d);
     // Refresh stats once job completes so season list updates
     setTimeout(window.loadStats, 3000);
-  } catch(e) {
-    window.log('error', 'Request error: ' + e.message);
   } finally {
     if (btn) btn.disabled = false;
   }
 }
 async function triggerIndex(season, task, force) {
   window.log('info', '\u25b6 season=' + season + '  task=' + task + '  force=' + force);
-  try {
-    const r = await fetch('/admin/api/index', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ season, task, force: !!force }),
-    });
-    const d = await r.json();
-    if (r.status === 429) { window.log('warn', '\u23f3 ' + d.detail); return; }
-    if (!r.ok) { window.log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
-    window.log('info', 'Job ' + d.job_id + ' queued \u2014 ' + d.label);
-    window.registerJob(d);
-  } catch(e) {
-    window.log('error', 'Request error: ' + e.message);
-  }
+  const d = await fetchJSON('/admin/api/index', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ season, task, force: !!force }),
+  });
+  if (!d) { window.log('error', 'Rejected: index request failed'); return; }
+  window.log('info', 'Job ' + d.job_id + ' queued \u2014 ' + d.label);
+  window.registerJob(d);
 }
 async function triggerIndexTiered(season, task, force) {
   const sel = document.getElementById('tier-' + task + '-' + season);
   const max_tier = sel ? parseInt(sel.value, 10) : (window._defaultTiers[task] != null ? window._defaultTiers[task] : 7);
   const tierLabel = sel ? sel.options[sel.selectedIndex].text : 'auto';
   window.log('info', '\u25b6 season=' + season + '  task=' + task + '  force=' + force + '  tier\u2264' + max_tier + ' (' + tierLabel + ')');
-  try {
-    const r = await fetch('/admin/api/index', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ season, task, force: !!force, max_tier }),
-    });
-    const d = await r.json();
-    if (r.status === 429) { window.log('warn', '\u23f3 ' + d.detail); return; }
-    if (!r.ok) { window.log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
-    window.log('info', 'Job ' + d.job_id + ' queued \u2014 ' + d.label);
-    window.registerJob(d);
-  } catch(e) {
-    window.log('error', 'Request error: ' + e.message);
-  }
+  const d = await fetchJSON('/admin/api/index', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ season, task, force: !!force, max_tier }),
+  });
+  if (!d) { window.log('error', 'Rejected: index request failed'); return; }
+  window.log('info', 'Job ' + d.job_id + ' queued \u2014 ' + d.label);
+  window.registerJob(d);
 }
 async function triggerIndexEvents(season, force) {
   const sel = document.getElementById('tier-events-' + season);
   const max_tier = sel ? parseInt(sel.value, 10) : 7;
   const tierLabel = sel ? sel.options[sel.selectedIndex].text : 'all';
   window.log('info', '\u25b6 season=' + season + '  task=events  force=' + force + '  tier\u2264' + max_tier + ' (' + tierLabel + ')');
-  try {
-    const r = await fetch('/admin/api/index', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ season, task: 'events', force: !!force, max_tier }),
-    });
-    const d = await r.json();
-    if (r.status === 429) { window.log('warn', '\u23f3 ' + d.detail); return; }
-    if (!r.ok) { window.log('error', 'Rejected: ' + (d.detail || JSON.stringify(d))); return; }
-    window.log('info', 'Job ' + d.job_id + ' queued \u2014 ' + d.label);
-    window.registerJob(d);
-  } catch(e) {
-    window.log('error', 'Request error: ' + e.message);
-  }
+  const d = await fetchJSON('/admin/api/index', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ season, task: 'events', force: !!force, max_tier }),
+  });
+  if (!d) { window.log('error', 'Rejected: index request failed'); return; }
+  window.log('info', 'Job ' + d.job_id + ' queued \u2014 ' + d.label);
+  window.registerJob(d);
 }
 const _LAYER_LABELS = {
   events: 'Game Events', games: 'Games', groups: 'League Groups',
@@ -367,16 +341,11 @@ async function deleteLayer(season, layer) {
   const year  = season + '/' + String(season + 1).slice(-2);
   if (!confirm('Delete ' + label + ' for season ' + year + '?\n\nThis cannot be undone.')) return;
   window.log('warn', '\ud83d\uddd1 Deleting ' + label + ' for season ' + year + '\u2026');
-  try {
-    const r = await fetch('/admin/api/season/' + season + '?layer=' + layer, { method: 'DELETE' });
-    const d = await r.json();
-    if (!r.ok) { window.log('error', 'Delete failed: ' + (d.detail || JSON.stringify(d))); return; }
-    const total = Object.values(d.deleted || {}).reduce(function(a, b) { return a + b; }, 0);
-    window.log('info', '\u2713 Deleted ' + total + ' rows (' + Object.entries(d.deleted || {}).map(function(e) { return e[0] + ':' + e[1]; }).join(', ') + ')');
-    await window.loadStats();
-  } catch(e) {
-    window.log('error', 'Request error: ' + e.message);
-  }
+  const d = await fetchJSON('/admin/api/season/' + season + '?layer=' + layer, { method: 'DELETE' });
+  if (!d) { window.log('error', 'Delete failed: request failed'); return; }
+  const total = Object.values(d.deleted || {}).reduce(function(a, b) { return a + b; }, 0);
+  window.log('info', '\u2713 Deleted ' + total + ' rows (' + Object.entries(d.deleted || {}).map(function(e) { return e[0] + ':' + e[1]; }).join(', ') + ')');
+  await window.loadStats();
 }
 
 /* =======================================================
@@ -406,19 +375,14 @@ async function runPurge(forcePreview) {
 
   window.log(dryRun ? 'info' : 'warn', (dryRun ? '\ud83d\udd0d Previewing' : '\ud83d\uddd1 Purging') + ' ' + modeLabels[mode] + '\u2026');
 
-  try {
-    const r = await fetch('/admin/api/purge', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ season, mode, dry_run: dryRun }),
-    });
-    const d = await r.json();
-    if (!r.ok) { window.log('error', 'Purge rejected: ' + (d.detail || JSON.stringify(d))); return; }
-    window.log('info', 'Job ' + d.job_id + ' queued \u2014 ' + d.label);
-    window.registerJob(d);
-  } catch(e) {
-    window.log('error', 'Purge request error: ' + e.message);
-  }
+  const d = await fetchJSON('/admin/api/purge', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ season, mode, dry_run: dryRun }),
+  });
+  if (!d) { window.log('error', 'Purge rejected: request failed'); return; }
+  window.log('info', 'Job ' + d.job_id + ' queued \u2014 ' + d.label);
+  window.registerJob(d);
 }
 
 function toggleEl(bodyId, chevId) {
