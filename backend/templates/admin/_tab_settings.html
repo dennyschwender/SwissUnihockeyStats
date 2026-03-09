@@ -1,0 +1,154 @@
+  <!-- ══ Tab: Settings ══ -->
+  <div class="tab-panel" id="tab-settings">
+
+    <p class="section-title">Scheduler Settings</p>
+    <div class="season-card">
+      <div style="border-top:1px solid #30363d">
+        <div class="quick-row" style="gap:.5rem;align-items:center;flex-wrap:wrap">
+          <label style="font-size:.75rem;color:#8b949e;white-space:nowrap">Min season:</label>
+          <input id="sched-min-season" type="number" min="1996" max="2100" placeholder="all"
+            oninput="schedMarkDirty()"
+            style="width:72px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+          <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Exclude seasons:</label>
+          <input id="sched-excluded" type="text" placeholder="e.g. 1996,1997,2001"
+            oninput="schedMarkDirty()"
+            style="width:160px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+          <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">Max concurrent:</label>
+          <input id="sched-max-concurrent" type="number" min="1" max="10" placeholder="2"
+            oninput="schedMarkDirty()"
+            style="width:52px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+          <button class="btn btn-sm" onclick="schedSaveFilter()" style="white-space:nowrap">💾 Save</button>
+          <button class="btn btn-sm" onclick="schedClearFilter()" style="white-space:nowrap;color:#f85149">✕ Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="section-title" style="margin-top:1.25rem">Policy Tier Limits</p>
+
+    <!-- Tier reference info box -->
+    <div style="background:#111827;border:1px solid #1d4ed8;border-radius:8px;padding:.75rem 1rem;margin-bottom:.9rem;font-size:.75rem;line-height:1.6">
+      <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.55rem">
+        <span style="font-size:.85rem">ℹ️</span>
+        <strong style="color:#93c5fd;font-size:.75rem;letter-spacing:.04em;text-transform:uppercase">League Tier Reference</strong>
+      </div>
+      <table style="border-collapse:collapse;width:100%">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:2px 10px 4px 0;color:#6e7681;font-weight:600;white-space:nowrap">Tier</th>
+            <th style="text-align:left;padding:2px 10px 4px 0;color:#6e7681;font-weight:600">Leagues included</th>
+            <th style="text-align:left;padding:2px 0 4px;color:#6e7681;font-weight:600">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#3fb950;font-weight:700;white-space:nowrap">T1</td>
+            <td style="padding:2px 10px 2px 0;color:#c9d1d9">NLA · SML · L-UPL</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Top national leagues M+F (ids 1, 10, 24)</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#58a6ff;font-weight:700;white-space:nowrap">T2</td>
+            <td style="padding:2px 10px 2px 0;color:#c9d1d9">NLB · U14A · U16A · U18A · U21A · Jun. U21A/U17A</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Second division + A-level youth (ids 2, 13)</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#58a6ff;font-weight:700;white-space:nowrap">T3</td>
+            <td style="padding:2px 10px 2px 0;color:#c9d1d9">1. Liga M+F · U14B · U16B · U18B · U21B · Jun. U21B/U17B</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Third division + B-level youth (ids 3, 14)</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#d29922;font-weight:700;white-space:nowrap">T4</td>
+            <td style="padding:2px 10px 2px 0;color:#c9d1d9">2. Liga M+F · U16C · U18C · U21C</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Fourth division + C-level youth (ids 4, 15)</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#d29922;font-weight:700;white-space:nowrap">T5</td>
+            <td style="padding:2px 10px 2px 0;color:#c9d1d9">3. Liga M+F · U21D</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Fifth division + D-level youth (ids 5, 16)</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#8b949e;font-weight:700;white-space:nowrap">T6</td>
+            <td style="padding:2px 10px 2px 0;color:#c9d1d9">4. Liga · 5. Liga · Regional · Supercup · Test/Cup</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Lowest tiers + cups (ids 6, 7, 12, 23, 25)</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 10px 2px 0;color:#6e7681;font-weight:700;white-space:nowrap">T7 / All</td>
+            <td style="padding:2px 10px 2px 0;color:#6e7681;font-style:italic">everything else</td>
+            <td style="padding:2px 0;color:#6e7681;font-size:.7rem">Any unlisted league_id not in the map above</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top:.55rem;color:#6e7681;font-size:.7rem;line-height:1.5">
+        The cascade scheduler runs T1 first, then T2 only once T1 is fresh, then T3, and so on —
+        so lowering the tier limit speeds up indexing by skipping lower leagues entirely.
+      </div>
+    </div>
+
+    <div class="season-card">
+      <div style="padding:.75rem 1rem;border-top:1px solid #30363d">
+        <div style="font-size:.7rem;color:#6e7681;margin-bottom:.75rem;line-height:1.5">
+          Restrict heavy tasks to top-tier leagues only.
+          Lower tier = fewer leagues = faster &amp; lighter indexing.
+        </div>
+        <table style="font-size:.75rem;width:auto;border-collapse:collapse">
+          <thead><tr>
+            <th style="text-align:left;padding:2px 8px;color:#8b949e;font-weight:normal">Policy</th>
+            <th style="text-align:left;padding:2px 8px;color:#8b949e;font-weight:normal">Max Tier</th>
+          </tr></thead>
+          <tbody id="sched-tiers-tbody"></tbody>
+        </table>
+        <div style="margin-top:.75rem">
+          <button class="btn btn-sm" onclick="schedSaveTiers()">💾 Save tier limits</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="section-title" style="margin-top:1.25rem">Rendering Filters</p>
+    <div class="season-card" style="font-size:.75rem;color:#8b949e">
+      <div style="border-top:1px solid #30363d;padding:.6rem .9rem">
+        <p style="margin:0 0 .5rem;color:#6e7681">Items listed here are hidden from all public pages (leagues, clubs, teams lists). Separate entries with commas. IDs are the numeric API IDs.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem .8rem">
+          <div>
+            <label style="display:block;margin-bottom:2px;color:#8b949e">Excluded league names</label>
+            <input id="rf-lg-names" type="text" placeholder="e.g. Herren Test, Test Liga"
+              oninput="rfMarkDirty()"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:3px 7px;font-size:.78rem">
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:2px;color:#8b949e">Excluded league IDs</label>
+            <input id="rf-lg-ids" type="text" placeholder="e.g. 99, 100"
+              oninput="rfMarkDirty()"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:3px 7px;font-size:.78rem">
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:2px;color:#8b949e">Excluded club names</label>
+            <input id="rf-club-names" type="text" placeholder="e.g. Test Club"
+              oninput="rfMarkDirty()"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:3px 7px;font-size:.78rem">
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:2px;color:#8b949e">Excluded club IDs</label>
+            <input id="rf-club-ids" type="text" placeholder="e.g. 12345"
+              oninput="rfMarkDirty()"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:3px 7px;font-size:.78rem">
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:2px;color:#8b949e">Excluded team names</label>
+            <input id="rf-team-names" type="text" placeholder="e.g. Test Team 1"
+              oninput="rfMarkDirty()"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:3px 7px;font-size:.78rem">
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:2px;color:#8b949e">Excluded team IDs</label>
+            <input id="rf-team-ids" type="text" placeholder="e.g. 44444"
+              oninput="rfMarkDirty()"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:3px 7px;font-size:.78rem">
+          </div>
+        </div>
+        <div style="margin-top:.6rem;display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="rfSave()">💾 Save</button>
+          <button class="btn btn-sm" onclick="rfClear()" style="color:#f85149">✕ Clear all</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
