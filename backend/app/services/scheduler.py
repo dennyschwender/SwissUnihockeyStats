@@ -28,10 +28,13 @@ import asyncio
 import json
 import logging
 import os
+import time as _time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Awaitable
+
+_SNAPSHOT_INTERVAL_S = 6 * 3600
 
 logger = logging.getLogger(__name__)
 
@@ -413,6 +416,7 @@ class Scheduler:
         self._history: list[JobRecord] = []
         self._cold_start = True   # run all jobs immediately on first enable
         self._enabled = self._load_state()
+        self._last_snapshot_ts: float = 0.0
 
     # ── persistence ───────────────────────────────────────────────────────────
 
@@ -724,6 +728,30 @@ class Scheduler:
             await self._dispatch_due()
         except Exception as exc:
             logger.exception("[scheduler] tick error: %s", exc)
+
+        # Write stats snapshot every 6 hours
+        now_mono = _time.monotonic()
+        if now_mono - self._last_snapshot_ts >= _SNAPSHOT_INTERVAL_S:
+            try:
+                from app.services.stats_snapshot import write_stats_snapshot
+                from app.services.database import get_database_service
+                recent = [j for j in list(self._history)[-200:] if j.status == "done"]
+                durations = [
+                    (j.finished_at - j.started_at).total_seconds()
+                    for j in recent
+                    if j.finished_at is not None and j.started_at is not None
+                ]
+                avg_dur = sum(durations) / len(durations) if durations else 0.0
+                errors  = sum(1 for j in list(self._history)[-200:] if j.error)
+                write_stats_snapshot(
+                    get_database_service(),
+                    jobs_run=len(recent),
+                    jobs_errors=errors,
+                    avg_job_duration_s=avg_dur,
+                )
+            except Exception as exc:
+                logger.warning("Failed to write stats snapshot: %s", exc)
+            self._last_snapshot_ts = now_mono
 
     async def _refresh_queue(self):
         """
