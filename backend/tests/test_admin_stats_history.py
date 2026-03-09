@@ -47,7 +47,9 @@ def test_write_stats_snapshot_replace_on_same_ts():
     db = _make_db()
     write_stats_snapshot(db, jobs_run=1, jobs_errors=0, avg_job_duration_s=10.0)
     write_stats_snapshot(db, jobs_run=2, jobs_errors=0, avg_job_duration_s=5.0)
-    # Should not raise; may have 1 or 2 rows depending on timestamp resolution
+    # Intentionally loose: two rapid writes may share the same UTC second (→ 1 row
+    # via INSERT OR REPLACE) or land in different seconds (→ 2 rows).  The test
+    # only verifies that no IntegrityError / UNIQUE constraint violation is raised.
     with db.engine.connect() as conn:
         count = conn.execute(text("SELECT COUNT(*) FROM admin_stats_snapshots")).scalar()
     assert count >= 1
