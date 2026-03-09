@@ -776,7 +776,7 @@ class DataIndexer:
         season_label: str,
         session,
         staged: dict,
-    ) -> tuple:
+    ) -> tuple[int, bool]:
         """Fetch /api/players/:id/statistics and upsert matching rows.
 
         Uses the caller-supplied session so it can be embedded in a larger
