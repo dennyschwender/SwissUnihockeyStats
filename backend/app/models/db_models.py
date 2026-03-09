@@ -145,6 +145,8 @@ class Player(Base):
     # For search optimization
     name_normalized: Mapped[Optional[str]] = mapped_column(String(200))  # Lowercase for case-insensitive search
     last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
+    api_failures: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
+    api_skip_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Relationships
     team_memberships = relationship("TeamPlayer", back_populates="player", cascade="all, delete-orphan")

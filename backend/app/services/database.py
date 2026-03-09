@@ -263,6 +263,15 @@ class DatabaseService:
                             END)
             """))
 
+            # ── Add api_failures / api_skip_until to players ─────────────────
+            player_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(players)"))}
+            for col, typedef in [
+                ("api_failures",   "INTEGER NOT NULL DEFAULT 0"),
+                ("api_skip_until", "DATETIME"),
+            ]:
+                if col not in player_cols:
+                    conn.execute(text(f"ALTER TABLE players ADD COLUMN {col} {typedef}"))
+
             conn.commit()
             logger.debug("SQLite migrations applied")
     

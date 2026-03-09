@@ -2261,9 +2261,9 @@ loadRenderingFilters();
 // Stagger DB info so it doesn't contend with stats at boot
 setTimeout(loadDbInfo, 2000);
 setInterval(loadStats, 30000);
-setInterval(loadScheduler, 3000);
+setInterval(loadScheduler, 10000);
 setInterval(loadDbInfo, 30000);
-setInterval(loadSystemStats, 5000);
+setInterval(loadSystemStats, 15000);
 
 /* ── DB Health panel (Alpine.js) ── */
 function healthPanel() {

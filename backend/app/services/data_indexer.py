@@ -7,6 +7,7 @@ SEASONS → LEAGUES → GROUPS → GAMES → PLAYERS
 import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
@@ -21,6 +22,14 @@ from app.services.swissunihockey import get_swissunihockey_client
 from app.services.database import get_database_service
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _PlayerGameStatsFetchResult:
+    """Result of a Phase-1 API fetch for one player's game stats."""
+    player_id: int
+    game_stats: dict = field(default_factory=dict)  # game_id -> (goals, assists, pim)
+    api_error: bool = False  # True only for HTTP 5xx — increments skip counter
 
 
 def _phase_from_slider_text(slider_text: str) -> str:
@@ -2142,30 +2151,34 @@ class DataIndexer:
 
     # ==================== PLAYER GAME STATS PATH ====================
 
-    def index_player_game_stats(self, player_id: int, season_id: int, force: bool = False, request_timeout: int | None = None) -> int:
-        """Update game_players.goals/assists/penalty_minutes for one player using
-        GET /api/players/:id/overview (per-game breakdown).
+    _API_FAILURE_THRESHOLD = 3
+    _API_SKIP_DAYS = 7
 
-        Overview cell layout (0-indexed):
-          0 – date, 1 – location, 2 – status/time,
-          3 – home team, 4 – away team, 5 – score,
-          6 – goals (T), 7 – assists (A), 8 – points (P), 9 – penalty minutes (SM)
+    def _fetch_player_game_stats(
+        self, player_id: int, season_id: int, force: bool = False, request_timeout: int | None = None
+    ) -> "_PlayerGameStatsFetchResult":
+        """Phase 1: fetch and parse one player's game stats. No DB writes.
 
-        Returns the number of game_players rows updated.
+        Returns a result object; sets api_error=True only on HTTP 5xx so the
+        caller can track upstream failures separately from timeouts/parse errors.
         """
+        result = _PlayerGameStatsFetchResult(player_id=player_id)
         entity_id = f"player_game_stats:{player_id}:{season_id}"
         if not force and not self._should_update("player_game_stats", entity_id, max_age_hours=4):
-            return 0
+            return result
 
         try:
             data = self.client.get_player_overview(player_id, season=season_id, request_timeout=request_timeout)
-            regions = data.get("data", {}).get("regions", [])
         except Exception as exc:
-            logger.debug("Could not fetch overview for player %s: %s", player_id, exc)
-            return 0
+            import requests as _req
+            if isinstance(exc, _req.HTTPError) and exc.response is not None and exc.response.status_code >= 500:
+                logger.debug("API 5xx for player %s: %s", player_id, exc)
+                result.api_error = True
+            else:
+                logger.debug("Could not fetch overview for player %s: %s", player_id, exc)
+            return result
 
-        # Build mapping: game_id -> (goals, assists, pim)
-        game_stats: dict[int, tuple[int, int, int]] = {}
+        regions = data.get("data", {}).get("regions", [])
         for region in regions:
             for row in region.get("rows", []):
                 row_id = row.get("id")
@@ -2181,7 +2194,6 @@ class DataIndexer:
                         v = v[0] if v else None
                     return (v or "").strip()
 
-                # Skip rows where player did not play
                 if _txt(6) in ("Nicht gespielt", ""):
                     continue
 
@@ -2191,15 +2203,30 @@ class DataIndexer:
                     except (ValueError, TypeError):
                         return 0
 
-                game_stats[row_id] = (_int(6), _int(7), _int(9))  # goals, assists, pim
+                result.game_stats[row_id] = (_int(6), _int(7), _int(9))  # goals, assists, pim
 
-        if not game_stats:
+        return result
+
+    def index_player_game_stats(self, player_id: int, season_id: int, force: bool = False, request_timeout: int | None = None) -> int:
+        """Update game_players.goals/assists/penalty_minutes for one player using
+        GET /api/players/:id/overview (per-game breakdown).
+
+        Overview cell layout (0-indexed):
+          0 – date, 1 – location, 2 – status/time,
+          3 – home team, 4 – away team, 5 – score,
+          6 – goals (T), 7 – assists (A), 8 – points (P), 9 – penalty minutes (SM)
+
+        Returns the number of game_players rows updated.
+        """
+        entity_id = f"player_game_stats:{player_id}:{season_id}"
+        fetch_result = self._fetch_player_game_stats(player_id, season_id, force=force, request_timeout=request_timeout)
+        if not fetch_result.game_stats:
             return 0
 
         updated = 0
         try:
             with self.db_service.session_scope() as session:
-                for game_id, (goals, assists, pim) in game_stats.items():
+                for game_id, (goals, assists, pim) in fetch_result.game_stats.items():
                     n = (
                         session.query(GamePlayer)
                         .filter(
@@ -2295,37 +2322,127 @@ class DataIndexer:
                     self._mark_sync_complete(session, entity_type, entity_id, 0)
             return 0
 
+        # Pre-fetch: exclude players whose API skip window is still active
+        now = datetime.now(timezone.utc)
+        with self.db_service.session_scope() as session:
+            skip_ids = {
+                r[0] for r in session.query(Player.person_id)
+                .filter(Player.api_skip_until.isnot(None), Player.api_skip_until > now).all()
+            }
+        if skip_ids:
+            logger.info("Skipping %d players with active API skip window", len(skip_ids))
+        player_ids = [pid for pid in player_ids if pid not in skip_ids]
+
+        if not player_ids:
+            logger.info("No eligible players to process for season %s%s after skip filter", season_id, tier_lbl)
+            with self.db_service.session_scope() as session:
+                self._mark_sync_complete(session, entity_type, entity_id, 0)
+            return 0
+
         logger.info(
             "Updating per-game G/A/PIM for %d players in season %s%s...",
             len(player_ids), season_id, tier_lbl,
         )
-        total = 0
+
+        # ── Phase 1: parallel API fetches (no DB writes) ────────────────────
         completed = 0
         _lock = threading.Lock()
+        fetch_results: list["_PlayerGameStatsFetchResult"] = []
 
-        def _fetch_one(pid: int) -> int:
+        def _fetch_one(pid: int) -> "_PlayerGameStatsFetchResult":
             nonlocal completed
-            n = self.index_player_game_stats(pid, season_id=season_id, force=force,
-                                             request_timeout=10)
+            result = self._fetch_player_game_stats(pid, season_id=season_id, force=force, request_timeout=10)
             with _lock:
                 completed += 1
                 if on_progress:
-                    on_progress(int(completed / len(player_ids) * 95))
-            return n
+                    on_progress(int(completed / len(player_ids) * 80))
+            return result
 
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = {pool.submit(_fetch_one, pid) for pid in player_ids}
+            futures = {pool.submit(_fetch_one, pid): pid for pid in player_ids}
             for fut in as_completed(futures):
                 try:
-                    total += fut.result()
+                    fetch_results.append(fut.result())
                 except Exception as exc:
                     logger.warning("player_game_stats worker error: %s", exc)
 
+        # ── Phase 2: single sequential session for all DB writes ────────────
+        total = self._run_phase2(
+            fetch_results=fetch_results,
+            season_id=season_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            exact_tier=exact_tier,
+            now=now,
+        )
+
+        if on_progress:
+            on_progress(100)
+        logger.info(
+            "\u2713 Updated %d game_players rows with G/A/PIM for season %s%s",
+            total, season_id, tier_lbl,
+        )
+        return total
+
+    def _run_phase2(
+        self,
+        fetch_results: list,
+        season_id: int,
+        entity_type: str,
+        entity_id: str,
+        exact_tier: Optional[int],
+        now: datetime,
+    ) -> int:
+        """Phase 2: write all player game stats results in a single session.
+
+        Serialises all DB writes so there is at most one concurrent SQLite writer
+        regardless of how many threads were used in Phase 1.  Also handles
+        api_failure tracking and api_skip_until management.
+
+        Returns total game_players rows updated.
+        """
+        total = 0
         with self.db_service.session_scope() as session:
+            for result in fetch_results:
+                pid = result.player_id
+                entity_id_p = f"player_game_stats:{pid}:{season_id}"
+
+                if result.api_error:
+                    player = session.query(Player).filter(Player.person_id == pid).first()
+                    if player is not None:
+                        player.api_failures = (player.api_failures or 0) + 1
+                        if player.api_failures >= self._API_FAILURE_THRESHOLD:
+                            player.api_skip_until = now + timedelta(days=self._API_SKIP_DAYS)
+                            logger.info(
+                                "Player %s hit %d API failures; skipping until %s",
+                                pid, player.api_failures, player.api_skip_until,
+                            )
+                    continue
+
+                if not result.game_stats:
+                    continue
+
+                updated = 0
+                for game_id, (goals, assists, pim) in result.game_stats.items():
+                    n = (
+                        session.query(GamePlayer)
+                        .filter(
+                            GamePlayer.game_id == game_id,
+                            GamePlayer.player_id == pid,
+                        )
+                        .update({"goals": goals, "assists": assists, "penalty_minutes": pim})
+                    )
+                    updated += n or 0
+
+                if updated:
+                    self._mark_sync_complete(session, "player_game_stats", entity_id_p, updated)
+                    player = session.query(Player).filter(Player.person_id == pid).first()
+                    if player is not None and (player.api_failures or 0) > 0:
+                        player.api_failures = 0
+                        player.api_skip_until = None
+                    total += updated
+
             self._mark_sync_complete(session, entity_type, entity_id, total)
-            # When running untiered (exact_tier=None), also stamp each
-            # tier-specific SyncStatus row so the scheduler sees all tiers as
-            # fresh after a full manual re-index.
             if exact_tier is None:
                 for t in range(1, 7):
                     self._mark_sync_complete(
@@ -2334,15 +2451,11 @@ class DataIndexer:
                         f"season_game_stats:t{t}:{season_id}",
                         total,
                     )
-        logger.info(
-            "\u2713 Updated %d game_players rows with G/A/PIM for season %s%s",
-            total, season_id, tier_lbl,
-        )
         return total
 
     def get_indexing_stats(self) -> Dict[str, Any]:
         """Get current indexing statistics
-        
+
         Returns:
             Dict with entity counts and sync status
         """
