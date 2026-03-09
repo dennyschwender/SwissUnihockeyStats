@@ -114,16 +114,6 @@ POLICIES: list[dict] = [
         "run_at_hour": 3,
     },
     {
-        "name":        "league_groups",
-        "entity_type": "league_groups",
-        "max_age":     timedelta(days=7),
-        "task":        "groups",
-        "scope":       "season",
-        "label":       "League groups refresh",
-        "priority":    60,
-        "run_at_hour": 3,
-    },
-    {
         "name":        "games",
         "entity_type": "games",
         "max_age":     timedelta(days=7),
