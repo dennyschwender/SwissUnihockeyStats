@@ -1,0 +1,45 @@
+  <!-- ══ Tab: Database ══ -->
+  <div class="tab-panel" id="tab-db">
+
+    <p class="section-title">SQLite Health</p>
+    <div class="sync-panel" id="db-panel" style="margin-top:0">
+      <h2>Database</h2>
+      <div id="db-body" style="display:block">
+        <div style="display:flex;flex-wrap:wrap;gap:1rem;padding:.75rem 1rem;align-items:flex-start">
+          <div style="min-width:200px">
+            <div class="task-group-label" style="margin-bottom:.4rem">File Sizes</div>
+            <table style="font-size:.78rem;border-collapse:collapse;width:100%">
+              <tbody id="db-files-tbody"></tbody>
+            </table>
+          </div>
+          <div style="min-width:200px">
+            <div class="task-group-label" style="margin-bottom:.4rem">SQLite PRAGMA</div>
+            <table style="font-size:.78rem;border-collapse:collapse;width:100%">
+              <tbody id="db-pragma-tbody"></tbody>
+            </table>
+          </div>
+          <div style="min-width:160px">
+            <div class="task-group-label" style="margin-bottom:.4rem">Maintenance</div>
+            <div style="display:flex;flex-direction:column;gap:.4rem">
+              <button class="btn btn-sm" id="vacuum-btn" onclick="runVacuum()" title="VACUUM + WAL checkpoint: reclaims space from deleted rows and merges WAL back into .db">🧹 VACUUM + Checkpoint</button>
+              <button class="btn btn-sm" id="cleanup-btn" onclick="runCleanup()" title="Remove duplicate league_groups, game_events, and old sync_status rows">🗑️ Cleanup Duplicates</button>
+              <button class="btn btn-sm" onclick="loadDbInfo()">↺ Refresh</button>
+            </div>
+            <div style="margin-top:.5rem;font-size:.7rem;color:#6e7681;line-height:1.5">
+              VACUUM rewrites the DB to reclaim free pages and merge the WAL file back. Can take a few seconds on large DBs.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="section-title" style="margin-top:1.25rem">Output</p>
+    <div class="log-panel">
+      <div class="panel-header">
+        DB Actions Log
+        <button class="btn btn-sm" onclick="clearDbLog()">Clear</button>
+      </div>
+      <div class="log-box" id="db-log-box">Ready.</div>
+    </div>
+
+  </div>

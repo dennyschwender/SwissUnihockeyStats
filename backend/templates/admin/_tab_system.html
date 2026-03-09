@@ -1,0 +1,72 @@
+  <!-- ══ Tab: System ══ -->
+  <div class="tab-panel" id="tab-system">
+
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
+      <span id="sys-refresh-ts" style="font-size:.7rem;color:#6e7681">Loading…</span>
+      <button class="btn btn-sm" onclick="loadSystemStats(true)">↺ Refresh</button>
+    </div>
+
+    <!-- Gauge cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.75rem;margin-bottom:.75rem">
+
+      <div class="sync-panel" style="margin:0;padding:.75rem 1rem">
+        <div style="font-size:.68rem;color:#6e7681;text-transform:uppercase;letter-spacing:.04em">CPU Usage</div>
+        <div style="font-size:1.6rem;font-weight:700;color:#e6edf3;line-height:1.2;margin:.2rem 0 .3rem" id="sys-cpu-val">—</div>
+        <div class="sys-gauge-track"><div class="sys-gauge-bar" id="sys-cpu-bar"></div></div>
+        <div style="font-size:.68rem;color:#6e7681;margin-top:.3rem" id="sys-cpu-sub">— cores</div>
+      </div>
+
+      <div class="sync-panel" style="margin:0;padding:.75rem 1rem">
+        <div style="font-size:.68rem;color:#6e7681;text-transform:uppercase;letter-spacing:.04em">Memory</div>
+        <div style="font-size:1.6rem;font-weight:700;color:#e6edf3;line-height:1.2;margin:.2rem 0 .3rem" id="sys-mem-val">—</div>
+        <div class="sys-gauge-track"><div class="sys-gauge-bar" id="sys-mem-bar"></div></div>
+        <div style="font-size:.68rem;color:#6e7681;margin-top:.3rem" id="sys-mem-sub">— / —</div>
+      </div>
+
+      <div class="sync-panel" style="margin:0;padding:.75rem 1rem">
+        <div style="font-size:.68rem;color:#6e7681;text-transform:uppercase;letter-spacing:.04em">Disk</div>
+        <div style="font-size:1.6rem;font-weight:700;color:#e6edf3;line-height:1.2;margin:.2rem 0 .3rem" id="sys-disk-val">—</div>
+        <div class="sys-gauge-track"><div class="sys-gauge-bar" id="sys-disk-bar"></div></div>
+        <div style="font-size:.68rem;color:#6e7681;margin-top:.3rem" id="sys-disk-sub">— / —</div>
+      </div>
+
+    </div><!-- /gauge cards -->
+
+    <!-- Info cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.75rem">
+
+      <div class="sync-panel" style="margin:0;padding:.75rem 1rem">
+        <div style="font-size:.68rem;color:#6e7681;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">Network I/O</div>
+        <table style="font-size:.78rem;border-collapse:collapse;width:100%">
+          <tr><td style="color:#6e7681;padding:2px 0;width:52px">↑ Sent</td><td id="sys-net-sent">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">↓ Recv</td><td id="sys-net-recv">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">Pkts ↑</td><td id="sys-net-psent">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">Pkts ↓</td><td id="sys-net-precv">—</td></tr>
+        </table>
+      </div>
+
+      <div class="sync-panel" style="margin:0;padding:.75rem 1rem">
+        <div style="font-size:.68rem;color:#6e7681;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">App Process</div>
+        <table style="font-size:.78rem;border-collapse:collapse;width:100%">
+          <tr><td style="color:#6e7681;padding:2px 0;width:60px">PID</td><td id="sys-proc-pid">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">RSS Mem</td><td id="sys-proc-mem">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">CPU %</td><td id="sys-proc-cpu">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">Threads</td><td id="sys-proc-thr">—</td></tr>
+        </table>
+      </div>
+
+      <div class="sync-panel" style="margin:0;padding:.75rem 1rem">
+        <div style="font-size:.68rem;color:#6e7681;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">System / Container</div>
+        <table style="font-size:.78rem;border-collapse:collapse;width:100%">
+          <tr><td style="color:#6e7681;padding:2px 0;width:60px">Host</td><td id="sys-hostname" style="font-family:monospace;font-size:.7rem;word-break:break-all">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">Uptime</td><td id="sys-uptime">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">cg Limit</td><td id="sys-cg-limit">—</td></tr>
+          <tr><td style="color:#6e7681;padding:2px 0">cg Used</td><td id="sys-cg-used">—</td></tr>
+        </table>
+      </div>
+
+    </div><!-- /info cards -->
+
+    <div id="sys-error" style="display:none;color:#f85149;font-size:.78rem;margin-top:.75rem"></div>
+
+  </div>

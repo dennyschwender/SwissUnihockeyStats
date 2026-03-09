@@ -1,0 +1,30 @@
+<!-- Trends tab: historical graphs -->
+<div class="tab-panel" id="tab-trends">
+  <div class="trends-toolbar">
+    <span class="section-title">Historical Trends</span>
+    <div class="trends-range-btns">
+      <button class="btn btn-sm" onclick="setTrendsRange(7)"  id="tr-7d">7d</button>
+      <button class="btn btn-sm btn-active" onclick="setTrendsRange(30)" id="tr-30d">30d</button>
+      <button class="btn btn-sm" onclick="setTrendsRange(90)" id="tr-90d">90d</button>
+    </div>
+  </div>
+  <div class="trends-grid">
+    <div class="trend-card">
+      <h3 class="trend-card-title">DB Size</h3>
+      <canvas id="chart-db-size"></canvas>
+    </div>
+    <div class="trend-card">
+      <h3 class="trend-card-title">Record Counts</h3>
+      <canvas id="chart-records"></canvas>
+    </div>
+    <div class="trend-card">
+      <h3 class="trend-card-title">Jobs Run vs. Errors</h3>
+      <canvas id="chart-jobs"></canvas>
+    </div>
+    <div class="trend-card">
+      <h3 class="trend-card-title">Avg Job Duration</h3>
+      <canvas id="chart-duration"></canvas>
+    </div>
+  </div>
+  <p class="trends-hint">Snapshots taken every 6 hours by the scheduler.</p>
+</div>

@@ -488,6 +488,28 @@ async def admin_stats(_: None = Depends(require_admin)):
         return {"totals": {}, "by_season": [], "sync_status": [], "error": str(exc)}
 
 
+@app.get("/admin/api/stats/history")
+async def admin_stats_history(
+    days: int = 30,
+    _: None = Depends(require_admin),
+):
+    """Return admin_stats_snapshots rows for the last `days` days, newest first."""
+    from sqlalchemy import text
+    from datetime import datetime, timezone, timedelta
+    from app.services.database import get_database_service
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    db_service = get_database_service()
+    with db_service.engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT ts, db_size_bytes, games, players, events, player_stats,
+                   jobs_run, jobs_errors, avg_job_duration_s
+            FROM admin_stats_snapshots
+            WHERE ts >= :cutoff
+            ORDER BY ts DESC
+        """), {"cutoff": cutoff}).fetchall()
+    return [dict(r._mapping) for r in rows]
+
+
 @app.get("/admin/api/db-info")
 async def admin_db_info(_: None = Depends(require_admin)):
     """SQLite file sizes and PRAGMA health metrics."""
