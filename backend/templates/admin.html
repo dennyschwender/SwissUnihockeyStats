@@ -6,6 +6,7 @@
   <title>Admin — Unihockey Stats</title>
   <link rel="stylesheet" href="/static/css/main.css?v=25">
   <link rel="stylesheet" href="/static/css/admin.css?v=1">
+  <script src="/static/js/vendor/chart.umd.min.js"></script>
   <script defer src="/static/js/vendor/alpine.min.js"></script>
 </head>
 <body>
@@ -29,6 +30,7 @@
   <button class="tab-btn" id="tabBtn-settings" onclick="switchTab('settings')">⚙ Settings</button>
   <button class="tab-btn" id="tabBtn-db" onclick="switchTab('db')">🗄 Database</button>
   <button class="tab-btn" id="tabBtn-system" onclick="switchTab('system')">🐳 System</button>
+  <button class="tab-btn" id="tabBtn-trends" onclick="switchTab('trends')">📈 Trends</button>
 </div>
 
 <div class="tab-content">
@@ -43,6 +45,8 @@
 
   {% include "admin/_tab_system.html" %}
 
+  {% include "admin/_tab_trends.html" %}
+
 </div><!-- /tab-content -->
 
 <script type="module">
@@ -53,6 +57,7 @@ import { loadScheduler, pollJob } from '/static/js/admin/scheduling.js';
 import { loadRenderingFilters } from '/static/js/admin/settings.js';
 import { loadDbInfo } from '/static/js/admin/database.js';
 import { loadSystemStats } from '/static/js/admin/system.js';
+import '/static/js/admin/trends.js';
 
 /* ── Globals ── */
 // Per-task tier defaults — updated from scheduler policy_tiers on load
@@ -88,6 +93,7 @@ function switchTab(name) {
   if (name === 'settings') { loadScheduler(); loadRenderingFilters(); }
   if (name === 'db')     loadDbInfo();
   if (name === 'system') loadSystemStats(true);
+  if (name === 'trends') window.loadTrends();
 }
 
 /* ── DB Health panel (Alpine.js) ── */

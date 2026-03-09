@@ -314,3 +314,38 @@
     .collapsible-body { display: none; }
     .collapsible-body.open { display: block; }
     .health-empty { color: #3fb950; font-size: .78rem; padding: .3rem 0; }
+
+/* ── Trends tab ───────────────────────────────────────── */
+.trends-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.trends-range-btns { display: flex; gap: .4rem; }
+.trends-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+@media (max-width: 700px) { .trends-grid { grid-template-columns: 1fr; } }
+.trend-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 1rem;
+}
+.trend-card-title {
+  margin: 0 0 .75rem;
+  font-size: .85rem;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.trends-hint {
+  font-size: .75rem;
+  color: #8b949e;
+  margin-top: .75rem;
+  text-align: center;
+}
+.btn-active { background: var(--swiss-red); color: #fff; border-color: var(--swiss-red); }
