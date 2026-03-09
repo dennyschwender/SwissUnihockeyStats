@@ -776,12 +776,13 @@ class DataIndexer:
         season_label: str,
         session,
         staged: dict,
-    ) -> int:
+    ) -> tuple:
         """Fetch /api/players/:id/statistics and upsert matching rows.
 
         Uses the caller-supplied session so it can be embedded in a larger
         transaction (season loop) or a standalone one (single-player call).
-        Returns the number of rows upserted for this player.
+        Returns a (rows_upserted, api_error) tuple where api_error is True
+        only for HTTP 5xx responses (used to increment the skip counter).
 
         Cell layout (0-indexed):
           0 – season text (e.g. "2025/26")
@@ -799,8 +800,12 @@ class DataIndexer:
         try:
             stats_data = self.client.get_player_stats(person_id)
         except Exception as exc:
+            import requests as _req
+            if isinstance(exc, _req.HTTPError) and exc.response is not None and exc.response.status_code >= 500:
+                logger.debug("API 5xx for player stats %s: %s", person_id, exc)
+                return 0, True   # (rows_upserted, api_error)
             logger.debug("Could not fetch stats for player %s: %s", person_id, exc)
-            return 0
+            return 0, False
 
         regions = stats_data.get("data", {}).get("regions", [])
         count = 0
@@ -921,7 +926,7 @@ class DataIndexer:
                     session.add(obj)
                     staged[key] = obj
                 count += 1
-        return count
+        return count, False
 
     def index_player_stats_one(self, player_id: int, season_id: int, force: bool = False) -> int:
         """Index statistics for a single player in one season.
@@ -938,7 +943,7 @@ class DataIndexer:
             season_row = session.get(SeasonModel, season_id)
             season_label = season_row.text if season_row and season_row.text else str(season_id)
             staged: dict[tuple, PlayerStatistics] = {}
-            count = self._upsert_player_stats_from_api(player_id, season_id, season_label, session, staged)
+            count, _api_err = self._upsert_player_stats_from_api(player_id, season_id, season_label, session, staged)
             session.commit()
             if count:
                 self._mark_sync_complete(session, "player_stats_one", entity_id, count)
@@ -1027,12 +1032,40 @@ class DataIndexer:
                         self._mark_sync_complete(session, entity_type, entity_id, 0)
                     return 0
 
+                # Exclude players whose API skip window is still active
+                now_skip = datetime.now(timezone.utc)
+                skip_ids = {
+                    r[0] for r in session.query(Player.person_id)
+                    .filter(Player.api_skip_until.isnot(None), Player.api_skip_until > now_skip)
+                    .all()
+                }
+                if skip_ids:
+                    logger.info("player_stats: skipping %d player(s) with active API skip window", len(skip_ids))
+                player_ids = [pid for pid in player_ids if pid not in skip_ids]
+
                 count = 0
                 staged: dict[tuple, PlayerStatistics] = {}
                 for i, person_id in enumerate(player_ids, 1):
-                    count += self._upsert_player_stats_from_api(
+                    n, api_err = self._upsert_player_stats_from_api(
                         person_id, season_id, season_label, session, staged
                     )
+                    count += n
+                    if api_err:
+                        player = session.query(Player).filter(Player.person_id == person_id).first()
+                        if player is not None:
+                            player.api_failures = (player.api_failures or 0) + 1
+                            if player.api_failures >= self._API_FAILURE_THRESHOLD:
+                                player.api_skip_until = now_skip + timedelta(days=self._API_SKIP_DAYS)
+                                logger.info(
+                                    "player_stats: player %s hit %d API failures; skipping until %s",
+                                    person_id, player.api_failures, player.api_skip_until,
+                                )
+                    elif n > 0:
+                        # Successful update — reset failure counter
+                        player = session.query(Player).filter(Player.person_id == person_id).first()
+                        if player is not None and (player.api_failures or 0) > 0:
+                            player.api_failures = 0
+                            player.api_skip_until = None
                     if on_progress and player_ids:
                         on_progress(int(i / len(player_ids) * 95))
 
