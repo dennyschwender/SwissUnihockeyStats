@@ -335,6 +335,7 @@ class DataIndexer:
         sync.sync_status    = "completed"
         sync.records_synced = records_count
         sync.last_sync      = datetime.now(timezone.utc)
+        sync.error_message  = None
         session.commit()
     
     def bulk_already_indexed(self, entity_type: str, entity_ids: list[str],
