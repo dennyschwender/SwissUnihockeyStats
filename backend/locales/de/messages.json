@@ -8,7 +8,20 @@
     "search": "Suchen",
     "filter": "Filter",
     "back": "Zurück",
-    "close": "Schliessen"
+    "close": "Schliessen",
+    "prev": "← Zurück",
+    "next": "Weiter →",
+    "total": "gesamt",
+    "vs": "vs",
+    "search_placeholder": "Spieler, Teams, Ligen suchen…",
+    "toggle_theme": "Design wechseln",
+    "toggle_menu": "Menü öffnen",
+    "all": "Alle",
+    "men": "Herren",
+    "women": "Damen",
+    "gp": "Sp",
+    "pts": "Pkt",
+    "pim": "Str"
   },
   "nav": {
     "home": "Startseite",
@@ -69,7 +82,13 @@
     "subtitle": "Spielplan und Ergebnisse",
     "live": "Live",
     "upcoming": "Bevorstehende Spiele",
-    "results": "Ergebnisse"
+    "results": "Ergebnisse",
+    "schedule": "Spielplan",
+    "filter_level": "Stufe",
+    "no_games": "Keine Spiele gefunden",
+    "no_games_filtered": "Keine Spiele für diesen Filter gefunden",
+    "count_suffix": "Spiele",
+    "upcoming_short": "bevorstehend"
   },
   "rankings": {
     "title": "Ranglisten",
@@ -84,7 +103,9 @@
     "order_points": "Punkte",
     "order_goals": "Tore",
     "order_assists": "Assists",
-    "search_placeholder": "Nach Name suchen…"
+    "search_placeholder": "Nach Name suchen…",
+    "filter_season": "Saison",
+    "no_stats": "Noch keine Spielerstatistiken verfügbar."
   },
   "footer": {
     "copyright": "© 2026 SwissUnihockey",
@@ -210,5 +231,10 @@
     "install_title": "📱 Unihockey Stats installieren",
     "install_desc": "Offline-Zugriff, schnelleres Laden",
     "install_btn": "Installieren"
+  },
+  "meta": {
+    "description": "Umfassende Statistiken für Schweizer Unihockey-Ligen, Teams, Spiele und Ranglisten",
+    "og_description": "Umfassende Statistiken für Schweizer Unihockey-Ligen, Teams, Spiele und Ranglisten",
+    "keywords": "unihockey, floorball, schweiz, statistiken, ligen, teams, ranglisten"
   }
 }
