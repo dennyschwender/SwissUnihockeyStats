@@ -583,7 +583,7 @@ function gameTimeline(events, totalSeconds) {
   {% endif %}
 
   {% if playoff_series %}
-  <script>const _playoffSeries = {{ playoff_series.series_list | tojson }};</script>
+  <script>const _playoffSeries = {{ playoff_series.phases | tojson }};</script>
   {% endif %}
 
   <!-- Tabs -->
@@ -598,7 +598,7 @@ function gameTimeline(events, totalSeconds) {
       <button class="gd-tab" :class="tab === 'h2h' ? 'active' : ''" @click="tab = 'h2h'" role="tab">📊 {{ t.game.tab_h2h }}</button>
       <button class="gd-tab" :class="tab === 'table' ? 'active' : ''" @click="tab = 'table'" role="tab">🏆 {{ t.game.tab_table }}</button>
       {% if playoff_series %}
-      <button class="gd-tab" :class="tab === 'playoff' ? 'active' : ''" @click="tab = 'playoff'" role="tab">🥊 {{ playoff_series.phase_display }}</button>
+      <button class="gd-tab" :class="tab === 'playoff' ? 'active' : ''" @click="tab = 'playoff'" role="tab">🥊 {{ t.game.tab_playoff }}</button>
       {% endif %}
     </div>
 
@@ -996,15 +996,17 @@ function gameTimeline(events, totalSeconds) {
 
     {% if playoff_series %}
     <!-- PLAYOFF tab -->
-    <div class="gd-tabpanel" x-show="tab === 'playoff'" x-data="{ seriesData: _playoffSeries }">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem;">
-        <span style="font-size:.8rem;color:var(--gray-500);">{{ playoff_series.phase_display }}</span>
+    <div class="gd-tabpanel" x-show="tab === 'playoff'" x-data="{ phases: _playoffSeries }">
+      <div style="display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem;">
         {% if game.league_db_id %}
         <a href="/{{ locale }}/league/{{ game.league_db_id }}" style="font-size:.8rem;color:var(--swiss-red);text-decoration:none;font-weight:500;">View full bracket →</a>
         {% endif %}
       </div>
-      <div class="playoff-grid">
-        <template x-for="s in seriesData" :key="s.team_a_id + '-' + s.team_b_id">
+      <template x-for="phase in phases" :key="phase.phase_name">
+        <div style="margin-bottom:1.5rem;">
+          <h3 style="font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gray-500);margin:0 0 .75rem 0;" x-text="phase.phase_name"></h3>
+          <div class="playoff-grid">
+        <template x-for="s in phase.series_list" :key="s.team_a_id + '-' + s.team_b_id">
           <div :style="'background:var(--card-bg,white);border:' + (s.is_current_series ? '2px solid var(--swiss-red)' : '1px solid var(--gray-200)') + ';border-radius:.75rem;overflow:hidden;box-shadow:' + (s.is_current_series ? '0 2px 8px rgba(220,38,38,.15)' : '0 1px 3px rgba(0,0,0,.06)') + ';'">
             <!-- Series header -->
             <div style="background:var(--gray-50);padding:.75rem 1rem;border-bottom:1px solid var(--gray-200);">
@@ -1054,7 +1056,9 @@ function gameTimeline(events, totalSeconds) {
             </div>
           </div>
         </template>
-      </div>
+          </div>
+        </div>
+      </template>
     </div>
     {% endif %}
 
