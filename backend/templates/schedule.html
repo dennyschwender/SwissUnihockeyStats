@@ -7,7 +7,7 @@
 
   <div class="page-header">
     <h1 class="page-title">📅 {{ t.nav.schedule }}</h1>
-    <span style="font-size:.875rem;color:var(--gray-500);">{{ total }} upcoming</span>
+    <span style="font-size:.875rem;color:var(--gray-500);">{{ total }} {{ t.games.upcoming_short }}</span>
   </div>
 
   <!-- League filters (same style as Leagues page) -->
@@ -58,7 +58,7 @@
           {% if g.home_team_logo %}<img src="{{ g.home_team_logo }}" alt="" style="width:1.25rem;height:1.25rem;object-fit:contain;flex-shrink:0;">{% endif %}
         </a>
       </div>
-      <div class="game-col-vs">vs</div>
+      <div class="game-col-vs">{{ t.common.vs }}</div>
       <div class="game-col-team">
         <a href="/{{ locale }}/team/{{ g.away_team_id }}" class="link-inherit" style="display:inline-flex;align-items:center;gap:.3rem;">
           {% if g.away_team_logo %}<img src="{{ g.away_team_logo }}" alt="" style="width:1.25rem;height:1.25rem;object-fit:contain;flex-shrink:0;">{% endif %}
@@ -72,7 +72,7 @@
   {% else %}
   <div class="empty-state-center">
     <p class="empty-state-icon">📅</p>
-    <p>No upcoming games found{% if sex != 'all' or age != 'all' or field != 'all' %} for this filter{% endif %}.</p>
+    <p>{% if sex != 'all' or age != 'all' or field != 'all' %}{{ t.games.no_games_filtered }}{% else %}{{ t.games.no_games }}{% endif %}.</p>
   </div>
   {% endif %}
 
@@ -80,16 +80,16 @@
   {% set fp = 'sex=' ~ sex ~ '&age=' ~ age ~ '&field=' ~ field %}
   <div class="pagination">
     {% if page > 1 %}
-    <a href="?{{ fp }}&page={{ page - 1 }}" class="page-link wide">← Prev</a>
+    <a href="?{{ fp }}&page={{ page - 1 }}" class="page-link wide">{{ t.common.prev }}</a>
     {% endif %}
     {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
     <a href="?{{ fp }}&page={{ p }}"
        class="page-link{% if p == page %} active{% endif %}">{{ p }}</a>
     {% endfor %}
     {% if page < total_pages %}
-    <a href="?{{ fp }}&page={{ page + 1 }}" class="page-link wide">Next →</a>
+    <a href="?{{ fp }}&page={{ page + 1 }}" class="page-link wide">{{ t.common.next }}</a>
     {% endif %}
-    <span class="pagination-total">{{ total }} total</span>
+    <span class="pagination-total">{{ total }} {{ t.common.total }}</span>
   </div>
   {% endif %}
 
