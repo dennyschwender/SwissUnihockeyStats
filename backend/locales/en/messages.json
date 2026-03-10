@@ -8,7 +8,20 @@
     "search": "Search",
     "filter": "Filter",
     "back": "Back",
-    "close": "Close"
+    "close": "Close",
+    "prev": "← Prev",
+    "next": "Next →",
+    "total": "total",
+    "vs": "vs",
+    "search_placeholder": "Search players, teams, leagues…",
+    "toggle_theme": "Toggle theme",
+    "toggle_menu": "Toggle menu",
+    "all": "All",
+    "men": "Men",
+    "women": "Women",
+    "gp": "GP",
+    "pts": "PTS",
+    "pim": "PIM"
   },
   "nav": {
     "home": "Home",
@@ -69,7 +82,13 @@
     "subtitle": "Schedule and Results",
     "live": "Live",
     "upcoming": "Upcoming Games",
-    "results": "Results"
+    "results": "Results",
+    "schedule": "Schedule",
+    "filter_level": "Level",
+    "no_games": "No games found",
+    "no_games_filtered": "No games found for this filter",
+    "count_suffix": "games",
+    "upcoming_short": "upcoming"
   },
   "rankings": {
     "title": "Rankings",
@@ -84,7 +103,9 @@
     "order_points": "Points",
     "order_goals": "Goals",
     "order_assists": "Assists",
-    "search_placeholder": "Search by name…"
+    "search_placeholder": "Search by name…",
+    "filter_season": "Season",
+    "no_stats": "No player statistics available yet."
   },
   "footer": {
     "copyright": "© 2026 SwissUnihockey",
@@ -210,5 +231,10 @@
     "install_title": "📱 Install Unihockey Stats",
     "install_desc": "Access stats offline, faster loading",
     "install_btn": "Install"
+  },
+  "meta": {
+    "description": "Comprehensive statistics for Swiss floorball leagues, teams, games, and rankings",
+    "og_description": "Comprehensive statistics for Swiss floorball leagues, teams, games, and rankings",
+    "keywords": "unihockey, floorball, swiss, statistics, leagues, teams, rankings"
   }
 }
