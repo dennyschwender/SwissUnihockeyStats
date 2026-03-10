@@ -1105,9 +1105,10 @@ class DataIndexer:
 
         logger.info(f"Indexing leagues for season {season_id}...")
 
-        with self.db_service.session_scope() as session:
-            self._mark_sync_start(session, "leagues", entity_id)
-            try:
+        try:
+            with self.db_service.session_scope() as session:
+                self._mark_sync_start(session, "leagues", entity_id)
+
                 leagues_data = self.client.get_leagues()
                 entries = leagues_data.get("entries", [])
 
@@ -1144,29 +1145,31 @@ class DataIndexer:
                     staged[key] = league
                     count += 1
 
-                session.commit()
                 self._mark_sync_complete(session, "leagues", entity_id, count)
                 logger.info(f"✓ Indexed {count} leagues for season {season_id}")
                 return count
 
-            except Exception as e:
-                logger.error(f"Failed to index leagues for season {season_id}: {e}", exc_info=True)
-                # If this is a past season that already has leagues indexed, treat
-                # the API failure as non-fatal and mark completed so the scheduler
-                # doesn't re-queue it every tick (the API may no longer serve old data).
-                session.rollback()
-                existing = session.query(League).filter(
-                    League.season_id == season_id
-                ).count()
-                if existing > 0:
-                    logger.info(
-                        f"[leagues] API failed but {existing} leagues already exist "
-                        f"for season {season_id} — marking completed to suppress retries"
-                    )
-                    self._mark_sync_complete(session, "leagues", entity_id, existing)
-                else:
-                    self._mark_sync_failed(session, "leagues", entity_id, str(e))
-                return 0
+        except Exception as e:
+            logger.error(f"Failed to index leagues for season {season_id}: {e}", exc_info=True)
+            # If this is a past season that already has leagues indexed, treat
+            # the API failure as non-fatal and mark completed so the scheduler
+            # doesn't re-queue it every tick (the API may no longer serve old data).
+            try:
+                with self.db_service.session_scope() as s:
+                    existing = s.query(League).filter(
+                        League.season_id == season_id
+                    ).count()
+                    if existing > 0:
+                        logger.info(
+                            f"[leagues] API failed but {existing} leagues already exist "
+                            f"for season {season_id} — marking completed to suppress retries"
+                        )
+                        self._mark_sync_complete(s, "leagues", entity_id, existing)
+                    else:
+                        self._mark_sync_failed(s, "leagues", entity_id, str(e))
+            except Exception:
+                pass
+            return 0
 
     def index_groups_for_league(self, league_db_id: int, season_id: int,
                                  league_id: int, game_class: int,

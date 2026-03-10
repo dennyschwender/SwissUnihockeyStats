@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional
 
 import requests
 import requests.exceptions
+from requests.adapters import HTTPAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +188,11 @@ class SwissUnihockeyClient:
         self.retry_attempts = retry_attempts
         self.retry_delay = retry_delay
         self.session = requests.Session()
+        # Increase connection pool to handle concurrent indexing jobs.
+        # Default pool_maxsize=10 is exhausted under 4 concurrent workers.
+        _adapter = HTTPAdapter(pool_connections=2, pool_maxsize=25)
+        self.session.mount("https://", _adapter)
+        self.session.mount("http://", _adapter)
         self.use_cache = use_cache
         self.cache = CacheManager(cache_dir) if use_cache else None
 
