@@ -6,8 +6,8 @@
     <title>{% block title %}{{ t.common.app_name }}{% endblock %}</title>
     
     <!-- SEO Meta Tags -->
-    <meta name="description" content="{% block description %}Unihockey Stats - Comprehensive statistics for Swiss floorball leagues, teams, games, and rankings{% endblock %}">
-    <meta name="keywords" content="{% block keywords %}unihockey, floorball, swiss, switzerland, sports, leagues, teams, statistics, rankings{% endblock %}">
+    <meta name="description" content="{% block description %}{{ t.meta.description }}{% endblock %}">
+    <meta name="keywords" content="{% block keywords %}{{ t.meta.keywords }}{% endblock %}">
     <meta name="author" content="Unihockey Stats">
     <meta name="robots" content="index, follow">
     
@@ -15,7 +15,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request.url }}">
     <meta property="og:title" content="{% block og_title %}{{ t.common.app_name }} - Swiss Floorball Statistics{% endblock %}">
-    <meta property="og:description" content="{% block og_description %}Comprehensive statistics for Swiss floorball leagues, teams, games, and rankings{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{{ t.meta.og_description }}{% endblock %}">
     <meta property="og:image" content="{% block og_image %}/static/images/og-image.png{% endblock %}">
     <meta property="og:locale" content="{{ locale }}_CH">
     
@@ -23,7 +23,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="{{ request.url }}">
     <meta name="twitter:title" content="{% block twitter_title %}{{ t.common.app_name }} - Swiss Floorball Statistics{% endblock %}">
-    <meta name="twitter:description" content="{% block twitter_description %}Comprehensive statistics for Swiss floorball leagues, teams, and rankings{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}{{ t.meta.og_description }}{% endblock %}">
     <meta name="twitter:image" content="{% block twitter_image %}/static/images/og-image.png{% endblock %}">
     
     <!-- Canonical URL -->
@@ -114,9 +114,9 @@
                     </div>
                     <!-- Mobile theme toggle (visible inside hamburger menu only) -->
                     <div class="mobile-theme-row">
-                        <button class="theme-toggle mobile-theme-btn" onclick="themeManager.toggle()" aria-label="Toggle theme">
+                        <button class="theme-toggle mobile-theme-btn" onclick="themeManager.toggle()" aria-label="{{ t.common.toggle_theme }}">
                             <span class="theme-toggle-icon">🌙</span>
-                            <span class="mobile-theme-label">Toggle theme</span>
+                            <span class="mobile-theme-label">{{ t.common.toggle_theme }}</span>
                         </button>
                     </div>
                 </nav>
@@ -127,8 +127,8 @@
                   <button id="search-icon-btn"
                           class="theme-toggle"
                           @click="open = !open; if(open) $nextTick(() => $refs.searchInput.focus())"
-                          aria-label="Search"
-                          title="Search"
+                          aria-label="{{ t.common.search_placeholder }}"
+                          title="{{ t.common.search_placeholder }}"
                           :aria-expanded="open">🔍</button>
 
                   <div class="header-search-panel" x-show="open" style="display:none;">
@@ -144,7 +144,7 @@
                         hx-trigger="keyup changed delay:300ms"
                         hx-target="#header-search-results"
                         hx-include="[name='q']"
-                        placeholder="Search players, teams, leagues…"
+                        placeholder="{{ t.common.search_placeholder }}"
                         class="universal-search-input"
                         @keydown.escape="open = false; q = ''"
                       >
@@ -157,11 +157,11 @@
                 <!-- Theme Toggle -->
                 <button id="theme-toggle-btn" class="theme-toggle"
                         onclick="themeManager.toggle()"
-                        aria-label="Toggle theme"
-                        title="Toggle dark/light mode"><span class="theme-toggle-icon">🌙</span></button>
+                        aria-label="{{ t.common.toggle_theme }}"
+                        title="{{ t.common.toggle_theme }}"><span class="theme-toggle-icon">🌙</span></button>
 
                 <!-- Hamburger (mobile only) -->
-                <button id="hamburger-btn" class="hamburger-btn" onclick="toggleMobileNav()" aria-label="Toggle menu">
+                <button id="hamburger-btn" class="hamburger-btn" onclick="toggleMobileNav()" aria-label="{{ t.common.toggle_menu }}">
                     <span></span><span></span><span></span>
                 </button>
                 
