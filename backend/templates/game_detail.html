@@ -671,12 +671,12 @@ function gameTimeline(events, totalSeconds) {
               {% if game.game_stats_indexed %}
               <th :class="cls('game_g')"     @click="sortBy('game_g')"     style="text-align:center;" title="Goals (game)">G&#9733;<span class="sort-icon" x-text="icon('game_g')"></span></th>
               <th :class="cls('game_a')"     @click="sortBy('game_a')"     style="text-align:center;" title="Assists (game)">A&#9733;<span class="sort-icon" x-text="icon('game_a')"></span></th>
-              <th :class="cls('game_pts')"   @click="sortBy('game_pts')"   style="text-align:center;" title="Points (game)">PTS&#9733;<span class="sort-icon" x-text="icon('game_pts')"></span></th>
+              <th :class="cls('game_pts')"   @click="sortBy('game_pts')"   style="text-align:center;" title="Points (game)">{{ t.common.pts }}&#9733;<span class="sort-icon" x-text="icon('game_pts')"></span></th>
               {% endif %}
-              <th :class="cls('season_gp')"  @click="sortBy('season_gp')"  style="text-align:center;color:var(--gray-400);" title="Games played (season)">GP<span class="sort-icon" x-text="icon('season_gp')"></span></th>
+              <th :class="cls('season_gp')"  @click="sortBy('season_gp')"  style="text-align:center;color:var(--gray-400);" title="Games played (season)">{{ t.common.gp }}<span class="sort-icon" x-text="icon('season_gp')"></span></th>
               <th :class="cls('season_g')"   @click="sortBy('season_g')"   style="text-align:center;color:var(--gray-400);" title="Goals (season)">G<span class="sort-icon" x-text="icon('season_g')"></span></th>
               <th :class="cls('season_a')"   @click="sortBy('season_a')"   style="text-align:center;color:var(--gray-400);" title="Assists (season)">A<span class="sort-icon" x-text="icon('season_a')"></span></th>
-              <th :class="cls('season_pts')" @click="sortBy('season_pts')" style="text-align:center;color:var(--gray-400);" title="Points (season)">PTS<span class="sort-icon" x-text="icon('season_pts')"></span></th>
+              <th :class="cls('season_pts')" @click="sortBy('season_pts')" style="text-align:center;color:var(--gray-400);" title="Points (season)">{{ t.common.pts }}<span class="sort-icon" x-text="icon('season_pts')"></span></th>
             </tr></thead>
             <tbody>
               <template x-for="p in sorted" :key="p.player_id || p.player">
@@ -710,12 +710,12 @@ function gameTimeline(events, totalSeconds) {
               {% if game.game_stats_indexed %}
               <th :class="cls('game_g')"     @click="sortBy('game_g')"     style="text-align:center;" title="Goals (game)">G&#9733;<span class="sort-icon" x-text="icon('game_g')"></span></th>
               <th :class="cls('game_a')"     @click="sortBy('game_a')"     style="text-align:center;" title="Assists (game)">A&#9733;<span class="sort-icon" x-text="icon('game_a')"></span></th>
-              <th :class="cls('game_pts')"   @click="sortBy('game_pts')"   style="text-align:center;" title="Points (game)">PTS&#9733;<span class="sort-icon" x-text="icon('game_pts')"></span></th>
+              <th :class="cls('game_pts')"   @click="sortBy('game_pts')"   style="text-align:center;" title="Points (game)">{{ t.common.pts }}&#9733;<span class="sort-icon" x-text="icon('game_pts')"></span></th>
               {% endif %}
-              <th :class="cls('season_gp')"  @click="sortBy('season_gp')"  style="text-align:center;color:var(--gray-400);" title="Games played (season)">GP<span class="sort-icon" x-text="icon('season_gp')"></span></th>
+              <th :class="cls('season_gp')"  @click="sortBy('season_gp')"  style="text-align:center;color:var(--gray-400);" title="Games played (season)">{{ t.common.gp }}<span class="sort-icon" x-text="icon('season_gp')"></span></th>
               <th :class="cls('season_g')"   @click="sortBy('season_g')"   style="text-align:center;color:var(--gray-400);" title="Goals (season)">G<span class="sort-icon" x-text="icon('season_g')"></span></th>
               <th :class="cls('season_a')"   @click="sortBy('season_a')"   style="text-align:center;color:var(--gray-400);" title="Assists (season)">A<span class="sort-icon" x-text="icon('season_a')"></span></th>
-              <th :class="cls('season_pts')" @click="sortBy('season_pts')" style="text-align:center;color:var(--gray-400);" title="Points (season)">PTS<span class="sort-icon" x-text="icon('season_pts')"></span></th>
+              <th :class="cls('season_pts')" @click="sortBy('season_pts')" style="text-align:center;color:var(--gray-400);" title="Points (season)">{{ t.common.pts }}<span class="sort-icon" x-text="icon('season_pts')"></span></th>
             </tr></thead>
             <tbody>
               <template x-for="p in sorted" :key="p.player_id || p.player">
@@ -957,7 +957,7 @@ function gameTimeline(events, totalSeconds) {
         <thead><tr>
           <th style="width:2rem;text-align:center;">#</th>
           <th>{{ t.table.team }}</th>
-          <th style="text-align:center;">GP</th>
+          <th style="text-align:center;">{{ t.common.gp }}</th>
           <th style="text-align:center;" title="Regulation Wins">W</th>
           <th style="text-align:center;" title="Overtime/Shootout Wins">OTW</th>
           <th style="text-align:center;" title="Overtime/Shootout Losses">OTL</th>
@@ -965,7 +965,7 @@ function gameTimeline(events, totalSeconds) {
           <th style="text-align:center;">GF</th>
           <th style="text-align:center;">GA</th>
           <th style="text-align:center;">GD</th>
-          <th style="text-align:center;font-weight:700;color:var(--gray-700);">PTS</th>
+          <th style="text-align:center;font-weight:700;color:var(--gray-700);">{{ t.common.pts }}</th>
         </tr></thead>
         <tbody>
           {% for row in game.group_standings %}
@@ -1048,7 +1048,7 @@ function gameTimeline(events, totalSeconds) {
                       <span style="font-size:.9rem;font-weight:700;color:var(--gray-900);" x-text="g.home_score + ':' + g.away_score"></span>
                     </template>
                     <template x-if="!g.played">
-                      <span style="font-size:.72rem;color:var(--gray-400);font-style:italic;">upcoming</span>
+                      <span style="font-size:.72rem;color:var(--gray-400);font-style:italic;">{{ t.games.upcoming_short }}</span>
                     </template>
                   </div>
                 </div>
