@@ -8,7 +8,20 @@
     "search": "Cerca",
     "filter": "Filtro",
     "back": "Indietro",
-    "close": "Chiudi"
+    "close": "Chiudi",
+    "prev": "← Prec.",
+    "next": "Succ. →",
+    "total": "totale",
+    "vs": "vs",
+    "search_placeholder": "Cerca giocatori, squadre, leghe…",
+    "toggle_theme": "Cambia tema",
+    "toggle_menu": "Apri menu",
+    "all": "Tutti",
+    "men": "Uomini",
+    "women": "Donne",
+    "gp": "PG",
+    "pts": "PTS",
+    "pim": "MIN"
   },
   "nav": {
     "home": "Home",
@@ -69,7 +82,13 @@
     "subtitle": "Calendario e risultati",
     "live": "In diretta",
     "upcoming": "Prossime partite",
-    "results": "Risultati"
+    "results": "Risultati",
+    "schedule": "Programma",
+    "filter_level": "Livello",
+    "no_games": "Nessuna partita trovata",
+    "no_games_filtered": "Nessuna partita trovata per questo filtro",
+    "count_suffix": "partite",
+    "upcoming_short": "in arrivo"
   },
   "rankings": {
     "title": "Classifiche",
@@ -84,7 +103,9 @@
     "order_points": "Punti",
     "order_goals": "Gol",
     "order_assists": "Assist",
-    "search_placeholder": "Cerca per nome…"
+    "search_placeholder": "Cerca per nome…",
+    "filter_season": "Stagione",
+    "no_stats": "Nessuna statistica disponibile."
   },
   "footer": {
     "copyright": "© 2026 SwissUnihockey",
@@ -210,5 +231,10 @@
     "install_title": "📱 Installa Unihockey Stats",
     "install_desc": "Accesso offline, caricamento più veloce",
     "install_btn": "Installa"
+  },
+  "meta": {
+    "description": "Statistiche complete per leghe, squadre, partite e classifiche dell'unihockey svizzero",
+    "og_description": "Statistiche complete per leghe, squadre, partite e classifiche dell'unihockey svizzero",
+    "keywords": "unihockey, floorball, svizzera, statistiche, leghe, squadre, classifiche"
   }
 }
