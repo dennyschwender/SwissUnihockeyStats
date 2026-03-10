@@ -8,7 +8,20 @@
     "search": "Rechercher",
     "filter": "Filtrer",
     "back": "Retour",
-    "close": "Fermer"
+    "close": "Fermer",
+    "prev": "← Préc.",
+    "next": "Suiv. →",
+    "total": "total",
+    "vs": "vs",
+    "search_placeholder": "Rechercher joueurs, équipes, ligues…",
+    "toggle_theme": "Changer le thème",
+    "toggle_menu": "Ouvrir le menu",
+    "all": "Tous",
+    "men": "Hommes",
+    "women": "Femmes",
+    "gp": "MJ",
+    "pts": "PTS",
+    "pim": "PUN"
   },
   "nav": {
     "home": "Accueil",
@@ -69,7 +82,13 @@
     "subtitle": "Calendrier et résultats",
     "live": "En direct",
     "upcoming": "Matchs à venir",
-    "results": "Résultats"
+    "results": "Résultats",
+    "schedule": "Programme",
+    "filter_level": "Niveau",
+    "no_games": "Aucun match trouvé",
+    "no_games_filtered": "Aucun match trouvé pour ce filtre",
+    "count_suffix": "matchs",
+    "upcoming_short": "à venir"
   },
   "rankings": {
     "title": "Classements",
@@ -84,7 +103,9 @@
     "order_points": "Points",
     "order_goals": "Buts",
     "order_assists": "Passes décisives",
-    "search_placeholder": "Rechercher par nom…"
+    "search_placeholder": "Rechercher par nom…",
+    "filter_season": "Saison",
+    "no_stats": "Aucune statistique de joueur disponible."
   },
   "footer": {
     "copyright": "© 2026 SwissUnihockey",
@@ -210,5 +231,10 @@
     "install_title": "📱 Installer Unihockey Stats",
     "install_desc": "Accès hors ligne, chargement plus rapide",
     "install_btn": "Installer"
+  },
+  "meta": {
+    "description": "Statistiques complètes pour les ligues, équipes, matchs et classements de l'unihockey suisse",
+    "og_description": "Statistiques complètes pour les ligues, équipes, matchs et classements de l'unihockey suisse",
+    "keywords": "unihockey, floorball, suisse, statistiques, ligues, équipes, classements"
   }
 }
