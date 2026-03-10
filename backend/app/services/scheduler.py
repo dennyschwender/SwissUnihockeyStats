@@ -865,15 +865,24 @@ class Scheduler:
             run_at = now + timedelta(seconds=policy["priority"])
         else:
             if "run_at_hour" in policy:
-                # Snap to the next nightly window AFTER the last sync, not after
-                # last_sync + max_age.  Anchoring on max_age caused night-time
-                # manual syncs (e.g. 20:23) to skip the very next 03:00 window
-                # entirely because last_sync + max_age (e.g. next-day 20:23) was
-                # still past the only 03:00 candidate for that day → snapped to
-                # the morning two days later.  Snapping from last_sync instead
-                # always schedules the immediately following nightly window, which
-                # is what we want so late-evening games are indexed by morning.
-                run_at = _snap_to_hour(last_sync, policy["run_at_hour"])
+                # Snap to the next nightly window that satisfies max_age.
+                #
+                # For 24 h policies (game_lineups, player_stats, …) we snap from
+                # last_sync so we always get tomorrow's 03:00 window — this
+                # guarantees late-evening games are indexed by morning.
+                #
+                # For longer policies (max_age > 24 h, e.g. games=7 d, clubs=7 d,
+                # teams=3 d) we snap from last_sync + (max_age - 24 h) so the job
+                # runs at the first 03:00 window that is at least max_age after the
+                # last sync, not the very next morning.  Without this, a 7-day
+                # policy would fire every night — the original snap-from-last_sync
+                # trick (added to fix late-night manual syncs skipping the next
+                # 03:00) was correct for 24 h policies but over-eager for longer ones.
+                if policy["max_age"] > timedelta(hours=24):
+                    snap_from = last_sync + policy["max_age"] - timedelta(hours=24)
+                else:
+                    snap_from = last_sync
+                run_at = _snap_to_hour(snap_from, policy["run_at_hour"])
             else:
                 run_at = last_sync + policy["max_age"]
 
