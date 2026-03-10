@@ -537,14 +537,14 @@ class DataIndexer:
         
         logger.info(f"Indexing clubs for season {season_id}...")
         
-        with self.db_service.session_scope() as session:
-            self._mark_sync_start(session, "clubs", entity_id)
-            
-            try:
+        try:
+            with self.db_service.session_scope() as session:
+                self._mark_sync_start(session, "clubs", entity_id)
+
                 # Fetch clubs from API
                 clubs_data = self.client.get_clubs(season=season_id)
                 entries = self._extract_table_data(clubs_data)
-                
+
                 count = 0
                 for entry in entries:
                     # Club ID is in set_in_context
@@ -552,32 +552,29 @@ class DataIndexer:
                     club_id = context.get("club_id")
                     if not club_id:
                         continue
-                    
+
                     # Check if club exists for this season
                     club = session.query(Club).filter(
                         Club.id == club_id,
                         Club.season_id == season_id
                     ).first()
-                    
+
                     if not club:
                         club = Club(id=club_id, season_id=season_id)
                         session.add(club)
-                    
+
                     club.name = entry.get("text", "")
                     club.text = entry.get("text", "")
                     club.region = entry.get("region")
                     club.last_updated = datetime.now(timezone.utc)
                     count += 1
-                
-                session.commit()
+
                 self._mark_sync_complete(session, "clubs", entity_id, count)
                 logger.info(f"✓ Indexed {count} clubs for season {season_id}")
                 return count
-                
-            except Exception as e:
-                logger.error(f"Failed to index clubs for season {season_id}: {e}", exc_info=True)
-                self._mark_sync_failed(session, "clubs", entity_id, str(e))
-                return 0
+        except Exception as e:
+            logger.error(f"Failed to index clubs for season {season_id}: {e}", exc_info=True)
+            return 0
     
     # ==================== LEVEL 3: TEAMS ====================
     
@@ -599,8 +596,8 @@ class DataIndexer:
         logger.debug(f"Indexing teams for club {club_id}, season {season_id}...")
         
         team_ids = []
-        with self.db_service.session_scope() as session:
-            try:
+        try:
+            with self.db_service.session_scope() as session:
                 # Fetch teams from API (without mode parameter - it returns empty with mode="by_club")
                 teams_data = self.client.get_teams(season=season_id, club=club_id)
                 rows = self._extract_table_data(teams_data)
@@ -643,14 +640,11 @@ class DataIndexer:
                     team_ids.append(team_id)
                     count += 1
                 
-                session.commit()
                 self._mark_sync_complete(session, "teams", entity_id, count)
                 return (count, team_ids)
-                
-            except Exception as e:
-                logger.debug(f"Failed to index teams for club {club_id}: {e}")
-                self._mark_sync_failed(session, "teams", entity_id, str(e))
-                return (0, team_ids)
+        except Exception as e:
+            logger.debug(f"Failed to index teams for club {club_id}: {e}")
+            return (0, team_ids)
     
     # ==================== LEVEL 4: PLAYERS ====================
     
@@ -671,8 +665,8 @@ class DataIndexer:
         
         logger.debug(f"Indexing players for team {team_id}...")
         
-        with self.db_service.session_scope() as session:
-            try:
+        try:
+            with self.db_service.session_scope() as session:
                 # Fetch players from API
                 players_data = self.client.get_team_players(team_id)
                 rows = self._extract_table_data(players_data)
@@ -755,15 +749,12 @@ class DataIndexer:
                     
                     count += 1
                 
-                session.commit()
                 self._mark_sync_complete(session, "players", entity_id, count)
                 logger.debug(f"✓ Indexed {count} players for team {team_id}")
                 return count
-                
-            except Exception as e:
-                logger.debug(f"Failed to index players for team {team_id}: {e}")
-                self._mark_sync_failed(session, "players", entity_id, str(e))
-                return 0
+        except Exception as e:
+            logger.debug(f"Failed to index players for team {team_id}: {e}")
+            return 0
     
     # ------------------------------------------------------------------
     # Internal helper shared by both the single-player and full-season
@@ -981,8 +972,8 @@ class DataIndexer:
         tier_lbl = f" (tier {exact_tier} only)" if exact_tier else ""
         logger.info("Indexing player stats for season %s%s...", season_id, tier_lbl)
 
-        with self.db_service.session_scope() as session:
-            try:
+        try:
+            with self.db_service.session_scope() as session:
                 from app.models.db_models import Season as SeasonModel, GamePlayer as _GamePlayer, Team as _TTeam
                 season_row = session.get(SeasonModel, season_id)
                 season_label = season_row.text if season_row and season_row.text else str(season_id)
@@ -1069,7 +1060,6 @@ class DataIndexer:
                     if on_progress and player_ids:
                         on_progress(int(i / len(player_ids) * 95))
 
-                session.commit()
                 self._mark_sync_complete(session, entity_type, entity_id, count)
                 logger.info("✓ Indexed %d player stat rows for season %s%s", count, season_id, tier_lbl)
 
@@ -1086,11 +1076,9 @@ class DataIndexer:
                             count,
                         )
                 return count
-
-            except Exception as e:
-                logger.error("Failed to index player stats for season %s%s: %s", season_id, tier_lbl, e, exc_info=True)
-                self._mark_sync_failed(session, entity_type, entity_id, str(e))
-                return 0
+        except Exception as e:
+            logger.error("Failed to index player stats for season %s%s: %s", season_id, tier_lbl, e, exc_info=True)
+            return 0
 
     # ==================== LEAGUES PATH ====================
 
@@ -1194,8 +1182,8 @@ class DataIndexer:
 
         logger.debug(f"Indexing groups for league {league_id} game_class {game_class} season {season_id}")
 
-        with self.db_service.session_scope() as session:
-            try:
+        try:
+            with self.db_service.session_scope() as session:
                 groups_data = self.client.get_groups(
                     season=season_id, league=league_id, game_class=game_class
                 )
@@ -1227,13 +1215,11 @@ class DataIndexer:
                     grp.last_updated = datetime.now(timezone.utc)
                     count += 1
 
-                session.commit()
                 logger.debug(f"✓ Indexed {count} groups for league {league_id}")
                 return count
-
-            except Exception as e:
-                logger.error(f"Failed to index groups for league {league_id}: {e}", exc_info=True)
-                return 0
+        except Exception as e:
+            logger.error(f"Failed to index groups for league {league_id}: {e}", exc_info=True)
+            return 0
 
     def index_games_for_league(self, league_db_id: int, season_id: int,
                                 league_id: int, game_class: int,
@@ -1697,8 +1683,8 @@ class DataIndexer:
         new_period = period_from_api or ("SO" if is_so else ("OT" if is_ot else None))
 
         # ── 3. Write to DB (short critical section, no network I/O) ───────
-        with self.db_service.session_scope() as session:
-            try:
+        try:
+            with self.db_service.session_scope() as session:
                 # Delete stale events so re-indexing is idempotent
                 session.query(GameEvent).filter(GameEvent.game_id == game_id).delete()
                 session.flush()
@@ -1751,13 +1737,11 @@ class DataIndexer:
                     session.add(evt)
                     count += 1
 
-                session.commit()
                 self._mark_sync_complete(session, "game_events", entity_id, count)
                 return count
-
-            except Exception as e:
-                logger.debug(f"Failed to write events for game {game_id}: {e}")
-                return 0
+        except Exception as e:
+            logger.debug(f"Failed to write events for game {game_id}: {e}")
+            return 0
 
     def index_game_lineup(self, game_id: int, season_id: int,
                           force: bool = False,
@@ -1794,8 +1778,8 @@ class DataIndexer:
                 lineup_raw[is_home_flag] = {}
 
         # ── 2. Write to DB (short critical section, no network I/O) ───────
-        with self.db_service.session_scope() as session:
-            try:
+        try:
+            with self.db_service.session_scope() as session:
                 # Build the set of player_ids already stored for this game.
                 # We do NOT pre-read goals/assists/penalty_minutes here.
                 # The update strategy below never touches those columns for
@@ -1938,13 +1922,11 @@ class DataIndexer:
                         GamePlayer.player_id.in_(removed_ids),
                     ).delete(synchronize_session=False)
 
-                session.commit()
                 self._mark_sync_complete(session, "game_lineup", entity_id, count)
                 return count
-
-            except Exception as e:
-                logger.debug(f"Failed to write lineup for game {game_id}: {e}")
-                return 0
+        except Exception as e:
+            logger.debug(f"Failed to write lineup for game {game_id}: {e}")
+            return 0
 
     def backfill_team_names(self, season_id: int, force: bool = False) -> int:
         """Backfill Team.name for stub rows that have no name.
