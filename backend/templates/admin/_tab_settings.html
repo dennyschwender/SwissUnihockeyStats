@@ -17,6 +17,10 @@
           <input id="sched-max-concurrent" type="number" min="1" max="10" placeholder="2"
             oninput="schedMarkDirty()"
             style="width:52px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
+          <label style="font-size:.75rem;color:#8b949e;white-space:nowrap;margin-left:.5rem">API workers (player stats):</label>
+          <input id="sched-player-game-stats-workers" type="number" min="1" max="20" placeholder="10"
+            oninput="schedMarkDirty()"
+            style="width:52px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 6px;font-size:.8rem">
           <button class="btn btn-sm" onclick="schedSaveFilter()" style="white-space:nowrap">💾 Save</button>
           <button class="btn btn-sm" onclick="schedClearFilter()" style="white-space:nowrap;color:#f85149">✕ Clear</button>
         </div>

@@ -9,11 +9,13 @@ async function schedSaveFilter() {
   const rawMin = document.getElementById('sched-min-season').value.trim();
   const rawExc = document.getElementById('sched-excluded').value.trim();
   const rawMax = document.getElementById('sched-max-concurrent').value.trim();
+  const rawWorkers = document.getElementById('sched-player-game-stats-workers').value.trim();
   const min_season = rawMin ? parseInt(rawMin, 10) : null;
   const excluded_seasons = rawExc
     ? rawExc.split(',').map(s => s.trim()).filter(Boolean).map(Number).filter(n => !isNaN(n))
     : [];
   const max_concurrent = rawMax ? Math.max(1, parseInt(rawMax, 10)) : 2;
+  const player_game_stats_workers = rawWorkers ? Math.max(1, parseInt(rawWorkers, 10)) : 10;
 
   // Save season filter
   const d1 = await fetchJSON('/admin/api/scheduler', {
@@ -25,9 +27,14 @@ async function schedSaveFilter() {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({action: 'max_concurrent', value: max_concurrent}),
   });
-  if (d1 && d2) {
+  // Save player_game_stats_workers
+  const d3 = await fetchJSON('/admin/api/scheduler', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({action: 'player_game_stats_workers', value: player_game_stats_workers}),
+  });
+  if (d1 && d2 && d3) {
     window._settingsDirty = false;
-    window.log('info', `✓ Scheduler settings saved — min: ${min_season ?? 'none'}, excluded: ${excluded_seasons.join(', ') || 'none'}, max concurrent: ${max_concurrent}`);
+    window.log('info', `✓ Scheduler settings saved — min: ${min_season ?? 'none'}, excluded: ${excluded_seasons.join(', ') || 'none'}, max concurrent: ${max_concurrent}, API workers: ${player_game_stats_workers}`);
     await window.loadScheduler();
   } else {
     window.log('error', 'Failed to save scheduler settings');
@@ -43,8 +50,12 @@ async function schedClearFilter() {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({action: 'max_concurrent', value: 2}),
   });
+  await fetchJSON('/admin/api/scheduler', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({action: 'player_game_stats_workers', value: 10}),
+  });
   window._settingsDirty = false;
-  window.log('info', '✓ Scheduler settings cleared (max concurrent reset to 2)');
+  window.log('info', '✓ Scheduler settings cleared (max concurrent reset to 2, API workers reset to 10)');
   await window.loadScheduler();
 }
 

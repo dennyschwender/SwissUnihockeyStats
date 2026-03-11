@@ -362,9 +362,11 @@ function renderScheduler(d) {
     const minEl = document.getElementById('sched-min-season');
     const excEl = document.getElementById('sched-excluded');
     const maxEl = document.getElementById('sched-max-concurrent');
+    const workersEl = document.getElementById('sched-player-game-stats-workers');
     if (minEl) minEl.value = sf.min_season != null ? sf.min_season : '';
     if (excEl) excEl.value = (sf.excluded_seasons || []).join(', ');
     if (maxEl) maxEl.value = sf.max_concurrent ?? 2;
+    if (workersEl) workersEl.value = d.player_game_stats_workers ?? 10;
 
     // Policy tier selects
     const TIER_LABELS = {
