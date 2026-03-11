@@ -2470,6 +2470,9 @@ class DataIndexer:
     # minutes, even when processing thousands of players.
     _PHASE2_BATCH_SIZE = 300
 
+    # Maximum players to write per player-stats Phase 2 batch.
+    _PLAYER_STATS_PHASE2_BATCH_SIZE = 300
+
     def _run_phase2(
         self,
         fetch_results: list,
@@ -2540,6 +2543,68 @@ class DataIndexer:
                         session,
                         f"player_game_stats_t{t}",
                         f"season_game_stats:t{t}:{season_id}",
+                        total,
+                    )
+        return total
+
+    def _run_player_stats_phase2(
+        self,
+        fetch_results: list,
+        season_id: int,
+        season_label: str,
+        entity_type: str,
+        entity_id: str,
+        exact_tier,
+        now,
+    ) -> int:
+        """Phase 2: write player seasonal stats in batches to limit SQLite lock time.
+
+        Each batch of _PLAYER_STATS_PHASE2_BATCH_SIZE players gets its own
+        session_scope() — the write lock is held for only a few seconds per batch.
+        Per-player SyncStatus rows committed per batch enable checkpoint resume.
+        """
+        total = 0
+        for batch_start in range(0, len(fetch_results), self._PLAYER_STATS_PHASE2_BATCH_SIZE):
+            batch = fetch_results[batch_start : batch_start + self._PLAYER_STATS_PHASE2_BATCH_SIZE]
+            with self.db_service.session_scope() as session:
+                staged: dict = {}
+                for result in batch:
+                    pid = result.player_id
+                    entity_id_p = f"player_stats:{pid}:{season_id}"
+
+                    if result.api_error:
+                        player = session.query(Player).filter(Player.person_id == pid).first()
+                        if player is not None:
+                            player.api_failures = (player.api_failures or 0) + 1
+                            if player.api_failures >= self._API_FAILURE_THRESHOLD:
+                                player.api_skip_until = now + timedelta(days=self._API_SKIP_DAYS)
+                                logger.info(
+                                    "player_stats: player %s hit %d API failures; skipping until %s",
+                                    pid, player.api_failures, player.api_skip_until,
+                                )
+                        continue
+
+                    n = self._apply_player_stats_result(
+                        session, pid, result.raw_data, season_id, season_label, staged
+                    )
+                    # Stamp checkpoint even when n == 0 (fetched OK, just no rows this season).
+                    # Only api_error players are skipped — they should be retried next run.
+                    self._mark_sync_complete(session, "player_stats", entity_id_p, n)
+                    if n > 0:
+                        player = session.query(Player).filter(Player.person_id == pid).first()
+                        if player is not None and (player.api_failures or 0) > 0:
+                            player.api_failures = 0
+                            player.api_skip_until = None
+                        total += n
+
+        with self.db_service.session_scope() as session:
+            self._mark_sync_complete(session, entity_type, entity_id, total)
+            if exact_tier is None:
+                for t in range(1, 7):
+                    self._mark_sync_complete(
+                        session,
+                        f"player_stats_t{t}",
+                        f"season_player_stats:t{t}:{season_id}",
                         total,
                     )
         return total
