@@ -68,10 +68,13 @@ def test_fetch_helper_does_not_open_session():
     mock_db.session_scope.assert_not_called()
 
 
-# ── Test 2: Phase 2 uses exactly one session_scope ───────────────────────────
+# ── Test 2: Phase 2 uses batched session_scopes ───────────────────────────────
 
-def test_run_phase2_uses_single_session():
-    """_run_phase2 must open exactly one session_scope regardless of player count."""
+def test_run_phase2_batches_sessions():
+    """_run_phase2 opens ceil(n/BATCH_SIZE) + 1 sessions: one per batch plus one
+    final session for the tier-level SyncStatus mark."""
+    from app.services.data_indexer import DataIndexer
+
     session = MagicMock()
     session.query.return_value.filter.return_value.update.return_value = 1
     session.query.return_value.filter.return_value.first.return_value = _make_player_mock()
@@ -88,6 +91,7 @@ def test_run_phase2_uses_single_session():
     mock_db.session_scope = counting_scope
     indexer = _make_indexer(mock_db=mock_db)
 
+    # 3 players << BATCH_SIZE → 1 batch session + 1 tier session = 2
     results = [
         _PlayerGameStatsFetchResult(player_id=1, game_stats={10: (1, 0, 0)}),
         _PlayerGameStatsFetchResult(player_id=2, game_stats={11: (0, 1, 0)}),
@@ -104,7 +108,51 @@ def test_run_phase2_uses_single_session():
             now=datetime.now(timezone.utc),
         )
 
-    assert call_count == 1, f"Expected 1 session_scope, got {call_count}"
+    expected = 2  # 1 batch + 1 tier mark
+    assert call_count == expected, f"Expected {expected} session_scope calls, got {call_count}"
+
+
+def test_run_phase2_opens_multiple_batch_sessions():
+    """With more players than BATCH_SIZE, _run_phase2 opens multiple batch sessions."""
+    from app.services.data_indexer import DataIndexer
+
+    session = MagicMock()
+    session.query.return_value.filter.return_value.update.return_value = 1
+    session.query.return_value.filter.return_value.first.return_value = _make_player_mock()
+
+    call_count = 0
+
+    @contextmanager
+    def counting_scope():
+        nonlocal call_count
+        call_count += 1
+        yield session
+
+    mock_db = MagicMock()
+    mock_db.session_scope = counting_scope
+    indexer = _make_indexer(mock_db=mock_db)
+
+    batch_size = DataIndexer._PHASE2_BATCH_SIZE
+    # Create enough players to fill 2 full batches + 1 partial
+    n_players = batch_size * 2 + 5
+    results = [
+        _PlayerGameStatsFetchResult(player_id=i, game_stats={100 + i: (1, 0, 0)})
+        for i in range(n_players)
+    ]
+
+    with patch.object(indexer, "_mark_sync_complete"):
+        indexer._run_phase2(
+            fetch_results=results,
+            season_id=2025,
+            entity_type="player_game_stats_t1",
+            entity_id="season_game_stats:t1:2025",
+            exact_tier=1,
+            now=datetime.now(timezone.utc),
+        )
+
+    import math
+    expected = math.ceil(n_players / batch_size) + 1  # batches + 1 tier mark
+    assert call_count == expected, f"Expected {expected} session_scope calls, got {call_count}"
 
 
 # ── Test 3: HTTP 500 sets api_error ──────────────────────────────────────────

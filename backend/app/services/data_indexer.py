@@ -2357,6 +2357,31 @@ class DataIndexer:
                 self._mark_sync_complete(session, entity_type, entity_id, 0)
             return 0
 
+        # Per-player checkpoint: skip players whose stats were already written in a
+        # previous run's Phase 2 (enables resume after a Phase 2 failure).
+        if not force:
+            already_synced = self.bulk_already_indexed(
+                "player_game_stats",
+                [f"player_game_stats:{pid}:{season_id}" for pid in player_ids],
+                max_age_hours=4,
+            )
+            if already_synced:
+                before = len(player_ids)
+                player_ids = [
+                    pid for pid in player_ids
+                    if f"player_game_stats:{pid}:{season_id}" not in already_synced
+                ]
+                logger.info(
+                    "Skipping %d already-synced players (checkpoint resume), %d remaining",
+                    before - len(player_ids), len(player_ids),
+                )
+
+        if not player_ids:
+            # All players already synced this cycle — stamp the tier and return.
+            with self.db_service.session_scope() as session:
+                self._mark_sync_complete(session, entity_type, entity_id, 0)
+            return 0
+
         logger.info(
             "Updating per-game G/A/PIM for %d players in season %s%s...",
             len(player_ids), season_id, tier_lbl,
@@ -2402,6 +2427,11 @@ class DataIndexer:
         )
         return total
 
+    # Maximum players to write per Phase 2 batch.  Each batch is its own
+    # session_scope(), so the SQLite write lock is held for seconds, not
+    # minutes, even when processing thousands of players.
+    _PHASE2_BATCH_SIZE = 300
+
     def _run_phase2(
         self,
         fetch_results: list,
@@ -2411,55 +2441,60 @@ class DataIndexer:
         exact_tier: Optional[int],
         now: datetime,
     ) -> int:
-        """Phase 2: write all player game stats results in a single session.
+        """Phase 2: write player game stats in small batches to limit lock time.
 
-        Serialises all DB writes so there is at most one concurrent SQLite writer
-        regardless of how many threads were used in Phase 1.  Also handles
-        api_failure tracking and api_skip_until management.
+        Each batch of _PHASE2_BATCH_SIZE players gets its own session_scope()
+        so the SQLite write lock is held for only a few seconds per batch.
+        Per-player SyncStatus rows are committed per batch, enabling checkpoint
+        resume if a later batch fails.
 
         Returns total game_players rows updated.
         """
         total = 0
-        with self.db_service.session_scope() as session:
-            for result in fetch_results:
-                pid = result.player_id
-                entity_id_p = f"player_game_stats:{pid}:{season_id}"
+        for batch_start in range(0, len(fetch_results), self._PHASE2_BATCH_SIZE):
+            batch = fetch_results[batch_start : batch_start + self._PHASE2_BATCH_SIZE]
+            with self.db_service.session_scope() as session:
+                for result in batch:
+                    pid = result.player_id
+                    entity_id_p = f"player_game_stats:{pid}:{season_id}"
 
-                if result.api_error:
-                    player = session.query(Player).filter(Player.person_id == pid).first()
-                    if player is not None:
-                        player.api_failures = (player.api_failures or 0) + 1
-                        if player.api_failures >= self._API_FAILURE_THRESHOLD:
-                            player.api_skip_until = now + timedelta(days=self._API_SKIP_DAYS)
-                            logger.info(
-                                "Player %s hit %d API failures; skipping until %s",
-                                pid, player.api_failures, player.api_skip_until,
+                    if result.api_error:
+                        player = session.query(Player).filter(Player.person_id == pid).first()
+                        if player is not None:
+                            player.api_failures = (player.api_failures or 0) + 1
+                            if player.api_failures >= self._API_FAILURE_THRESHOLD:
+                                player.api_skip_until = now + timedelta(days=self._API_SKIP_DAYS)
+                                logger.info(
+                                    "Player %s hit %d API failures; skipping until %s",
+                                    pid, player.api_failures, player.api_skip_until,
+                                )
+                        continue
+
+                    if not result.game_stats:
+                        continue
+
+                    updated = 0
+                    for game_id, (goals, assists, pim) in result.game_stats.items():
+                        n = (
+                            session.query(GamePlayer)
+                            .filter(
+                                GamePlayer.game_id == game_id,
+                                GamePlayer.player_id == pid,
                             )
-                    continue
-
-                if not result.game_stats:
-                    continue
-
-                updated = 0
-                for game_id, (goals, assists, pim) in result.game_stats.items():
-                    n = (
-                        session.query(GamePlayer)
-                        .filter(
-                            GamePlayer.game_id == game_id,
-                            GamePlayer.player_id == pid,
+                            .update({"goals": goals, "assists": assists, "penalty_minutes": pim})
                         )
-                        .update({"goals": goals, "assists": assists, "penalty_minutes": pim})
-                    )
-                    updated += n or 0
+                        updated += n or 0
 
-                if updated:
-                    self._mark_sync_complete(session, "player_game_stats", entity_id_p, updated)
-                    player = session.query(Player).filter(Player.person_id == pid).first()
-                    if player is not None and (player.api_failures or 0) > 0:
-                        player.api_failures = 0
-                        player.api_skip_until = None
-                    total += updated
+                    if updated:
+                        self._mark_sync_complete(session, "player_game_stats", entity_id_p, updated)
+                        player = session.query(Player).filter(Player.person_id == pid).first()
+                        if player is not None and (player.api_failures or 0) > 0:
+                            player.api_failures = 0
+                            player.api_skip_until = None
+                        total += updated
 
+        # Mark the tier (and optionally all tiers) complete after all batches.
+        with self.db_service.session_scope() as session:
             self._mark_sync_complete(session, entity_type, entity_id, total)
             if exact_tier is None:
                 for t in range(1, 7):
