@@ -1988,7 +1988,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             push("info", f"Indexing games for {total} groups across {len(lg_list)} leagues (batch concurrency=2)...")
 
             # Process in small batches so the event loop stays responsive
-            _GAMES_BATCH = 2
+            _GAMES_BATCH = 4
             for batch_start in range(0, max(total, 1), _GAMES_BATCH):
                 await _backoff_if_busy()
                 batch = work[batch_start:batch_start + _GAMES_BATCH]
@@ -2088,7 +2088,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
 
             # Process in small batches (2 games at a time) so the event loop
             # stays responsive for admin API requests between batches.
-            _EV_BATCH = 2
+            _EV_BATCH = 6
             for batch_start in range(0, max(total, 1), _EV_BATCH):
                 await _backoff_if_busy()
                 batch = finished[batch_start:batch_start + _EV_BATCH]
