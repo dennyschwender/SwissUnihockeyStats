@@ -761,20 +761,20 @@ class DataIndexer:
     # stats indexing paths.
     # ------------------------------------------------------------------
 
-    def _upsert_player_stats_from_api(
+    def _apply_player_stats_result(
         self,
+        session,
         person_id: int,
+        stats_data: dict,
         season_id: int,
         season_label: str,
-        session,
         staged: dict,
-    ) -> tuple[int, bool]:
-        """Fetch /api/players/:id/statistics and upsert matching rows.
+    ) -> int:
+        """Write PlayerStatistics rows from a pre-fetched API response.
 
-        Uses the caller-supplied session so it can be embedded in a larger
-        transaction (season loop) or a standalone one (single-player call).
-        Returns a (rows_upserted, api_error) tuple where api_error is True
-        only for HTTP 5xx responses (used to increment the skip counter).
+        Accepts the raw dict returned by client.get_player_stats() and upserts
+        matching PlayerStatistics rows using the supplied session.
+        Returns the number of rows upserted.
 
         Cell layout (0-indexed):
           0 – season text (e.g. "2025/26")
@@ -789,16 +789,6 @@ class DataIndexer:
           9 – 10-min penalties
          10 – match penalties
         """
-        try:
-            stats_data = self.client.get_player_stats(person_id)
-        except Exception as exc:
-            import requests as _req
-            if isinstance(exc, _req.HTTPError) and exc.response is not None and exc.response.status_code >= 500:
-                logger.debug("API 5xx for player stats %s: %s", person_id, exc)
-                return 0, True   # (rows_upserted, api_error)
-            logger.debug("Could not fetch stats for player %s: %s", person_id, exc)
-            return 0, False
-
         regions = stats_data.get("data", {}).get("regions", [])
         count = 0
 
@@ -918,7 +908,33 @@ class DataIndexer:
                     session.add(obj)
                     staged[key] = obj
                 count += 1
-        return count, False
+        return count
+
+    def _upsert_player_stats_from_api(
+        self,
+        person_id: int,
+        season_id: int,
+        season_label: str,
+        session,
+        staged: dict,
+    ) -> tuple[int, bool]:
+        """Fetch /api/players/:id/statistics and upsert matching rows.
+
+        Uses the caller-supplied session so it can be embedded in a larger
+        transaction (season loop) or a standalone one (single-player call).
+        Returns a (rows_upserted, api_error) tuple where api_error is True
+        only for HTTP 5xx responses (used to increment the skip counter).
+        """
+        try:
+            stats_data = self.client.get_player_stats(person_id)
+        except Exception as exc:
+            import requests as _req
+            if isinstance(exc, _req.HTTPError) and exc.response is not None and exc.response.status_code >= 500:
+                logger.debug("API 5xx for player stats %s: %s", person_id, exc)
+                return 0, True   # (rows_upserted, api_error)
+            logger.debug("Could not fetch stats for player %s: %s", person_id, exc)
+            return 0, False
+        return self._apply_player_stats_result(session, person_id, stats_data, season_id, season_label, staged), False
 
     def index_player_stats_one(self, player_id: int, season_id: int, force: bool = False) -> int:
         """Index statistics for a single player in one season.
