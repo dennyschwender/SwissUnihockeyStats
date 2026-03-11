@@ -272,6 +272,25 @@ class DatabaseService:
                 if col not in player_cols:
                     conn.execute(text(f"ALTER TABLE players ADD COLUMN {col} {typedef}"))
 
+            # ── Covering index for game_events duplicate cleanup ─────────────
+            # The admin cleanup DELETE uses NOT IN (SELECT MIN(id) … GROUP BY
+            # game_id, event_type, period, time, player_id).  Without a
+            # covering index SQLite does a full-table sort for the subquery
+            # (O(n²) on 370 K rows → 4+ minutes).  The covering index lets
+            # SQLite resolve the GROUP BY + MIN entirely from the index.
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_event_dedup "
+                "ON game_events(game_id, event_type, period, time, player_id, id)"
+            ))
+
+            # ── Composite index for sync_status cleanup query ─────────────────
+            # The cleanup DELETE filters on both columns simultaneously; a
+            # composite index is more selective than two separate indexes.
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_sync_cleanup "
+                "ON sync_status(sync_status, last_sync)"
+            ))
+
             # ── Create admin_stats_snapshots if it doesn't exist ─────────────
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS admin_stats_snapshots (
