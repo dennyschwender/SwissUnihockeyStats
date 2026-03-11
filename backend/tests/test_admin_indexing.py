@@ -100,3 +100,14 @@ class TestAdminSeasonAPI:
     def test_delete_unknown_layer_returns_400(self, admin_client):
         r = admin_client.delete("/admin/api/season/2025?layer=bad_layer")
         assert r.status_code == 400
+
+
+def test_player_game_stats_workers_endpoint(admin_client):
+    """POST /admin/api/scheduler with action=player_game_stats_workers updates the setting."""
+    r = admin_client.post(
+        "/admin/api/scheduler",
+        json={"action": "player_game_stats_workers", "value": 8},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["player_game_stats_workers"] == 8

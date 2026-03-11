@@ -1483,6 +1483,12 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
             raise HTTPException(status_code=400, detail="value must be a positive integer")
         sched.set_max_concurrent(n)
         return {"ok": True, "max_concurrent": sched._max_concurrent}
+    if action == "player_game_stats_workers":
+        n = payload.get("value", 10)
+        if not isinstance(n, int) or n < 1:
+            raise HTTPException(status_code=400, detail="value must be a positive integer")
+        sched.set_player_game_stats_workers(n)
+        return {"ok": True, "player_game_stats_workers": sched._player_game_stats_workers}
     if action == "policy_tiers":
         tiers_raw = payload.get("tiers", {})
         if not isinstance(tiers_raw, dict):
@@ -1925,6 +1931,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                 indexer.index_player_game_stats_for_season,
                 season_id=season, force=force, exact_tier=_exact_tier,
                 on_progress=set_progress,
+                max_workers=sched._player_game_stats_workers,
             )
             stats["player_game_stats"] = pgstats_n
             push("ok", f"Player game stats: {pgstats_n}")
