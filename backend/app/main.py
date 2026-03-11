@@ -2086,7 +2086,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             events_n = 0
             lineup_n = 0
 
-            # Process in small batches (2 games at a time) so the event loop
+            # Process in small batches (6 games at a time) so the event loop
             # stays responsive for admin API requests between batches.
             _EV_BATCH = 6
             for batch_start in range(0, max(total, 1), _EV_BATCH):
