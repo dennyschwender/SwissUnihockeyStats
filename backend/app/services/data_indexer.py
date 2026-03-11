@@ -32,6 +32,14 @@ class _PlayerGameStatsFetchResult:
     api_error: bool = False  # True only for HTTP 5xx — increments skip counter
 
 
+@dataclass
+class _PlayerStatsFetchResult:
+    """Result of a Phase-1 API fetch for one player's seasonal stats."""
+    player_id: int
+    raw_data: dict = field(default_factory=dict)
+    api_error: bool = False  # True only for HTTP 5xx — increments skip counter
+
+
 def _phase_from_slider_text(slider_text: str) -> str:
     """Extract a stable phase bucket from a slider round title.
 
@@ -909,6 +917,20 @@ class DataIndexer:
                     staged[key] = obj
                 count += 1
         return count
+
+    def _fetch_player_stats_raw(self, person_id: int) -> "_PlayerStatsFetchResult":
+        """Phase-1 worker: fetch seasonal stats for one player (no DB access)."""
+        try:
+            raw = self.client.get_player_stats(person_id)
+            return _PlayerStatsFetchResult(player_id=person_id, raw_data=raw)
+        except Exception as exc:
+            import requests as _req
+            is_5xx = (
+                isinstance(exc, _req.HTTPError)
+                and exc.response is not None
+                and exc.response.status_code >= 500
+            )
+            return _PlayerStatsFetchResult(player_id=person_id, api_error=is_5xx)
 
     def _upsert_player_stats_from_api(
         self,
