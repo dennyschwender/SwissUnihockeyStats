@@ -2618,10 +2618,11 @@ def get_game_box_score(game_id: int) -> dict:
                 period_markers.append({"time": time_str, "label": ev_type, "period": derived_period})
 
             elif kind == "best_player":
-                # Resolve which side by team_id first, then by substring match
-                # (raw event team is club name; Team.name may add " II" etc.)
-                # Normalize whitespace before comparing so that API double-spaces
-                # (e.g. "Unihockey Langenthal  Aarwangen") don't cause mismatches.
+                # Resolve which side by team_id first, then by substring match.
+                # The API returns the club name (e.g. "Unihockey Langenthal Aarwangen")
+                # while Team.name may be shorter ("Langenthal Aarwangen") or longer
+                # ("Langenthal Aarwangen II").  Check both directions so either
+                # form resolves correctly.
                 import re as _re
                 def _norm(s: str) -> str:
                     return _re.sub(r"\s+", " ", s).strip().lower()
@@ -2632,16 +2633,35 @@ def get_game_box_score(game_id: int) -> dict:
                     _tl = _norm(team_label)
                     _hn = _norm(home_name)
                     _an = _norm(away_name)
-                    if _tl and (_tl in _hn or _hn.startswith(_tl)):
+                    if _tl and (_tl in _hn or _hn in _tl):
                         _is_home = True
-                    elif _tl and (_tl in _an or _an.startswith(_tl)):
+                    elif _tl and (_tl in _an or _an in _tl):
                         _is_home = False
                     else:
-                        # Fallback: unknown team — default to away so at least
-                        # the event still appears on the correct side if the
-                        # home best player was already resolved correctly.
-                        _is_home = False
+                        _is_home = None  # unresolved; fixed up below
                 best_players.append({"team": team_label, "player": player_name, "is_home": _is_home})
+
+        # ── Fix up unresolved best-player sides ──────────────────────────────
+        # If name matching failed (is_home=None), or both players ended up on
+        # the same side, reassign by position: the API consistently returns the
+        # home best player first, away second.
+        if best_players:
+            unresolved = [bp for bp in best_players if bp["is_home"] is None]
+            if unresolved:
+                # Assign unresolved entries alternating from the side that has
+                # fewer entries so far.
+                resolved_home = sum(1 for bp in best_players if bp["is_home"] is True)
+                resolved_away = sum(1 for bp in best_players if bp["is_home"] is False)
+                for bp in unresolved:
+                    if resolved_home <= resolved_away:
+                        bp["is_home"] = True
+                        resolved_home += 1
+                    else:
+                        bp["is_home"] = False
+                        resolved_away += 1
+            elif len(best_players) == 2 and best_players[0]["is_home"] == best_players[1]["is_home"]:
+                # Both matched the same side — flip the second one.
+                best_players[1]["is_home"] = not best_players[0]["is_home"]
 
         # ── Deduplicate goals ────────────────────────────────────────────────
         # The API emits 2 rows per assisted goal: one scorer-only and one
