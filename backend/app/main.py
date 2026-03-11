@@ -571,7 +571,13 @@ async def admin_db_info(_: None = Depends(require_admin)):
 
 @app.post("/admin/api/vacuum")
 async def admin_vacuum(_: None = Depends(require_admin)):
-    """Run VACUUM + WAL checkpoint to reclaim free pages and merge WAL back into DB."""
+    """Run VACUUM + WAL checkpoint in the background.
+
+    VACUUM rewrites the entire DB file and can take several minutes on large
+    databases.  To avoid browser connection timeouts (typically ~120s) the
+    operation runs as a background task; this endpoint returns immediately.
+    Check server logs for completion / errors.
+    """
     from app.services.database import get_database_service
     from sqlalchemy import text as _text
 
@@ -583,22 +589,25 @@ async def admin_vacuum(_: None = Depends(require_admin)):
         return {"ok": False, "detail": "Database engine not initialized"}
 
     engine = db_service.engine
-    loop = asyncio.get_running_loop()
-    def _vacuum():
+
+    async def _run_vacuum():
         import time
         t0 = time.time()
-        with engine.connect() as conn:
-            conn.execute(_text("PRAGMA wal_checkpoint(TRUNCATE)"))
-            conn.execute(_text("VACUUM"))
-        return round(time.time() - t0, 2)
+        try:
+            def _vacuum():
+                with engine.connect() as conn:
+                    conn.execute(_text("PRAGMA wal_checkpoint(TRUNCATE)"))
+                    conn.execute(_text("VACUUM"))
 
-    try:
-        elapsed = await loop.run_in_executor(None, _vacuum)
-        logger.info("Admin VACUUM completed in %.2fs", elapsed)
-        return {"ok": True, "elapsed_s": elapsed}
-    except Exception as e:
-        logger.error("Admin VACUUM failed: %s", e, exc_info=True)
-        return {"ok": False, "detail": str(e)}
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, _vacuum)
+            elapsed = round(time.time() - t0, 2)
+            logger.info("Admin VACUUM completed in %.2fs", elapsed)
+        except Exception as e:
+            logger.error("Admin VACUUM failed after %.2fs: %s", time.time() - t0, e, exc_info=True)
+
+    asyncio.create_task(_run_vacuum())
+    return {"ok": True, "started": True}
 
 
 @app.post("/admin/api/cleanup")

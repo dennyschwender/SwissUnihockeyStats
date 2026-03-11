@@ -72,7 +72,9 @@ async function runVacuum() {
   dbLog('info', '🧹 VACUUM + WAL checkpoint started…');
   try {
     const d = await fetchJSON('/admin/api/vacuum', { method: 'POST' });
-    if (d && d.ok) {
+    if (d && d.ok && d.started) {
+      dbLog('info', '⏳ VACUUM running in background — check server logs for completion (may take a few minutes).');
+    } else if (d && d.ok) {
       dbLog('ok', `✓ VACUUM complete in ${d.elapsed_s}s`);
       await loadDbInfo();
     } else {
