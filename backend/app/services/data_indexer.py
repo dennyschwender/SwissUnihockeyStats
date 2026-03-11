@@ -2616,12 +2616,14 @@ class DataIndexer:
                     # Stamp checkpoint even when n == 0 (fetched OK, just no rows this season).
                     # Only api_error players are skipped — they should be retried next run.
                     self._mark_sync_complete(session, "player_stats", entity_id_p, n)
-                    if n > 0:
-                        player = session.query(Player).filter(Player.person_id == pid).first()
-                        if player is not None and (player.api_failures or 0) > 0:
-                            player.api_failures = 0
-                            player.api_skip_until = None
-                        total += n
+                    # Reset failure counter on any successful fetch (n==0 is a valid terminal
+                    # state for a player with no seasonal stats — unlike player_game_stats where
+                    # 0 rows may mean "not indexed yet").
+                    player = session.query(Player).filter(Player.person_id == pid).first()
+                    if player is not None and (player.api_failures or 0) > 0:
+                        player.api_failures = 0
+                        player.api_skip_until = None
+                    total += n
 
         with self.db_service.session_scope() as session:
             self._mark_sync_complete(session, entity_type, entity_id, total)
