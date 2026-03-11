@@ -1010,113 +1010,139 @@ class DataIndexer:
         tier_lbl = f" (tier {exact_tier} only)" if exact_tier else ""
         logger.info("Indexing player stats for season %s%s...", season_id, tier_lbl)
 
-        try:
-            with self.db_service.session_scope() as session:
-                from app.models.db_models import Season as SeasonModel, GamePlayer as _GamePlayer, Team as _TTeam
-                season_row = session.get(SeasonModel, season_id)
-                season_label = season_row.text if season_row and season_row.text else str(season_id)
+        # ── Pre-fetch season label (one short read) ──────────────────────────
+        from app.models.db_models import Season as SeasonModel
+        with self.db_service.session_scope() as session:
+            season_row = session.get(SeasonModel, season_id)
+            season_label = season_row.text if season_row and season_row.text else str(season_id)
 
-                if exact_tier is not None:
-                    tier_team_ids = {
-                        t.id for t in session.query(_TTeam)
-                        .filter(_TTeam.season_id == season_id).all()
-                        if league_tier(t.league_id or 0) == exact_tier
-                    }
-                    tp_ids = {
-                        r[0] for r in
-                        session.query(TeamPlayer.player_id)
-                        .filter(
-                            TeamPlayer.season_id == season_id,
-                            TeamPlayer.team_id.in_(tier_team_ids),
-                        ).distinct().all()
-                    }
-                    gp_ids = {
-                        r[0] for r in
-                        session.query(_GamePlayer.player_id)
-                        .filter(
-                            _GamePlayer.season_id == season_id,
-                            _GamePlayer.team_id.in_(tier_team_ids),
-                        ).distinct().all()
-                    }
-                else:
-                    tp_ids = {
-                        r[0] for r in
-                        session.query(TeamPlayer.player_id)
-                        .filter(TeamPlayer.season_id == season_id)
-                        .distinct().all()
-                    }
-                    gp_ids = {
-                        r[0] for r in
-                        session.query(_GamePlayer.player_id)
-                        .filter(_GamePlayer.season_id == season_id)
-                        .distinct().all()
-                    }
-                player_ids = list(tp_ids | gp_ids)
-
-                if not player_ids:
-                    logger.info("No players found for season %s%s", season_id, tier_lbl)
-                    # Stamp the SyncStatus so the scheduler doesn't re-queue
-                    # this tier indefinitely (empty tier = nothing to do).
-                    if exact_tier is not None:
-                        self._mark_sync_complete(session, entity_type, entity_id, 0)
-                    return 0
-
-                # Exclude players whose API skip window is still active
-                now_skip = datetime.now(timezone.utc)
-                skip_ids = {
-                    r[0] for r in session.query(Player.person_id)
-                    .filter(Player.api_skip_until.isnot(None), Player.api_skip_until > now_skip)
-                    .all()
+        # ── Collect eligible player IDs ───────────────────────────────────────
+        with self.db_service.session_scope() as session:
+            from app.models.db_models import GamePlayer as _GamePlayer, Team as _TTeam
+            if exact_tier is not None:
+                tier_team_ids = {
+                    t.id for t in session.query(_TTeam)
+                    .filter(_TTeam.season_id == season_id).all()
+                    if league_tier(t.league_id or 0) == exact_tier
                 }
-                if skip_ids:
-                    logger.info("player_stats: skipping %d player(s) with active API skip window", len(skip_ids))
-                player_ids = [pid for pid in player_ids if pid not in skip_ids]
+                tp_ids = {
+                    r[0] for r in
+                    session.query(TeamPlayer.player_id)
+                    .filter(
+                        TeamPlayer.season_id == season_id,
+                        TeamPlayer.team_id.in_(tier_team_ids),
+                    ).distinct().all()
+                }
+                gp_ids = {
+                    r[0] for r in
+                    session.query(_GamePlayer.player_id)
+                    .filter(
+                        _GamePlayer.season_id == season_id,
+                        _GamePlayer.team_id.in_(tier_team_ids),
+                    ).distinct().all()
+                }
+            else:
+                tp_ids = {
+                    r[0] for r in
+                    session.query(TeamPlayer.player_id)
+                    .filter(TeamPlayer.season_id == season_id)
+                    .distinct().all()
+                }
+                gp_ids = {
+                    r[0] for r in
+                    session.query(_GamePlayer.player_id)
+                    .filter(_GamePlayer.season_id == season_id)
+                    .distinct().all()
+                }
+            player_ids = list(tp_ids | gp_ids)
 
-                count = 0
-                staged: dict[tuple, PlayerStatistics] = {}
-                for i, person_id in enumerate(player_ids, 1):
-                    n, api_err = self._upsert_player_stats_from_api(
-                        person_id, season_id, season_label, session, staged
-                    )
-                    count += n
-                    if api_err:
-                        player = session.query(Player).filter(Player.person_id == person_id).first()
-                        if player is not None:
-                            player.api_failures = (player.api_failures or 0) + 1
-                            if player.api_failures >= self._API_FAILURE_THRESHOLD:
-                                player.api_skip_until = now_skip + timedelta(days=self._API_SKIP_DAYS)
-                                logger.info(
-                                    "player_stats: player %s hit %d API failures; skipping until %s",
-                                    person_id, player.api_failures, player.api_skip_until,
-                                )
-                    elif n > 0:
-                        # Successful update — reset failure counter
-                        player = session.query(Player).filter(Player.person_id == person_id).first()
-                        if player is not None and (player.api_failures or 0) > 0:
-                            player.api_failures = 0
-                            player.api_skip_until = None
-                    if on_progress and player_ids:
-                        on_progress(int(i / len(player_ids) * 95))
-
-                self._mark_sync_complete(session, entity_type, entity_id, count)
-                logger.info("✓ Indexed %d player stat rows for season %s%s", count, season_id, tier_lbl)
-
-                # When running untiered (exact_tier=None), also stamp each
-                # tier-specific SyncStatus row.  This lets the scheduler know
-                # all tiers are fresh after a full manual re-index so they
-                # won't queue individual tier jobs for another 24 h.
-                if exact_tier is None:
-                    for t in range(1, 7):
-                        self._mark_sync_complete(
-                            session,
-                            f"player_stats_t{t}",
-                            f"season_player_stats:t{t}:{season_id}",
-                            count,
-                        )
-                return count
-        except Exception as e:
-            logger.error("Failed to index player stats for season %s%s: %s", season_id, tier_lbl, e, exc_info=True)
+        if not player_ids:
+            logger.info("No players found for season %s%s", season_id, tier_lbl)
+            if exact_tier is not None:
+                with self.db_service.session_scope() as session:
+                    self._mark_sync_complete(session, entity_type, entity_id, 0)
             return 0
+
+        # Exclude players whose API skip window is still active
+        now = datetime.now(timezone.utc)
+        with self.db_service.session_scope() as session:
+            skip_ids = {
+                r[0] for r in session.query(Player.person_id)
+                .filter(Player.api_skip_until.isnot(None), Player.api_skip_until > now)
+                .all()
+            }
+        if skip_ids:
+            logger.info("player_stats: skipping %d player(s) with active API skip window", len(skip_ids))
+        player_ids = [pid for pid in player_ids if pid not in skip_ids]
+
+        if not player_ids:
+            logger.info("No eligible players for season %s%s after skip filter", season_id, tier_lbl)
+            with self.db_service.session_scope() as session:
+                self._mark_sync_complete(session, entity_type, entity_id, 0)
+            return 0
+
+        # Per-player checkpoint resume
+        if not force:
+            already_synced = self.bulk_already_indexed(
+                "player_stats",
+                [f"player_stats:{pid}:{season_id}" for pid in player_ids],
+                max_age_hours=24,
+            )
+            if already_synced:
+                before = len(player_ids)
+                player_ids = [
+                    pid for pid in player_ids
+                    if f"player_stats:{pid}:{season_id}" not in already_synced
+                ]
+                logger.info(
+                    "player_stats: skipping %d already-synced players (checkpoint resume), %d remaining",
+                    before - len(player_ids), len(player_ids),
+                )
+
+        if not player_ids:
+            with self.db_service.session_scope() as session:
+                self._mark_sync_complete(session, entity_type, entity_id, 0)
+            return 0
+
+        logger.info("Indexing player stats for season %s%s (%d players)...", season_id, tier_lbl, len(player_ids))
+
+        # ── Phase 1: parallel API fetches (no DB session held) ───────────────
+        completed = 0
+        _lock = threading.Lock()
+        fetch_results: list = []
+
+        def _fetch_one(pid: int):
+            nonlocal completed
+            result = self._fetch_player_stats_raw(pid)
+            with _lock:
+                completed += 1
+                if on_progress:
+                    on_progress(int(completed / len(player_ids) * 80))
+            return result
+
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            futures = {pool.submit(_fetch_one, pid): pid for pid in player_ids}
+            for fut in as_completed(futures):
+                try:
+                    fetch_results.append(fut.result())
+                except Exception as exc:
+                    logger.warning("player_stats worker error: %s", exc)
+
+        # ── Phase 2: batched DB writes ────────────────────────────────────────
+        count = self._run_player_stats_phase2(
+            fetch_results=fetch_results,
+            season_id=season_id,
+            season_label=season_label,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            exact_tier=exact_tier,
+            now=now,
+        )
+
+        if on_progress:
+            on_progress(100)
+        logger.info("✓ Indexed %d player stat rows for season %s%s", count, season_id, tier_lbl)
+        return count
 
     # ==================== LEAGUES PATH ====================
 

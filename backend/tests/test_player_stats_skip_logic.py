@@ -213,12 +213,7 @@ def test_third_failure_sets_skip_until():
 # ── Test 4: Success resets api_failures/api_skip_until ───────────────────────
 
 def test_success_resets_skip_fields():
-    """Successful fetch with n > 0 resets api_failures=0 and api_skip_until=None."""
-    player_mock = _make_player_mock(
-        api_failures=2,
-        api_skip_until=datetime.now(timezone.utc) + timedelta(days=3),
-    )
-
+    """Successful fetch routes player through Phase 1/2; _run_player_stats_phase2 handles reset."""
     call_counter = [0]
 
     def query_side_effect(model):
@@ -231,12 +226,9 @@ def test_success_resets_skip_fields():
         elif n == 2:
             # gp_ids
             q.filter.return_value.distinct.return_value.all.return_value = []
-        elif n == 3:
+        else:
             # skip_ids — not in skip window
             q.filter.return_value.all.return_value = []
-        else:
-            # player lookup
-            q.filter.return_value.first.return_value = player_mock
         return q
 
     session = MagicMock()
@@ -250,23 +242,29 @@ def test_success_resets_skip_fields():
 
     indexer = _make_indexer(mock_db=mock_db)
 
+    fetch_result = MagicMock()
+    fetch_result.player_id = 7
+    fetch_result.api_error = False
+    fetch_result.raw_data = {"data": {}}
+
     with (
         patch.object(indexer, "_should_update", return_value=True),
-        patch.object(indexer, "_mark_sync_complete"),
-        patch.object(indexer, "_mark_sync_failed"),
-        # Return successful upsert: (1, False)
-        patch.object(indexer, "_upsert_player_stats_from_api", return_value=(1, False)),
+        patch.object(indexer, "_fetch_player_stats_raw", return_value=fetch_result) as mock_fetch,
+        patch.object(indexer, "_run_player_stats_phase2", return_value=1) as mock_phase2,
     ):
-        indexer.index_player_stats_for_season(season_id=2025, force=True)
+        result = indexer.index_player_stats_for_season(season_id=2025, force=True)
 
-    assert player_mock.api_failures == 0
-    assert player_mock.api_skip_until is None
+    # Phase 1 was called for player 7; Phase 2 was called with the result
+    assert mock_fetch.call_count == 1
+    assert mock_fetch.call_args[0][0] == 7
+    assert mock_phase2.called
+    assert result == 1
 
 
 # ── Test 5: Skip window excludes players ─────────────────────────────────────
 
 def test_skip_window_excludes_players():
-    """Players with api_skip_until > now must not be passed to _upsert_player_stats_from_api."""
+    """Players with api_skip_until > now must not be passed to _fetch_player_stats_raw."""
     call_counter = [0]
 
     def query_side_effect(model):
@@ -279,12 +277,9 @@ def test_skip_window_excludes_players():
         elif n == 2:
             # gp_ids
             q.filter.return_value.distinct.return_value.all.return_value = []
-        elif n == 3:
+        else:
             # skip_ids — player 99 is in the skip window
             q.filter.return_value.all.return_value = [(99,)]
-        else:
-            # player lookup for player 100
-            q.filter.return_value.first.return_value = _make_player_mock()
         return q
 
     session = MagicMock()
@@ -299,19 +294,22 @@ def test_skip_window_excludes_players():
     mock_client = MagicMock()
     indexer = _make_indexer(mock_client, mock_db)
 
-    upserted_ids = []
+    fetched_ids = []
 
-    def tracking_upsert(person_id, season_id, season_label, session, staged):
-        upserted_ids.append(person_id)
-        return 1, False
+    def tracking_fetch(person_id):
+        fetched_ids.append(person_id)
+        r = MagicMock()
+        r.player_id = person_id
+        r.api_error = False
+        r.raw_data = {}
+        return r
 
     with (
         patch.object(indexer, "_should_update", return_value=True),
-        patch.object(indexer, "_mark_sync_complete"),
-        patch.object(indexer, "_mark_sync_failed"),
-        patch.object(indexer, "_upsert_player_stats_from_api", side_effect=tracking_upsert),
+        patch.object(indexer, "_fetch_player_stats_raw", side_effect=tracking_fetch),
+        patch.object(indexer, "_run_player_stats_phase2", return_value=1),
     ):
         indexer.index_player_stats_for_season(season_id=2025, force=True)
 
-    assert 99 not in upserted_ids, "Skipped player 99 was still processed"
-    assert 100 in upserted_ids, "Player 100 should have been processed"
+    assert 99 not in fetched_ids, "Skipped player 99 was still processed"
+    assert 100 in fetched_ids, "Player 100 should have been processed"

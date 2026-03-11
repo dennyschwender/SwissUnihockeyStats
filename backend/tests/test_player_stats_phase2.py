@@ -122,3 +122,43 @@ def test_player_stats_phase2_uses_batch_sessions():
 
     expected = math.ceil(n_players / 300) + 1  # 1 batch + 1 tier mark
     assert call_count == expected
+
+
+def test_index_player_stats_for_season_uses_parallel_phase1():
+    """index_player_stats_for_season calls _fetch_player_stats_raw per player,
+    not _upsert_player_stats_from_api."""
+    from app.services.data_indexer import DataIndexer
+
+    # Session that returns player IDs [1, 2, 3] and empty skip list
+    session = MagicMock()
+    # For player IDs query
+    session.query.return_value.filter.return_value.distinct.return_value.all.return_value = [
+        (1,), (2,), (3,),
+    ]
+    # For api_skip_until query (no skipped players)
+    session.query.return_value.filter.return_value.all.return_value = []
+
+    @contextmanager
+    def fake_scope():
+        yield session
+
+    db = MagicMock()
+    db.session_scope = fake_scope
+
+    indexer = DataIndexer.__new__(DataIndexer)
+    indexer.db_service = db
+    indexer._API_FAILURE_THRESHOLD = 3
+    indexer._API_SKIP_DAYS = 7
+    indexer._PLAYER_STATS_PHASE2_BATCH_SIZE = 300
+    indexer._should_update = MagicMock(return_value=True)
+    indexer.bulk_already_indexed = MagicMock(return_value=set())
+
+    fetch_results = [MagicMock(player_id=i, api_error=False, raw_data={}) for i in (1, 2, 3)]
+
+    with patch.object(indexer, "_fetch_player_stats_raw", side_effect=fetch_results) as mock_fetch, \
+         patch.object(indexer, "_run_player_stats_phase2", return_value=3) as mock_phase2:
+        result = indexer.index_player_stats_for_season(season_id=2025, force=False)
+
+    assert mock_fetch.call_count == 3
+    assert mock_phase2.called
+    assert result == 3
