@@ -429,12 +429,14 @@ class Scheduler:
                 self._min_season: int | None = data.get("min_season", None)
                 self._excluded_seasons: list[int] = data.get("excluded_seasons", [])
                 self._max_concurrent: int = max(1, int(data.get("max_concurrent", 2)))
+                self._player_game_stats_workers: int = max(1, int(data.get("player_game_stats_workers", 10)))
                 self._policy_tiers: dict[str, int] = data.get("policy_tiers", {})
                 return bool(data.get("enabled", True))
         except (FileNotFoundError, json.JSONDecodeError):
             self._min_season = None
             self._excluded_seasons = []
             self._max_concurrent = 2
+            self._player_game_stats_workers = 10
             self._policy_tiers = {}
             return True
 
@@ -449,6 +451,7 @@ class Scheduler:
                     "min_season": self._min_season,
                     "excluded_seasons": self._excluded_seasons,
                     "max_concurrent": self._max_concurrent,
+                    "player_game_stats_workers": self._player_game_stats_workers,
                     "policy_tiers": self._policy_tiers,
                 }, f, indent=2)
                 f.flush()
@@ -471,6 +474,7 @@ class Scheduler:
             self._min_season = data.get("min_season", None)
             self._excluded_seasons = data.get("excluded_seasons", [])
             self._max_concurrent = max(1, int(data.get("max_concurrent", 2)))
+            self._player_game_stats_workers = max(1, int(data.get("player_game_stats_workers", 10)))
             self._policy_tiers = data.get("policy_tiers", {})
         except (FileNotFoundError, json.JSONDecodeError):
             pass  # keep current in-memory values on read failure
@@ -529,6 +533,12 @@ class Scheduler:
         self._max_concurrent = max(1, n)
         self._save_state()
         logger.info("[scheduler] max_concurrent set to %d", self._max_concurrent)
+
+    def set_player_game_stats_workers(self, n: int):
+        """Set the thread-pool size for player_game_stats Phase 1 API fetches."""
+        self._player_game_stats_workers = max(1, n)
+        self._save_state()
+        logger.info("[scheduler] player_game_stats_workers set to %d", self._player_game_stats_workers)
 
     def _count_running(self) -> int:
         """Count jobs currently in pending/running state."""

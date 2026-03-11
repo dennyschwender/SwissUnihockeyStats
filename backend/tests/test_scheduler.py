@@ -375,3 +375,39 @@ def test_repair_policy_exists():
     assert policy["scope"] == "global"
     assert policy["task"] == "repair"
     assert policy.get("run_at_hour") == 3
+
+
+def test_player_game_stats_workers_persists(tmp_path, monkeypatch):
+    """player_game_stats_workers is saved to and loaded from config."""
+    import json
+    from app.services.scheduler import Scheduler
+
+    cfg = tmp_path / "scheduler_config.json"
+    monkeypatch.setattr("app.services.scheduler._CONFIG_PATH", str(cfg))
+    sched = Scheduler({}, submit_job=None)
+
+    sched.set_player_game_stats_workers(12)
+
+    data = json.loads(cfg.read_text())
+    assert data["player_game_stats_workers"] == 12
+    assert sched._player_game_stats_workers == 12
+
+    # Reload from file via a fresh Scheduler (tests _load_state)
+    sched2 = Scheduler({}, submit_job=None)
+    assert sched2._player_game_stats_workers == 12
+
+
+def test_player_game_stats_workers_reload_config(tmp_path, monkeypatch):
+    """_reload_config picks up player_game_stats_workers written externally."""
+    import json
+    from app.services.scheduler import Scheduler
+
+    cfg = tmp_path / "scheduler_config.json"
+    monkeypatch.setattr("app.services.scheduler._CONFIG_PATH", str(cfg))
+    sched = Scheduler({}, submit_job=None)
+
+    # Simulate another process writing the config file directly
+    cfg.write_text(json.dumps({"player_game_stats_workers": 15}))
+    sched._reload_config()
+
+    assert sched._player_game_stats_workers == 15
