@@ -418,6 +418,7 @@ class Scheduler:
         self._cold_start = True   # run all jobs immediately on first enable
         self._enabled = self._load_state()
         self._last_snapshot_ts: float = 0.0
+        self._deferred_tick_pending: bool = False
 
     # ── persistence ───────────────────────────────────────────────────────────
 
@@ -787,9 +788,18 @@ class Scheduler:
                 )
                 indexed_seasons: list[int] = [r[0] for r in season_rows]
 
+                # Yield to the event loop every N iterations so that HTTP
+                # request handlers (health checks, page loads) are not starved
+                # by the synchronous DB work in _maybe_schedule.  With 30
+                # seasons × ~10 policies this loop can run 300+ iterations;
+                # without yields it blocks the event loop for several seconds
+                # on a Pi4 ARM under heavy indexer load.
+                _YIELD_EVERY = 10
+                _itr = 0
                 for policy in POLICIES:
                     if policy["scope"] == "global":
                         self._maybe_schedule(session, policy, season=None, is_current_season=True)
+                        _itr += 1
                     else:
                         for sid in indexed_seasons:
                             if self._season_filtered(sid):
@@ -798,6 +808,9 @@ class Scheduler:
                                 session, policy, season=sid,
                                 is_current_season=(sid == current_season_id),
                             )
+                            _itr += 1
+                            if _itr % _YIELD_EVERY == 0:
+                                await asyncio.sleep(0)
 
                 # Cold start complete – subsequent ticks use normal max_age scheduling
                 self._cold_start = False
@@ -945,7 +958,13 @@ class Scheduler:
             )
             # Schedule a fast follow-up tick so deferred jobs aren't waiting
             # the full TICK_SECONDS interval before the next dispatch attempt.
-            asyncio.create_task(self._deferred_tick(delay=8))
+            # Guard: only one deferred-tick task at a time.  Without this, each
+            # tick creates a new task, so after N ticks there are N concurrent
+            # chains each calling _refresh_queue every 8 s — the accumulated
+            # synchronous DB work starves the event loop and causes HTTP 524.
+            if not self._deferred_tick_pending:
+                self._deferred_tick_pending = True
+                asyncio.create_task(self._deferred_tick(delay=8))
 
         for job in to_launch:
             if job.task == "repair" and self._count_running() > 0:
@@ -964,6 +983,7 @@ class Scheduler:
     async def _deferred_tick(self, delay: int = 8):
         """Fire a tick after a short delay to dispatch deferred overflow jobs."""
         await asyncio.sleep(delay)
+        self._deferred_tick_pending = False
         await self._tick()
 
     async def _launch(self, job: ScheduledJob):
