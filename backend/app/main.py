@@ -1936,11 +1936,12 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             _exact_tier = max_tier if max_tier < 7 else None
             _tier_lbl   = f" (tier {max_tier} only)" if _exact_tier else ""
             push("info", f"Updating per-game G/A/PIM for season {season}{_tier_lbl}...")
+            from app.services.scheduler import get_scheduler as _get_sched
             pgstats_n = await asyncio.to_thread(
                 indexer.index_player_game_stats_for_season,
                 season_id=season, force=force, exact_tier=_exact_tier,
                 on_progress=set_progress,
-                max_workers=sched._player_game_stats_workers,
+                max_workers=getattr(_get_sched(), "_player_game_stats_workers", 10),
             )
             stats["player_game_stats"] = pgstats_n
             push("ok", f"Player game stats: {pgstats_n}")
