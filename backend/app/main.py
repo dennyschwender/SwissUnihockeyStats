@@ -3813,6 +3813,8 @@ async def admin_sync_failures(request: Request, _: None = Depends(require_admin)
     """Admin page showing all GameSyncFailure rows with retry controls."""
     from sqlalchemy import select
     from app.models.db_models import GameSyncFailure, Game
+    locale = get_locale_from_path(request.url.path)
+    t = get_translations(locale)
     with db_service.session_scope() as session:
         rows = session.execute(
             select(GameSyncFailure, Game)
@@ -3823,7 +3825,7 @@ async def admin_sync_failures(request: Request, _: None = Depends(require_admin)
             {
                 "failure_id": f.id,
                 "game_id": g.id,
-                "game_api_id": g.api_id,
+                "game_api_id": g.id,
                 "season_id": f.season_id,
                 "game_date": g.game_date,
                 "abandoned_at": f.abandoned_at,
@@ -3836,7 +3838,7 @@ async def admin_sync_failures(request: Request, _: None = Depends(require_admin)
     return templates.TemplateResponse(
         request,
         "admin_sync_failures.html",
-        {"failures": failures_data},
+        {"failures": failures_data, "t": t, "locale": locale},
     )
 
 

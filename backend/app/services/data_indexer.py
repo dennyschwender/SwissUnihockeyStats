@@ -5,6 +5,7 @@ SEASONS → CLUBS → TEAMS → PLAYERS
 SEASONS → LEAGUES → GROUPS → GAMES → PLAYERS
 """
 import logging
+import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -55,11 +56,11 @@ def _phase_from_slider_text(slider_text: str) -> str:
     :class:`LeagueGroup`.  Every other label gets its own bucket, which
     means playoff phases each become a separate group.
     """
-    import re as _re
+    
     if not slider_text:
         return "Regelsaison"
     label = slider_text.split(" / ")[0].strip()
-    if _re.match(r'Runde\s+\d+$', label, _re.IGNORECASE):
+    if re.match(r'Runde\s+\d+$', label, re.IGNORECASE):
         return "Regelsaison"
     return label or "Regelsaison"
 
@@ -73,7 +74,7 @@ def _parse_game_rows(regions: list) -> list[dict]:
         away_team_id, away_team_name, away_logo_url,
         home_score, away_score, status, period
     """
-    import re as _re
+    
     games: list[dict] = []
     for region in regions:
         for row in region.get("rows", []):
@@ -153,8 +154,8 @@ def _parse_game_rows(regions: list) -> list[dict]:
                 score_text = cells[7].get("text", ["-"])
                 score_text = score_text[0] if isinstance(score_text, list) else score_text
                 if score_text and score_text not in ("-", ""):
-                    m = _re.match(r'(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?',
-                                  score_text.strip(), _re.I)
+                    m = re.match(r'(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?',
+                                  score_text.strip(), re.I)
                     if m:
                         home_score = int(m.group(1))
                         away_score = int(m.group(2))
@@ -1576,8 +1577,8 @@ class DataIndexer:
         try:
             summary = self.client.get_game_summary(game_id)
             title = summary.get("data", {}).get("title", "") or ""
-            import re as _re
-            m = _re.search(r'(\d+):(\d+)\s*(n\.V\.|n\.P\.)?', title, _re.I)
+            
+            m = re.search(r'(\d+):(\d+)\s*(n\.V\.|n\.P\.)?', title, re.I)
             if m:
                 home_score_val = int(m.group(1))
                 away_score_val = int(m.group(2))
@@ -1645,8 +1646,8 @@ class DataIndexer:
                 if not game_is_finished:
                     _result = _dcell(4)
                     if _result:
-                        import re as _re
-                        _m = _re.match(r'(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?', _result.strip(), _re.I)
+                        
+                        _m = re.match(r'(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?', _result.strip(), re.I)
                         if _m:
                             home_score_val = int(_m.group(1))
                             away_score_val = int(_m.group(2))
@@ -2669,8 +2670,8 @@ class DataIndexer:
             # Column layout: 0=home_logo 1=home_name 2=away_logo 3=away_name
             # 4=result 5=date 6=time 7=location 8=first_referee 9=second_referee 10=spectators
             _result_text = _dcell(4)
-            import re as _re
-            if _result_text and _re.search(r'\d+\s*:\s*\d+', _result_text):
+            
+            if _result_text and re.search(r'\d+\s*:\s*\d+', _result_text):
                 result["status"] = "finished"
             else:
                 result["status"] = "scheduled"
@@ -2851,6 +2852,7 @@ class DataIndexer:
                 failure.can_retry = False
 
         # Step 2: Process all post_game games
+        now_naive = now.replace(tzinfo=None)
         with self.db_service.session_scope() as session:
             games = session.execute(
                 select(Game).where(
@@ -2874,7 +2876,7 @@ class DataIndexer:
                     game.completeness_status = "complete"
                     game.incomplete_fields = None
                     transitioned += 1
-                elif game.give_up_at is not None and now.replace(tzinfo=None) >= (game.give_up_at.replace(tzinfo=None) if hasattr(game.give_up_at, 'tzinfo') else game.give_up_at):
+                elif game.give_up_at is not None and now_naive >= game.give_up_at.replace(tzinfo=None):
                     game.completeness_status = "abandoned"
                     game.incomplete_fields = missing
                     failure = session.execute(

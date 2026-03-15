@@ -71,6 +71,15 @@ def admin_client(app):
         yield c
 
 
+@pytest.fixture(autouse=True)
+def clear_job_cooldowns():
+    """Clear admin-job cooldown state before each test to prevent 429 interference."""
+    from app.main import _job_last_done
+    _job_last_done.clear()
+    yield
+    _job_last_done.clear()
+
+
 @pytest.fixture
 def mock_api_client():
     """
