@@ -1,38 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ locale }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sync Failures — Unihockey Stats Admin</title>
+  <title>{{ t.admin.sync_failures.title }} — Unihockey Stats Admin</title>
   <link rel="stylesheet" href="/static/css/main.css?v=25">
   <link rel="stylesheet" href="/static/css/admin.css?v=1">
 </head>
 <body>
 
 <div class="topbar">
-  <h1>Unihockey Stats <span class="badge">Admin</span></h1>
-  <a href="/admin">← Dashboard</a>
+  <h1>{{ t.common.app_name }} <span class="badge">Admin</span></h1>
+  <a href="/admin">← {{ t.common.back }}</a>
   <div class="topbar-right">
-    <a href="/admin/logout" class="btn btn-sm btn-red" style="text-decoration:none">⎋ Logout</a>
+    <a href="/admin/logout" class="btn btn-sm btn-red" style="text-decoration:none">⎋ {{ t.common.close }}</a>
   </div>
 </div>
 
 <div style="padding: 1.5rem;">
-  <h2>Game Sync Failures</h2>
+  <h2>{{ t.admin.sync_failures.title }}</h2>
 
   {% if not failures %}
-    <p>No sync failures found.</p>
+    <p>{{ t.admin.sync_failures.no_failures }}</p>
   {% else %}
     <table class="data-table" style="width:100%; border-collapse:collapse;">
       <thead>
         <tr>
-          <th>Game API ID</th>
-          <th>Season</th>
-          <th>Game Date</th>
-          <th>Abandoned At</th>
-          <th>Missing Fields</th>
-          <th>Retry Queued</th>
-          <th>Retried At</th>
+          <th>{{ t.admin.sync_failures.game }}</th>
+          <th>{{ t.admin.sync_failures.season }}</th>
+          <th>{{ t.admin.sync_failures.game_date }}</th>
+          <th>{{ t.admin.sync_failures.abandoned_at }}</th>
+          <th>{{ t.admin.sync_failures.missing_fields }}</th>
+          <th>{{ t.admin.sync_failures.can_retry }}</th>
+          <th>{{ t.admin.sync_failures.retried_at }}</th>
           <th>Action</th>
         </tr>
       </thead>
@@ -49,7 +49,7 @@
           <td>
             {% if not f.can_retry and not f.retried_at %}
             <form method="post" action="/admin/sync-failures/{{ f.failure_id }}/retry" style="display:inline">
-              <button type="submit" class="btn btn-sm">Queue Retry</button>
+              <button type="submit" class="btn btn-sm">{{ t.admin.sync_failures.queue_retry }}</button>
             </form>
             {% else %}
             —
