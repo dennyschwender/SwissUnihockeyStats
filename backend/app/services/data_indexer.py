@@ -2821,6 +2821,10 @@ class DataIndexer:
     def index_post_game_completion(self, season_id: int, force: bool = False) -> int:
         """Process post_game games: fetch full data, check completeness, transition state.
 
+        Args:
+            season_id: The season to process
+            force: Reserved for future forced reprocessing of complete games
+
         Returns count of games transitioned (to complete or abandoned).
         """
         from datetime import timedelta
@@ -2834,7 +2838,7 @@ class DataIndexer:
         # Step 1: Process manual retries (GameSyncFailure rows with can_retry=True)
         with self.db_service.session_scope() as session:
             retry_failures = session.execute(
-                select(GameSyncFailure).where(GameSyncFailure.can_retry == True)
+                select(GameSyncFailure).where(GameSyncFailure.can_retry == True, GameSyncFailure.season_id == season_id)
             ).scalars().all()
             for failure in retry_failures:
                 game = session.get(Game, failure.game_id)
