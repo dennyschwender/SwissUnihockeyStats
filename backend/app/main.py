@@ -477,7 +477,6 @@ async def admin_stats(_: None = Depends(require_admin)):
     return instantly.  A background task keeps the cache warm; the first call
     after a server restart will await the initial computation.
     """
-    global _stats_cache, _stats_cache_time
     now = time.monotonic()
     cache_age = now - _stats_cache_time
 
@@ -3813,9 +3812,10 @@ async def admin_sync_failures(request: Request, _: None = Depends(require_admin)
     """Admin page showing all GameSyncFailure rows with retry controls."""
     from sqlalchemy import select
     from app.models.db_models import GameSyncFailure, Game
+    from app.services.database import get_database_service
     locale = get_locale_from_path(request.url.path)
     t = get_translations(locale)
-    with db_service.session_scope() as session:
+    with get_database_service().session_scope() as session:
         rows = session.execute(
             select(GameSyncFailure, Game)
             .join(Game, GameSyncFailure.game_id == Game.id)
@@ -3846,7 +3846,8 @@ async def admin_sync_failures(request: Request, _: None = Depends(require_admin)
 async def admin_retry_sync_failure(failure_id: int, request: Request, _: None = Depends(require_admin)):
     """Queue a GameSyncFailure for retry by setting can_retry=True."""
     from app.models.db_models import GameSyncFailure
-    with db_service.session_scope() as session:
+    from app.services.database import get_database_service
+    with get_database_service().session_scope() as session:
         failure = session.get(GameSyncFailure, failure_id)
         if failure is None:
             raise HTTPException(status_code=404, detail="Failure not found")
