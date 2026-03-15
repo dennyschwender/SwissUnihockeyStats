@@ -1142,6 +1142,8 @@ _TASK_META = {
     "leagues_path":      "Index Leagues Path (leagues + groups + games)",
     "full":              "Full Index (clubs path + leagues path + lineups + game stats)",
     "repair":            "DB Repair",
+    "upcoming_games":        "Index Upcoming Games",
+    "post_game_completion":  "Index Post-Game Completion",
 }
 
 # Minimum minutes before the same (task, season) can be re-triggered without force=True.
@@ -2120,6 +2122,22 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             push("ok", f"Game events: {events_n}  Lineups: {lineup_n}")
             # Season-level sentinel: game_events entity_ids are "game:{id}:events" (no season year)
             await asyncio.to_thread(indexer.record_season_sync, "game_events", season, events_n)
+
+        # ── UPCOMING GAMES ─────────────────────────────────────────────────
+        if task == "upcoming_games":
+            push("info", "Indexing upcoming games...")
+            n = await asyncio.to_thread(indexer.index_upcoming_games, season, force=force)
+            stats["transitioned"] = n
+            push("ok", f"Upcoming games: {n}")
+            await asyncio.to_thread(indexer.record_season_sync, "upcoming_games", season, n)
+
+        # ── POST-GAME COMPLETION ────────────────────────────────────────────
+        if task == "post_game_completion":
+            push("info", "Indexing post-game completion...")
+            n = await asyncio.to_thread(indexer.index_post_game_completion, season, force=force)
+            stats["transitioned"] = n
+            push("ok", f"Post-game completion: {n}")
+            await asyncio.to_thread(indexer.record_season_sync, "post_game_completion", season, n)
 
         # ── DB REPAIR ──────────────────────────────────────────────────────
         if task == "repair":

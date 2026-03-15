@@ -102,6 +102,18 @@ class TestAdminSeasonAPI:
         assert r.status_code == 400
 
 
+def test_upcoming_games_task_is_recognised(admin_client):
+    """upcoming_games task should be dispatched without 422/404."""
+    r = admin_client.post("/admin/api/index", json={"season": 2025, "task": "upcoming_games", "force": False})
+    assert r.status_code in (200, 202, 204), f"Got {r.status_code}: {r.text}"
+
+
+def test_post_game_completion_task_is_recognised(admin_client):
+    """post_game_completion task should be dispatched without 422/404."""
+    r = admin_client.post("/admin/api/index", json={"season": 2025, "task": "post_game_completion", "force": False})
+    assert r.status_code in (200, 202, 204), f"Got {r.status_code}: {r.text}"
+
+
 def test_player_game_stats_workers_endpoint(admin_client):
     """POST /admin/api/scheduler with action=player_game_stats_workers updates the setting."""
     r = admin_client.post(
