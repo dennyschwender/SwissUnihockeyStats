@@ -259,10 +259,10 @@ def _game_events_ttl_hours(game_date: "datetime | None") -> float:
 
 class DataIndexer:
     """Hierarchical data indexer for Swiss Unihockey stats"""
-    
-    def __init__(self):
-        self.client = get_swissunihockey_client()
-        self.db_service = get_database_service()
+
+    def __init__(self, db=None, api=None):
+        self.client = api if api is not None else get_swissunihockey_client()
+        self.db_service = db if db is not None else get_database_service()
 
     def cleanup_stale_sync_status(self) -> int:
         """Reset any in_progress rows left over from a previous server process."""
@@ -2636,6 +2636,162 @@ class DataIndexer:
                         total,
                     )
         return total
+
+    # ==================== GAME LIFECYCLE METHODS ====================
+
+    def _fetch_game_metadata(self, game_api_id: int) -> "dict | None":
+        """Fetch game metadata from the API.
+
+        Parses the /api/games/{id} details response into a normalised dict with
+        keys: status, date, time, venue, referee_1, referee_2.
+        Returns None if the game is not found or the response is empty.
+        """
+        try:
+            details = self.client.get_game_details(game_api_id)
+        except Exception:
+            return None
+
+        if not details:
+            return None
+
+        _rows = (details.get("data", {}).get("regions") or [{}])[0].get("rows", [])
+        result: dict = {}
+
+        if _rows:
+            _cells = _rows[0].get("cells", [])
+
+            def _dcell(idx: int) -> str:
+                if len(_cells) <= idx:
+                    return ""
+                v = _cells[idx].get("text", "")
+                return (v[0] if isinstance(v, list) else v or "").strip()
+
+            # Column layout: 0=home_logo 1=home_name 2=away_logo 3=away_name
+            # 4=result 5=date 6=time 7=location 8=first_referee 9=second_referee 10=spectators
+            _result_text = _dcell(4)
+            import re as _re
+            if _result_text and _re.search(r'\d+\s*:\s*\d+', _result_text):
+                result["status"] = "finished"
+            else:
+                result["status"] = "scheduled"
+
+            _date_str = _dcell(5)
+            _time_str = _dcell(6)
+            if _date_str:
+                _dt_str = f"{_date_str} {_time_str}".strip()
+                for _fmt in ("%d.%m.%Y %H:%M", "%d.%m.%y %H:%M", "%d.%m.%Y", "%d.%m.%y"):
+                    try:
+                        result["date"] = datetime.strptime(_dt_str, _fmt)
+                        result["time"] = _time_str or None
+                        break
+                    except ValueError:
+                        pass
+
+            venue = _dcell(7)
+            if venue:
+                result["venue"] = venue
+            ref1 = _dcell(8)
+            if ref1:
+                result["referee_1"] = ref1
+            ref2 = _dcell(9)
+            if ref2:
+                result["referee_2"] = ref2
+
+        return result or None
+
+    def _get_league_groups_for_season(self, season_id: int, session) -> list:
+        """Return all LeagueGroup rows for the given season.
+
+        LeagueGroup has no direct season_id column; it links to League which
+        has season_id.
+        """
+        from sqlalchemy import select
+        from app.models.db_models import LeagueGroup, League
+        return session.execute(
+            select(LeagueGroup).join(League, LeagueGroup.league_id == League.id).where(
+                League.season_id == season_id
+            )
+        ).scalars().all()
+
+    def index_upcoming_games(self, season_id: int, force: bool = False) -> int:
+        """Poll upcoming games for schedule updates.
+
+        Fetches game metadata for all games with completeness_status='upcoming'
+        and flips any API-finished games to post_game.
+
+        Returns count of games transitioned to post_game.
+        """
+        from datetime import timedelta
+        from sqlalchemy import select
+        from app.models.db_models import Game, _utcnow
+        from app.services.game_completeness import _resolve_game_tier, _is_game_complete
+
+        transitioned = 0
+
+        with self.db_service.session_scope() as session:
+            games = session.execute(
+                select(Game).where(
+                    Game.season_id == season_id,
+                    Game.completeness_status == "upcoming",
+                )
+            ).scalars().all()
+
+            for game in games:
+                # Defensive rule: finished games stuck in upcoming → treat as post_game
+                if game.status == "finished":
+                    game.completeness_status = "post_game"
+                    if game.give_up_at is None:
+                        deadline = (
+                            (game.game_date + timedelta(days=3))
+                            if game.game_date
+                            else (_utcnow() + timedelta(days=3))
+                        )
+                        game.give_up_at = deadline
+                    tier = _resolve_game_tier(game, session)
+                    _, missing = _is_game_complete(game, tier, session)
+                    game.incomplete_fields = missing
+                    game.completeness_checked_at = _utcnow()
+                    transitioned += 1
+                    continue
+
+                # Fetch latest game metadata from API
+                try:
+                    api_data = self._fetch_game_metadata(game.id)
+                except Exception:
+                    continue  # skip on API error, retry next tick
+
+                if api_data is None:
+                    continue
+
+                # Update schedule metadata
+                if api_data.get("date"):
+                    game.game_date = api_data["date"]
+                if api_data.get("time"):
+                    game.game_time = api_data["time"]
+                if api_data.get("referee_1"):
+                    game.referee_1 = api_data["referee_1"]
+                if api_data.get("referee_2"):
+                    game.referee_2 = api_data["referee_2"]
+                if api_data.get("venue"):
+                    game.venue = api_data.get("venue")
+
+                # If API says finished → flip to post_game
+                if api_data.get("status") == "finished":
+                    game.status = "finished"
+                    game.completeness_status = "post_game"
+                    deadline = (
+                        (game.game_date + timedelta(days=3))
+                        if game.game_date
+                        else (_utcnow() + timedelta(days=3))
+                    )
+                    game.give_up_at = deadline
+                    tier = _resolve_game_tier(game, session)
+                    _, missing = _is_game_complete(game, tier, session)
+                    game.incomplete_fields = missing
+                    game.completeness_checked_at = _utcnow()
+                    transitioned += 1
+
+        return transitioned
 
     def get_indexing_stats(self) -> Dict[str, Any]:
         """Get current indexing statistics
