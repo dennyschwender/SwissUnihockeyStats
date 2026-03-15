@@ -30,7 +30,7 @@ _CLUB_H_ID = 10
 _CLUB_A_ID = 11
 _TEAM_H_ID = 100
 _TEAM_A_ID = 101
-_PLAYER_IDS = [1, 2, 3, 4]
+_PLAYER_IDS = [1, 2, 3, 4, 5]
 
 
 def _ensure_base_rows(session):
