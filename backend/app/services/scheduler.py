@@ -113,48 +113,50 @@ POLICIES: list[dict] = [
         "priority":    50,
         "run_at_hour": 3,
     },
+    # ── Upcoming games polling — schedule changes (noon / evening / night) ───
+    # Runs 3× daily so any postponements or venue changes are caught promptly.
     {
-        "name":        "games",
-        "entity_type": "games",
-        "max_age":     timedelta(days=7),
-        "task":        "games",
+        "name":        "upcoming_games_noon",
+        "entity_type": "upcoming_games_noon",
+        "max_age":     timedelta(hours=23),
+        "task":        "upcoming_games",
         "scope":       "season",
-        "label":       "Games refresh",
+        "label":       "Poll upcoming games for schedule changes (noon)",
         "priority":    70,
-        "run_at_hour": 3,
+        "run_at_hour": 12,
     },
     {
-        "name":        "game_lineups",
-        "entity_type": "game_lineups",
-        "max_age":     timedelta(hours=24),
-        "task":        "game_lineups",
+        "name":        "upcoming_games_evening",
+        "entity_type": "upcoming_games_evening",
+        "max_age":     timedelta(hours=23),
+        "task":        "upcoming_games",
         "scope":       "season",
-        "label":       "Game lineups refresh",
-        "priority":    75,      # runs after games (70), before game_events (80)
-        "max_tier":    2,       # NLA + NLB + A-level only, mirrors game_events
-        "run_at_hour": 3,
+        "label":       "Poll upcoming games for schedule changes (evening)",
+        "priority":    70,
+        "run_at_hour": 18,
     },
-    # ── Live / recent game-events polling ────────────────────────────────────
-    # Runs every 10 minutes (no hour-snap) throughout the day so that:
-    #   • live games (< 3 h old)   are refreshed every ~5 min
-    #   • today's games (< 12 h)   are refreshed every ~1 h
-    #   • yesterday's games (<48 h) are refreshed every ~4 h
-    #   • older games (≥ 48 h)     are skipped immediately (720 h TTL)
-    # The per-game TTL is computed by _game_events_ttl_hours() inside
-    # index_game_events(); the scheduler just provides the trigger cadence.
-    # player_stats / player_game_stats still run at 04:00 UTC (after the
-    # overnight events pass) so G/A/PIM numbers reflect last night's games.
     {
-        "name":        "game_events",
-        "entity_type": "game_events",
-        "max_age":     timedelta(minutes=10),
-        "task":        "events",
+        "name":        "upcoming_games_night",
+        "entity_type": "upcoming_games_night",
+        "max_age":     timedelta(hours=23),
+        "task":        "upcoming_games",
         "scope":       "season",
-        "label":       "Game events refresh",
-        "priority":    80,
-        "max_tier":    2,   # NLA + NLB + A-level youth only
-        "current_only": True,
-        # no run_at_hour — runs throughout the day based on game ages
+        "label":       "Poll upcoming games for schedule changes (night)",
+        "priority":    70,
+        "run_at_hour": 23,
+    },
+    # ── Post-game completion polling — every 2 hours ──────────────────────────
+    # Fetches lineups, events and best-player data for recently finished games
+    # until all data is complete or the window expires.
+    {
+        "name":        "post_game_completion",
+        "entity_type": "post_game_completion",
+        "max_age":     timedelta(hours=2),
+        "task":        "post_game_completion",
+        "scope":       "season",
+        "label":       "Poll post-game data until complete or abandoned",
+        "priority":    75,
+        # no run_at_hour — runs throughout the day every 2 hours
     },
     # ── Player season stats: cascade T1 → T2 → … → T6 ──────────────────────
     # current_only is NOT set: these run once for past seasons too (frozen after
