@@ -3,15 +3,102 @@ Database service for managing connections and sessions
 """
 import logging
 from contextlib import contextmanager
+from datetime import timedelta
 from typing import Generator, Optional
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, select, text, inspect as sa_inspect
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import NullPool, StaticPool
 
-from app.models.db_models import Base
+from app.models.db_models import Base, Game, GameSyncFailure, _utcnow
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def run_lifecycle_migration(engine) -> None:
+    """Idempotent migration: add lifecycle columns to games, create game_sync_failures,
+    and backfill completeness_status for all existing games rows.
+
+    Safe to call multiple times — all operations are gated on current state.
+    """
+    insp = sa_inspect(engine)
+    existing_cols = {c["name"] for c in insp.get_columns("games")}
+
+    with engine.connect() as conn:
+        if "completeness_status" not in existing_cols:
+            conn.execute(text(
+                "ALTER TABLE games ADD COLUMN completeness_status VARCHAR(20) NOT NULL DEFAULT 'upcoming'"
+            ))
+        if "incomplete_fields" not in existing_cols:
+            conn.execute(text("ALTER TABLE games ADD COLUMN incomplete_fields TEXT"))
+        if "give_up_at" not in existing_cols:
+            conn.execute(text("ALTER TABLE games ADD COLUMN give_up_at DATETIME"))
+        if "completeness_checked_at" not in existing_cols:
+            conn.execute(text("ALTER TABLE games ADD COLUMN completeness_checked_at DATETIME"))
+        conn.commit()
+
+    # Create game_sync_failures table if missing
+    GameSyncFailure.__table__.create(engine, checkfirst=True)
+
+    # Backfill: only touch rows that are still 'upcoming' (the column default)
+    # so that already-processed rows are skipped on re-runs.
+    now = _utcnow()
+    # SQLite returns naive datetimes; use a naive UTC now for comparisons.
+    now_naive = now.replace(tzinfo=None)
+    with Session(engine) as session:
+        games = session.execute(
+            select(Game).where(Game.completeness_status == "upcoming")
+        ).scalars().all()
+
+        for i, game in enumerate(games):
+            if game.status != "finished":
+                # scheduled / live → keep upcoming
+                game.completeness_status = "upcoming"
+                game.give_up_at = None
+                game.incomplete_fields = None
+            else:
+                is_complete = (
+                    game.home_score is not None and game.away_score is not None
+                )
+                if is_complete:
+                    game.completeness_status = "complete"
+                    game.give_up_at = None
+                    game.incomplete_fields = None
+                else:
+                    missing = ["score"]
+                    deadline = (
+                        (game.game_date + timedelta(days=3))
+                        if game.game_date is not None
+                        else (now_naive + timedelta(days=3))
+                    )
+                    if game.game_date is None or deadline > now_naive:
+                        game.completeness_status = "post_game"
+                        game.give_up_at = deadline
+                        game.incomplete_fields = missing
+                    else:
+                        game.completeness_status = "abandoned"
+                        game.give_up_at = None
+                        game.incomplete_fields = missing
+                        # Write failure row only if one doesn't already exist
+                        existing_failure = session.execute(
+                            select(GameSyncFailure).where(
+                                GameSyncFailure.game_id == game.id
+                            )
+                        ).scalar_one_or_none()
+                        if existing_failure is None:
+                            session.add(GameSyncFailure(
+                                game_id=game.id,
+                                season_id=game.season_id,
+                                abandoned_at=now,
+                                missing_fields=missing,
+                                can_retry=False,
+                            ))
+
+            if (i + 1) % 200 == 0:
+                session.commit()
+
+        session.commit()
+    logger.debug("Lifecycle migration applied")
 
 
 class DatabaseService:
@@ -88,6 +175,9 @@ class DatabaseService:
         # ── Schema migrations ────────────────────────────────────────────
         if self.database_url.startswith("sqlite"):
             self._run_sqlite_migrations()
+
+        # ── Game lifecycle migration (idempotent backfill) ───────────────
+        run_lifecycle_migration(self.engine)
 
         self._initialized = True
         logger.info("Database initialized successfully")
