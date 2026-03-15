@@ -3805,6 +3805,54 @@ async def privacy_page(request: Request, locale: str):
 
 
 # ============================================================================
+# GameSyncFailure Admin Routes
+# ============================================================================
+
+@app.get("/admin/sync-failures", response_class=HTMLResponse)
+async def admin_sync_failures(request: Request, _: None = Depends(require_admin)):
+    """Admin page showing all GameSyncFailure rows with retry controls."""
+    from sqlalchemy import select
+    from app.models.db_models import GameSyncFailure, Game
+    with db_service.session_scope() as session:
+        rows = session.execute(
+            select(GameSyncFailure, Game)
+            .join(Game, GameSyncFailure.game_id == Game.id)
+            .order_by(GameSyncFailure.abandoned_at.desc())
+        ).all()
+        failures_data = [
+            {
+                "failure_id": f.id,
+                "game_id": g.id,
+                "game_api_id": g.api_id,
+                "season_id": f.season_id,
+                "game_date": g.game_date,
+                "abandoned_at": f.abandoned_at,
+                "missing_fields": f.missing_fields or [],
+                "can_retry": f.can_retry,
+                "retried_at": f.retried_at,
+            }
+            for f, g in rows
+        ]
+    return templates.TemplateResponse(
+        request,
+        "admin_sync_failures.html",
+        {"failures": failures_data},
+    )
+
+
+@app.post("/admin/sync-failures/{failure_id}/retry")
+async def admin_retry_sync_failure(failure_id: int, request: Request, _: None = Depends(require_admin)):
+    """Queue a GameSyncFailure for retry by setting can_retry=True."""
+    from app.models.db_models import GameSyncFailure
+    with db_service.session_scope() as session:
+        failure = session.get(GameSyncFailure, failure_id)
+        if failure is None:
+            raise HTTPException(status_code=404, detail="Failure not found")
+        failure.can_retry = True
+    return RedirectResponse(url="/admin/sync-failures", status_code=303)
+
+
+# ============================================================================
 # Error Handlers
 # ============================================================================
 

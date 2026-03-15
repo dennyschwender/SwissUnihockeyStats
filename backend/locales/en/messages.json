@@ -232,6 +232,20 @@
     "install_desc": "Access stats offline, faster loading",
     "install_btn": "Install"
   },
+  "admin": {
+    "sync_failures": {
+      "title": "Game Sync Failures",
+      "game": "Game",
+      "season": "Season",
+      "game_date": "Game Date",
+      "abandoned_at": "Abandoned At",
+      "missing_fields": "Missing Fields",
+      "can_retry": "Retry Queued",
+      "retried_at": "Retried At",
+      "queue_retry": "Queue Retry",
+      "no_failures": "No sync failures found."
+    }
+  },
   "meta": {
     "description": "Comprehensive statistics for Swiss floorball leagues, teams, games, and rankings",
     "og_description": "Comprehensive statistics for Swiss floorball leagues, teams, games, and rankings",

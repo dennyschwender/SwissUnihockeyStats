@@ -232,6 +232,20 @@
     "install_desc": "Accesso offline, caricamento più veloce",
     "install_btn": "Installa"
   },
+  "admin": {
+    "sync_failures": {
+      "title": "Errori di sincronizzazione partite",
+      "game": "Partita",
+      "season": "Stagione",
+      "game_date": "Data partita",
+      "abandoned_at": "Abbandonato il",
+      "missing_fields": "Campi mancanti",
+      "can_retry": "Nuovo tentativo pianificato",
+      "retried_at": "Riprovato il",
+      "queue_retry": "Pianifica nuovo tentativo",
+      "no_failures": "Nessun errore di sincronizzazione trovato."
+    }
+  },
   "meta": {
     "description": "Statistiche complete per leghe, squadre, partite e classifiche dell'unihockey svizzero",
     "og_description": "Statistiche complete per leghe, squadre, partite e classifiche dell'unihockey svizzero",

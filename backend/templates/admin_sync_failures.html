@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sync Failures — Unihockey Stats Admin</title>
+  <link rel="stylesheet" href="/static/css/main.css?v=25">
+  <link rel="stylesheet" href="/static/css/admin.css?v=1">
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Unihockey Stats <span class="badge">Admin</span></h1>
+  <a href="/admin">← Dashboard</a>
+  <div class="topbar-right">
+    <a href="/admin/logout" class="btn btn-sm btn-red" style="text-decoration:none">⎋ Logout</a>
+  </div>
+</div>
+
+<div style="padding: 1.5rem;">
+  <h2>Game Sync Failures</h2>
+
+  {% if not failures %}
+    <p>No sync failures found.</p>
+  {% else %}
+    <table class="data-table" style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th>Game API ID</th>
+          <th>Season</th>
+          <th>Game Date</th>
+          <th>Abandoned At</th>
+          <th>Missing Fields</th>
+          <th>Retry Queued</th>
+          <th>Retried At</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in failures %}
+        <tr>
+          <td>{{ f.game_api_id }}</td>
+          <td>{{ f.season_id }}</td>
+          <td>{{ f.game_date or '—' }}</td>
+          <td>{{ f.abandoned_at.strftime('%Y-%m-%d %H:%M') if f.abandoned_at else '—' }}</td>
+          <td>{{ f.missing_fields | join(', ') if f.missing_fields else '—' }}</td>
+          <td>{{ 'Yes' if f.can_retry else 'No' }}</td>
+          <td>{{ f.retried_at.strftime('%Y-%m-%d %H:%M') if f.retried_at else '—' }}</td>
+          <td>
+            {% if not f.can_retry and not f.retried_at %}
+            <form method="post" action="/admin/sync-failures/{{ f.failure_id }}/retry" style="display:inline">
+              <button type="submit" class="btn btn-sm">Queue Retry</button>
+            </form>
+            {% else %}
+            —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+
+</body>
+</html>

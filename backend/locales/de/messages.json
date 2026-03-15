@@ -232,6 +232,20 @@
     "install_desc": "Offline-Zugriff, schnelleres Laden",
     "install_btn": "Installieren"
   },
+  "admin": {
+    "sync_failures": {
+      "title": "Spiel-Synchronisierungsfehler",
+      "game": "Spiel",
+      "season": "Saison",
+      "game_date": "Spieldatum",
+      "abandoned_at": "Abgebrochen am",
+      "missing_fields": "Fehlende Felder",
+      "can_retry": "Wiederholung geplant",
+      "retried_at": "Wiederholt am",
+      "queue_retry": "Wiederholung planen",
+      "no_failures": "Keine Synchronisierungsfehler gefunden."
+    }
+  },
   "meta": {
     "description": "Umfassende Statistiken für Schweizer Unihockey-Ligen, Teams, Spiele und Ranglisten",
     "og_description": "Umfassende Statistiken für Schweizer Unihockey-Ligen, Teams, Spiele und Ranglisten",
