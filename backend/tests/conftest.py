@@ -89,11 +89,13 @@ def admin_client(app):
 
 @pytest.fixture(autouse=True)
 def clear_job_cooldowns():
-    """Clear admin-job cooldown state before each test to prevent 429 interference."""
-    from app.main import _job_last_done
+    """Clear admin-job cooldown state and contact rate limits before each test."""
+    from app.main import _job_last_done, _contact_attempts
     _job_last_done.clear()
+    _contact_attempts.clear()
     yield
     _job_last_done.clear()
+    _contact_attempts.clear()
 
 
 @pytest.fixture
