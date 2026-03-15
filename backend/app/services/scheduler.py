@@ -162,7 +162,7 @@ POLICIES: list[dict] = [
     # current_only is NOT set: these run once for past seasons too (frozen after
     # first successful sync). Tiers beyond the players policy max_tier will find
     # 0 players and freeze immediately via the empty-tier stamp.
-    # run_at_hour=4: runs after game_events (03:xx) so stats reflect last night's games.
+    # run_at_hour=4: runs in the early morning so stats reflect last night's games.
     {
         "name":        "player_stats_t1",
         "entity_type": "player_stats_t1",
@@ -849,8 +849,8 @@ class Scheduler:
         last_sync = _last_sync_for(session, policy["entity_type"], season)
         now = _utcnow()
 
-        # current_only policies (e.g. game_events) are live data that changes
-        # every match — they must never run on past seasons, even for an initial sync.
+        # current_only policies are live data that changes every match — they must
+        # never run on past seasons, even for an initial sync.
         if policy.get("current_only") and not is_current_season:
             return
 
