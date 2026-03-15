@@ -198,6 +198,20 @@ def test_tier1_missing_best_players(session):
     assert "best_players" in missing
 
 
+def test_tier1_missing_spectators(session):
+    game = _make_game(session, api_id=36, home_score=2, away_score=0)
+    game.referee_1 = "Ref E"
+    # spectators deliberately left as None
+    session.flush()
+    session.add(GameEvent(game_id=game.id, event_type="goal", period=1, team_id=game.home_team_id, season_id=_SEASON_ID))
+    session.add(GameEvent(game_id=game.id, event_type="best_player", period=0, team_id=game.home_team_id, season_id=_SEASON_ID))
+    session.add(GamePlayer(game_id=game.id, team_id=game.home_team_id, player_id=5, season_id=_SEASON_ID, is_home_team=True))
+    session.flush()
+    ok, missing = _is_game_complete(game, 1, session)
+    assert ok is False
+    assert "spectators" in missing
+
+
 def test_missing_fields_list_contains_all_missing(session):
     game = _make_game(session, api_id=35)  # no score, no anything
     ok, missing = _is_game_complete(game, 1, session)
