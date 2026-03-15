@@ -155,7 +155,10 @@ def test_game_sync_failure_missing_fields_stores_list(session):
 
 
 def test_game_sync_failure_abandoned_at_set_automatically(session):
+    from datetime import timedelta
+    from app.models.db_models import _utcnow
     season, team_h, team_a = _get_valid_season_and_teams(session)
+    before = _utcnow()
     game = Game(
         id=994,
         season_id=season.id,
@@ -171,4 +174,6 @@ def test_game_sync_failure_abandoned_at_set_automatically(session):
     )
     session.add(failure)
     session.flush()
+    after = _utcnow()
     assert failure.abandoned_at is not None
+    assert before - timedelta(seconds=1) <= failure.abandoned_at <= after + timedelta(seconds=1)
