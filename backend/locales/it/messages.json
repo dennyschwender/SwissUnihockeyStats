@@ -243,7 +243,8 @@
       "can_retry": "Nuovo tentativo pianificato",
       "retried_at": "Riprovato il",
       "queue_retry": "Pianifica nuovo tentativo",
-      "no_failures": "Nessun errore di sincronizzazione trovato."
+      "no_failures": "Nessun errore di sincronizzazione trovato.",
+      "action": "Azione"
     }
   },
   "meta": {

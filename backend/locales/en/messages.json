@@ -243,7 +243,8 @@
       "can_retry": "Retry Queued",
       "retried_at": "Retried At",
       "queue_retry": "Queue Retry",
-      "no_failures": "No sync failures found."
+      "no_failures": "No sync failures found.",
+      "action": "Action"
     }
   },
   "meta": {

@@ -1,14 +1,12 @@
-<!DOCTYPE html>
-<html lang="{{ locale }}">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ t.admin.sync_failures.title }} — Unihockey Stats Admin</title>
-  <link rel="stylesheet" href="/static/css/main.css?v=25">
-  <link rel="stylesheet" href="/static/css/admin.css?v=1">
-</head>
-<body>
+{% extends "base.html" %}
 
+{% block title %}{{ t.admin.sync_failures.title }} — Unihockey Stats Admin{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="/static/css/admin.css?v=1">
+{% endblock %}
+
+{% block content %}
 <div class="topbar">
   <h1>{{ t.common.app_name }} <span class="badge">Admin</span></h1>
   <a href="/admin">← {{ t.common.back }}</a>
@@ -33,7 +31,7 @@
           <th>{{ t.admin.sync_failures.missing_fields }}</th>
           <th>{{ t.admin.sync_failures.can_retry }}</th>
           <th>{{ t.admin.sync_failures.retried_at }}</th>
-          <th>Action</th>
+          <th>{{ t.admin.sync_failures.action }}</th>
         </tr>
       </thead>
       <tbody>
@@ -61,6 +59,4 @@
     </table>
   {% endif %}
 </div>
-
-</body>
-</html>
+{% endblock %}

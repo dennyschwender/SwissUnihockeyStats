@@ -243,7 +243,8 @@
       "can_retry": "Wiederholung geplant",
       "retried_at": "Wiederholt am",
       "queue_retry": "Wiederholung planen",
-      "no_failures": "Keine Synchronisierungsfehler gefunden."
+      "no_failures": "Keine Synchronisierungsfehler gefunden.",
+      "action": "Aktion"
     }
   },
   "meta": {
