@@ -47,12 +47,28 @@ def _make_mock_client():
 def app():
     """Application fixture — patches the API client for the whole session."""
     mock_client = _make_mock_client()
-    with patch(
+    # Patch both the canonical location and every endpoint module that has
+    # already bound the function via `from app.services.swissunihockey import
+    # get_swissunihockey_client`.  Without these extra patches the endpoint
+    # modules keep their original reference and hit the real API.
+    _patch_targets = [
         "app.services.swissunihockey.get_swissunihockey_client",
-        return_value=mock_client,
-    ):
+        "app.api.v1.endpoints.clubs.get_swissunihockey_client",
+        "app.api.v1.endpoints.leagues.get_swissunihockey_client",
+        "app.api.v1.endpoints.teams.get_swissunihockey_client",
+        "app.api.v1.endpoints.games.get_swissunihockey_client",
+        "app.api.v1.endpoints.players.get_swissunihockey_client",
+        "app.api.v1.endpoints.rankings.get_swissunihockey_client",
+    ]
+    patchers = [patch(t, return_value=mock_client) for t in _patch_targets]
+    for p in patchers:
+        p.start()
+    try:
         from app.main import app as _app
         yield _app
+    finally:
+        for p in patchers:
+            p.stop()
 
 
 @pytest.fixture(scope="session")

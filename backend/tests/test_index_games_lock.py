@@ -58,7 +58,8 @@ class TestIndexGamesForLeagueLockOrder:
         """
         call_order: list[str] = []
 
-        indexer = DataIndexer()
+        # Use an isolated mock DB so the global singleton is not mutated.
+        mock_db = MagicMock()
 
         # Replace session_scope with a tracking wrapper around the mock session
         real_mock_factory = _mock_session_scope()
@@ -69,7 +70,8 @@ class TestIndexGamesForLeagueLockOrder:
             with real_mock_factory() as s:
                 yield s
 
-        indexer.db_service.session_scope = tracking_scope
+        mock_db.session_scope = tracking_scope
+        indexer = DataIndexer(db=mock_db)
 
         # Replace the API client with a mock that records calls
         mock_client = Mock()
@@ -110,8 +112,10 @@ class TestIndexGamesForLeagueLockOrder:
 
     def test_api_called_once_for_single_round_league(self):
         """With a single round (no pagination), get_games() is called exactly once."""
-        indexer = DataIndexer()
-        indexer.db_service.session_scope = _mock_session_scope()
+        # Use an isolated mock DB so the global singleton is not mutated.
+        mock_db = MagicMock()
+        mock_db.session_scope = _mock_session_scope()
+        indexer = DataIndexer(db=mock_db)
 
         mock_client = Mock()
         mock_client.get_games.return_value = _EMPTY_ROUND
