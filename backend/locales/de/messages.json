@@ -21,7 +21,9 @@
     "women": "Damen",
     "gp": "Sp",
     "pts": "Pkt",
-    "pim": "Str"
+    "pim": "Str",
+    "yes": "Ja",
+    "no": "Nein"
   },
   "nav": {
     "home": "Startseite",

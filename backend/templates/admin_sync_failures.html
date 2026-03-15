@@ -42,7 +42,7 @@
           <td>{{ f.game_date or '—' }}</td>
           <td>{{ f.abandoned_at.strftime('%Y-%m-%d %H:%M') if f.abandoned_at else '—' }}</td>
           <td>{{ f.missing_fields | join(', ') if f.missing_fields else '—' }}</td>
-          <td>{{ 'Yes' if f.can_retry else 'No' }}</td>
+          <td>{{ t.common.yes if f.can_retry else t.common.no }}</td>
           <td>{{ f.retried_at.strftime('%Y-%m-%d %H:%M') if f.retried_at else '—' }}</td>
           <td>
             {% if not f.can_retry and not f.retried_at %}

@@ -21,7 +21,9 @@
     "women": "Women",
     "gp": "GP",
     "pts": "PTS",
-    "pim": "PIM"
+    "pim": "PIM",
+    "yes": "Yes",
+    "no": "No"
   },
   "nav": {
     "home": "Home",
