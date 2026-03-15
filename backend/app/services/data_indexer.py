@@ -2793,6 +2793,107 @@ class DataIndexer:
 
         return transitioned
 
+    def _fetch_and_store_game_data(self, game, session) -> None:
+        """Fetch and store all available data for a single game (events, lineup, score, referees, spectators).
+
+        Best-effort: individual fetch failures are tolerated.
+        """
+        try:
+            self.index_game_events(game.id, game.season_id, force=True, game_date=game.game_date)
+        except Exception:
+            pass
+        try:
+            self.index_game_lineup(game.id, game.season_id, force=True, game_date=game.game_date)
+        except Exception:
+            pass
+        try:
+            meta = self._fetch_game_metadata(game.id)
+            if meta:
+                if meta.get("referee_1"):
+                    game.referee_1 = meta["referee_1"]
+                if meta.get("referee_2"):
+                    game.referee_2 = meta["referee_2"]
+                if meta.get("venue"):
+                    game.venue = meta["venue"]
+        except Exception:
+            pass
+
+    def index_post_game_completion(self, season_id: int, force: bool = False) -> int:
+        """Process post_game games: fetch full data, check completeness, transition state.
+
+        Returns count of games transitioned (to complete or abandoned).
+        """
+        from datetime import timedelta
+        from sqlalchemy import select
+        from app.models.db_models import Game, GameSyncFailure, _utcnow
+        from app.services.game_completeness import _resolve_game_tier, _is_game_complete
+
+        transitioned = 0
+        now = _utcnow()
+
+        # Step 1: Process manual retries (GameSyncFailure rows with can_retry=True)
+        with self.db_service.session_scope() as session:
+            retry_failures = session.execute(
+                select(GameSyncFailure).where(GameSyncFailure.can_retry == True)
+            ).scalars().all()
+            for failure in retry_failures:
+                game = session.get(Game, failure.game_id)
+                if game is None:
+                    continue
+                game.completeness_status = "post_game"
+                game.give_up_at = now + timedelta(days=3)
+                game.incomplete_fields = None
+                failure.retried_at = now
+                failure.can_retry = False
+
+        # Step 2: Process all post_game games
+        with self.db_service.session_scope() as session:
+            games = session.execute(
+                select(Game).where(
+                    Game.season_id == season_id,
+                    Game.completeness_status == "post_game",
+                )
+            ).scalars().all()
+
+            for game in games:
+                # Fetch full game data from API
+                try:
+                    self._fetch_and_store_game_data(game, session)
+                except Exception:
+                    pass  # log but continue; completeness check still runs
+
+                tier = _resolve_game_tier(game, session)
+                is_complete, missing = _is_game_complete(game, tier, session)
+                game.completeness_checked_at = now
+
+                if is_complete:
+                    game.completeness_status = "complete"
+                    game.incomplete_fields = None
+                    transitioned += 1
+                elif game.give_up_at is not None and now.replace(tzinfo=None) >= (game.give_up_at.replace(tzinfo=None) if hasattr(game.give_up_at, 'tzinfo') else game.give_up_at):
+                    game.completeness_status = "abandoned"
+                    game.incomplete_fields = missing
+                    failure = session.execute(
+                        select(GameSyncFailure).where(GameSyncFailure.game_id == game.id)
+                    ).scalar_one_or_none()
+                    if failure is None:
+                        session.add(GameSyncFailure(
+                            game_id=game.id,
+                            season_id=game.season_id,
+                            abandoned_at=now,
+                            missing_fields=missing,
+                            can_retry=False,
+                        ))
+                    else:
+                        failure.abandoned_at = now
+                        failure.missing_fields = missing
+                        failure.can_retry = False
+                    transitioned += 1
+                else:
+                    game.incomplete_fields = missing
+
+        return transitioned
+
     def get_indexing_stats(self) -> Dict[str, Any]:
         """Get current indexing statistics
 
