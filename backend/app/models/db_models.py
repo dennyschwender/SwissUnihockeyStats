@@ -206,7 +206,13 @@ class Game(Base):
     referee_2: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     last_events_update: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    
+    completeness_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="upcoming", server_default="upcoming"
+    )
+    incomplete_fields: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    give_up_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    completeness_checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
     # Relationships
     group = relationship("LeagueGroup", back_populates="games")
     season = relationship("Season", overlaps="clubs,leagues")
@@ -222,7 +228,20 @@ class Game(Base):
         Index('idx_game_teams', 'home_team_id', 'away_team_id'),
         Index('idx_game_date', 'game_date'),
         Index('idx_game_status', 'status'),
+        Index('idx_game_completeness_status', 'completeness_status'),
     )
+
+
+class GameSyncFailure(Base):
+    __tablename__ = "game_sync_failures"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    game_id: Mapped[int] = mapped_column(Integer, ForeignKey("games.id"), nullable=False)
+    season_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    abandoned_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+    missing_fields: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    can_retry: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    retried_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
 class GamePlayer(Base):
