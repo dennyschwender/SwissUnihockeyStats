@@ -440,7 +440,6 @@ class Scheduler:
         self._running = False
         self._queue: list[ScheduledJob] = []
         self._history: list[JobRecord] = []
-        self._cold_start = True  # run all jobs immediately on first enable
         self._enabled = self._load_state()
         self._last_snapshot_ts: float = 0.0
         self._deferred_tick_pending: bool = False
@@ -609,10 +608,8 @@ class Scheduler:
         self._enabled = v
         self._save_state()
         if v:
-            # Drop any stale queued jobs so re-enable triggers a fresh
-            # cold-start run for all policies (don't wait for max_age).
+            # Drop any stale queued jobs on re-enable.
             self._purge_overdue()
-            self._cold_start = True
         logger.info("[scheduler] %s", "enabled" if v else "disabled")
 
     @property
@@ -848,8 +845,6 @@ class Scheduler:
                             if _itr % _YIELD_EVERY == 0:
                                 await asyncio.sleep(0)
 
-                # Cold start complete – subsequent ticks use normal max_age scheduling
-                self._cold_start = False
         except Exception as exc:
             logger.error("[scheduler] refresh_queue error: %s", exc, exc_info=True)
 
@@ -919,9 +914,8 @@ class Scheduler:
                 if (now - last_attempt) < policy["max_age"]:
                     return  # back off until max_age expires
 
-        if last_sync is None or self._cold_start:
-            # Never synced or cold-start (first run after enable) –
-            # run soon, staggered by priority to avoid thundering herd.
+        if last_sync is None:
+            # Never synced – run soon, staggered by priority to avoid thundering herd.
             run_at = now + timedelta(seconds=policy["priority"])
         else:
             if "run_at_hour" in policy:

@@ -263,7 +263,6 @@ class TestSeasonFiltering:
             sched._max_concurrent = 2
             sched._policy_tiers = {}
             sched._enabled = True
-            sched._cold_start = False
             sched._queue = []
             sched._history = []
             sched._running = False
@@ -359,7 +358,6 @@ class TestClearDone:
             sched._max_concurrent = 2
             sched._policy_tiers = {}
             sched._enabled = True
-            sched._cold_start = False
             sched._queue = []
             sched._running = False
         now = datetime.now()
@@ -428,3 +426,58 @@ def test_player_game_stats_workers_reload_config(tmp_path, monkeypatch):
     sched._reload_config()
 
     assert sched._player_game_stats_workers == 15
+
+
+@pytest.mark.asyncio
+async def test_fresh_sync_status_not_requeued_on_restart(scheduler):
+    """Jobs with a fresh SyncStatus must not be queued after a restart with all-fresh data."""
+    from datetime import datetime, timezone
+    from app.models.db_models import SyncStatus
+    from app.services.scheduler import POLICIES
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # Seed a fresh SyncStatus (just completed) for every policy
+    db = scheduler._db_service if hasattr(scheduler, '_db_service') else None
+    if db is None:
+        from app.services.database import get_database_service
+        db = get_database_service()
+
+    with db.session_scope() as s:
+        for policy in POLICIES:
+            scope = policy.get("scope", "global")
+            if scope == "season":
+                entity_id = "season:1"
+            else:
+                entity_id = policy["entity_type"]
+            existing = s.query(SyncStatus).filter_by(
+                entity_type=policy["entity_type"],
+                entity_id=entity_id,
+            ).first()
+            if existing:
+                existing.sync_status = "completed"
+                existing.last_sync = now
+            else:
+                s.add(SyncStatus(
+                    entity_type=policy["entity_type"],
+                    entity_id=entity_id,
+                    sync_status="completed",
+                    last_sync=now,
+                    records_synced=0,
+                ))
+
+    # Clear the queue before the simulated restart tick
+    scheduler._queue.clear()
+
+    # Run one tick — simulates restart with all-fresh SyncStatus
+    await scheduler._refresh_queue()
+
+    # No job should be immediately due: all SyncStatus rows are within max_age.
+    # Jobs may still be enqueued with a future run_at (e.g. next nightly window),
+    # but none should have run_at <= now (which was the cold_start behaviour).
+    import datetime as _dt
+    check_now = _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None)
+    due_now = [j.policy_name for j in scheduler._queue if j.run_at <= check_now]
+    assert len(due_now) == 0, (
+        f"Expected no immediately-due jobs, got {len(due_now)}: {due_now}"
+    )
