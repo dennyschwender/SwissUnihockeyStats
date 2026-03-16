@@ -9,7 +9,7 @@ services:
     environment:
       - HOST=0.0.0.0
       - PORT=8000
-      - WORKERS=4
+      - WORKERS=1
       - DEBUG=false
       - TZ=Europe/Zurich
       - DATABASE_PATH=/app/data/swissunihockey.db
@@ -27,10 +27,11 @@ services:
     networks:
       - swissunihockey-net
 
-    # Run with gunicorn + uvicorn workers for production
+    # Single uvicorn worker — SQLite does not support concurrent multi-process writes.
+    # Async uvicorn handles all request concurrency within one process via asyncio.
     command: [
       "gunicorn", "app.main:app",
-      "--workers", "4",
+      "--workers", "1",
       "--worker-class", "uvicorn.workers.UvicornWorker",
       "--bind", "0.0.0.0:8000",
       "--timeout", "120",
