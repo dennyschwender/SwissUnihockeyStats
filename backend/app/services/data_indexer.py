@@ -1013,6 +1013,13 @@ class DataIndexer:
                 self._mark_sync_complete(_s, entity_type, entity_id, 0)
             return 0
 
+        # T1–T3 stats are computed from local game data; skip API calls for these tiers.
+        if exact_tier in {1, 2, 3}:
+            logger.info(
+                "Skipping API player stats for tier %d (handled by local aggregation)", exact_tier
+            )
+            return 0
+
         tier_lbl = f" (tier {exact_tier} only)" if exact_tier else ""
         logger.info("Indexing player stats for season %s%s...", season_id, tier_lbl)
 
@@ -1149,6 +1156,32 @@ class DataIndexer:
             on_progress(100)
         logger.info("✓ Indexed %d player stat rows for season %s%s", count, season_id, tier_lbl)
         return count
+
+    def compute_player_stats_for_season(
+        self, season_id: int, force: bool = False, tiers: tuple[int, ...] = (1, 2, 3),
+    ) -> int:
+        """Compute PlayerStatistics from local GamePlayer/GameEvent data for T1–T3.
+
+        Replaces per-player API calls for tiers where game data is complete.
+        """
+        entity_type = "compute_player_stats"
+        entity_id = f"season:{season_id}"
+
+        if not force and not self._should_update(entity_type, entity_id, max_age_hours=6):
+            with self.db_service.session_scope() as _s:
+                self._mark_sync_complete(_s, entity_type, entity_id, 0)
+            return 0
+
+        from app.services.local_stats_aggregator import aggregate_player_stats_for_season
+        try:
+            count = aggregate_player_stats_for_season(self.db_service, season_id, tiers=tiers)
+            with self.db_service.session_scope() as session:
+                self._mark_sync_complete(session, entity_type, entity_id, count)
+            logger.info("compute_player_stats season=%s → %d rows", season_id, count)
+            return count
+        except Exception as exc:
+            logger.error("compute_player_stats season=%s failed: %s", season_id, exc)
+            raise
 
     # ==================== LEAGUES PATH ====================
 
