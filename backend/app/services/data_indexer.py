@@ -472,14 +472,14 @@ class DataIndexer:
         
         logger.info("Indexing seasons...")
         
-        with self.db_service.session_scope() as session:
-            self._mark_sync_start(session, "seasons", "all")
-            
-            try:
+        try:
+            with self.db_service.session_scope() as session:
+                self._mark_sync_start(session, "seasons", "all")
+
                 # Fetch seasons from API
                 seasons_data = self.client.get_seasons()
                 entries = seasons_data.get("entries", [])
-                
+
                 # Derive the latest season that has actually started.
                 # Sep-Dec: current year; Jan-Aug: previous year.
                 _now_dt = datetime.now()
@@ -489,7 +489,7 @@ class DataIndexer:
                 for entry in entries:
                     context = entry.get("set_in_context", {})
                     season_id = context.get("season")
-                    
+
                     if not season_id:
                         continue
 
@@ -499,29 +499,34 @@ class DataIndexer:
                         logger.debug("Skipping future season %s (max=%s)", season_id, _max_season)
                         continue
 
-                    # Check if season exists
-                    season = session.query(Season).filter(Season.id == season_id).first()
-                    
-                    if not season:
-                        season = Season(id=season_id)
-                        # Only honour the API's highlight flag for brand-new seasons;
-                        # existing seasons keep whatever the admin manually selected.
-                        season.highlighted = entry.get("highlight", False)
+                    # merge() upserts: updates if exists, inserts if not.
+                    # This makes concurrent calls safe (no UNIQUE constraint race).
+                    existing = session.get(Season, season_id)
+                    if existing is None:
+                        season = Season(
+                            id=season_id,
+                            highlighted=entry.get("highlight", False),
+                        )
                         session.add(season)
-                    
+                    else:
+                        season = existing
+
                     season.text = entry.get("text", f"{season_id}/{season_id+1}")
                     season.last_updated = datetime.now(timezone.utc)
                     count += 1
-                
-                session.commit()
+
                 self._mark_sync_complete(session, "seasons", "all", count)
                 logger.info(f"✓ Indexed {count} seasons")
-                return count
-                
-            except Exception as e:
-                logger.error(f"Failed to index seasons: {e}", exc_info=True)
-                self._mark_sync_failed(session, "seasons", "all", str(e))
-                raise
+            return count
+
+        except Exception as e:
+            logger.error(f"Failed to index seasons: {e}", exc_info=True)
+            try:
+                with self.db_service.session_scope() as s:
+                    self._mark_sync_failed(s, "seasons", "all", str(e))
+            except Exception:
+                pass
+            raise
     
     # ==================== LEVEL 2: CLUBS ====================
     
