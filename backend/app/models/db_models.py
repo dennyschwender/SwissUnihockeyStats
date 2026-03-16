@@ -244,6 +244,26 @@ class GameSyncFailure(Base):
     retried_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
+class UnresolvedPlayerEvent(Base):
+    """Player name from GameEvent that could not be matched to a GamePlayer row."""
+    __tablename__ = "unresolved_player_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    game_id: Mapped[int] = mapped_column(Integer, ForeignKey("games.id"), nullable=False)
+    team_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    season_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("seasons.id"), nullable=True)
+    raw_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    resolved_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    __table_args__ = (
+        Index("idx_unresolved_game", "game_id"),
+        Index("idx_unresolved_unresolved", "resolved_at"),
+    )
+
+
 class GamePlayer(Base):
     """Association between games and players (lineup)"""
     __tablename__ = "game_players"
@@ -327,6 +347,8 @@ class PlayerStatistics(Base):
     plus_minus: Mapped[Optional[int]] = mapped_column(Integer, default=0)
     game_class: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Gender/age class (mirrors Team.game_class)
     last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
+    computed_from_local: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="0")
+    local_computed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
     # Relationships
     player = relationship("Player", back_populates="statistics")
