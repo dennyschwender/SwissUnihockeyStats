@@ -124,6 +124,7 @@ POLICIES: list[dict] = [
         "label":       "Poll upcoming games for schedule changes (noon)",
         "priority":    70,
         "run_at_hour": 12,
+        "current_only": True,  # past seasons have no upcoming games
     },
     {
         "name":        "upcoming_games_evening",
@@ -134,6 +135,7 @@ POLICIES: list[dict] = [
         "label":       "Poll upcoming games for schedule changes (evening)",
         "priority":    70,
         "run_at_hour": 18,
+        "current_only": True,  # past seasons have no upcoming games
     },
     {
         "name":        "upcoming_games_night",
@@ -144,6 +146,7 @@ POLICIES: list[dict] = [
         "label":       "Poll upcoming games for schedule changes (night)",
         "priority":    70,
         "run_at_hour": 23,
+        "current_only": True,  # past seasons have no upcoming games
     },
     # ── Post-game completion polling — every 2 hours ──────────────────────────
     # Fetches lineups, events and best-player data for recently finished games

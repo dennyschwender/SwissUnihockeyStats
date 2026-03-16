@@ -2717,81 +2717,75 @@ class DataIndexer:
     def index_upcoming_games(self, season_id: int, force: bool = False) -> int:
         """Poll upcoming games for schedule updates.
 
-        Fetches game metadata for all games with completeness_status='upcoming'
-        and flips any API-finished games to post_game.
+        Uses the same batch league→group→games fetch as index_leagues_path
+        (one API call per round, not one per game) to refresh game statuses.
+        After the batch refresh, does a pure-DB scan to flip any newly-finished
+        games from upcoming → post_game.
 
         Returns count of games transitioned to post_game.
         """
         from datetime import timedelta
-        from sqlalchemy import select
         from app.models.db_models import Game, _utcnow
         from app.services.game_completeness import _resolve_game_tier, _is_game_complete
 
-        transitioned = 0
-
+        # ── Phase 1: batch-refresh all game statuses via league→group round calls ──
+        # This reuses index_games_for_league (force=True so TTL is bypassed),
+        # updating game_date, status, score, venue, referees for ALL games in the
+        # season in O(rounds) API calls instead of O(games) calls.
         with self.db_service.session_scope() as session:
-            games = session.execute(
-                select(Game).where(
-                    Game.season_id == season_id,
-                    Game.completeness_status == "upcoming",
+            league_rows = [
+                (lg.id, lg.league_id, lg.game_class)
+                for lg in session.query(League).filter(
+                    League.season_id == season_id
+                ).all()
+            ]
+
+        games_refreshed = 0
+        for league_db_id, league_id, game_class in league_rows:
+            with self.db_service.session_scope() as _gs:
+                group_rows = [
+                    (grp.id, grp.name)
+                    for grp in _gs.query(LeagueGroup).filter(
+                        LeagueGroup.league_id == league_db_id
+                    ).all()
+                ]
+            if not group_rows:
+                group_rows = [(None, None)]
+            for grp_db_id, grp_name in group_rows:
+                games_refreshed += self.index_games_for_league(
+                    league_db_id, season_id, league_id, game_class,
+                    group_name=grp_name, group_db_id=grp_db_id,
+                    force=True,
                 )
-            ).scalars().all()
 
-            for game in games:
-                # Defensive rule: finished games stuck in upcoming → treat as post_game
-                if game.status == "finished":
-                    game.completeness_status = "post_game"
-                    if game.give_up_at is None:
-                        deadline = (
-                            (game.game_date + timedelta(days=3))
-                            if game.game_date
-                            else (_utcnow() + timedelta(days=3))
-                        )
-                        game.give_up_at = deadline
-                    tier = _resolve_game_tier(game, session)
-                    _, missing = _is_game_complete(game, tier, session)
-                    game.incomplete_fields = missing
-                    game.completeness_checked_at = _utcnow()
-                    transitioned += 1
-                    continue
-
-                # Fetch latest game metadata from API
-                try:
-                    api_data = self._fetch_game_metadata(game.id)
-                except Exception:
-                    continue  # skip on API error, retry next tick
-
-                if api_data is None:
-                    continue
-
-                # Update schedule metadata
-                if api_data.get("date"):
-                    game.game_date = api_data["date"]
-                if api_data.get("time"):
-                    game.game_time = api_data["time"]
-                if api_data.get("referee_1"):
-                    game.referee_1 = api_data["referee_1"]
-                if api_data.get("referee_2"):
-                    game.referee_2 = api_data["referee_2"]
-                if api_data.get("venue"):
-                    game.venue = api_data.get("venue")
-
-                # If API says finished → flip to post_game
-                if api_data.get("status") == "finished":
-                    game.status = "finished"
-                    game.completeness_status = "post_game"
-                    deadline = (
-                        (game.game_date + timedelta(days=3))
-                        if game.game_date
-                        else (_utcnow() + timedelta(days=3))
-                    )
+        # ── Phase 2: pure-DB scan — flip finished games from upcoming → post_game ──
+        transitioned = 0
+        now = _utcnow()
+        with self.db_service.session_scope() as session:
+            stuck = session.query(Game).filter(
+                Game.season_id == season_id,
+                Game.completeness_status == "upcoming",
+                Game.status == "finished",
+            ).all()
+            for game in stuck:
+                game.completeness_status = "post_game"
+                deadline = (
+                    (game.game_date + timedelta(days=3))
+                    if game.game_date
+                    else (now + timedelta(days=3))
+                )
+                if game.give_up_at is None:
                     game.give_up_at = deadline
-                    tier = _resolve_game_tier(game, session)
-                    _, missing = _is_game_complete(game, tier, session)
-                    game.incomplete_fields = missing
-                    game.completeness_checked_at = _utcnow()
-                    transitioned += 1
+                tier = _resolve_game_tier(game, session)
+                _, missing = _is_game_complete(game, tier, session)
+                game.incomplete_fields = missing
+                game.completeness_checked_at = now
+                transitioned += 1
 
+        logger.info(
+            "[upcoming_games] season=%s refreshed=%d games, transitioned=%d to post_game",
+            season_id, games_refreshed, transitioned,
+        )
         return transitioned
 
     def _fetch_and_store_game_data(self, game, session) -> None:

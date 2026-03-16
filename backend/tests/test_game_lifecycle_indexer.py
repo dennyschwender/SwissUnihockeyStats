@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models.db_models import Base, Game, Season, Club, Team, _utcnow
+from app.models.db_models import Base, Game, Season, Club, Team, League, LeagueGroup, _utcnow
 from app.services.data_indexer import DataIndexer
 
 
@@ -65,14 +65,34 @@ def _seed_game(engine, api_id=1, status="scheduled", home_score=None, away_score
 
 def test_index_upcoming_games_returns_int(engine, indexer):
     _, season_id = _seed_game(engine)
-    indexer._fetch_game_metadata = MagicMock(return_value={"status": "scheduled"})
+    # No leagues in test DB → batch phase does nothing; result is still an int.
+    indexer.index_games_for_league = MagicMock(return_value=0)
     result = indexer.index_upcoming_games(season_id)
     assert isinstance(result, int)
 
 
 def test_index_upcoming_games_transitions_api_finished_to_post_game(engine, indexer):
+    """Batch fetch (via index_games_for_league) marks game finished → Phase 2 flips to post_game."""
     game_id, season_id = _seed_game(engine, status="scheduled", completeness_status="upcoming")
-    indexer._fetch_game_metadata = MagicMock(return_value={"status": "finished", "home_score": 3, "away_score": 1})
+
+    # Add a league + group so Phase 1 actually calls index_games_for_league.
+    with Session(engine) as s:
+        lg = League(id=1, season_id=season_id, league_id=100, game_class=1, name="Test League")
+        s.add(lg)
+        s.flush()
+        grp = LeagueGroup(id=1, league_id=lg.id, group_id=999, name="Test Group")
+        s.add(grp)
+        s.commit()
+
+    # Simulate index_games_for_league updating the game's status to 'finished' in the DB.
+    def _flip_to_finished(*args, **kwargs):
+        with Session(engine) as s:
+            g = s.get(Game, game_id)
+            g.status = "finished"
+            s.commit()
+        return 1
+
+    indexer.index_games_for_league = MagicMock(side_effect=_flip_to_finished)
     count = indexer.index_upcoming_games(season_id)
     assert count == 1
     with Session(engine) as s:
@@ -82,9 +102,9 @@ def test_index_upcoming_games_transitions_api_finished_to_post_game(engine, inde
 
 
 def test_index_upcoming_games_defensive_finished_stuck_in_upcoming(engine, indexer):
-    """A game with status=finished but completeness_status=upcoming should be transitioned."""
+    """A game already status=finished but completeness_status=upcoming is transitioned by Phase 2."""
     game_id, season_id = _seed_game(engine, status="finished", completeness_status="upcoming")
-    # No API call needed for defensive rule — it should flip without fetching
+    # No leagues → Phase 1 is a no-op; Phase 2 DB scan catches the stuck game.
     count = indexer.index_upcoming_games(season_id)
     assert count == 1
     with Session(engine) as s:
@@ -92,9 +112,11 @@ def test_index_upcoming_games_defensive_finished_stuck_in_upcoming(engine, index
         assert game.completeness_status == "post_game"
 
 
-def test_index_upcoming_games_skips_on_api_error(engine, indexer):
-    game_id, season_id = _seed_game(engine)
-    indexer._fetch_game_metadata = MagicMock(side_effect=Exception("API down"))
+def test_index_upcoming_games_no_transition_for_scheduled(engine, indexer):
+    """A still-scheduled game stays upcoming after the job runs."""
+    game_id, season_id = _seed_game(engine, status="scheduled", completeness_status="upcoming")
+    # Batch fetch returns 0 updates (game stays scheduled).
+    indexer.index_games_for_league = MagicMock(return_value=0)
     count = indexer.index_upcoming_games(season_id)
     assert count == 0
     with Session(engine) as s:
