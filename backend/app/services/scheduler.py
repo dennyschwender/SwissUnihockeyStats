@@ -161,6 +161,16 @@ POLICIES: list[dict] = [
         "priority":    75,
         # no run_at_hour — runs throughout the day every 2 hours
     },
+    {
+        "name":        "compute_player_stats",
+        "entity_type": "compute_player_stats",
+        "max_age":     timedelta(hours=6),
+        "task":        "compute_player_stats",
+        "priority":    4,
+        "scope":       "season",
+        "current_only": True,
+        "label":       "Compute local player stats (T1–T3)",
+    },
     # ── Player season stats: cascade T1 → T2 → … → T6 ──────────────────────
     # current_only is NOT set: these run once for past seasons too (frozen after
     # first successful sync). Tiers beyond the players policy max_tier will find
