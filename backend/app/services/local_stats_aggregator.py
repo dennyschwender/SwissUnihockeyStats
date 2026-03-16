@@ -28,12 +28,15 @@ from app.models.db_models import (
     PlayerStatistics,
     UnresolvedPlayerEvent,
 )
+
 logger = logging.getLogger(__name__)
 
 
 def _get_league_tiers() -> dict:
     from app.services.data_indexer import LEAGUE_TIERS  # lazy to avoid circular import
+
     return LEAGUE_TIERS
+
 
 _PEN_BREAKDOWN_TIERS = {1, 2}
 
@@ -401,19 +404,22 @@ def backfill_game_player_stats_from_events(
             seen_unresolved.add(key)
             existing = (
                 session.query(UnresolvedPlayerEvent)
-                .filter_by(game_id=evt.game_id, team_id=evt.team_id,
-                            raw_name=raw_name, resolved_at=None)
+                .filter_by(
+                    game_id=evt.game_id, team_id=evt.team_id, raw_name=raw_name, resolved_at=None
+                )
                 .first()
             )
             if existing is None:
-                session.add(UnresolvedPlayerEvent(
-                    game_id=evt.game_id,
-                    team_id=evt.team_id,
-                    season_id=evt.season_id,
-                    raw_name=raw_name,
-                    event_type=evt.event_type,
-                    created_at=_now(),
-                ))
+                session.add(
+                    UnresolvedPlayerEvent(
+                        game_id=evt.game_id,
+                        team_id=evt.team_id,
+                        season_id=evt.season_id,
+                        raw_name=raw_name,
+                        event_type=evt.event_type,
+                        created_at=_now(),
+                    )
+                )
 
         def _resolve_name(evt: GameEvent, raw_name: str | None) -> int | None:
             if not raw_name:

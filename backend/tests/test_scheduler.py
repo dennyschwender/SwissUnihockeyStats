@@ -438,9 +438,10 @@ async def test_fresh_sync_status_not_requeued_on_restart(scheduler):
     now = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # Seed a fresh SyncStatus (just completed) for every policy
-    db = scheduler._db_service if hasattr(scheduler, '_db_service') else None
+    db = scheduler._db_service if hasattr(scheduler, "_db_service") else None
     if db is None:
         from app.services.database import get_database_service
+
         db = get_database_service()
 
     with db.session_scope() as s:
@@ -450,21 +451,27 @@ async def test_fresh_sync_status_not_requeued_on_restart(scheduler):
                 entity_id = "season:1"
             else:
                 entity_id = policy["entity_type"]
-            existing = s.query(SyncStatus).filter_by(
-                entity_type=policy["entity_type"],
-                entity_id=entity_id,
-            ).first()
+            existing = (
+                s.query(SyncStatus)
+                .filter_by(
+                    entity_type=policy["entity_type"],
+                    entity_id=entity_id,
+                )
+                .first()
+            )
             if existing:
                 existing.sync_status = "completed"
                 existing.last_sync = now
             else:
-                s.add(SyncStatus(
-                    entity_type=policy["entity_type"],
-                    entity_id=entity_id,
-                    sync_status="completed",
-                    last_sync=now,
-                    records_synced=0,
-                ))
+                s.add(
+                    SyncStatus(
+                        entity_type=policy["entity_type"],
+                        entity_id=entity_id,
+                        sync_status="completed",
+                        last_sync=now,
+                        records_synced=0,
+                    )
+                )
 
     # Clear the queue before the simulated restart tick
     scheduler._queue.clear()
@@ -476,8 +483,7 @@ async def test_fresh_sync_status_not_requeued_on_restart(scheduler):
     # Jobs may still be enqueued with a future run_at (e.g. next nightly window),
     # but none should have run_at <= now (which was the cold_start behaviour).
     import datetime as _dt
+
     check_now = _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None)
     due_now = [j.policy_name for j in scheduler._queue if j.run_at <= check_now]
-    assert len(due_now) == 0, (
-        f"Expected no immediately-due jobs, got {len(due_now)}: {due_now}"
-    )
+    assert len(due_now) == 0, f"Expected no immediately-due jobs, got {len(due_now)}: {due_now}"

@@ -1256,13 +1256,17 @@ class DataIndexer:
             return 0
 
         try:
-            backfill_count = backfill_game_player_stats_from_events(self.db_service, season_id, tiers=tiers)
+            backfill_count = backfill_game_player_stats_from_events(
+                self.db_service, season_id, tiers=tiers
+            )
             count = aggregate_player_stats_for_season(self.db_service, season_id, tiers=tiers)
             with self.db_service.session_scope() as session:
                 self._mark_sync_complete(session, entity_type, entity_id, count)
             logger.info(
                 "compute_player_stats season=%s → backfill=%d aggregated=%d rows",
-                season_id, backfill_count, count,
+                season_id,
+                backfill_count,
+                count,
             )
             return count
         except Exception as exc:
