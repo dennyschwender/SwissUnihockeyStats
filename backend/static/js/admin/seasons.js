@@ -255,9 +255,18 @@ function buildSeasonFreshSummary(sid) {
   if (!relevant.length) return '';
   // Exclude FROZEN rows -- past seasons are intentionally frozen by the scheduler
   // once indexed (data doesn't change), so they should never appear as warnings.
+  // Also exclude NEVER_SYNCED rows on past (non-current) seasons where current_only
+  // is false -- these are tier policies (player_stats_t2+, player_game_stats_t4+)
+  // added after the season ended; the scheduler will never run them for past seasons,
+  // so they are effectively frozen-with-no-data and should not count as warnings.
   // Exclude game_events -- its 10-minute TTL means it is almost always stale
   // between scheduler runs; its live status is visible in the diag table.
-  const active = relevant.filter(function(v) { return v.status !== 'FROZEN' && v.entity_type !== 'game_events'; });
+  const active = relevant.filter(function(v) {
+    if (v.status === 'FROZEN') return false;
+    if (v.entity_type === 'game_events') return false;
+    if (v.status === 'NEVER_SYNCED' && !v.is_current && !v.current_only) return false;
+    return true;
+  });
   const neverRows = active.filter(function(v) { return v.status === 'NEVER_SYNCED'; });
   const staleRows = active.filter(function(v) { return v.status === 'STALE'; });
   const neverCount = neverRows.length;
