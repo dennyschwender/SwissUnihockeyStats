@@ -311,6 +311,19 @@ POLICIES: list[dict] = [
         "priority": 90,
         "run_at_hour": 3,
     },
+    # ── Nightly cache purge ───────────────────────────────────────────────
+    # Runs at 04:00 UTC — after repair (03:30) to clean up stale API cache
+    # files and prevent unbounded disk growth.  Global scope.
+    {
+        "name": "purge_cache",
+        "entity_type": "purge_cache",
+        "max_age": timedelta(hours=24),
+        "task": "purge_cache",
+        "scope": "global",
+        "label": "Nightly cache purge",
+        "priority": 95,
+        "run_at_hour": 4,
+    },
 ]
 
 # How often the scheduler wakes up (seconds)

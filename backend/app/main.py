@@ -1247,6 +1247,7 @@ _TASK_META = {
     "leagues_path": "Index Leagues Path (leagues + groups + games)",
     "full": "Full Index (clubs path + leagues path + lineups + game stats)",
     "repair": "DB Repair",
+    "purge_cache": "Cache Purge",
     "upcoming_games": "Index Upcoming Games",
     "post_game_completion": "Index Post-Game Completion",
     "compute_player_stats": "Compute Player Stats (local)",
@@ -2428,6 +2429,22 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                     f"events={result['missing_events']}, "
                     f"period={result['null_period_fixed']}, "
                     f"failed={result['stale_failed']})"
+                ),
+            )
+            set_progress(100)
+
+        # ── CACHE PURGE ────────────────────────────────────────────────────
+        if task == "purge_cache":
+            push("info", "Purging expired and orphaned cache files...")
+            result = await asyncio.to_thread(indexer.client.cache.purge_expired)
+            stats.update(result)
+            push(
+                "ok",
+                (
+                    f"Cache purge complete: "
+                    f"expired={result['expired_deleted']}, "
+                    f"orphaned={result['orphaned_deleted']}, "
+                    f"freed={result['bytes_freed_mb']} MB"
                 ),
             )
             set_progress(100)

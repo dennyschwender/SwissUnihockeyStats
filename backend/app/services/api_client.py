@@ -162,6 +162,56 @@ class CacheManager:
                 self.metadata = {}
         self._save_metadata()
 
+    def purge_expired(self) -> dict:
+        """Delete expired and orphaned cache files.
+
+        - Expired: tracked in metadata but past their TTL.
+        - Orphaned: .json files on disk with no metadata entry.
+
+        Returns dict with counts: expired_deleted, orphaned_deleted, bytes_freed_mb.
+        """
+        expired_deleted = 0
+        orphaned_deleted = 0
+        bytes_freed = 0
+
+        with self._lock:
+            keys_to_remove = []
+            for key, info in list(self.metadata.items()):
+                cat = info.get("category", "general")
+                path = self._get_cache_path(key, cat)
+                cached_at = info.get("cached_at", "")
+                ttl = info.get("ttl", self._determine_ttl(info.get("endpoint", "")))
+                if cached_at:
+                    exp = datetime.fromisoformat(cached_at) + timedelta(seconds=ttl)
+                    if datetime.now() > exp:
+                        if path.exists():
+                            bytes_freed += path.stat().st_size
+                            path.unlink()
+                        keys_to_remove.append(key)
+                        expired_deleted += 1
+            for key in keys_to_remove:
+                del self.metadata[key]
+
+        # Orphaned files: on disk but not in metadata
+        tracked_keys = set(self.metadata.keys())
+        for subdir in self.cache_dir.iterdir():
+            if not subdir.is_dir():
+                continue
+            for f in subdir.glob("*.json"):
+                if f.stem not in tracked_keys:
+                    bytes_freed += f.stat().st_size
+                    f.unlink()
+                    orphaned_deleted += 1
+
+        if expired_deleted or orphaned_deleted:
+            self._save_metadata()
+
+        return {
+            "expired_deleted": expired_deleted,
+            "orphaned_deleted": orphaned_deleted,
+            "bytes_freed_mb": round(bytes_freed / (1024 * 1024), 1),
+        }
+
     def get_stats(self) -> Dict[str, Any]:
         total_files = sum(1 for _ in self.cache_dir.glob("**/*.json") if _.name != "metadata.json")
         total_size = sum(
