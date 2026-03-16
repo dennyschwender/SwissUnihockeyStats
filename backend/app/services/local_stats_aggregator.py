@@ -34,6 +34,8 @@ logger = logging.getLogger(__name__)
 
 _PEN_BREAKDOWN_TIERS = {1, 2}
 
+_BUCKET_MINUTES: dict[str, int] = {"2min": 2, "5min": 5, "10min": 10, "match": 5}
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -270,6 +272,209 @@ def aggregate_player_stats_for_season(
 
         logger.info(
             "Local stats aggregation: %d PlayerStatistics rows upserted for season %s (tiers %s)",
+            updated,
+            season_id,
+            sorted(tiers_set),
+        )
+
+    return updated
+
+
+def _parse_goal_players(raw_data: dict) -> tuple[str | None, str | None]:
+    """Parse scorer and optional assister from a goal event's raw_data.
+
+    The "player" field format is either "Scorer" or "Scorer / Assister".
+    Returns (scorer_name, assister_name_or_None).
+    """
+    raw = (raw_data or {}).get("player", "") or ""
+    if "/" in raw:
+        parts = raw.split("/", 1)
+        return parts[0].strip() or None, parts[1].strip() or None
+    return raw.strip() or None, None
+
+
+def backfill_game_player_stats_from_events(
+    db_service,
+    season_id: int,
+    tiers: Sequence[int] = (1, 2, 3),
+) -> int:
+    """Backfill GamePlayer.goals/assists/penalty_minutes from GameEvent rows.
+
+    Only processes games in the target tiers where ALL GamePlayer rows for
+    that game have goals IS NULL (i.e., not yet filled).
+
+    Returns the number of GamePlayer rows updated.
+    """
+    tiers_set = set(tiers)
+    updated = 0
+
+    with db_service.session_scope() as session:
+        # Find complete games in target tiers
+        games = (
+            session.query(Game)
+            .filter(
+                Game.season_id == season_id,
+                Game.completeness_status == "complete",
+                Game.group_id.isnot(None),
+            )
+            .all()
+        )
+
+        target_games: list[Game] = []
+        for game in games:
+            result = _resolve_tier_and_abbrev(game, session)
+            if result is None:
+                continue
+            tier, _ = result
+            if tier not in tiers_set:
+                continue
+            target_games.append(game)
+
+        if not target_games:
+            return 0
+
+        target_game_ids = [g.id for g in target_games]
+
+        # Only process games where NO GamePlayer row has goals already set (> 0).
+        # GamePlayer.goals defaults to 0 on insert, so goals > 0 means already filled.
+        eligible_game_ids: list[int] = []
+        for gid in target_game_ids:
+            gp_rows = (
+                session.query(GamePlayer)
+                .filter(GamePlayer.game_id == gid, GamePlayer.season_id == season_id)
+                .all()
+            )
+            if not gp_rows:
+                continue
+            if all((gp.goals or 0) == 0 for gp in gp_rows):
+                eligible_game_ids.append(gid)
+
+        if not eligible_game_ids:
+            return 0
+
+        # Build player name → player_id map per (game_id, team_id)
+        gp_all = (
+            session.query(GamePlayer)
+            .filter(
+                GamePlayer.season_id == season_id,
+                GamePlayer.game_id.in_(eligible_game_ids),
+            )
+            .all()
+        )
+        player_names: dict[int, str] = {
+            p.person_id: f"{p.first_name or ''} {p.last_name or ''}".strip().lower()
+            for p in session.query(PlayerModel)
+            .filter(PlayerModel.person_id.in_({gp.player_id for gp in gp_all}))
+            .all()
+        }
+        # (game_id, team_id) → {lower_name: player_id}
+        name_map: dict[tuple[int, int], dict[str, int]] = {}
+        for gp in gp_all:
+            key = (gp.game_id, gp.team_id)
+            name = player_names.get(gp.player_id, "")
+            if name:
+                name_map.setdefault(key, {})[name] = gp.player_id
+
+        # Accumulate goals/assists/pim per (game_id, player_id)
+        goals_acc: dict[tuple[int, int], int] = {}
+        assists_acc: dict[tuple[int, int], int] = {}
+        pim_acc: dict[tuple[int, int], int] = {}
+
+        events = (
+            session.query(GameEvent)
+            .filter(
+                GameEvent.season_id == season_id,
+                GameEvent.game_id.in_(eligible_game_ids),
+            )
+            .all()
+        )
+
+        seen_unresolved: set[tuple] = set()
+
+        def _add_unresolved(evt: GameEvent, raw_name: str) -> None:
+            key = (evt.game_id, evt.team_id, raw_name)
+            if key in seen_unresolved:
+                return
+            seen_unresolved.add(key)
+            existing = (
+                session.query(UnresolvedPlayerEvent)
+                .filter_by(game_id=evt.game_id, team_id=evt.team_id,
+                            raw_name=raw_name, resolved_at=None)
+                .first()
+            )
+            if existing is None:
+                session.add(UnresolvedPlayerEvent(
+                    game_id=evt.game_id,
+                    team_id=evt.team_id,
+                    season_id=evt.season_id,
+                    raw_name=raw_name,
+                    event_type=evt.event_type,
+                    created_at=_now(),
+                ))
+
+        def _resolve_name(evt: GameEvent, raw_name: str | None) -> int | None:
+            if not raw_name:
+                return None
+            key = (evt.game_id, evt.team_id)
+            pid = name_map.get(key, {}).get(raw_name.lower())
+            if pid is None:
+                # Try across all teams in the game
+                for (gid, _tid), nmap in name_map.items():
+                    if gid == evt.game_id:
+                        pid = nmap.get(raw_name.lower())
+                        if pid is not None:
+                            break
+            return pid
+
+        for evt in events:
+            et_lower = evt.event_type.lower() if evt.event_type else ""
+
+            if "torschütze" in et_lower or "eigentor" in et_lower:
+                scorer_name, assister_name = _parse_goal_players(evt.raw_data or {})
+                is_own_goal = "eigentor" in et_lower
+
+                if scorer_name:
+                    pid = _resolve_name(evt, scorer_name)
+                    if pid is not None:
+                        key = (evt.game_id, pid)
+                        goals_acc[key] = goals_acc.get(key, 0) + 1
+                    else:
+                        _add_unresolved(evt, scorer_name)
+
+                if assister_name and not is_own_goal:
+                    pid = _resolve_name(evt, assister_name)
+                    if pid is not None:
+                        key = (evt.game_id, pid)
+                        assists_acc[key] = assists_acc.get(key, 0) + 1
+                    else:
+                        _add_unresolved(evt, assister_name)
+
+            elif "'-strafe" in et_lower:
+                bucket = _pen_bucket(evt.event_type)
+                if bucket is None:
+                    continue
+                raw_name = _player_name_from_event(evt)
+                if not raw_name:
+                    continue
+                pid = _resolve_name(evt, raw_name)
+                if pid is not None:
+                    key = (evt.game_id, pid)
+                    pim_acc[key] = pim_acc.get(key, 0) + _BUCKET_MINUTES[bucket]
+                else:
+                    _add_unresolved(evt, raw_name)
+
+        # Write back to GamePlayer rows (only those with goals == 0, i.e. not yet backfilled)
+        for gp in gp_all:
+            if (gp.goals or 0) != 0:
+                continue
+            key = (gp.game_id, gp.player_id)
+            gp.goals = goals_acc.get(key, 0)
+            gp.assists = assists_acc.get(key, 0)
+            gp.penalty_minutes = pim_acc.get(key, 0)
+            updated += 1
+
+        logger.info(
+            "Backfill game player stats: %d GamePlayer rows updated for season %s (tiers %s)",
             updated,
             season_id,
             sorted(tiers_set),

@@ -24,6 +24,7 @@ from app.models.db_models import (
 from app.services.local_stats_aggregator import (
     _pen_bucket,
     aggregate_player_stats_for_season,
+    backfill_game_player_stats_from_events,
 )
 
 
@@ -219,3 +220,143 @@ def test_unresolved_event_created_for_unknown_player(engine, mock_db):
     with Session(engine) as s:
         unresolved = s.query(UnresolvedPlayerEvent).filter_by(game_id=1).all()
         assert any(u.raw_name == "Unknown Player" for u in unresolved)
+
+
+# ── backfill_game_player_stats_from_events tests ──────────────────────────────
+
+def _seed_complete_game_with_events(engine, api_id=10):
+    """Seed a complete game with two players and goal + penalty events."""
+    from sqlalchemy.orm import Session
+    from sqlalchemy import select as _sel
+    from app.models.db_models import (
+        Season, Club, Team, League, LeagueGroup, Player,
+        Game, GamePlayer, GameEvent,
+    )
+    with Session(engine) as s:
+        season = s.execute(_sel(Season).where(Season.id == 1)).scalar_one_or_none()
+        if season is None:
+            season = Season(id=1, text="2025")
+            s.add(season)
+            s.flush()
+
+        club = Club(id=api_id * 10, season_id=1, name=f"Club{api_id}")
+        s.add(club)
+        s.flush()
+        team = Team(id=api_id * 10, season_id=1, club_id=api_id * 10,
+                    name=f"Team{api_id}", league_id=1)
+        s.add(team)
+        s.flush()
+
+        league = s.execute(_sel(League).where(League.id == 1)).scalar_one_or_none()
+        if league is None:
+            league = League(id=1, season_id=1, league_id=1, game_class=1, name="NLA")
+            s.add(league)
+            s.flush()
+        group = s.execute(_sel(LeagueGroup).where(LeagueGroup.id == 1)).scalar_one_or_none()
+        if group is None:
+            group = LeagueGroup(id=1, league_id=1, group_id=1, name="NLA")
+            s.add(group)
+            s.flush()
+
+        p1 = Player(person_id=api_id * 100, first_name="Anna", last_name="Müller")
+        p2 = Player(person_id=api_id * 100 + 1, first_name="Ben", last_name="Huber")
+        s.add_all([p1, p2])
+        s.flush()
+
+        game = Game(
+            id=api_id, season_id=1,
+            home_team_id=api_id * 10, away_team_id=api_id * 10,
+            status="finished", completeness_status="complete",
+            home_score=2, away_score=1, group_id=1,
+        )
+        s.add(game)
+        s.flush()
+
+        gp1 = GamePlayer(game_id=api_id, player_id=api_id * 100,
+                         team_id=api_id * 10, season_id=1,
+                         is_home_team=True, goals=None, assists=None, penalty_minutes=None)
+        gp2 = GamePlayer(game_id=api_id, player_id=api_id * 100 + 1,
+                         team_id=api_id * 10, season_id=1,
+                         is_home_team=True, goals=None, assists=None, penalty_minutes=None)
+        s.add_all([gp1, gp2])
+        s.flush()
+
+        ge_goal = GameEvent(
+            game_id=api_id, team_id=api_id * 10, season_id=1,
+            event_type="Torschütze",
+            raw_data={"player": "Anna Müller / Ben Huber", "event_type": "Torschütze",
+                      "time": "10:00", "team": f"Team{api_id}"},
+        )
+        ge_pen = GameEvent(
+            game_id=api_id, team_id=api_id * 10, season_id=1,
+            event_type="2'-Strafe",
+            raw_data={"player": "Anna Müller", "event_type": "2'-Strafe",
+                      "time": "20:00", "team": f"Team{api_id}"},
+        )
+        s.add_all([ge_goal, ge_pen])
+        s.commit()
+    return api_id
+
+
+def test_backfill_sets_goals_and_assists(engine, mock_db):
+    gid = _seed_complete_game_with_events(engine, api_id=10)
+    count = backfill_game_player_stats_from_events(mock_db, season_id=1, tiers=[1, 2, 3])
+    assert count >= 1
+    from sqlalchemy.orm import Session
+    from app.models.db_models import GamePlayer
+    with Session(engine) as s:
+        gp_scorer = s.query(GamePlayer).filter_by(game_id=gid, player_id=1000).first()
+        gp_assister = s.query(GamePlayer).filter_by(game_id=gid, player_id=1001).first()
+        assert gp_scorer.goals == 1
+        assert gp_scorer.assists == 0
+        assert gp_assister.assists == 1
+        assert gp_assister.goals == 0
+
+
+def test_backfill_sets_penalty_minutes(engine, mock_db):
+    gid = _seed_complete_game_with_events(engine, api_id=10)
+    backfill_game_player_stats_from_events(mock_db, season_id=1, tiers=[1, 2, 3])
+    from sqlalchemy.orm import Session
+    from app.models.db_models import GamePlayer
+    with Session(engine) as s:
+        gp = s.query(GamePlayer).filter_by(game_id=gid, player_id=1000).first()
+        assert gp.penalty_minutes == 2
+
+
+def test_backfill_skips_already_filled_rows(engine, mock_db):
+    gid = _seed_complete_game_with_events(engine, api_id=10)
+    from sqlalchemy.orm import Session
+    from app.models.db_models import GamePlayer
+    with Session(engine) as s:
+        gp = s.query(GamePlayer).filter_by(game_id=gid, player_id=1000).first()
+        gp.goals = 5
+        s.commit()
+    count = backfill_game_player_stats_from_events(mock_db, season_id=1, tiers=[1, 2, 3])
+    assert count == 0
+    with Session(engine) as s:
+        gp = s.query(GamePlayer).filter_by(game_id=gid, player_id=1000).first()
+        assert gp.goals == 5
+
+
+def test_backfill_creates_unresolved_for_unknown_player(engine, mock_db):
+    gid = _seed_complete_game_with_events(engine, api_id=10)
+    from sqlalchemy.orm import Session
+    from app.models.db_models import GameEvent, UnresolvedPlayerEvent
+    with Session(engine) as s:
+        s.add(GameEvent(
+            game_id=gid, team_id=100, season_id=1,
+            event_type="Torschütze",
+            raw_data={"player": "Ghost Player", "event_type": "Torschütze",
+                      "time": "30:00", "team": "Team10"},
+        ))
+        s.commit()
+    backfill_game_player_stats_from_events(mock_db, season_id=1, tiers=[1, 2, 3])
+    with Session(engine) as s:
+        unresolved = s.query(UnresolvedPlayerEvent).filter_by(
+            game_id=gid, raw_name="Ghost Player").first()
+        assert unresolved is not None
+
+
+def test_backfill_no_complete_games_returns_zero(engine, mock_db):
+    count = backfill_game_player_stats_from_events(mock_db, season_id=999, tiers=[1, 2, 3])
+    assert count == 0
