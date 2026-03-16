@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Unresolved Player Events{% endblock %}
+{% block content %}
+<div class="container" style="max-width:900px;margin:2rem auto;padding:0 1rem">
+  <h1 style="font-size:1.4rem;margin-bottom:1rem">⚠️ Unresolved Player Events</h1>
+  <p style="font-size:.85rem;color:#8b949e;margin-bottom:1.5rem">
+    These penalty events could not be matched to a player in the lineup.
+    Stats for these events are excluded from PlayerStatistics until resolved or dismissed.
+  </p>
+  {% if rows %}
+  <table style="width:100%;font-size:.82rem;border-collapse:collapse">
+    <thead>
+      <tr style="text-align:left;border-bottom:1px solid #30363d">
+        <th style="padding:.4rem .6rem">Name in event</th>
+        <th style="padding:.4rem .6rem">Event type</th>
+        <th style="padding:.4rem .6rem">Game ID</th>
+        <th style="padding:.4rem .6rem">Team ID</th>
+        <th style="padding:.4rem .6rem">Created</th>
+        <th style="padding:.4rem .6rem"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr style="border-bottom:1px solid #21262d">
+        <td style="padding:.4rem .6rem">{{ row.raw_name }}</td>
+        <td style="padding:.4rem .6rem">{{ row.event_type }}</td>
+        <td style="padding:.4rem .6rem">{{ row.game_id }}</td>
+        <td style="padding:.4rem .6rem">{{ row.team_id }}</td>
+        <td style="padding:.4rem .6rem">{{ row.created_at.strftime('%Y-%m-%d') if row.created_at }}</td>
+        <td style="padding:.4rem .6rem">
+          <form method="post" action="/admin/unresolved-events/{{ row.id }}/dismiss">
+            <button class="btn btn-sm">Dismiss</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#8b949e">No unresolved events.</p>
+  {% endif %}
+  <div style="margin-top:1.5rem">
+    <a href="/admin" class="btn btn-sm">← Back to Admin</a>
+  </div>
+</div>
+{% endblock %}

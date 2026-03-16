@@ -77,3 +77,15 @@ def test_index_player_stats_skips_tier_3(engine, indexer):
         s.commit()
     result = indexer.index_player_stats_for_season(season_id=1, exact_tier=3, force=True)
     assert result == 0
+
+
+def test_compute_player_stats_task_registered_in_main():
+    """The task name must appear in _TASK_META so the scheduler can submit it."""
+    from app.main import _TASK_META
+    assert "compute_player_stats" in _TASK_META
+
+
+def test_unresolved_events_route_registered():
+    from app.main import app as fastapi_app
+    routes = {r.path for r in fastapi_app.routes}
+    assert "/admin/unresolved-events" in routes

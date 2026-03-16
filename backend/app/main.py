@@ -1160,6 +1160,7 @@ _TASK_META = {
     "repair":            "DB Repair",
     "upcoming_games":        "Index Upcoming Games",
     "post_game_completion":  "Index Post-Game Completion",
+    "compute_player_stats": "Compute Player Stats (local)",
 }
 
 # Minimum minutes before the same (task, season) can be re-triggered without force=True.
@@ -1179,6 +1180,7 @@ _TASK_COOLDOWN_MINS: dict[str, int] = {
     "game_lineups":      30,
     "team_names":        60,
     "seasons":           60,
+    "compute_player_stats": 30,
 }
 # Tracks when each (task, season) last finished successfully (in-memory).
 _job_last_done: dict[tuple[str, int], datetime] = {}
@@ -2156,6 +2158,14 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             stats["transitioned"] = n
             push("ok", f"Post-game completion: {n}")
             await asyncio.to_thread(indexer.record_season_sync, "post_game_completion", season, n)
+
+        if task == "compute_player_stats":
+            n = await asyncio.to_thread(
+                indexer.compute_player_stats_for_season,
+                season,
+                force,
+            )
+            stats["compute_player_stats"] = n
 
         # ── DB REPAIR ──────────────────────────────────────────────────────
         if task == "repair":
@@ -3872,6 +3882,55 @@ async def admin_retry_sync_failure(failure_id: int, request: Request, _: None = 
             raise HTTPException(status_code=404, detail="Failure not found")
         failure.can_retry = True
     return RedirectResponse(url="/admin/sync-failures", status_code=303)
+
+
+@app.get("/admin/unresolved-events", response_class=HTMLResponse)
+async def admin_unresolved_events(request: Request, _: None = Depends(require_admin)):
+    from app.models.db_models import UnresolvedPlayerEvent
+    db = get_database_service()
+    with db.session_scope() as session:
+        rows = (
+            session.query(UnresolvedPlayerEvent)
+            .filter(UnresolvedPlayerEvent.resolved_at.is_(None))
+            .order_by(UnresolvedPlayerEvent.created_at.desc())
+            .limit(500)
+            .all()
+        )
+        data = [
+            {
+                "id": r.id,
+                "game_id": r.game_id,
+                "team_id": r.team_id,
+                "raw_name": r.raw_name,
+                "event_type": r.event_type,
+                "created_at": r.created_at,
+            }
+            for r in rows
+        ]
+    locale = "de"
+    t = get_translations(locale)
+    return templates.TemplateResponse(
+        "admin_unresolved_events.html",
+        {"request": request, "locale": locale, "t": t, "rows": data},
+    )
+
+
+@app.post("/admin/unresolved-events/{event_id}/dismiss")
+async def admin_dismiss_unresolved_event(
+    event_id: int, request: Request, _: None = Depends(require_admin)
+):
+    from app.models.db_models import UnresolvedPlayerEvent
+    from datetime import datetime, timezone
+    db = get_database_service()
+    try:
+        with db.session_scope() as session:
+            row = session.get(UnresolvedPlayerEvent, event_id)
+            if row:
+                row.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                row.resolved_by = "dismissed"
+        return RedirectResponse("/admin/unresolved-events", status_code=303)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 # ============================================================================
