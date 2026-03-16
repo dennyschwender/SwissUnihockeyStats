@@ -701,14 +701,31 @@ async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
             # ── game_events duplicates ───────────────────────────────────────
             # Keep the row with the lowest id per
             # (game_id, event_type, period, time, player_id).
-            r = conn.execute(_text(
-                "DELETE FROM game_events "
-                "WHERE id NOT IN ("
-                "  SELECT MIN(id) FROM game_events "
-                "  GROUP BY game_id, event_type, period, time, player_id"
-                ")"
-            ))
-            counts["game_events"] = r.rowcount
+            # Batched by game_id to avoid holding the write lock over 300k+ rows
+            # in a single statement.
+            game_id_rows = conn.execute(_text(
+                "SELECT DISTINCT game_id FROM game_events "
+                "GROUP BY game_id, event_type, period, time, player_id "
+                "HAVING COUNT(*) > 1"
+            )).fetchall()
+            dup_game_ids = [r[0] for r in game_id_rows]
+            event_deleted = 0
+            _CHUNK = 200
+            for _i in range(0, len(dup_game_ids), _CHUNK):
+                chunk = dup_game_ids[_i: _i + _CHUNK]
+                placeholders = ",".join("?" * len(chunk))
+                r = conn.execute(_text(
+                    f"DELETE FROM game_events "
+                    f"WHERE game_id IN ({placeholders}) "
+                    f"AND id NOT IN ("
+                    f"  SELECT MIN(id) FROM game_events "
+                    f"  WHERE game_id IN ({placeholders}) "
+                    f"  GROUP BY game_id, event_type, period, time, player_id"
+                    f")"
+                ), chunk + chunk)
+                event_deleted += r.rowcount
+                conn.commit()
+            counts["game_events"] = event_deleted
 
             # ── stale sync_status entries ────────────────────────────────────
             # Remove completed/failed records older than 7 days — pure clutter.
@@ -1434,8 +1451,6 @@ async def admin_delete_season_layer(season_id: int, layer: str = "all", _: None 
                 SyncStatus.entity_id == f"season:{season_id}"
             ).delete(synchronize_session=False)
 
-        session.commit()
-
     logger.info("Admin deleted season=%s layer=%s — %s", season_id, layer, totals)
     return {"ok": True, "season_id": season_id, "layer": layer, "deleted": totals}
 
@@ -1681,14 +1696,17 @@ async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
         push("info", f"Seasons to purge ({len(target_ids)}): {sorted(target_ids)}")
         job["progress"] = 5
 
+        # Fetch IDs once — reused for both counting and deleting to avoid TOCTOU.
         with db.session_scope() as session:
             game_ids = [r[0] for r in session.query(Game.id).filter(Game.season_id.in_(target_ids)).all()]
             league_ids = [r[0] for r in session.query(League.id).filter(League.season_id.in_(target_ids)).all()]
-            sync_filters = sa_or(*[
-                SyncStatus.entity_id.like(f"%:{s}:%") | SyncStatus.entity_id.like(f"%:{s}")
-                for s in target_ids
-            ]) if target_ids else (SyncStatus.id == -1)
 
+        sync_filters = sa_or(*[
+            SyncStatus.entity_id.like(f"%:{s}:%") | SyncStatus.entity_id.like(f"%:{s}")
+            for s in target_ids
+        ]) if target_ids else (SyncStatus.id == -1)
+
+        with db.session_scope() as session:
             counts = {
                 "GameEvent":        batched_count(session, GameEvent,        GameEvent.game_id,           game_ids),
                 "GamePlayer":       batched_count(session, GamePlayer,       GamePlayer.game_id,          game_ids),
@@ -1718,42 +1736,43 @@ async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
 
         push("info", "Deleting...")
 
-        with db.session_scope() as session:
-            game_ids = [r[0] for r in session.query(Game.id).filter(Game.season_id.in_(target_ids)).all()]
-            league_ids = [r[0] for r in session.query(League.id).filter(League.season_id.in_(target_ids)).all()]
-
-            steps = [
-                ("GameEvent",        lambda s: batched_delete(s, GameEvent,        GameEvent.game_id,           game_ids)),
-                ("GamePlayer",       lambda s: batched_delete(s, GamePlayer,       GamePlayer.game_id,          game_ids)),
-                ("PlayerStatistics", lambda s: batched_delete(s, PlayerStatistics, PlayerStatistics.season_id,  target_ids)),
-                ("TeamPlayer",       lambda s: batched_delete(s, TeamPlayer,       TeamPlayer.season_id,        target_ids)),
-                ("Game",             lambda s: batched_delete(s, Game,             Game.season_id,              target_ids)),
-                ("LeagueGroup",      lambda s: batched_delete(s, LeagueGroup,      LeagueGroup.league_id,       league_ids)),
-                ("Team",             lambda s: batched_delete(s, Team,             Team.season_id,              target_ids)),
-                ("Club",             lambda s: batched_delete(s, Club,             Club.season_id,              target_ids)),
-                ("League",           lambda s: batched_delete(s, League,           League.season_id,            target_ids)),
-            ]
-            deleted: dict[str, int] = {}
-            for i, (name, fn) in enumerate(steps, 1):
+        # Each step runs in its own session_scope so the write lock is held
+        # only for the duration of that step, not the entire purge.
+        deleted: dict[str, int] = {}
+        steps = [
+            ("GameEvent",        lambda s: batched_delete(s, GameEvent,        GameEvent.game_id,           game_ids)),
+            ("GamePlayer",       lambda s: batched_delete(s, GamePlayer,       GamePlayer.game_id,          game_ids)),
+            ("PlayerStatistics", lambda s: batched_delete(s, PlayerStatistics, PlayerStatistics.season_id,  target_ids)),
+            ("TeamPlayer",       lambda s: batched_delete(s, TeamPlayer,       TeamPlayer.season_id,        target_ids)),
+            ("Game",             lambda s: batched_delete(s, Game,             Game.season_id,              target_ids)),
+            ("LeagueGroup",      lambda s: batched_delete(s, LeagueGroup,      LeagueGroup.league_id,       league_ids)),
+            ("Team",             lambda s: batched_delete(s, Team,             Team.season_id,              target_ids)),
+            ("Club",             lambda s: batched_delete(s, Club,             Club.season_id,              target_ids)),
+            ("League",           lambda s: batched_delete(s, League,           League.season_id,            target_ids)),
+        ]
+        for i, (name, fn) in enumerate(steps, 1):
+            with db.session_scope() as session:
                 n = fn(session)
-                deleted[name] = n
-                push("ok", f"  Deleted {n:,} {name} rows")
-                job["progress"] = 15 + int(i / (len(steps) + 2) * 75)
+            deleted[name] = n
+            push("ok", f"  Deleted {n:,} {name} rows")
+            job["progress"] = 15 + int(i / (len(steps) + 3) * 75)
+            await asyncio.sleep(0)  # yield to event loop between steps
 
-            # SyncStatus
-            sync_filters = sa_or(*[
-                SyncStatus.entity_id.like(f"%:{s}:%") | SyncStatus.entity_id.like(f"%:{s}")
-                for s in target_ids
-            ]) if target_ids else (SyncStatus.id == -1)
+        with db.session_scope() as session:
             n = session.query(SyncStatus).filter(sync_filters).delete(synchronize_session=False)
-            deleted["SyncStatus"] = n
-            push("ok", f"  Deleted {n:,} SyncStatus rows")
+        deleted["SyncStatus"] = n
+        push("ok", f"  Deleted {n:,} SyncStatus rows")
+        job["progress"] = 15 + int((len(steps) + 1) / (len(steps) + 3) * 75)
+        await asyncio.sleep(0)
 
+        with db.session_scope() as session:
             n = batched_delete(session, Season, Season.id, target_ids)
-            deleted["Season"] = n
-            push("ok", f"  Deleted {n:,} Season rows")
+        deleted["Season"] = n
+        push("ok", f"  Deleted {n:,} Season rows")
 
-            # Orphaned players: no TeamPlayer AND no GamePlayer rows anywhere
+        # Orphaned players: no TeamPlayer AND no GamePlayer rows anywhere.
+        # Run after all season data is deleted so the joins reflect final state.
+        with db.session_scope() as session:
             orphan_ids = [
                 r[0] for r in
                 session.query(Player.person_id)
