@@ -32,6 +32,10 @@ from app.models.db_models import (
 )
 from app.services.swissunihockey import get_swissunihockey_client
 from app.services.database import get_database_service
+from app.services.local_stats_aggregator import (
+    aggregate_player_stats_for_season,
+    backfill_game_player_stats_from_events,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1251,13 +1255,15 @@ class DataIndexer:
                 self._mark_sync_complete(_s, entity_type, entity_id, 0)
             return 0
 
-        from app.services.local_stats_aggregator import aggregate_player_stats_for_season
-
         try:
+            backfill_count = backfill_game_player_stats_from_events(self.db_service, season_id, tiers=tiers)
             count = aggregate_player_stats_for_season(self.db_service, season_id, tiers=tiers)
             with self.db_service.session_scope() as session:
                 self._mark_sync_complete(session, entity_type, entity_id, count)
-            logger.info("compute_player_stats season=%s → %d rows", season_id, count)
+            logger.info(
+                "compute_player_stats season=%s → backfill=%d aggregated=%d rows",
+                season_id, backfill_count, count,
+            )
             return count
         except Exception as exc:
             logger.error("compute_player_stats season=%s failed: %s", season_id, exc)
@@ -2550,6 +2556,15 @@ class DataIndexer:
         else:
             entity_type = "player_game_stats_season"
             entity_id = f"season_game_stats:{season_id}"
+
+        # T1–T3 per-game stats are derived locally; skip API calls for these tiers.
+        if exact_tier in {1, 2, 3}:
+            logger.info(
+                "Skipping API player game stats for tier %d (handled by local backfill)", exact_tier
+            )
+            with self.db_service.session_scope() as _s:
+                self._mark_sync_complete(_s, entity_type, entity_id, 0)
+            return 0
 
         if not force and not self._should_update(entity_type, entity_id, max_age_hours=4):
             # Bump last_sync so the scheduler's _snap_to_hour advances to the

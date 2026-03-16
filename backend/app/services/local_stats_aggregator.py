@@ -28,9 +28,12 @@ from app.models.db_models import (
     PlayerStatistics,
     UnresolvedPlayerEvent,
 )
-from app.services.data_indexer import LEAGUE_TIERS
-
 logger = logging.getLogger(__name__)
+
+
+def _get_league_tiers() -> dict:
+    from app.services.data_indexer import LEAGUE_TIERS  # lazy to avoid circular import
+    return LEAGUE_TIERS
 
 _PEN_BREAKDOWN_TIERS = {1, 2}
 
@@ -70,7 +73,7 @@ def _resolve_tier_and_abbrev(game: Game, session: Session) -> tuple[int, str] | 
     league = session.get(League, group.league_id)
     if league is None:
         return None
-    tier = LEAGUE_TIERS.get(league.league_id, 6)
+    tier = _get_league_tiers().get(league.league_id, 6)
     abbrev = (league.name or "unknown")[:20]
     return tier, abbrev
 
