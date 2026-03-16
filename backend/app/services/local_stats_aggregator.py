@@ -62,7 +62,7 @@ def _resolve_tier_and_abbrev(game: Game, session: Session) -> tuple[int, str] | 
     """Return (tier, league_abbrev) for a game, or None if not resolvable."""
     if game.group_id is None:
         return None
-    group = session.query(LeagueGroup).filter_by(group_id=game.group_id).first()
+    group = session.get(LeagueGroup, game.group_id)
     if group is None:
         return None
     league = session.get(League, group.league_id)

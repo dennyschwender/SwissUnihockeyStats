@@ -80,7 +80,7 @@ def _seed_complete_game(engine, tier=1):
             completeness_status="complete",
             home_score=3,
             away_score=1,
-            group_id=10,
+            group_id=1,
         )
         s.add(game)
         s.flush()
