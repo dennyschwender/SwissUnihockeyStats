@@ -24,6 +24,7 @@
               <button class="btn btn-sm" id="vacuum-btn" onclick="runVacuum()" title="VACUUM + WAL checkpoint: reclaims space from deleted rows and merges WAL back into .db">🧹 VACUUM + Checkpoint</button>
               <button class="btn btn-sm" id="cleanup-btn" onclick="runCleanup()" title="Remove duplicate league_groups, game_events, and old sync_status rows">🗑️ Cleanup Duplicates</button>
               <button class="btn btn-sm" onclick="loadDbInfo()">↺ Refresh</button>
+              <a href="/admin/sync-failures" class="btn btn-sm" style="text-decoration:none">⚠️ Sync Failures</a>
             </div>
             <div style="margin-top:.5rem;font-size:.7rem;color:#6e7681;line-height:1.5">
               VACUUM rewrites the DB to reclaim free pages and merge the WAL file back. Can take a few seconds on large DBs.
