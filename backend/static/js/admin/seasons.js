@@ -239,12 +239,20 @@ function buildSeasonFreshSummary(sid) {
   // Exclude game_events -- its 10-minute TTL means it is almost always stale
   // between scheduler runs; its live status is visible in the diag table.
   const active = relevant.filter(function(v) { return v.status !== 'FROZEN' && v.entity_type !== 'game_events'; });
-  const neverCount = active.filter(function(v) { return v.status === 'NEVER_SYNCED'; }).length;
-  const staleCount = active.filter(function(v) { return v.status === 'STALE'; }).length;
+  const neverRows = active.filter(function(v) { return v.status === 'NEVER_SYNCED'; });
+  const staleRows = active.filter(function(v) { return v.status === 'STALE'; });
+  const neverCount = neverRows.length;
+  const staleCount = staleRows.length;
+  const neverNames = neverRows.map(function(v) { return v.label || v.policy; });
+  const staleNames = staleRows.map(function(v) { return v.label || v.policy; });
+  if (neverCount && staleCount) {
+    const tip = 'Never synced: ' + neverNames.join(', ') + '\nStale: ' + staleNames.join(', ');
+    return '<span class="s-chip" style="background:#2d1214;color:#f85149;border-color:#da3633" title="' + tip + '">\u26a0 ' + neverCount + ' never synced</span>';
+  }
   if (neverCount)
-    return '<span class="s-chip" style="background:#2d1214;color:#f85149;border-color:#da3633" title="' + neverCount + ' data type(s) never synced">\u26a0 ' + neverCount + ' never synced</span>';
+    return '<span class="s-chip" style="background:#2d1214;color:#f85149;border-color:#da3633" title="Never synced: ' + neverNames.join(', ') + '">\u26a0 ' + neverCount + ' never synced</span>';
   if (staleCount)
-    return '<span class="s-chip warn" title="' + staleCount + ' data type(s) stale">\u26a1 ' + staleCount + ' stale</span>';
+    return '<span class="s-chip warn" title="Stale: ' + staleNames.join(', ') + '">\u26a1 ' + staleCount + ' stale</span>';
   return '<span class="s-chip ok" title="All data types fresh">\u2713 all fresh</span>';
 }
 

@@ -1015,6 +1015,7 @@ async def admin_scheduler_diag(_: None = Depends(require_admin)):
                     rows.append(
                         {
                             "policy": policy["name"],
+                            "label": policy.get("label", policy["name"]),
                             "entity_type": policy["entity_type"],
                             "scope": policy["scope"],
                             "season": sid,
