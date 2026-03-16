@@ -228,11 +228,30 @@ function buildCompletenessChip(s) {
   return '<span class="s-chip ' + cls + '" title="' + tip + '">\ud83d\udcca ' + done + '/' + total + ' layers (' + pct + '%)</span>';
 }
 
+// Entity types that have a visible task row in the season accordion.
+// Policies whose entity_type is NOT in this set are background-only jobs
+// (e.g. upcoming_games_*, post_game_completion, compute_player_stats) that
+// have no rendered row in the dropdown, so they must not be counted in the
+// summary chip — otherwise the chip says "N never synced" but expanding the
+// season shows all rows green.
+const _ACCORDION_ENTITY_TYPES = new Set([
+  'clubs', 'teams', 'players', 'player_stats', 'game_lineups', 'player_game_stats',
+  'leagues', 'league_groups', 'games', 'game_events',
+  'player_stats_t1', 'player_stats_t2', 'player_stats_t3',
+  'player_stats_t4', 'player_stats_t5', 'player_stats_t6',
+  'player_game_stats_t4', 'player_game_stats_t5', 'player_game_stats_t6',
+]);
+
 function buildSeasonFreshSummary(sid) {
   const relevant = Object.entries(_freshnessMap)
     .filter(function(entry) { return entry[0].endsWith(':' + sid); })
     .map(function(entry) { return entry[1]; })
-    .filter(function(v) { return !(v.current_only && !v.is_current); });
+    .filter(function(v) { return !(v.current_only && !v.is_current); })
+    // Only count entity types that actually have a visible row in the accordion.
+    // Background-only policies (upcoming_games_*, post_game_completion,
+    // compute_player_stats) are tracked in the freshness map but not rendered
+    // as rows, so excluding them prevents the "N never synced" phantom count.
+    .filter(function(v) { return _ACCORDION_ENTITY_TYPES.has(v.entity_type); });
   if (!relevant.length) return '';
   // Exclude FROZEN rows -- past seasons are intentionally frozen by the scheduler
   // once indexed (data doesn't change), so they should never appear as warnings.
