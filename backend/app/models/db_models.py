@@ -259,6 +259,7 @@ class UnresolvedPlayerEvent(Base):
     resolved_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     __table_args__ = (
+        ForeignKeyConstraint(['team_id', 'season_id'], ['teams.id', 'teams.season_id']),
         Index("idx_unresolved_game", "game_id"),
         Index("idx_unresolved_unresolved", "resolved_at"),
     )
