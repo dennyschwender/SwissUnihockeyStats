@@ -1018,6 +1018,8 @@ class DataIndexer:
             logger.info(
                 "Skipping API player stats for tier %d (handled by local aggregation)", exact_tier
             )
+            with self.db_service.session_scope() as _s:
+                self._mark_sync_complete(_s, entity_type, entity_id, 0)
             return 0
 
         tier_lbl = f" (tier {exact_tier} only)" if exact_tier else ""
