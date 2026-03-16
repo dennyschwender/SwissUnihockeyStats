@@ -61,7 +61,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Data directory (entrypoint will chown at runtime so mounted volumes work too)
 RUN mkdir -p /app/data/cache && chown -R appuser:appuser /app/data
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -fs http://127.0.0.1:8000/health || exit 1
 
 EXPOSE 8000

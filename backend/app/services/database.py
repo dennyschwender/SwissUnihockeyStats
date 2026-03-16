@@ -40,59 +40,57 @@ def run_lifecycle_migration(engine) -> None:
     # Create game_sync_failures table if missing
     GameSyncFailure.__table__.create(engine, checkfirst=True)
 
-    # Backfill: only touch rows that are still 'upcoming' (the column default)
-    # so that already-processed rows are skipped on re-runs.
+    # Backfill: only process finished games still marked 'upcoming' (the column default).
+    # Non-finished (scheduled/live) games are correctly 'upcoming' already — skip them
+    # to avoid loading thousands of ORM objects on every restart.
     now = _utcnow()
     # SQLite returns naive datetimes; use a naive UTC now for comparisons.
     now_naive = now.replace(tzinfo=None)
     with Session(engine) as session:
         games = session.execute(
-            select(Game).where(Game.completeness_status == "upcoming")
+            select(Game).where(
+                Game.completeness_status == "upcoming",
+                Game.status == "finished",
+            )
         ).scalars().all()
 
         for i, game in enumerate(games):
-            if game.status != "finished":
-                # scheduled / live → keep upcoming
-                game.completeness_status = "upcoming"
+            is_complete = (
+                game.home_score is not None and game.away_score is not None
+            )
+            if is_complete:
+                game.completeness_status = "complete"
                 game.give_up_at = None
                 game.incomplete_fields = None
             else:
-                is_complete = (
-                    game.home_score is not None and game.away_score is not None
+                missing = ["score"]
+                deadline = (
+                    (game.game_date + timedelta(days=3))
+                    if game.game_date is not None
+                    else (now_naive + timedelta(days=3))
                 )
-                if is_complete:
-                    game.completeness_status = "complete"
-                    game.give_up_at = None
-                    game.incomplete_fields = None
+                if game.game_date is None or deadline > now_naive:
+                    game.completeness_status = "post_game"
+                    game.give_up_at = deadline
+                    game.incomplete_fields = missing
                 else:
-                    missing = ["score"]
-                    deadline = (
-                        (game.game_date + timedelta(days=3))
-                        if game.game_date is not None
-                        else (now_naive + timedelta(days=3))
-                    )
-                    if game.game_date is None or deadline > now_naive:
-                        game.completeness_status = "post_game"
-                        game.give_up_at = deadline
-                        game.incomplete_fields = missing
-                    else:
-                        game.completeness_status = "abandoned"
-                        game.give_up_at = None
-                        game.incomplete_fields = missing
-                        # Write failure row only if one doesn't already exist
-                        existing_failure = session.execute(
-                            select(GameSyncFailure).where(
-                                GameSyncFailure.game_id == game.id
-                            )
-                        ).scalar_one_or_none()
-                        if existing_failure is None:
-                            session.add(GameSyncFailure(
-                                game_id=game.id,
-                                season_id=game.season_id,
-                                abandoned_at=now,
-                                missing_fields=missing,
-                                can_retry=False,
-                            ))
+                    game.completeness_status = "abandoned"
+                    game.give_up_at = None
+                    game.incomplete_fields = missing
+                    # Write failure row only if one doesn't already exist
+                    existing_failure = session.execute(
+                        select(GameSyncFailure).where(
+                            GameSyncFailure.game_id == game.id
+                        )
+                    ).scalar_one_or_none()
+                    if existing_failure is None:
+                        session.add(GameSyncFailure(
+                            game_id=game.id,
+                            season_id=game.season_id,
+                            abandoned_at=now,
+                            missing_fields=missing,
+                            can_retry=False,
+                        ))
 
             if (i + 1) % 200 == 0:
                 session.commit()
