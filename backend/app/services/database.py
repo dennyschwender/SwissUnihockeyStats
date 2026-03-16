@@ -1,6 +1,7 @@
 """
 Database service for managing connections and sessions
 """
+
 import logging
 from contextlib import contextmanager
 from datetime import timedelta
@@ -26,9 +27,11 @@ def run_lifecycle_migration(engine) -> None:
 
     with engine.connect() as conn:
         if "completeness_status" not in existing_cols:
-            conn.execute(text(
-                "ALTER TABLE games ADD COLUMN completeness_status VARCHAR(20) NOT NULL DEFAULT 'upcoming'"
-            ))
+            conn.execute(
+                text(
+                    "ALTER TABLE games ADD COLUMN completeness_status VARCHAR(20) NOT NULL DEFAULT 'upcoming'"
+                )
+            )
         if "incomplete_fields" not in existing_cols:
             conn.execute(text("ALTER TABLE games ADD COLUMN incomplete_fields TEXT"))
         if "give_up_at" not in existing_cols:
@@ -47,17 +50,19 @@ def run_lifecycle_migration(engine) -> None:
     # SQLite returns naive datetimes; use a naive UTC now for comparisons.
     now_naive = now.replace(tzinfo=None)
     with Session(engine) as session:
-        games = session.execute(
-            select(Game).where(
-                Game.completeness_status == "upcoming",
-                Game.status == "finished",
+        games = (
+            session.execute(
+                select(Game).where(
+                    Game.completeness_status == "upcoming",
+                    Game.status == "finished",
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         for i, game in enumerate(games):
-            is_complete = (
-                game.home_score is not None and game.away_score is not None
-            )
+            is_complete = game.home_score is not None and game.away_score is not None
             if is_complete:
                 game.completeness_status = "complete"
                 game.give_up_at = None
@@ -79,18 +84,18 @@ def run_lifecycle_migration(engine) -> None:
                     game.incomplete_fields = missing
                     # Write failure row only if one doesn't already exist
                     existing_failure = session.execute(
-                        select(GameSyncFailure).where(
-                            GameSyncFailure.game_id == game.id
-                        )
+                        select(GameSyncFailure).where(GameSyncFailure.game_id == game.id)
                     ).scalar_one_or_none()
                     if existing_failure is None:
-                        session.add(GameSyncFailure(
-                            game_id=game.id,
-                            season_id=game.season_id,
-                            abandoned_at=now,
-                            missing_fields=missing,
-                            can_retry=False,
-                        ))
+                        session.add(
+                            GameSyncFailure(
+                                game_id=game.id,
+                                season_id=game.season_id,
+                                abandoned_at=now,
+                                missing_fields=missing,
+                                can_retry=False,
+                            )
+                        )
 
             if (i + 1) % 200 == 0:
                 session.commit()
@@ -101,10 +106,10 @@ def run_lifecycle_migration(engine) -> None:
 
 class DatabaseService:
     """Manages database connections and sessions"""
-    
+
     def __init__(self, database_url: str = None):
         """Initialize database service
-        
+
         Args:
             database_url: Database URL (defaults to settings)
         """
@@ -112,22 +117,22 @@ class DatabaseService:
         self.engine = None
         self.SessionLocal = None
         self._initialized = False
-    
+
     def _get_database_url(self) -> str:
         """Get database URL from settings"""
         # Use SQLite by default for simplicity
         # Can be overridden in settings to use PostgreSQL
         db_path = getattr(settings, "DATABASE_PATH", "data/swissunihockey.db")
         return f"sqlite:///{db_path}"
-    
+
     def initialize(self):
         """Initialize database engine and create tables"""
         if self._initialized:
             logger.debug("Database already initialized")
             return
-        
+
         logger.info(f"Initializing database: {self.database_url}")
-        
+
         # Create engine
         if self.database_url.startswith("sqlite"):
             # For :memory: databases (tests) use StaticPool so all connections
@@ -140,33 +145,29 @@ class DatabaseService:
                 self.database_url,
                 connect_args={"check_same_thread": False},
                 poolclass=StaticPool if is_memory else NullPool,
-                echo=False  # Set to True for SQL debugging
+                echo=False,  # Set to True for SQL debugging
             )
-            
+
             # Enable foreign keys for SQLite
             @event.listens_for(self.engine, "connect")
             def set_sqlite_pragma(dbapi_conn, connection_record):
                 cursor = dbapi_conn.cursor()
-                cursor.execute("PRAGMA busy_timeout=30000") # wait up to 30s for locks (must be first)
+                cursor.execute(
+                    "PRAGMA busy_timeout=30000"
+                )  # wait up to 30s for locks (must be first)
                 cursor.execute("PRAGMA foreign_keys=ON")
-                cursor.execute("PRAGMA journal_mode=WAL")   # concurrent readers + writer
+                cursor.execute("PRAGMA journal_mode=WAL")  # concurrent readers + writer
                 cursor.close()
+
         else:
             # PostgreSQL or other database
             self.engine = create_engine(
-                self.database_url,
-                pool_size=10,
-                max_overflow=20,
-                echo=False
+                self.database_url, pool_size=10, max_overflow=20, echo=False
             )
-        
+
         # Create session factory
-        self.SessionLocal = sessionmaker(
-            autocommit=False,
-            autoflush=False,
-            bind=self.engine
-        )
-        
+        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+
         # Create all tables
         Base.metadata.create_all(bind=self.engine)
 
@@ -192,6 +193,7 @@ class DatabaseService:
           must be removed after all instances have been updated.
         """
         from sqlalchemy import text
+
         with self.engine.connect() as conn:
 
             # ── Add new columns to player_statistics (idempotent) ───────────
@@ -201,8 +203,8 @@ class DatabaseService:
                 row[1] for row in conn.execute(text("PRAGMA table_info(player_statistics)"))
             }
             for col, typedef in [
-                ("pen_2min",  "INTEGER DEFAULT 0"),
-                ("pen_5min",  "INTEGER DEFAULT 0"),
+                ("pen_2min", "INTEGER DEFAULT 0"),
+                ("pen_5min", "INTEGER DEFAULT 0"),
                 ("pen_10min", "INTEGER DEFAULT 0"),
                 ("pen_match", "INTEGER DEFAULT 0"),
                 ("game_class", "INTEGER"),
@@ -252,8 +254,8 @@ class DatabaseService:
             game_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(games)"))}
             for col, typedef in [
                 ("spectators", "INTEGER"),
-                ("referee_1",  "VARCHAR(100)"),
-                ("referee_2",  "VARCHAR(100)"),
+                ("referee_1", "VARCHAR(100)"),
+                ("referee_2", "VARCHAR(100)"),
             ]:
                 if col not in game_cols:
                     conn.execute(text(f"ALTER TABLE games ADD COLUMN {col} {typedef}"))
@@ -325,7 +327,8 @@ class DatabaseService:
             # ~30k historical games from prior seasons — the initial version
             # used game_date >= '-40 days' which missed earlier rounds of the
             # current season (Sep–Jan games were 44–156 days old, just outside).
-            conn.execute(text("""
+            conn.execute(
+                text("""
                 DELETE FROM sync_status
                 WHERE entity_type = 'game_events'
                   AND last_sync < '2026-03-02 00:00:00'
@@ -337,7 +340,9 @@ class DatabaseService:
                         AND g.home_score IS NOT NULL
                         AND g.season_id = 2025
                   )
-            """), {"suffix": ":events"})
+            """),
+                {"suffix": ":events"},
+            )
             # ── Remove phantom future-season rows ────────────────────────────
             # index_seasons now skips seasons that haven't started yet, but any
             # already-created phantom rows (e.g. 2026/27 created in Feb 2026)
@@ -354,7 +359,7 @@ class DatabaseService:
             # ── Add api_failures / api_skip_until to players ─────────────────
             player_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(players)"))}
             for col, typedef in [
-                ("api_failures",   "INTEGER NOT NULL DEFAULT 0"),
+                ("api_failures", "INTEGER NOT NULL DEFAULT 0"),
                 ("api_skip_until", "DATETIME"),
             ]:
                 if col not in player_cols:
@@ -366,18 +371,22 @@ class DatabaseService:
             # covering index SQLite does a full-table sort for the subquery
             # (O(n²) on 370 K rows → 4+ minutes).  The covering index lets
             # SQLite resolve the GROUP BY + MIN entirely from the index.
-            conn.execute(text(
-                "CREATE INDEX IF NOT EXISTS idx_event_dedup "
-                "ON game_events(game_id, event_type, period, time, player_id, id)"
-            ))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_event_dedup "
+                    "ON game_events(game_id, event_type, period, time, player_id, id)"
+                )
+            )
 
             # ── Composite index for sync_status cleanup query ─────────────────
             # The cleanup DELETE filters on both columns simultaneously; a
             # composite index is more selective than two separate indexes.
-            conn.execute(text(
-                "CREATE INDEX IF NOT EXISTS idx_sync_cleanup "
-                "ON sync_status(sync_status, last_sync)"
-            ))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_sync_cleanup "
+                    "ON sync_status(sync_status, last_sync)"
+                )
+            )
 
             # ── Create admin_stats_snapshots if it doesn't exist ─────────────
             conn.execute(text("""
@@ -396,24 +405,24 @@ class DatabaseService:
 
             conn.commit()
             logger.debug("SQLite migrations applied")
-    
+
     def get_session(self) -> Session:
         """Get a new database session
-        
+
         Returns:
             SQLAlchemy Session
         """
         if not self._initialized:
             self.initialize()
         return self.SessionLocal()
-    
+
     @contextmanager
     def session_scope(self) -> Generator[Session, None, None]:
         """Provide a transactional scope around a series of operations
-        
+
         Yields:
             SQLAlchemy Session
-        
+
         Example:
             with db_service.session_scope() as session:
                 players = session.query(Player).all()
@@ -428,20 +437,20 @@ class DatabaseService:
             raise
         finally:
             session.close()
-    
+
     def drop_all_tables(self):
         """Drop all tables (use with caution!)"""
         if not self._initialized:
             self.initialize()
         logger.warning("Dropping all database tables")
         Base.metadata.drop_all(bind=self.engine)
-    
+
     def recreate_all_tables(self):
         """Drop and recreate all tables (use with caution!)"""
         self.drop_all_tables()
         Base.metadata.create_all(bind=self.engine)
         logger.info("All tables recreated")
-    
+
     def close(self):
         """Close database connections"""
         if self.engine:
@@ -456,7 +465,7 @@ _db_service: Optional[DatabaseService] = None
 
 def get_database_service() -> DatabaseService:
     """Get the global database service instance
-    
+
     Returns:
         DatabaseService instance
     """
@@ -469,10 +478,10 @@ def get_database_service() -> DatabaseService:
 
 def get_db_session() -> Generator[Session, None, None]:
     """Dependency for FastAPI endpoints to get database session
-    
+
     Yields:
         SQLAlchemy Session
-    
+
     Example:
         @app.get("/players")
         def get_players(db: Session = Depends(get_db_session)):

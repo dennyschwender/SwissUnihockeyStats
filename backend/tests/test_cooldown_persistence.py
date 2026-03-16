@@ -2,15 +2,16 @@
 Tests for cooldown persistence helpers _load_cooldowns() / _persist_cooldowns()
 in app.main.
 """
+
 import json
 import os
 import pytest
 from datetime import datetime, timezone
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _write_config(path: str, data: dict) -> None:
     with open(path, "w") as f:
@@ -21,12 +22,14 @@ def _write_config(path: str, data: dict) -> None:
 # Tests
 # ---------------------------------------------------------------------------
 
+
 def test_persist_cooldowns_writes_to_file(tmp_path, monkeypatch):
     """_persist_cooldowns() writes _job_last_done entries to scheduler_config.json."""
     cfg_path = str(tmp_path / "scheduler_config.json")
     monkeypatch.setattr("app.services.scheduler._CONFIG_PATH", cfg_path)
 
     import app.main as main_mod
+
     # Patch the module-level dict directly
     dt = datetime(2026, 3, 9, 12, 0, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(main_mod, "_job_last_done", {("full", 2025): dt})
@@ -50,6 +53,7 @@ def test_load_cooldowns_reads_from_file(tmp_path, monkeypatch):
     _write_config(cfg_path, {"cooldowns": {"clubs:2024": dt_str}})
 
     import app.main as main_mod
+
     # Reset the dict so we can observe the load
     monkeypatch.setattr(main_mod, "_job_last_done", {})
 
@@ -66,6 +70,7 @@ def test_load_cooldowns_missing_file_is_noop(tmp_path, monkeypatch):
     monkeypatch.setattr("app.services.scheduler._CONFIG_PATH", cfg_path)
 
     import app.main as main_mod
+
     sentinel = {("teams", 2025): datetime(2026, 1, 1, tzinfo=timezone.utc)}
     monkeypatch.setattr(main_mod, "_job_last_done", dict(sentinel))
 
@@ -107,6 +112,7 @@ def test_persist_cooldowns_preserves_existing_scheduler_keys(tmp_path, monkeypat
     _write_config(cfg_path, {"enabled": True, "interval_minutes": 60})
 
     import app.main as main_mod
+
     dt = datetime(2026, 3, 9, 12, 0, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(main_mod, "_job_last_done", {("games", 2025): dt})
 
@@ -128,16 +134,20 @@ def test_load_cooldowns_skips_malformed_entries(tmp_path, monkeypatch):
     cfg_path = str(tmp_path / "scheduler_config.json")
     monkeypatch.setattr("app.services.scheduler._CONFIG_PATH", cfg_path)
 
-    _write_config(cfg_path, {
-        "cooldowns": {
-            "valid:2025": "2026-03-09T12:00:00+00:00",
-            "no_colon_here": "2026-03-09T12:00:00+00:00",   # bad key
-            "bad:season": "2026-03-09T12:00:00+00:00",       # season not int
-            "good:2024": "not-a-datetime",                    # bad datetime
-        }
-    })
+    _write_config(
+        cfg_path,
+        {
+            "cooldowns": {
+                "valid:2025": "2026-03-09T12:00:00+00:00",
+                "no_colon_here": "2026-03-09T12:00:00+00:00",  # bad key
+                "bad:season": "2026-03-09T12:00:00+00:00",  # season not int
+                "good:2024": "not-a-datetime",  # bad datetime
+            }
+        },
+    )
 
     import app.main as main_mod
+
     monkeypatch.setattr(main_mod, "_job_last_done", {})
 
     main_mod._load_cooldowns()

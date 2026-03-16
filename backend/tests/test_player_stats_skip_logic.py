@@ -8,6 +8,7 @@ Covers:
 4. Successful update resets api_failures/api_skip_until
 5. Players with active api_skip_until window are excluded from processing
 """
+
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch, call
@@ -15,8 +16,8 @@ import requests
 
 from app.services.data_indexer import DataIndexer
 
-
 # ── helpers ──────────────────────────────────────────────────────────────────
+
 
 def _make_indexer(mock_client=None, mock_db=None):
     mock_client = mock_client or MagicMock()
@@ -31,6 +32,7 @@ def _session_scope(session):
     @contextmanager
     def _scope():
         yield session
+
     return _scope
 
 
@@ -54,6 +56,7 @@ def _make_session_for_upsert():
 
 # ── Test 1: HTTP 500 sets api_error ──────────────────────────────────────────
 
+
 def test_http_500_sets_api_error():
     """_upsert_player_stats_from_api returns (0, True) on HTTP 5xx."""
     mock_client = MagicMock()
@@ -74,6 +77,7 @@ def test_http_500_sets_api_error():
 
 
 # ── Test 2: Non-5xx exception does not set api_error ─────────────────────────
+
 
 def test_non_5xx_does_not_set_api_error():
     """_upsert_player_stats_from_api returns (0, False) on non-HTTP-5xx exceptions."""
@@ -113,6 +117,7 @@ def test_http_404_does_not_set_api_error():
 
 # ── Test 3: Third failure sets api_skip_until ─────────────────────────────────
 
+
 def test_third_failure_sets_skip_until():
     """After 3 API failures in the season loop, api_skip_until is set on the Player row."""
     from app.models.db_models import Player as PlayerModel
@@ -141,6 +146,7 @@ def test_third_failure_sets_skip_until():
     ):
         # Patch the internals to return a single player_id=[7] after the player_ids query
         from app.models.db_models import Season as SeasonModel
+
         season_mock = MagicMock()
         season_mock.text = "2025/26"
         session.get.return_value = season_mock
@@ -212,6 +218,7 @@ def test_third_failure_sets_skip_until():
 
 # ── Test 4: Success resets api_failures/api_skip_until ───────────────────────
 
+
 def test_success_resets_skip_fields():
     """Successful fetch routes player through Phase 1/2; _run_player_stats_phase2 handles reset."""
     call_counter = [0]
@@ -262,6 +269,7 @@ def test_success_resets_skip_fields():
 
 
 # ── Test 5: Skip window excludes players ─────────────────────────────────────
+
 
 def test_skip_window_excludes_players():
     """Players with api_skip_until > now must not be passed to _fetch_player_stats_raw."""

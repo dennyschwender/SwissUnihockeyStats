@@ -1,6 +1,7 @@
 """
 Main API v1 router - aggregates all endpoint routers
 """
+
 from fastapi import APIRouter
 from app.api.v1.endpoints import clubs, leagues, teams, games, players, rankings
 

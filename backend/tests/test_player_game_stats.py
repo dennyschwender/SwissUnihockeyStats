@@ -9,6 +9,7 @@ Covers:
 5. Success resets api_failures / api_skip_until (via _run_phase2)
 6. Skip pre-fetch excludes players with active api_skip_until window
 """
+
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
@@ -16,8 +17,8 @@ import requests
 
 from app.services.data_indexer import DataIndexer, _PlayerGameStatsFetchResult
 
-
 # ── helpers ──────────────────────────────────────────────────────────────────
+
 
 def _make_indexer(mock_client=None, mock_db=None):
     mock_client = mock_client or MagicMock()
@@ -32,15 +33,22 @@ def _session_scope(session):
     @contextmanager
     def _scope():
         yield session
+
     return _scope
 
 
 def _overview_response(game_id: int, goals: int = 1, assists: int = 0, pim: int = 0):
     cells = [
-        {"text": "2026-01-01"}, {"text": "H"}, {"text": ""},
-        {"text": "A"}, {"text": "B"}, {"text": "3:2"},
-        {"text": str(goals)}, {"text": str(assists)},
-        {"text": str(goals + assists)}, {"text": str(pim)},
+        {"text": "2026-01-01"},
+        {"text": "H"},
+        {"text": ""},
+        {"text": "A"},
+        {"text": "B"},
+        {"text": "3:2"},
+        {"text": str(goals)},
+        {"text": str(assists)},
+        {"text": str(goals + assists)},
+        {"text": str(pim)},
     ]
     return {"data": {"regions": [{"rows": [{"id": game_id, "cells": cells}]}]}}
 
@@ -53,6 +61,7 @@ def _make_player_mock(api_failures=0, api_skip_until=None):
 
 
 # ── Test 1: Phase 1 makes no DB writes ───────────────────────────────────────
+
 
 def test_fetch_helper_does_not_open_session():
     """_fetch_player_game_stats must not call session_scope."""
@@ -69,6 +78,7 @@ def test_fetch_helper_does_not_open_session():
 
 
 # ── Test 2: Phase 2 uses batched session_scopes ───────────────────────────────
+
 
 def test_run_phase2_batches_sessions():
     """_run_phase2 opens ceil(n/BATCH_SIZE) + 1 sessions: one per batch plus one
@@ -151,11 +161,13 @@ def test_run_phase2_opens_multiple_batch_sessions():
         )
 
     import math
+
     expected = math.ceil(n_players / batch_size) + 1  # batches + 1 tier mark
     assert call_count == expected, f"Expected {expected} session_scope calls, got {call_count}"
 
 
 # ── Test 3: HTTP 500 sets api_error ──────────────────────────────────────────
+
 
 def test_http_500_sets_api_error():
     mock_client = MagicMock()
@@ -186,6 +198,7 @@ def test_non_5xx_does_not_set_api_error():
 
 # ── Test 4: Third failure sets api_skip_until ────────────────────────────────
 
+
 def test_third_failure_sets_skip_until():
     player_mock = _make_player_mock(api_failures=2)  # 2 previous failures
     session = MagicMock()
@@ -213,6 +226,7 @@ def test_third_failure_sets_skip_until():
 
 
 # ── Test 5: Success resets skip fields ───────────────────────────────────────
+
 
 def test_success_resets_api_failures_and_skip_until():
     player_mock = _make_player_mock(
@@ -243,6 +257,7 @@ def test_success_resets_api_failures_and_skip_until():
 
 # ── Test 6: Skip pre-fetch excludes active-skip players ──────────────────────
 
+
 def test_skip_window_players_not_fetched():
     """Players with api_skip_until > now must not be passed to _fetch_player_game_stats."""
     fetched_pids = []
@@ -258,9 +273,12 @@ def test_skip_window_players_not_fetched():
     # player_ids session returns players 99 and 100
     player_ids_session = MagicMock()
     player_ids_session.query.return_value.filter.return_value.distinct.return_value.all.return_value = [
-        (99,), (100,)
+        (99,),
+        (100,),
     ]
-    player_ids_session.query.return_value.filter.return_value.distinct.return_value.all.side_effect = None
+    player_ids_session.query.return_value.filter.return_value.distinct.return_value.all.side_effect = (
+        None
+    )
 
     scope_calls = []
 

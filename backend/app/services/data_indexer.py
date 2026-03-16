@@ -4,6 +4,7 @@ Fetches data from Swiss Unihockey API following the documented hierarchy:
 SEASONS → CLUBS → TEAMS → PLAYERS
 SEASONS → LEAGUES → GROUPS → GAMES → PLAYERS
 """
+
 import logging
 import re
 import threading
@@ -16,8 +17,18 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from app.models.db_models import (
-    Season, Club, Team, Player, TeamPlayer, League, LeagueGroup,
-    Game, GamePlayer, GameEvent, PlayerStatistics, SyncStatus
+    Season,
+    Club,
+    Team,
+    Player,
+    TeamPlayer,
+    League,
+    LeagueGroup,
+    Game,
+    GamePlayer,
+    GameEvent,
+    PlayerStatistics,
+    SyncStatus,
 )
 from app.services.swissunihockey import get_swissunihockey_client
 from app.services.database import get_database_service
@@ -28,6 +39,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class _PlayerGameStatsFetchResult:
     """Result of a Phase-1 API fetch for one player's game stats."""
+
     player_id: int
     game_stats: dict = field(default_factory=dict)  # game_id -> (goals, assists, pim)
     api_error: bool = False  # True only for HTTP 5xx — increments skip counter
@@ -36,6 +48,7 @@ class _PlayerGameStatsFetchResult:
 @dataclass
 class _PlayerStatsFetchResult:
     """Result of a Phase-1 API fetch for one player's seasonal stats."""
+
     player_id: int
     raw_data: dict = field(default_factory=dict)
     api_error: bool = False  # True only for HTTP 5xx — increments skip counter
@@ -56,11 +69,11 @@ def _phase_from_slider_text(slider_text: str) -> str:
     :class:`LeagueGroup`.  Every other label gets its own bucket, which
     means playoff phases each become a separate group.
     """
-    
+
     if not slider_text:
         return "Regelsaison"
     label = slider_text.split(" / ")[0].strip()
-    if re.match(r'Runde\s+\d+$', label, re.IGNORECASE):
+    if re.match(r"Runde\s+\d+$", label, re.IGNORECASE):
         return "Regelsaison"
     return label or "Regelsaison"
 
@@ -74,7 +87,7 @@ def _parse_game_rows(regions: list) -> list[dict]:
         away_team_id, away_team_name, away_logo_url,
         home_score, away_score, status, period
     """
-    
+
     games: list[dict] = []
     for region in regions:
         for row in region.get("rows", []):
@@ -154,8 +167,7 @@ def _parse_game_rows(regions: list) -> list[dict]:
                 score_text = cells[7].get("text", ["-"])
                 score_text = score_text[0] if isinstance(score_text, list) else score_text
                 if score_text and score_text not in ("-", ""):
-                    m = re.match(r'(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?',
-                                  score_text.strip(), re.I)
+                    m = re.match(r"(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?", score_text.strip(), re.I)
                     if m:
                         home_score = int(m.group(1))
                         away_score = int(m.group(2))
@@ -163,22 +175,24 @@ def _parse_game_rows(regions: list) -> list[dict]:
                         period = "SO" if "P" in sfx else ("OT" if "V" in sfx else None)
                         status = "finished"
 
-            games.append({
-                "game_id": game_id,
-                "game_date": game_date,
-                "game_time_str": game_time_str,
-                "venue": venue,
-                "home_team_id": home_team_id,
-                "home_team_name": home_team_name,
-                "home_logo_url": home_logo_url,
-                "away_team_id": away_team_id,
-                "away_team_name": away_team_name,
-                "away_logo_url": away_logo_url,
-                "home_score": home_score,
-                "away_score": away_score,
-                "status": status,
-                "period": period,
-            })
+            games.append(
+                {
+                    "game_id": game_id,
+                    "game_date": game_date,
+                    "game_time_str": game_time_str,
+                    "venue": venue,
+                    "home_team_id": home_team_id,
+                    "home_team_name": home_team_name,
+                    "home_logo_url": home_logo_url,
+                    "away_team_id": away_team_id,
+                    "away_team_name": away_team_name,
+                    "away_logo_url": away_logo_url,
+                    "home_score": home_score,
+                    "away_score": away_score,
+                    "status": status,
+                    "period": period,
+                }
+            )
     return games
 
 
@@ -193,22 +207,22 @@ def _parse_game_rows(regions: list) -> list[dict]:
 #   Tier 6 — + 4./5. Liga, Supercup, Test, Regional  (league_id 6, 7, 12, 23, 25)
 # ---------------------------------------------------------------------------
 LEAGUE_TIERS: dict[int, int] = {
-    1:  1,   # Herren/Damen NLA (legacy name)
-    10: 1,   # Herren/Damen SML (NLA, intermediate name)
-    24: 1,   # Herren/Damen L-UPL (NLA, current name)
-    2:  2,   # Herren/Damen NLB
-    13: 2,   # A-level youth: U14A, U16A, U18A, U21A, Juniorinnen U21A/U17A
-    3:  3,   # 1. Liga (Herren/Damen)
-    14: 3,   # B-level youth: U14B, U16B, U18B, U21B, Juniorinnen U21B/U17B
-    4:  4,   # 2. Liga (Herren/Damen)
-    15: 4,   # C-level youth: U16C, U18C, U21C
-    5:  5,   # 3. Liga (Herren/Damen)
-    16: 5,   # U21 D
-    6:  6,   # 4. Liga
-    7:  6,   # 5. Liga
-    12: 6,   # Regional (Junioren A–E, Juniorinnen A–D, Senioren)
-    23: 6,   # Supercup
-    25: 6,   # Test / Cup
+    1: 1,  # Herren/Damen NLA (legacy name)
+    10: 1,  # Herren/Damen SML (NLA, intermediate name)
+    24: 1,  # Herren/Damen L-UPL (NLA, current name)
+    2: 2,  # Herren/Damen NLB
+    13: 2,  # A-level youth: U14A, U16A, U18A, U21A, Juniorinnen U21A/U17A
+    3: 3,  # 1. Liga (Herren/Damen)
+    14: 3,  # B-level youth: U14B, U16B, U18B, U21B, Juniorinnen U21B/U17B
+    4: 4,  # 2. Liga (Herren/Damen)
+    15: 4,  # C-level youth: U16C, U18C, U21C
+    5: 5,  # 3. Liga (Herren/Damen)
+    16: 5,  # U21 D
+    6: 6,  # 4. Liga
+    7: 6,  # 5. Liga
+    12: 6,  # Regional (Junioren A–E, Juniorinnen A–D, Senioren)
+    23: 6,  # Supercup
+    25: 6,  # Test / Cup
 }
 # Default tier for unknown league_ids (7 = no filter / include everything)
 _DEFAULT_TIER = 7
@@ -245,17 +259,17 @@ def _game_events_ttl_hours(game_date: "datetime | None") -> float:
     if game_date is None:
         return 4.0  # safe default — treat as recently finished
     now = datetime.now(timezone.utc)
-    gd  = game_date if game_date.tzinfo else game_date.replace(tzinfo=timezone.utc)
+    gd = game_date if game_date.tzinfo else game_date.replace(tzinfo=timezone.utc)
     age = (now - gd).total_seconds() / 3600
     if age < 3:
-        return 5 / 60      # 5 minutes — may still be live
+        return 5 / 60  # 5 minutes — may still be live
     if age < 12:
-        return 1.0         # 1 hour — just finished today
+        return 1.0  # 1 hour — just finished today
     if age < 48:
-        return 4.0         # 4 hours — yesterday / very recent
+        return 4.0  # 4 hours — yesterday / very recent
     if age < 168:
-        return 24.0        # 1 day — officials add best players / referees within 24-48h
-    return 720.0           # 30 days — effectively frozen
+        return 24.0  # 1 day — officials add best players / referees within 24-48h
+    return 720.0  # 30 days — effectively frozen
 
 
 class DataIndexer:
@@ -268,9 +282,7 @@ class DataIndexer:
     def cleanup_stale_sync_status(self) -> int:
         """Reset any in_progress rows left over from a previous server process."""
         with self.db_service.session_scope() as session:
-            stale = session.query(SyncStatus).filter(
-                SyncStatus.sync_status == "in_progress"
-            ).all()
+            stale = session.query(SyncStatus).filter(SyncStatus.sync_status == "in_progress").all()
             for row in stale:
                 row.sync_status = "failed"
                 row.error_message = "Server restarted while job was running"
@@ -278,53 +290,54 @@ class DataIndexer:
             return len(stale)
 
     # ==================== UTILITY METHODS ====================
-    
+
     def _should_update(self, entity_type: str, entity_id: str, max_age_hours: int = 24) -> bool:
         """Check if an entity needs updating based on last sync time
-        
+
         Args:
             entity_type: Type of entity (e.g., "season", "club")
             entity_id: ID of specific entity
             max_age_hours: Maximum age in hours before update needed
-        
+
         Returns:
             True if update is needed
         """
         with self.db_service.session_scope() as session:
-            sync = session.query(SyncStatus).filter(
-                SyncStatus.entity_type == entity_type,
-                SyncStatus.entity_id == entity_id
-            ).first()
-            
+            sync = (
+                session.query(SyncStatus)
+                .filter(SyncStatus.entity_type == entity_type, SyncStatus.entity_id == entity_id)
+                .first()
+            )
+
             if not sync:
                 return True
-            
+
             last = sync.last_sync
             if last.tzinfo is None:
                 last = last.replace(tzinfo=timezone.utc)
             age = datetime.now(timezone.utc) - last
             return age > timedelta(hours=max_age_hours)
-    
+
     def _mark_sync_start(self, session: Session, entity_type: str, entity_id: str):
         """Mark synchronization as started"""
-        sync = session.query(SyncStatus).filter(
-            SyncStatus.entity_type == entity_type,
-            SyncStatus.entity_id == entity_id
-        ).first()
-        
+        sync = (
+            session.query(SyncStatus)
+            .filter(SyncStatus.entity_type == entity_type, SyncStatus.entity_id == entity_id)
+            .first()
+        )
+
         if not sync:
-            sync = SyncStatus(
-                entity_type=entity_type,
-                entity_id=entity_id
-            )
+            sync = SyncStatus(entity_type=entity_type, entity_id=entity_id)
             session.add(sync)
-        
+
         sync.last_sync = datetime.now(timezone.utc)
         sync.sync_status = "in_progress"
         sync.error_message = None
         session.commit()
-    
-    def _mark_sync_complete(self, session: Session, entity_type: str, entity_id: str, records_count: int = 0):
+
+    def _mark_sync_complete(
+        self, session: Session, entity_type: str, entity_id: str, records_count: int = 0
+    ):
         """Mark synchronization as completed (upsert — creates the row if it doesn't exist).
 
         _mark_sync_start is the historic row creator, but several indexer methods
@@ -332,23 +345,25 @@ class DataIndexer:
         the old update-only version silently wrote nothing.  This version always
         creates the row when missing so the scheduler's freshness check works.
         """
-        sync = session.query(SyncStatus).filter(
-            SyncStatus.entity_type == entity_type,
-            SyncStatus.entity_id == entity_id
-        ).first()
+        sync = (
+            session.query(SyncStatus)
+            .filter(SyncStatus.entity_type == entity_type, SyncStatus.entity_id == entity_id)
+            .first()
+        )
 
         if not sync:
             sync = SyncStatus(entity_type=entity_type, entity_id=entity_id)
             session.add(sync)
 
-        sync.sync_status    = "completed"
+        sync.sync_status = "completed"
         sync.records_synced = records_count
-        sync.last_sync      = datetime.now(timezone.utc)
-        sync.error_message  = None
+        sync.last_sync = datetime.now(timezone.utc)
+        sync.error_message = None
         session.commit()
-    
-    def bulk_already_indexed(self, entity_type: str, entity_ids: list[str],
-                              max_age_hours: int = 720) -> set[str]:
+
+    def bulk_already_indexed(
+        self, entity_type: str, entity_ids: list[str], max_age_hours: int = 720
+    ) -> set[str]:
         """Return the set of *entity_ids* that already have a fresh 'success'
         SyncStatus row, so the caller can skip re-indexing them.
 
@@ -387,16 +402,17 @@ class DataIndexer:
         the original exception propagates cleanly.
         """
         try:
-            session.rollback()          # clear PendingRollbackError state
-            sync = session.query(SyncStatus).filter(
-                SyncStatus.entity_type == entity_type,
-                SyncStatus.entity_id == entity_id
-            ).first()
+            session.rollback()  # clear PendingRollbackError state
+            sync = (
+                session.query(SyncStatus)
+                .filter(SyncStatus.entity_type == entity_type, SyncStatus.entity_id == entity_id)
+                .first()
+            )
             if not sync:
                 sync = SyncStatus(entity_type=entity_type, entity_id=entity_id)
                 session.add(sync)
             sync.sync_status = "failed"
-            sync.last_sync = datetime.now(timezone.utc)   # enable backoff
+            sync.last_sync = datetime.now(timezone.utc)  # enable backoff
             sync.error_message = error[:500] if error else error
             session.commit()
         except Exception:
@@ -422,56 +438,64 @@ class DataIndexer:
         entity_id = f"season:{season_id}"
         try:
             with self.db_service.session_scope() as session:
-                sync = session.query(SyncStatus).filter(
-                    SyncStatus.entity_type == entity_type,
-                    SyncStatus.entity_id   == entity_id,
-                ).first()
+                sync = (
+                    session.query(SyncStatus)
+                    .filter(
+                        SyncStatus.entity_type == entity_type,
+                        SyncStatus.entity_id == entity_id,
+                    )
+                    .first()
+                )
                 if not sync:
                     sync = SyncStatus(entity_type=entity_type, entity_id=entity_id)
                     session.add(sync)
-                sync.sync_status    = "completed"
+                sync.sync_status = "completed"
                 sync.records_synced = records
-                sync.last_sync      = datetime.now(timezone.utc)
+                sync.last_sync = datetime.now(timezone.utc)
                 session.commit()
                 logger.debug(
                     "record_season_sync: %s / %s = %d records",
-                    entity_type, entity_id, records,
+                    entity_type,
+                    entity_id,
+                    records,
                 )
         except Exception as exc:
-            logger.warning("record_season_sync failed for %s season %s: %s", entity_type, season_id, exc)
+            logger.warning(
+                "record_season_sync failed for %s season %s: %s", entity_type, season_id, exc
+            )
 
     def _extract_table_data(self, api_response: Dict[str, Any]) -> List[Dict]:
         """Extract data from API table format: data.regions[0].rows"""
         if not isinstance(api_response, dict):
             return []
-        
+
         data = api_response.get("data", {})
         if isinstance(data, dict) and "regions" in data:
             regions = data.get("regions", [])
             if regions and len(regions) > 0:
                 rows = regions[0].get("rows", [])
                 return rows if isinstance(rows, list) else []
-        
+
         # Fallback to entries format
         return api_response.get("entries", [])
-    
+
     # ==================== LEVEL 1: SEASONS ====================
-    
+
     def index_seasons(self, force: bool = False) -> int:
         """Index all seasons from API
-        
+
         Args:
             force: Force update even if recently synced
-        
+
         Returns:
             Number of seasons indexed
         """
         if not force and not self._should_update("seasons", "all", max_age_hours=720):  # 30 days
             logger.info("Seasons recently synced, skipping")
             return 0
-        
+
         logger.info("Indexing seasons...")
-        
+
         try:
             with self.db_service.session_scope() as session:
                 self._mark_sync_start(session, "seasons", "all")
@@ -527,16 +551,16 @@ class DataIndexer:
             except Exception:
                 pass
             raise
-    
+
     # ==================== LEVEL 2: CLUBS ====================
-    
+
     def index_clubs(self, season_id: int, force: bool = False) -> int:
         """Index clubs for a specific season
-        
+
         Args:
             season_id: Season ID to index clubs for
             force: Force update even if recently synced
-        
+
         Returns:
             Number of clubs indexed
         """
@@ -548,9 +572,9 @@ class DataIndexer:
             with self.db_service.session_scope() as _s:
                 self._mark_sync_complete(_s, "clubs", entity_id, 0)
             return 0
-        
+
         logger.info(f"Indexing clubs for season {season_id}...")
-        
+
         try:
             with self.db_service.session_scope() as session:
                 self._mark_sync_start(session, "clubs", entity_id)
@@ -568,10 +592,11 @@ class DataIndexer:
                         continue
 
                     # Check if club exists for this season
-                    club = session.query(Club).filter(
-                        Club.id == club_id,
-                        Club.season_id == season_id
-                    ).first()
+                    club = (
+                        session.query(Club)
+                        .filter(Club.id == club_id, Club.season_id == season_id)
+                        .first()
+                    )
 
                     if not club:
                         club = Club(id=club_id, season_id=season_id)
@@ -589,52 +614,55 @@ class DataIndexer:
         except Exception as e:
             logger.error(f"Failed to index clubs for season {season_id}: {e}", exc_info=True)
             return 0
-    
+
     # ==================== LEVEL 3: TEAMS ====================
-    
-    def index_teams_for_club(self, club_id: int, season_id: int, force: bool = False) -> tuple[int, list[int]]:
+
+    def index_teams_for_club(
+        self, club_id: int, season_id: int, force: bool = False
+    ) -> tuple[int, list[int]]:
         """Index teams for a specific club
-        
+
         Args:
             club_id: Club ID
             season_id: Season ID
             force: Force update
-        
+
         Returns:
             Tuple of (number of teams indexed, list of team IDs)
         """
         entity_id = f"club:{club_id}:season:{season_id}"
         if not force and not self._should_update("teams", entity_id, max_age_hours=72):  # 3 days
             return (0, [])
-        
+
         logger.debug(f"Indexing teams for club {club_id}, season {season_id}...")
-        
+
         team_ids = []
         try:
             with self.db_service.session_scope() as session:
                 # Fetch teams from API (without mode parameter - it returns empty with mode="by_club")
                 teams_data = self.client.get_teams(season=season_id, club=club_id)
                 rows = self._extract_table_data(teams_data)
-                
+
                 count = 0
                 for row in rows:
                     # Team ID is directly in the row
                     team_id = row.get("id")
                     if not team_id:
                         continue
-                    
+
                     # Check if team exists for this season (composite PK: id + season_id)
-                    team = session.query(Team).filter(
-                        Team.id == team_id,
-                        Team.season_id == season_id
-                    ).first()
-                    
+                    team = (
+                        session.query(Team)
+                        .filter(Team.id == team_id, Team.season_id == season_id)
+                        .first()
+                    )
+
                     if not team:
                         team = Team(id=team_id, club_id=club_id, season_id=season_id)
                         session.add(team)
                     # Do NOT overwrite club_id if team already exists - teams are shared
                     # across clubs in a season (league standings), first write wins
-                    
+
                     # Extract team name from cells
                     cells = row.get("cells", [])
                     team_name = "Unknown Team"
@@ -647,54 +675,54 @@ class DataIndexer:
                                 team_name = text_value[0]
                             else:
                                 team_name = str(text_value) if text_value else "Unknown Team"
-                    
+
                     team.name = team_name
                     team.text = team_name
                     team.last_updated = datetime.now(timezone.utc)
                     team_ids.append(team_id)
                     count += 1
-                
+
                 self._mark_sync_complete(session, "teams", entity_id, count)
                 return (count, team_ids)
         except Exception as e:
             logger.debug(f"Failed to index teams for club {club_id}: {e}")
             return (0, team_ids)
-    
+
     # ==================== LEVEL 4: PLAYERS ====================
-    
+
     def index_players_for_team(self, team_id: int, season_id: int, force: bool = False) -> int:
         """Index players for a specific team
-        
+
         Args:
             team_id: Team ID
             season_id: Season ID
             force: Force update
-        
+
         Returns:
             Number of players indexed
         """
         entity_id = f"team:{team_id}:season:{season_id}"
         if not force and not self._should_update("players", entity_id, max_age_hours=24):
             return 0
-        
+
         logger.debug(f"Indexing players for team {team_id}...")
-        
+
         try:
             with self.db_service.session_scope() as session:
                 # Fetch players from API
                 players_data = self.client.get_team_players(team_id)
                 rows = self._extract_table_data(players_data)
-                
+
                 if not rows or (isinstance(rows, str) and rows == ""):
                     logger.debug(f"No players found for team {team_id}")
                     return 0
-                
+
                 count = 0
                 for row in rows:
                     # Player ID is in cells[2].link.ids[0] (player name cell)
                     person_id = None
                     player_name = "Unknown Player"
-                    
+
                     cells = row.get("cells", [])
                     if len(cells) >= 3:
                         # cells[2] usually contains player name with link to player detail
@@ -702,50 +730,57 @@ class DataIndexer:
                         if isinstance(name_cell, dict):
                             # Get player name
                             if "text" in name_cell and name_cell["text"]:
-                                player_name = name_cell["text"][0] if isinstance(name_cell["text"], list) else name_cell["text"]
+                                player_name = (
+                                    name_cell["text"][0]
+                                    if isinstance(name_cell["text"], list)
+                                    else name_cell["text"]
+                                )
                             # Get player ID from link
                             if "link" in name_cell:
                                 link = name_cell["link"]
                                 if isinstance(link, dict) and "ids" in link and link["ids"]:
                                     person_id = link["ids"][0]
-                    
+
                     if not person_id:
                         logger.debug(f"Could not extract person_id from row: {row}")
                         continue
-                    
+
                     # Get or create player
                     player = session.query(Player).filter(Player.person_id == person_id).first()
-                    
+
                     if not player:
                         player = Player(
                             person_id=person_id,
                             full_name=player_name,
-                            name_normalized=player_name.lower()
+                            name_normalized=player_name.lower(),
                         )
                         session.add(player)
-                    
+
                     player.last_updated = datetime.now(timezone.utc)
-                    
+
                     # Create or update team roster entry
-                    team_player = session.query(TeamPlayer).filter(
-                        TeamPlayer.team_id == team_id,
-                        TeamPlayer.player_id == person_id,
-                        TeamPlayer.season_id == season_id
-                    ).first()
-                    
+                    team_player = (
+                        session.query(TeamPlayer)
+                        .filter(
+                            TeamPlayer.team_id == team_id,
+                            TeamPlayer.player_id == person_id,
+                            TeamPlayer.season_id == season_id,
+                        )
+                        .first()
+                    )
+
                     if not team_player:
                         team_player = TeamPlayer(
-                            team_id=team_id,
-                            player_id=person_id,
-                            season_id=season_id
+                            team_id=team_id, player_id=person_id, season_id=season_id
                         )
                         session.add(team_player)
-                    
+
                     # Extract additional info from cells: [0]=jersey#, [1]=position
                     if len(cells) >= 1:
                         num_cell = cells[0]
                         num_txt = num_cell.get("text", "") if isinstance(num_cell, dict) else ""
-                        if isinstance(num_txt, list): num_txt = num_txt[0] if num_txt else ""
+                        if isinstance(num_txt, list):
+                            num_txt = num_txt[0] if num_txt else ""
                         try:
                             team_player.jersey_number = int(num_txt) if num_txt else None
                         except (ValueError, TypeError):
@@ -755,21 +790,22 @@ class DataIndexer:
                     if len(cells) >= 2:
                         pos_cell = cells[1]
                         pos_txt = pos_cell.get("text", "") if isinstance(pos_cell, dict) else ""
-                        if isinstance(pos_txt, list): pos_txt = pos_txt[0] if pos_txt else ""
+                        if isinstance(pos_txt, list):
+                            pos_txt = pos_txt[0] if pos_txt else ""
                         team_player.position = pos_txt or None
                     else:
                         team_player.position = row.get("position")
                     team_player.last_updated = datetime.now(timezone.utc)
-                    
+
                     count += 1
-                
+
                 self._mark_sync_complete(session, "players", entity_id, count)
                 logger.debug(f"✓ Indexed {count} players for team {team_id}")
                 return count
         except Exception as e:
             logger.debug(f"Failed to index players for team {team_id}: {e}")
             return 0
-    
+
     # ------------------------------------------------------------------
     # Internal helper shared by both the single-player and full-season
     # stats indexing paths.
@@ -808,7 +844,7 @@ class DataIndexer:
 
         # Build team_name → (game_class, team_id) lookup for this player's roster memberships
         # so each PlayerStatistics row is tagged with the correct gender/age class and exact team.
-        _gc_map: dict[str, int] = {}   # team_name → game_class
+        _gc_map: dict[str, int] = {}  # team_name → game_class
         _tid_map: dict[str, int] = {}  # team_name → team.id
         try:
             for tname, tgc, tid in (
@@ -850,37 +886,37 @@ class DataIndexer:
                 if season_label and row_season != season_label:
                     continue
 
-                league_abbrev   = _txt(1)
-                team_name_txt   = _txt(2)
-                game_class      = _gc_map.get(team_name_txt)
-                team_db_id      = _tid_map.get(team_name_txt)
-                games_played    = _int(3)
-                goals           = _int(4)
-                assists         = _int(5)
-                points          = _int(6)
-                pen_2min        = _int(7)
-                pen_5min        = _int(8)
-                pen_10min       = _int(9)
-                pen_match       = _int(10)
+                league_abbrev = _txt(1)
+                team_name_txt = _txt(2)
+                game_class = _gc_map.get(team_name_txt)
+                team_db_id = _tid_map.get(team_name_txt)
+                games_played = _int(3)
+                goals = _int(4)
+                assists = _int(5)
+                points = _int(6)
+                pen_2min = _int(7)
+                pen_5min = _int(8)
+                pen_10min = _int(9)
+                pen_match = _int(10)
                 penalty_minutes = pen_2min * 2 + pen_5min * 5 + pen_10min * 10
-                now             = datetime.now(timezone.utc)
-                key             = (person_id, season_id, league_abbrev)
+                now = datetime.now(timezone.utc)
+                key = (person_id, season_id, league_abbrev)
 
                 def _apply(obj):
-                    obj.league_abbrev   = league_abbrev
-                    obj.team_name       = team_name_txt
-                    obj.game_class      = game_class
-                    obj.team_id         = team_db_id
-                    obj.games_played    = games_played
-                    obj.goals           = goals
-                    obj.assists         = assists
-                    obj.points          = points
+                    obj.league_abbrev = league_abbrev
+                    obj.team_name = team_name_txt
+                    obj.game_class = game_class
+                    obj.team_id = team_db_id
+                    obj.games_played = games_played
+                    obj.goals = goals
+                    obj.assists = assists
+                    obj.points = points
                     obj.penalty_minutes = penalty_minutes
-                    obj.pen_2min        = pen_2min
-                    obj.pen_5min        = pen_5min
-                    obj.pen_10min       = pen_10min
-                    obj.pen_match       = pen_match
-                    obj.last_updated    = now
+                    obj.pen_2min = pen_2min
+                    obj.pen_5min = pen_5min
+                    obj.pen_10min = pen_10min
+                    obj.pen_match = pen_match
+                    obj.last_updated = now
 
                 if key in staged:
                     _apply(staged[key])
@@ -894,7 +930,8 @@ class DataIndexer:
                             PlayerStatistics.player_id == person_id,
                             PlayerStatistics.season_id == season_id,
                             PlayerStatistics.league_abbrev == league_abbrev,
-                        ).first()
+                        )
+                        .first()
                     )
 
                 if existing:
@@ -902,22 +939,22 @@ class DataIndexer:
                     staged[key] = existing
                 else:
                     obj = PlayerStatistics(
-                        player_id       = person_id,
-                        season_id       = season_id,
-                        league_abbrev   = league_abbrev,
-                        team_name       = team_name_txt,
-                        game_class      = game_class,
-                        team_id         = team_db_id,
-                        games_played    = games_played,
-                        goals           = goals,
-                        assists         = assists,
-                        points          = points,
-                        penalty_minutes = penalty_minutes,
-                        pen_2min        = pen_2min,
-                        pen_5min        = pen_5min,
-                        pen_10min       = pen_10min,
-                        pen_match       = pen_match,
-                        last_updated    = now,
+                        player_id=person_id,
+                        season_id=season_id,
+                        league_abbrev=league_abbrev,
+                        team_name=team_name_txt,
+                        game_class=game_class,
+                        team_id=team_db_id,
+                        games_played=games_played,
+                        goals=goals,
+                        assists=assists,
+                        points=points,
+                        penalty_minutes=penalty_minutes,
+                        pen_2min=pen_2min,
+                        pen_5min=pen_5min,
+                        pen_10min=pen_10min,
+                        pen_match=pen_match,
+                        last_updated=now,
                     )
                     session.add(obj)
                     staged[key] = obj
@@ -931,6 +968,7 @@ class DataIndexer:
             return _PlayerStatsFetchResult(player_id=person_id, raw_data=raw)
         except Exception as exc:
             import requests as _req
+
             is_5xx = (
                 isinstance(exc, _req.HTTPError)
                 and exc.response is not None
@@ -957,12 +995,22 @@ class DataIndexer:
             stats_data = self.client.get_player_stats(person_id)
         except Exception as exc:
             import requests as _req
-            if isinstance(exc, _req.HTTPError) and exc.response is not None and exc.response.status_code >= 500:
+
+            if (
+                isinstance(exc, _req.HTTPError)
+                and exc.response is not None
+                and exc.response.status_code >= 500
+            ):
                 logger.debug("API 5xx for player stats %s: %s", person_id, exc)
-                return 0, True   # (rows_upserted, api_error)
+                return 0, True  # (rows_upserted, api_error)
             logger.debug("Could not fetch stats for player %s: %s", person_id, exc)
             return 0, False
-        return self._apply_player_stats_result(session, person_id, stats_data, season_id, season_label, staged), False
+        return (
+            self._apply_player_stats_result(
+                session, person_id, stats_data, season_id, season_label, staged
+            ),
+            False,
+        )
 
     def index_player_stats_one(self, player_id: int, season_id: int, force: bool = False) -> int:
         """Index statistics for a single player in one season.
@@ -975,17 +1023,23 @@ class DataIndexer:
             return 0
 
         from app.models.db_models import Season as SeasonModel
+
         with self.db_service.session_scope() as session:
             season_row = session.get(SeasonModel, season_id)
             season_label = season_row.text if season_row and season_row.text else str(season_id)
             staged: dict[tuple, PlayerStatistics] = {}
-            count, _api_err = self._upsert_player_stats_from_api(player_id, season_id, season_label, session, staged)
+            count, _api_err = self._upsert_player_stats_from_api(
+                player_id, season_id, season_label, session, staged
+            )
             if count:
                 self._mark_sync_complete(session, "player_stats_one", entity_id, count)
         return count
 
     def index_player_stats_for_season(
-        self, season_id: int, force: bool = False, exact_tier: int | None = None,
+        self,
+        season_id: int,
+        force: bool = False,
+        exact_tier: int | None = None,
         on_progress=None,
     ) -> int:
         """Index player statistics for every known player in a season.
@@ -1000,10 +1054,10 @@ class DataIndexer:
         """
         if exact_tier is not None:
             entity_type = f"player_stats_t{exact_tier}"
-            entity_id   = f"season_player_stats:t{exact_tier}:{season_id}"
+            entity_id = f"season_player_stats:t{exact_tier}:{season_id}"
         else:
             entity_type = "player_stats"
-            entity_id   = f"season:{season_id}"
+            entity_id = f"season:{season_id}"
 
         if not force and not self._should_update(entity_type, entity_id, max_age_hours=24):
             # Bump last_sync so the scheduler's _snap_to_hour advances to the
@@ -1027,6 +1081,7 @@ class DataIndexer:
 
         # ── Pre-fetch season label (one short read) ──────────────────────────
         from app.models.db_models import Season as SeasonModel
+
         with self.db_service.session_scope() as session:
             season_row = session.get(SeasonModel, season_id)
             season_label = season_row.text if season_row and season_row.text else str(season_id)
@@ -1034,40 +1089,47 @@ class DataIndexer:
         # ── Collect eligible player IDs ───────────────────────────────────────
         with self.db_service.session_scope() as session:
             from app.models.db_models import GamePlayer as _GamePlayer, Team as _TTeam
+
             if exact_tier is not None:
                 tier_team_ids = {
-                    t.id for t in session.query(_TTeam)
-                    .filter(_TTeam.season_id == season_id).all()
+                    t.id
+                    for t in session.query(_TTeam).filter(_TTeam.season_id == season_id).all()
                     if league_tier(t.league_id or 0) == exact_tier
                 }
                 tp_ids = {
-                    r[0] for r in
-                    session.query(TeamPlayer.player_id)
+                    r[0]
+                    for r in session.query(TeamPlayer.player_id)
                     .filter(
                         TeamPlayer.season_id == season_id,
                         TeamPlayer.team_id.in_(tier_team_ids),
-                    ).distinct().all()
+                    )
+                    .distinct()
+                    .all()
                 }
                 gp_ids = {
-                    r[0] for r in
-                    session.query(_GamePlayer.player_id)
+                    r[0]
+                    for r in session.query(_GamePlayer.player_id)
                     .filter(
                         _GamePlayer.season_id == season_id,
                         _GamePlayer.team_id.in_(tier_team_ids),
-                    ).distinct().all()
+                    )
+                    .distinct()
+                    .all()
                 }
             else:
                 tp_ids = {
-                    r[0] for r in
-                    session.query(TeamPlayer.player_id)
+                    r[0]
+                    for r in session.query(TeamPlayer.player_id)
                     .filter(TeamPlayer.season_id == season_id)
-                    .distinct().all()
+                    .distinct()
+                    .all()
                 }
                 gp_ids = {
-                    r[0] for r in
-                    session.query(_GamePlayer.player_id)
+                    r[0]
+                    for r in session.query(_GamePlayer.player_id)
                     .filter(_GamePlayer.season_id == season_id)
-                    .distinct().all()
+                    .distinct()
+                    .all()
                 }
             player_ids = list(tp_ids | gp_ids)
 
@@ -1082,16 +1144,21 @@ class DataIndexer:
         now = datetime.now(timezone.utc)
         with self.db_service.session_scope() as session:
             skip_ids = {
-                r[0] for r in session.query(Player.person_id)
+                r[0]
+                for r in session.query(Player.person_id)
                 .filter(Player.api_skip_until.isnot(None), Player.api_skip_until > now)
                 .all()
             }
         if skip_ids:
-            logger.info("player_stats: skipping %d player(s) with active API skip window", len(skip_ids))
+            logger.info(
+                "player_stats: skipping %d player(s) with active API skip window", len(skip_ids)
+            )
         player_ids = [pid for pid in player_ids if pid not in skip_ids]
 
         if not player_ids:
-            logger.info("No eligible players for season %s%s after skip filter", season_id, tier_lbl)
+            logger.info(
+                "No eligible players for season %s%s after skip filter", season_id, tier_lbl
+            )
             with self.db_service.session_scope() as session:
                 self._mark_sync_complete(session, entity_type, entity_id, 0)
             return 0
@@ -1106,12 +1173,14 @@ class DataIndexer:
             if already_synced:
                 before = len(player_ids)
                 player_ids = [
-                    pid for pid in player_ids
+                    pid
+                    for pid in player_ids
                     if f"player_stats:{pid}:{season_id}" not in already_synced
                 ]
                 logger.info(
                     "player_stats: skipping %d already-synced players (checkpoint resume), %d remaining",
-                    before - len(player_ids), len(player_ids),
+                    before - len(player_ids),
+                    len(player_ids),
                 )
 
         if not player_ids:
@@ -1119,7 +1188,12 @@ class DataIndexer:
                 self._mark_sync_complete(session, entity_type, entity_id, 0)
             return 0
 
-        logger.info("Indexing player stats for season %s%s (%d players)...", season_id, tier_lbl, len(player_ids))
+        logger.info(
+            "Indexing player stats for season %s%s (%d players)...",
+            season_id,
+            tier_lbl,
+            len(player_ids),
+        )
 
         # ── Phase 1: parallel API fetches (no DB session held) ───────────────
         completed = 0
@@ -1160,7 +1234,10 @@ class DataIndexer:
         return count
 
     def compute_player_stats_for_season(
-        self, season_id: int, force: bool = False, tiers: tuple[int, ...] = (1, 2, 3),
+        self,
+        season_id: int,
+        force: bool = False,
+        tiers: tuple[int, ...] = (1, 2, 3),
     ) -> int:
         """Compute PlayerStatistics from local GamePlayer/GameEvent data for T1–T3.
 
@@ -1175,6 +1252,7 @@ class DataIndexer:
             return 0
 
         from app.services.local_stats_aggregator import aggregate_player_stats_for_season
+
         try:
             count = aggregate_player_stats_for_season(self.db_service, season_id, tiers=tiers)
             with self.db_service.session_scope() as session:
@@ -1229,11 +1307,16 @@ class DataIndexer:
                         continue
 
                     key = (league_id, game_class)
-                    league = staged.get(key) or session.query(League).filter(
-                        League.season_id == season_id,
-                        League.league_id == league_id,
-                        League.game_class == game_class
-                    ).first()
+                    league = (
+                        staged.get(key)
+                        or session.query(League)
+                        .filter(
+                            League.season_id == season_id,
+                            League.league_id == league_id,
+                            League.game_class == game_class,
+                        )
+                        .first()
+                    )
 
                     if league is None:
                         league = League(
@@ -1261,9 +1344,7 @@ class DataIndexer:
             # doesn't re-queue it every tick (the API may no longer serve old data).
             try:
                 with self.db_service.session_scope() as s:
-                    existing = s.query(League).filter(
-                        League.season_id == season_id
-                    ).count()
+                    existing = s.query(League).filter(League.season_id == season_id).count()
                     if existing > 0:
                         logger.info(
                             f"[leagues] API failed but {existing} leagues already exist "
@@ -1276,9 +1357,14 @@ class DataIndexer:
                 pass
             return 0
 
-    def index_groups_for_league(self, league_db_id: int, season_id: int,
-                                 league_id: int, game_class: int,
-                                 force: bool = False) -> int:
+    def index_groups_for_league(
+        self,
+        league_db_id: int,
+        season_id: int,
+        league_id: int,
+        game_class: int,
+        force: bool = False,
+    ) -> int:
         """Index groups (divisions) for a league.
 
         Returns:
@@ -1288,7 +1374,9 @@ class DataIndexer:
         if not force and not self._should_update("groups", entity_id, max_age_hours=24):
             return 0
 
-        logger.debug(f"Indexing groups for league {league_id} game_class {game_class} season {season_id}")
+        logger.debug(
+            f"Indexing groups for league {league_id} game_class {game_class} season {season_id}"
+        )
 
         try:
             with self.db_service.session_scope() as session:
@@ -1302,12 +1390,15 @@ class DataIndexer:
                     group_name = entry.get("text", "") or ctx.get("group", "")
                     # Use a stable integer key: hash the string group name
                     # (the API doesn't give a numeric group ID directly)
-                    group_key = abs(hash(f"{league_db_id}:{group_name}")) % (10 ** 9)
+                    group_key = abs(hash(f"{league_db_id}:{group_name}")) % (10**9)
 
-                    grp = session.query(LeagueGroup).filter(
-                        LeagueGroup.league_id == league_db_id,
-                        LeagueGroup.group_id == group_key
-                    ).first()
+                    grp = (
+                        session.query(LeagueGroup)
+                        .filter(
+                            LeagueGroup.league_id == league_db_id, LeagueGroup.group_id == group_key
+                        )
+                        .first()
+                    )
 
                     if not grp:
                         grp = LeagueGroup(
@@ -1329,10 +1420,16 @@ class DataIndexer:
             logger.error(f"Failed to index groups for league {league_id}: {e}", exc_info=True)
             return 0
 
-    def index_games_for_league(self, league_db_id: int, season_id: int,
-                                league_id: int, game_class: int,
-                                group_name: str = None, group_db_id: int = None,
-                                force: bool = False) -> int:
+    def index_games_for_league(
+        self,
+        league_db_id: int,
+        season_id: int,
+        league_id: int,
+        game_class: int,
+        group_name: str = None,
+        group_db_id: int = None,
+        force: bool = False,
+    ) -> int:
         """Index all games for a league/game_class/season/group combination.
 
         Parses the table-format response from /api/games?mode=list.
@@ -1371,8 +1468,9 @@ class DataIndexer:
         # ── Phase 1: Fetch all rounds from API (no DB session held) ──────────
         # All network I/O happens here so the SQLite write lock is not acquired
         # until Phase 2.  See index_game_events() for the same pattern.
-        base_kwargs: dict = dict(season=season_id, league=league_id,
-                                 game_class=game_class, mode="list")
+        base_kwargs: dict = dict(
+            season=season_id, league=league_id, game_class=game_class, mode="list"
+        )
         if group_name:
             base_kwargs["group"] = group_name
 
@@ -1398,14 +1496,14 @@ class DataIndexer:
                         (slider.get("next") or {}).get("set_in_context", {}).get("round")
                     )
 
-                collected.append({
-                    "phase": _phase_from_slider_text(slider.get("text", "")),
-                    "games": _parse_game_rows(d.get("regions", [])),
-                })
-                visited_rounds.add(round_id)
-                prev_round = (
-                    (slider.get("prev") or {}).get("set_in_context", {}).get("round")
+                collected.append(
+                    {
+                        "phase": _phase_from_slider_text(slider.get("text", "")),
+                        "games": _parse_game_rows(d.get("regions", [])),
+                    }
                 )
+                visited_rounds.add(round_id)
+                prev_round = (slider.get("prev") or {}).get("set_in_context", {}).get("round")
                 if prev_round is None or prev_round in visited_rounds:
                     break
                 round_id = prev_round
@@ -1418,14 +1516,14 @@ class DataIndexer:
                 d = games_data.get("data", {})
                 slider = d.get("slider", {})
 
-                collected.append({
-                    "phase": _phase_from_slider_text(slider.get("text", "")),
-                    "games": _parse_game_rows(d.get("regions", [])),
-                })
-                visited_rounds.add(round_id)
-                next_round = (
-                    (slider.get("next") or {}).get("set_in_context", {}).get("round")
+                collected.append(
+                    {
+                        "phase": _phase_from_slider_text(slider.get("text", "")),
+                        "games": _parse_game_rows(d.get("regions", [])),
+                    }
                 )
+                visited_rounds.add(round_id)
+                next_round = (slider.get("next") or {}).get("set_in_context", {}).get("round")
                 if not next_round or next_round in visited_rounds:
                     break
                 round_id = next_round
@@ -1459,11 +1557,15 @@ class DataIndexer:
                 cache_key = f"{league_db_id}:{group_name or ''}:{phase}"
                 if cache_key in _phase_group_cache:
                     return _phase_group_cache[cache_key]
-                _gk = abs(hash(cache_key)) % (10 ** 9)
-                _grp = session.query(LeagueGroup).filter(
-                    LeagueGroup.league_id == league_db_id,
-                    LeagueGroup.group_id == _gk,
-                ).first()
+                _gk = abs(hash(cache_key)) % (10**9)
+                _grp = (
+                    session.query(LeagueGroup)
+                    .filter(
+                        LeagueGroup.league_id == league_db_id,
+                        LeagueGroup.group_id == _gk,
+                    )
+                    .first()
+                )
                 if not _grp:
                     _grp = LeagueGroup(
                         league_id=league_db_id,
@@ -1571,9 +1673,9 @@ class DataIndexer:
             )
             return count
 
-    def index_game_events(self, game_id: int, season_id: int,
-                          force: bool = False,
-                          game_date: "datetime | None" = None) -> int:
+    def index_game_events(
+        self, game_id: int, season_id: int, force: bool = False, game_date: "datetime | None" = None
+    ) -> int:
         """Fetch and store events (goals, penalties) for a single finished game.
 
         API calls are made *before* the DB session is opened so that the
@@ -1606,7 +1708,11 @@ class DataIndexer:
 
         rows = self._extract_table_data(events_data)
         if not rows:
-            rows = events_data.get("data", {}).get("regions", [{}])[0].get("rows", []) if events_data.get("data") else []
+            rows = (
+                events_data.get("data", {}).get("regions", [{}])[0].get("rows", [])
+                if events_data.get("data")
+                else []
+            )
 
         # Try to get score + confirm finished via summary title
         # Title format: "Team A - Team B 3:2 (1:0, 2:2, 0:0)"
@@ -1617,8 +1723,8 @@ class DataIndexer:
         try:
             summary = self.client.get_game_summary(game_id)
             title = summary.get("data", {}).get("title", "") or ""
-            
-            m = re.search(r'(\d+):(\d+)\s*(n\.V\.|n\.P\.)?', title, re.I)
+
+            m = re.search(r"(\d+):(\d+)\s*(n\.V\.|n\.P\.)?", title, re.I)
             if m:
                 home_score_val = int(m.group(1))
                 away_score_val = int(m.group(2))
@@ -1643,11 +1749,13 @@ class DataIndexer:
             _rows = (details.get("data", {}).get("regions") or [{}])[0].get("rows", [])
             if _rows:
                 _cells = _rows[0].get("cells", [])
+
                 def _dcell(idx):
                     if len(_cells) <= idx:
                         return ""
                     v = _cells[idx].get("text", "")
                     return (v[0] if isinstance(v, list) else v or "").strip()
+
                 # Column layout from attribute_list:
                 # 0=home_logo 1=home_name 2=away_logo 3=away_name
                 # 4=result 5=date 6=time 7=location 8=first_referee 9=second_referee 10=spectators
@@ -1686,8 +1794,10 @@ class DataIndexer:
                 if not game_is_finished:
                     _result = _dcell(4)
                     if _result:
-                        
-                        _m = re.match(r'(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?', _result.strip(), re.I)
+
+                        _m = re.match(
+                            r"(\d+)\s*:\s*(\d+)\s*(n\.V\.|n\.P\.)?", _result.strip(), re.I
+                        )
                         if _m:
                             home_score_val = int(_m.group(1))
                             away_score_val = int(_m.group(2))
@@ -1720,23 +1830,27 @@ class DataIndexer:
 
             def _txt(cell):
                 v = cell.get("text", "")
-                return (v[0] if isinstance(v, list) and v else (v if not isinstance(v, list) else "")) or ""
+                return (
+                    v[0] if isinstance(v, list) and v else (v if not isinstance(v, list) else "")
+                ) or ""
 
-            time_str    = _txt(cells[0]) if len(cells) > 0 else None
-            event_type  = _txt(cells[1]) if len(cells) > 1 else "unknown"
-            team_name   = _txt(cells[2]) if len(cells) > 2 else None
+            time_str = _txt(cells[0]) if len(cells) > 0 else None
+            event_type = _txt(cells[1]) if len(cells) > 1 else "unknown"
+            team_name = _txt(cells[2]) if len(cells) > 2 else None
             player_name = _txt(cells[3]) if len(cells) > 3 else None
 
             etype_lo = event_type.lower()
             if etype_lo in SKIP_EVENTS_EXACT or etype_lo.startswith(SKIP_EVENTS_PREFIX):
                 continue
 
-            raw_events.append({
-                "event_type": event_type,
-                "time": time_str,
-                "team": team_name,
-                "player": player_name,
-            })
+            raw_events.append(
+                {
+                    "event_type": event_type,
+                    "time": time_str,
+                    "team": team_name,
+                    "player": player_name,
+                }
+            )
 
         # Goals: API emits 2 rows per assisted goal (scorer-only, then
         # scorer+assist). Merge by (time, team), keeping the richer player.
@@ -1748,7 +1862,7 @@ class DataIndexer:
         seen_other: set[tuple] = set()
         for ev in raw_events:
             etype_lo = ev["event_type"].lower()
-            is_goal    = etype_lo.startswith(("torschütze", "eigentor"))
+            is_goal = etype_lo.startswith(("torschütze", "eigentor"))
             is_penalty = "'-strafe" in etype_lo
 
             if is_penalty:
@@ -1760,9 +1874,11 @@ class DataIndexer:
             elif is_goal:
                 found = False
                 for d in deduped:
-                    if (d["time"] == ev["time"] and d["team"] == ev["team"]
-                            and d["event_type"].lower().startswith(
-                                ("torschütze", "eigentor"))):
+                    if (
+                        d["time"] == ev["time"]
+                        and d["team"] == ev["team"]
+                        and d["event_type"].lower().startswith(("torschütze", "eigentor"))
+                    ):
                         if len(ev["player"] or "") > len(d["player"] or ""):
                             d["player"] = ev["player"]
                         found = True
@@ -1784,8 +1900,7 @@ class DataIndexer:
         )
         # Detect SO: from explicit API suffix OR from "Penaltyschiessen" event type
         is_so = (period_from_api is None) and any(
-            ev["event_type"].lower() == "penaltyschiessen"
-            for ev in deduped
+            ev["event_type"].lower() == "penaltyschiessen" for ev in deduped
         )
         # SO supersedes OT if both are detected (game went OT then SO)
         new_period = period_from_api or ("SO" if is_so else ("OT" if is_ot else None))
@@ -1819,6 +1934,7 @@ class DataIndexer:
                         game_row.spectators = spectators_val
                     # Backfill team logo URLs from game_details attribute_list
                     from app.models.db_models import Team as _Team
+
                     _season = game_row.season_id
                     if home_logo_val and game_row.home_team_id:
                         _ht = session.get(_Team, (game_row.home_team_id, _season))
@@ -1851,9 +1967,9 @@ class DataIndexer:
             logger.debug(f"Failed to write events for game {game_id}: {e}")
             return 0
 
-    def index_game_lineup(self, game_id: int, season_id: int,
-                          force: bool = False,
-                          game_date: "datetime | None" = None) -> int:
+    def index_game_lineup(
+        self, game_id: int, season_id: int, force: bool = False, game_date: "datetime | None" = None
+    ) -> int:
         """Fetch and store home + away lineups for a single finished game.
 
         Both API calls are made *before* the DB session is opened so that
@@ -1896,8 +2012,10 @@ class DataIndexer:
                 # written stats (old approach: read-snapshot → delete-all →
                 # re-insert from snapshot).
                 existing_player_ids: set[int] = {
-                    r[0] for r in session.query(GamePlayer.player_id)
-                    .filter(GamePlayer.game_id == game_id).all()
+                    r[0]
+                    for r in session.query(GamePlayer.player_id)
+                    .filter(GamePlayer.game_id == game_id)
+                    .all()
                 }
 
                 game_row = session.get(Game, game_id)
@@ -1908,12 +2026,10 @@ class DataIndexer:
 
                 # Pre-fetch valid FK sets to avoid IntegrityError on unknown players/teams
                 from app.models.db_models import Player as _Player, Team as _Team
-                valid_players: set[int] = {
-                    r[0] for r in session.query(_Player.person_id).all()
-                }
+
+                valid_players: set[int] = {r[0] for r in session.query(_Player.person_id).all()}
                 valid_teams: set[tuple] = {
-                    (r[0], r[1])
-                    for r in session.query(_Team.id, _Team.season_id).all()
+                    (r[0], r[1]) for r in session.query(_Team.id, _Team.season_id).all()
                 }
 
                 count = 0
@@ -1932,11 +2048,14 @@ class DataIndexer:
 
                             def _txt(cell):
                                 v = cell.get("text", "")
-                                return (v[0] if isinstance(v, list) and v
-                                        else (v if not isinstance(v, list) else "")) or ""
+                                return (
+                                    v[0]
+                                    if isinstance(v, list) and v
+                                    else (v if not isinstance(v, list) else "")
+                                ) or ""
 
                             jersey_raw = _txt(cells[0]) if len(cells) > 0 else ""
-                            position   = _txt(cells[1]) if len(cells) > 1 else None
+                            position = _txt(cells[1]) if len(cells) > 1 else None
                             player_raw = cells[2] if len(cells) > 2 else {}
 
                             # Extract player_id from link
@@ -1995,14 +2114,16 @@ class DataIndexer:
                                 # must never be reset here (avoids the read-snapshot race).
                                 session.query(GamePlayer).filter_by(
                                     game_id=game_id, player_id=player_id
-                                ).update({
-                                    "team_id":       team_id,
-                                    "season_id":     season_id,
-                                    "is_home_team":  is_home,
-                                    "jersey_number": jersey,
-                                    "position":      pos_str,
-                                    "last_updated":  datetime.now(timezone.utc),
-                                })
+                                ).update(
+                                    {
+                                        "team_id": team_id,
+                                        "season_id": season_id,
+                                        "is_home_team": is_home,
+                                        "jersey_number": jersey,
+                                        "position": pos_str,
+                                        "last_updated": datetime.now(timezone.utc),
+                                    }
+                                )
                             else:
                                 # INSERT new player row — goals/assists/pim start as NULL
                                 # (index_player_game_stats will fill them on its next run).
@@ -2134,10 +2255,13 @@ class DataIndexer:
         logger.info(f"✓ Backfilled league attrs for {updated} teams in season {season_id}")
         return updated
 
-    def index_leagues_path(self, season_id: int = 2025,
-                           index_games: bool = True,
-                           index_events: bool = False,
-                           force: bool = False) -> Dict[str, int]:
+    def index_leagues_path(
+        self,
+        season_id: int = 2025,
+        index_games: bool = True,
+        index_events: bool = False,
+        force: bool = False,
+    ) -> Dict[str, int]:
         """Full leagues → groups → games (→ events) indexing orchestration.
 
         Args:
@@ -2149,7 +2273,13 @@ class DataIndexer:
         Returns:
             Dict with counts: leagues, groups, games, events.
         """
-        stats: Dict[str, int] = {"leagues": 0, "groups": 0, "games": 0, "team_names": 0, "events": 0}
+        stats: Dict[str, int] = {
+            "leagues": 0,
+            "groups": 0,
+            "games": 0,
+            "team_names": 0,
+            "events": 0,
+        }
 
         logger.info(f"=== LEAGUES PATH starting for season {season_id} ===")
 
@@ -2179,17 +2309,21 @@ class DataIndexer:
             with self.db_service.session_scope() as _gs:
                 group_rows = [
                     (grp.id, grp.name)
-                    for grp in _gs.query(LeagueGroup).filter(
-                        LeagueGroup.league_id == league_db_id
-                    ).all()
+                    for grp in _gs.query(LeagueGroup)
+                    .filter(LeagueGroup.league_id == league_db_id)
+                    .all()
                 ]
             # Fall back to a single ungrouped call if no groups were stored
             if not group_rows:
                 group_rows = [(None, None)]
             for grp_db_id, grp_name in group_rows:
                 gm_count = self.index_games_for_league(
-                    league_db_id, season_id, league_id, game_class,
-                    group_name=grp_name, group_db_id=grp_db_id,
+                    league_db_id,
+                    season_id,
+                    league_id,
+                    game_class,
+                    group_name=grp_name,
+                    group_db_id=grp_db_id,
                     force=force,
                 )
                 stats["games"] += gm_count
@@ -2207,67 +2341,71 @@ class DataIndexer:
             with self.db_service.session_scope() as session:
                 past_ids = [
                     (g.id, g.season_id, g.game_date)
-                    for g in session.query(Game).filter(
+                    for g in session.query(Game)
+                    .filter(
                         Game.season_id == season_id,
                         Game.game_date < now,
-                    ).all()
+                    )
+                    .all()
                 ]
             logger.info(f"Fetching events for {len(past_ids)} past games...")
             for game_id, sid, gdate in past_ids:
-                stats["events"] += self.index_game_events(game_id, sid, force=force, game_date=gdate)
+                stats["events"] += self.index_game_events(
+                    game_id, sid, force=force, game_date=gdate
+                )
 
         logger.info(f"=== LEAGUES PATH complete === stats: {stats}")
         return stats
 
     # ==================== FULL INDEXING ORCHESTRATION ====================
-    
-    def index_current_season_clubs_path(self, season_id: int = 2025, max_clubs: int = None) -> Dict[str, int]:
+
+    def index_current_season_clubs_path(
+        self, season_id: int = 2025, max_clubs: int = None
+    ) -> Dict[str, int]:
         """Index current season following clubs → teams → players path
-        
+
         Args:
             season_id: Season to index (default: 2025)
             max_clubs: Maximum number of clubs to process (for testing)
-        
+
         Returns:
             Dict with counts of indexed entities
         """
         logger.info(f"=== Starting CLUBS PATH indexing for season {season_id} ===")
-        
-        stats = {
-            "seasons": 0,
-            "clubs": 0,
-            "teams": 0,
-            "players": 0
-        }
-        
+
+        stats = {"seasons": 0, "clubs": 0, "teams": 0, "players": 0}
+
         # 1. Ensure season exists
         stats["seasons"] = self.index_seasons()
-        
+
         # 2. Index clubs for season (first time only)
         stats["clubs"] = self.index_clubs(season_id, force=False)
-        
+
         # 3. Get list of club IDs (detached from session)
         with self.db_service.session_scope() as session:
-            club_ids = [(c.id, c.name) for c in session.query(Club).filter(Club.season_id == season_id).all()]
-        
+            club_ids = [
+                (c.id, c.name)
+                for c in session.query(Club).filter(Club.season_id == season_id).all()
+            ]
+
         if max_clubs:
             club_ids = club_ids[:max_clubs]
-        
+
         logger.info(f"Processing {len(club_ids)} clubs...")
-        
+
         # 4. Process each club in separate sessions
         for i, (club_id, club_name) in enumerate(club_ids, 1):
             logger.info(f"[{i}/{len(club_ids)}] Processing club: {club_name} (ID: {club_id})")
-            
+
             # Index teams for this club
             teams_count, team_ids = self.index_teams_for_club(club_id, season_id)
             stats["teams"] += teams_count
-            
+
             # Index players for each team
             for team_id in team_ids:
                 players_count = self.index_players_for_team(team_id, season_id)
                 stats["players"] += players_count
-        
+
         logger.info(f"=== CLUBS PATH indexing complete ===")
         logger.info(f"Stats: {stats}")
         return stats
@@ -2278,7 +2416,11 @@ class DataIndexer:
     _API_SKIP_DAYS = 7
 
     def _fetch_player_game_stats(
-        self, player_id: int, season_id: int, force: bool = False, request_timeout: int | None = None
+        self,
+        player_id: int,
+        season_id: int,
+        force: bool = False,
+        request_timeout: int | None = None,
     ) -> "_PlayerGameStatsFetchResult":
         """Phase 1: fetch and parse one player's game stats. No DB writes.
 
@@ -2291,10 +2433,17 @@ class DataIndexer:
             return result
 
         try:
-            data = self.client.get_player_overview(player_id, season=season_id, request_timeout=request_timeout)
+            data = self.client.get_player_overview(
+                player_id, season=season_id, request_timeout=request_timeout
+            )
         except Exception as exc:
             import requests as _req
-            if isinstance(exc, _req.HTTPError) and exc.response is not None and exc.response.status_code >= 500:
+
+            if (
+                isinstance(exc, _req.HTTPError)
+                and exc.response is not None
+                and exc.response.status_code >= 500
+            ):
                 logger.debug("API 5xx for player %s: %s", player_id, exc)
                 result.api_error = True
             else:
@@ -2330,7 +2479,13 @@ class DataIndexer:
 
         return result
 
-    def index_player_game_stats(self, player_id: int, season_id: int, force: bool = False, request_timeout: int | None = None) -> int:
+    def index_player_game_stats(
+        self,
+        player_id: int,
+        season_id: int,
+        force: bool = False,
+        request_timeout: int | None = None,
+    ) -> int:
         """Update game_players.goals/assists/penalty_minutes for one player using
         GET /api/players/:id/overview (per-game breakdown).
 
@@ -2342,7 +2497,9 @@ class DataIndexer:
         Returns the number of game_players rows updated.
         """
         entity_id = f"player_game_stats:{player_id}:{season_id}"
-        fetch_result = self._fetch_player_game_stats(player_id, season_id, force=force, request_timeout=request_timeout)
+        fetch_result = self._fetch_player_game_stats(
+            player_id, season_id, force=force, request_timeout=request_timeout
+        )
         if not fetch_result.game_stats:
             return 0
 
@@ -2362,12 +2519,18 @@ class DataIndexer:
                 if updated:
                     self._mark_sync_complete(session, "player_game_stats", entity_id, updated)
         except Exception as exc:
-            logger.error("Failed updating game stats for player %s: %s", player_id, exc, exc_info=True)
+            logger.error(
+                "Failed updating game stats for player %s: %s", player_id, exc, exc_info=True
+            )
         return updated
 
     def index_player_game_stats_for_season(
-        self, season_id: int, force: bool = False, exact_tier: int | None = None,
-        on_progress=None, max_workers: int = 5,
+        self,
+        season_id: int,
+        force: bool = False,
+        exact_tier: int | None = None,
+        on_progress=None,
+        max_workers: int = 5,
     ) -> int:
         """Update game_players G/A/PIM for all known players in a season.
 
@@ -2383,10 +2546,10 @@ class DataIndexer:
         """
         if exact_tier is not None:
             entity_type = f"player_game_stats_t{exact_tier}"
-            entity_id   = f"season_game_stats:t{exact_tier}:{season_id}"
+            entity_id = f"season_game_stats:t{exact_tier}:{season_id}"
         else:
             entity_type = "player_game_stats_season"
-            entity_id   = f"season_game_stats:{season_id}"
+            entity_id = f"season_game_stats:{season_id}"
 
         if not force and not self._should_update(entity_type, entity_id, max_age_hours=4):
             # Bump last_sync so the scheduler's _snap_to_hour advances to the
@@ -2399,39 +2562,46 @@ class DataIndexer:
         with self.db_service.session_scope() as session:
             if exact_tier is not None:
                 from app.models.db_models import Team as _TTeam
+
                 tier_team_ids = {
-                    t.id for t in session.query(_TTeam)
-                    .filter(_TTeam.season_id == season_id).all()
+                    t.id
+                    for t in session.query(_TTeam).filter(_TTeam.season_id == season_id).all()
                     if league_tier(t.league_id or 0) == exact_tier
                 }
                 tp_ids = {
-                    r[0] for r in
-                    session.query(TeamPlayer.player_id)
+                    r[0]
+                    for r in session.query(TeamPlayer.player_id)
                     .filter(
                         TeamPlayer.season_id == season_id,
                         TeamPlayer.team_id.in_(tier_team_ids),
-                    ).distinct().all()
+                    )
+                    .distinct()
+                    .all()
                 }
                 gp_ids = {
-                    r[0] for r in
-                    session.query(GamePlayer.player_id)
+                    r[0]
+                    for r in session.query(GamePlayer.player_id)
                     .filter(
                         GamePlayer.season_id == season_id,
                         GamePlayer.team_id.in_(tier_team_ids),
-                    ).distinct().all()
+                    )
+                    .distinct()
+                    .all()
                 }
             else:
                 tp_ids = {
-                    r[0] for r in
-                    session.query(TeamPlayer.player_id)
+                    r[0]
+                    for r in session.query(TeamPlayer.player_id)
                     .filter(TeamPlayer.season_id == season_id)
-                    .distinct().all()
+                    .distinct()
+                    .all()
                 }
                 gp_ids = {
-                    r[0] for r in
-                    session.query(GamePlayer.player_id)
+                    r[0]
+                    for r in session.query(GamePlayer.player_id)
                     .filter(GamePlayer.season_id == season_id)
-                    .distinct().all()
+                    .distinct()
+                    .all()
                 }
             player_ids = list(tp_ids | gp_ids)
 
@@ -2449,15 +2619,21 @@ class DataIndexer:
         now = datetime.now(timezone.utc)
         with self.db_service.session_scope() as session:
             skip_ids = {
-                r[0] for r in session.query(Player.person_id)
-                .filter(Player.api_skip_until.isnot(None), Player.api_skip_until > now).all()
+                r[0]
+                for r in session.query(Player.person_id)
+                .filter(Player.api_skip_until.isnot(None), Player.api_skip_until > now)
+                .all()
             }
         if skip_ids:
             logger.info("Skipping %d players with active API skip window", len(skip_ids))
         player_ids = [pid for pid in player_ids if pid not in skip_ids]
 
         if not player_ids:
-            logger.info("No eligible players to process for season %s%s after skip filter", season_id, tier_lbl)
+            logger.info(
+                "No eligible players to process for season %s%s after skip filter",
+                season_id,
+                tier_lbl,
+            )
             with self.db_service.session_scope() as session:
                 self._mark_sync_complete(session, entity_type, entity_id, 0)
             return 0
@@ -2473,12 +2649,14 @@ class DataIndexer:
             if already_synced:
                 before = len(player_ids)
                 player_ids = [
-                    pid for pid in player_ids
+                    pid
+                    for pid in player_ids
                     if f"player_game_stats:{pid}:{season_id}" not in already_synced
                 ]
                 logger.info(
                     "Skipping %d already-synced players (checkpoint resume), %d remaining",
-                    before - len(player_ids), len(player_ids),
+                    before - len(player_ids),
+                    len(player_ids),
                 )
 
         if not player_ids:
@@ -2489,7 +2667,9 @@ class DataIndexer:
 
         logger.info(
             "Updating per-game G/A/PIM for %d players in season %s%s...",
-            len(player_ids), season_id, tier_lbl,
+            len(player_ids),
+            season_id,
+            tier_lbl,
         )
 
         # ── Phase 1: parallel API fetches (no DB writes) ────────────────────
@@ -2499,7 +2679,9 @@ class DataIndexer:
 
         def _fetch_one(pid: int) -> "_PlayerGameStatsFetchResult":
             nonlocal completed
-            result = self._fetch_player_game_stats(pid, season_id=season_id, force=force, request_timeout=10)
+            result = self._fetch_player_game_stats(
+                pid, season_id=season_id, force=force, request_timeout=10
+            )
             with _lock:
                 completed += 1
                 if on_progress:
@@ -2528,7 +2710,9 @@ class DataIndexer:
             on_progress(100)
         logger.info(
             "\u2713 Updated %d game_players rows with G/A/PIM for season %s%s",
-            total, season_id, tier_lbl,
+            total,
+            season_id,
+            tier_lbl,
         )
         return total
 
@@ -2574,7 +2758,9 @@ class DataIndexer:
                                 player.api_skip_until = now + timedelta(days=self._API_SKIP_DAYS)
                                 logger.info(
                                     "Player %s hit %d API failures; skipping until %s",
-                                    pid, player.api_failures, player.api_skip_until,
+                                    pid,
+                                    player.api_failures,
+                                    player.api_skip_until,
                                 )
                         continue
 
@@ -2647,7 +2833,9 @@ class DataIndexer:
                                 player.api_skip_until = now + timedelta(days=self._API_SKIP_DAYS)
                                 logger.info(
                                     "player_stats: player %s hit %d API failures; skipping until %s",
-                                    pid, player.api_failures, player.api_skip_until,
+                                    pid,
+                                    player.api_failures,
+                                    player.api_skip_until,
                                 )
                         continue
 
@@ -2710,8 +2898,8 @@ class DataIndexer:
             # Column layout: 0=home_logo 1=home_name 2=away_logo 3=away_name
             # 4=result 5=date 6=time 7=location 8=first_referee 9=second_referee 10=spectators
             _result_text = _dcell(4)
-            
-            if _result_text and re.search(r'\d+\s*:\s*\d+', _result_text):
+
+            if _result_text and re.search(r"\d+\s*:\s*\d+", _result_text):
                 result["status"] = "finished"
             else:
                 result["status"] = "scheduled"
@@ -2748,11 +2936,16 @@ class DataIndexer:
         """
         from sqlalchemy import select
         from app.models.db_models import LeagueGroup, League
-        return session.execute(
-            select(LeagueGroup).join(League, LeagueGroup.league_id == League.id).where(
-                League.season_id == season_id
+
+        return (
+            session.execute(
+                select(LeagueGroup)
+                .join(League, LeagueGroup.league_id == League.id)
+                .where(League.season_id == season_id)
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
     def index_upcoming_games(self, season_id: int, force: bool = False) -> int:
         """Poll upcoming games for schedule updates.
@@ -2775,9 +2968,7 @@ class DataIndexer:
         with self.db_service.session_scope() as session:
             league_rows = [
                 (lg.id, lg.league_id, lg.game_class)
-                for lg in session.query(League).filter(
-                    League.season_id == season_id
-                ).all()
+                for lg in session.query(League).filter(League.season_id == season_id).all()
             ]
 
         games_refreshed = 0
@@ -2785,16 +2976,20 @@ class DataIndexer:
             with self.db_service.session_scope() as _gs:
                 group_rows = [
                     (grp.id, grp.name)
-                    for grp in _gs.query(LeagueGroup).filter(
-                        LeagueGroup.league_id == league_db_id
-                    ).all()
+                    for grp in _gs.query(LeagueGroup)
+                    .filter(LeagueGroup.league_id == league_db_id)
+                    .all()
                 ]
             if not group_rows:
                 group_rows = [(None, None)]
             for grp_db_id, grp_name in group_rows:
                 games_refreshed += self.index_games_for_league(
-                    league_db_id, season_id, league_id, game_class,
-                    group_name=grp_name, group_db_id=grp_db_id,
+                    league_db_id,
+                    season_id,
+                    league_id,
+                    game_class,
+                    group_name=grp_name,
+                    group_db_id=grp_db_id,
                     force=True,
                 )
 
@@ -2802,11 +2997,15 @@ class DataIndexer:
         transitioned = 0
         now = _utcnow()
         with self.db_service.session_scope() as session:
-            stuck = session.query(Game).filter(
-                Game.season_id == season_id,
-                Game.completeness_status == "upcoming",
-                Game.status == "finished",
-            ).all()
+            stuck = (
+                session.query(Game)
+                .filter(
+                    Game.season_id == season_id,
+                    Game.completeness_status == "upcoming",
+                    Game.status == "finished",
+                )
+                .all()
+            )
             for game in stuck:
                 game.completeness_status = "post_game"
                 deadline = (
@@ -2824,7 +3023,9 @@ class DataIndexer:
 
         logger.info(
             "[upcoming_games] season=%s refreshed=%d games, transitioned=%d to post_game",
-            season_id, games_refreshed, transitioned,
+            season_id,
+            games_refreshed,
+            transitioned,
         )
         return transitioned
 
@@ -2872,9 +3073,15 @@ class DataIndexer:
 
         # Step 1: Process manual retries (GameSyncFailure rows with can_retry=True)
         with self.db_service.session_scope() as session:
-            retry_failures = session.execute(
-                select(GameSyncFailure).where(GameSyncFailure.can_retry == True, GameSyncFailure.season_id == season_id)
-            ).scalars().all()
+            retry_failures = (
+                session.execute(
+                    select(GameSyncFailure).where(
+                        GameSyncFailure.can_retry == True, GameSyncFailure.season_id == season_id
+                    )
+                )
+                .scalars()
+                .all()
+            )
             for failure in retry_failures:
                 game = session.get(Game, failure.game_id)
                 if game is None:
@@ -2888,12 +3095,16 @@ class DataIndexer:
         # Step 2: Process all post_game games
         now_naive = now.replace(tzinfo=None)
         with self.db_service.session_scope() as session:
-            games = session.execute(
-                select(Game).where(
-                    Game.season_id == season_id,
-                    Game.completeness_status == "post_game",
+            games = (
+                session.execute(
+                    select(Game).where(
+                        Game.season_id == season_id,
+                        Game.completeness_status == "post_game",
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
 
             for game in games:
                 # Fetch full game data from API
@@ -2910,20 +3121,24 @@ class DataIndexer:
                     game.completeness_status = "complete"
                     game.incomplete_fields = None
                     transitioned += 1
-                elif game.give_up_at is not None and now_naive >= game.give_up_at.replace(tzinfo=None):
+                elif game.give_up_at is not None and now_naive >= game.give_up_at.replace(
+                    tzinfo=None
+                ):
                     game.completeness_status = "abandoned"
                     game.incomplete_fields = missing
                     failure = session.execute(
                         select(GameSyncFailure).where(GameSyncFailure.game_id == game.id)
                     ).scalar_one_or_none()
                     if failure is None:
-                        session.add(GameSyncFailure(
-                            game_id=game.id,
-                            season_id=game.season_id,
-                            abandoned_at=now,
-                            missing_fields=missing,
-                            can_retry=False,
-                        ))
+                        session.add(
+                            GameSyncFailure(
+                                game_id=game.id,
+                                season_id=game.season_id,
+                                abandoned_at=now,
+                                missing_fields=missing,
+                                can_retry=False,
+                            )
+                        )
                     else:
                         failure.abandoned_at = now
                         failure.missing_fields = missing
@@ -2949,7 +3164,7 @@ class DataIndexer:
                 "team_players": session.query(func.count(TeamPlayer.id)).scalar(),
                 "leagues": session.query(func.count(League.id)).scalar(),
                 "games": session.query(func.count(Game.id)).scalar(),
-                "last_updated": datetime.now(timezone.utc).isoformat()
+                "last_updated": datetime.now(timezone.utc).isoformat(),
             }
 
 

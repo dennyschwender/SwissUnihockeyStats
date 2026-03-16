@@ -1,4 +1,5 @@
 """Tests for Game lifecycle columns and GameSyncFailure model."""
+
 import pytest
 from datetime import timedelta
 from sqlalchemy import create_engine, inspect
@@ -24,6 +25,7 @@ def session(engine):
 def _get_valid_season_and_teams(session):
     """Create minimal Season, Club, Team rows needed for a Game FK."""
     from app.models.db_models import Season, Club, Team
+
     # Season.id is the API season ID (primary key), text is display name
     season = Season(id=1, text="2025/26")
     session.add(season)
@@ -157,6 +159,7 @@ def test_game_sync_failure_missing_fields_stores_list(session):
 def test_game_sync_failure_abandoned_at_set_automatically(session):
     from datetime import timedelta
     from app.models.db_models import _utcnow
+
     season, team_h, team_a = _get_valid_season_and_teams(session)
     before = _utcnow()
     game = Game(
@@ -181,9 +184,11 @@ def test_game_sync_failure_abandoned_at_set_automatically(session):
 
 # ── Migration / backfill tests ─────────────────────────────────────────────
 
+
 def _make_engine_without_lifecycle_cols():
     """Create a fresh in-memory DB WITHOUT the lifecycle columns to simulate pre-migration state."""
     from sqlalchemy import text
+
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     # Drop lifecycle columns by recreating the games table without them
@@ -195,6 +200,7 @@ def _make_engine_without_lifecycle_cols():
 def test_migration_adds_completeness_status_column(engine):
     """Migration must be idempotent — running on a DB that already has the columns should not fail."""
     from app.database import run_lifecycle_migration
+
     run_lifecycle_migration(engine)  # Should not raise
     inspector = inspect(engine)
     cols = {c["name"] for c in inspector.get_columns("games")}
@@ -203,6 +209,7 @@ def test_migration_adds_completeness_status_column(engine):
 
 def test_migration_backfills_non_finished_games_as_upcoming(engine, session):
     from app.database import run_lifecycle_migration
+
     season, team_h, team_a = _get_valid_season_and_teams(session)
     game = Game(
         id=901,
@@ -223,6 +230,7 @@ def test_migration_backfills_non_finished_games_as_upcoming(engine, session):
 
 def test_migration_backfills_finished_complete_game_as_complete(engine, session):
     from app.database import run_lifecycle_migration
+
     season, team_h, team_a = _get_valid_season_and_teams(session)
     game = Game(
         id=902,
@@ -246,6 +254,7 @@ def test_migration_backfills_finished_complete_game_as_complete(engine, session)
 def test_migration_backfills_recent_finished_incomplete_as_post_game(engine, session):
     from datetime import timedelta
     from app.database import run_lifecycle_migration
+
     season, team_h, team_a = _get_valid_season_and_teams(session)
     game_date = _utcnow() - timedelta(days=1)  # 1 day ago — within 3-day window
     game = Game(
@@ -270,6 +279,7 @@ def test_migration_backfills_recent_finished_incomplete_as_post_game(engine, ses
 def test_migration_backfills_old_finished_incomplete_as_abandoned(engine, session):
     from datetime import timedelta
     from app.database import run_lifecycle_migration
+
     season, team_h, team_a = _get_valid_season_and_teams(session)
     game_date = _utcnow() - timedelta(days=10)  # 10 days ago — past 3-day window
     game = Game(
@@ -290,6 +300,7 @@ def test_migration_backfills_old_finished_incomplete_as_abandoned(engine, sessio
     # A GameSyncFailure row should have been created
     from sqlalchemy import select
     from app.models.db_models import GameSyncFailure
+
     failure = session.execute(
         select(GameSyncFailure).where(GameSyncFailure.game_id == game.id)
     ).scalar_one_or_none()
@@ -299,9 +310,11 @@ def test_migration_backfills_old_finished_incomplete_as_abandoned(engine, sessio
 
 def test_migration_is_idempotent(engine, session):
     from app.database import run_lifecycle_migration
+
     # Running twice should not raise or duplicate GameSyncFailure rows
     season, team_h, team_a = _get_valid_season_and_teams(session)
     from datetime import timedelta
+
     game_date = _utcnow() - timedelta(days=10)
     game = Game(
         id=905,
@@ -317,7 +330,10 @@ def test_migration_is_idempotent(engine, session):
     run_lifecycle_migration(engine)  # second run — must not fail or duplicate
     from sqlalchemy import select
     from app.models.db_models import GameSyncFailure
-    failures = session.execute(
-        select(GameSyncFailure).where(GameSyncFailure.game_id == game.id)
-    ).scalars().all()
+
+    failures = (
+        session.execute(select(GameSyncFailure).where(GameSyncFailure.game_id == game.id))
+        .scalars()
+        .all()
+    )
     assert len(failures) == 1  # exactly one, not duplicated

@@ -10,6 +10,7 @@ Fixes persistent failures that the normal scheduler cannot self-heal:
 
 Also provides read-only report queries for the admin dashboard.
 """
+
 from __future__ import annotations
 
 import logging
@@ -42,11 +43,14 @@ class RepairService:
         """
         cutoff = datetime.utcnow() - timedelta(hours=_STUCK_THRESHOLD_HOURS)
         with self.db_service.session_scope() as session:
-            n = session.execute(text("""
+            n = session.execute(
+                text("""
                 DELETE FROM sync_status
                 WHERE sync_status = 'in_progress'
                   AND last_sync < :cutoff
-            """), {"cutoff": cutoff}).rowcount
+            """),
+                {"cutoff": cutoff},
+            ).rowcount
         if n:
             logger.info("[repair] reset %d stuck in_progress rows", n)
         return n
@@ -144,12 +148,15 @@ class RepairService:
         """
         cutoff = datetime.utcnow() - timedelta(days=_STALE_FAILED_DAYS)
         with self.db_service.session_scope() as session:
-            n = session.execute(text("""
+            n = session.execute(
+                text("""
                 DELETE FROM sync_status
                 WHERE entity_type = 'game_events'
                   AND sync_status = 'failed'
                   AND last_sync < :cutoff
-            """), {"cutoff": cutoff}).rowcount
+            """),
+                {"cutoff": cutoff},
+            ).rowcount
         if n:
             logger.info("[repair] cleared %d stale failed rows", n)
         return n
@@ -258,10 +265,10 @@ class RepairService:
         logger.info("[repair] starting nightly repair run")
         result = {
             "stuck_in_progress": self.fix_stuck_in_progress(),
-            "null_game_dates":   self.fix_null_game_dates(),
-            "missing_events":    self.fix_missing_events(),
+            "null_game_dates": self.fix_null_game_dates(),
+            "missing_events": self.fix_missing_events(),
             "null_period_fixed": self.fix_null_period_from_events(),
-            "stale_failed":      self.fix_stale_failed_rows(),
+            "stale_failed": self.fix_stale_failed_rows(),
         }
         result["total_fixed"] = sum(result.values())
         logger.info("[repair] nightly run complete: %s", result)
@@ -271,9 +278,7 @@ class RepairService:
     def _write_sync_status(self, total_fixed: int):
         """Upsert a completed sync_status row so the scheduler sees last run time."""
         with self.db_service.session_scope() as session:
-            row = session.query(SyncStatus).filter_by(
-                entity_type="repair", entity_id="all"
-            ).first()
+            row = session.query(SyncStatus).filter_by(entity_type="repair", entity_id="all").first()
             if not row:
                 row = SyncStatus(entity_type="repair", entity_id="all")
                 session.add(row)
@@ -291,5 +296,6 @@ def get_repair_service() -> RepairService:
     global _repair_service
     if _repair_service is None:
         from app.services.database import get_database_service
+
         _repair_service = RepairService(get_database_service())
     return _repair_service

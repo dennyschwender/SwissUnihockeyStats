@@ -1,4 +1,5 @@
 """Tests for game lifecycle indexer methods."""
+
 import pytest
 from unittest.mock import MagicMock, patch
 from sqlalchemy import create_engine
@@ -20,12 +21,15 @@ def engine():
 def mock_db(engine):
     """Create a mock DatabaseService that returns real sessions."""
     from contextlib import contextmanager
+
     db = MagicMock()
+
     @contextmanager
     def session_scope():
         with Session(engine) as session:
             yield session
             session.commit()
+
     db.session_scope = session_scope
     db.engine = engine
     return db
@@ -37,7 +41,14 @@ def indexer(mock_db):
     return DataIndexer(db=mock_db, api=api)
 
 
-def _seed_game(engine, api_id=1, status="scheduled", home_score=None, away_score=None, completeness_status="upcoming"):
+def _seed_game(
+    engine,
+    api_id=1,
+    status="scheduled",
+    home_score=None,
+    away_score=None,
+    completeness_status="upcoming",
+):
     with Session(engine) as s:
         season = Season(id=1, text="2025")
         club_h = Club(id=10, name="H", season_id=1)
@@ -139,6 +150,7 @@ def _seed_post_game(engine, api_id=50, give_up_days=2, home_score=None, away_sco
     """Seed a post_game game with give_up_at in the future (default +2 days)."""
     with Session(engine) as s:
         from sqlalchemy import select as sa_select
+
         season = s.execute(sa_select(Season).limit(1)).scalar_one_or_none()
         if season is None:
             season = Season(id=1, text="2025")
@@ -171,6 +183,7 @@ def _seed_post_game(engine, api_id=50, give_up_days=2, home_score=None, away_sco
 
 def test_post_game_completes_when_score_present(engine, indexer):
     from app.models.db_models import GameSyncFailure
+
     game_id, season_id = _seed_post_game(engine, api_id=51, home_score=3, away_score=1)
     indexer._fetch_and_store_game_data = MagicMock()
     count = indexer.index_post_game_completion(season_id)
@@ -196,33 +209,48 @@ def test_post_game_stays_post_game_when_incomplete(engine, indexer):
 def test_post_game_abandoned_when_past_deadline(engine, indexer):
     from app.models.db_models import GameSyncFailure
     from sqlalchemy import select as sa_select
-    game_id, season_id = _seed_post_game(engine, api_id=53, give_up_days=-1)  # deadline was yesterday
+
+    game_id, season_id = _seed_post_game(
+        engine, api_id=53, give_up_days=-1
+    )  # deadline was yesterday
     indexer._fetch_and_store_game_data = MagicMock()
     count = indexer.index_post_game_completion(season_id)
     assert count >= 1
     with Session(engine) as s:
         game = s.get(Game, game_id)
         assert game.completeness_status == "abandoned"
-        failure = s.execute(sa_select(GameSyncFailure).where(GameSyncFailure.game_id == game_id)).scalar_one_or_none()
+        failure = s.execute(
+            sa_select(GameSyncFailure).where(GameSyncFailure.game_id == game_id)
+        ).scalar_one_or_none()
         assert failure is not None
 
 
 def test_post_game_retry_resets_to_post_game(engine, indexer):
     from app.models.db_models import GameSyncFailure
+
     game_id, season_id = _seed_post_game(engine, api_id=54, give_up_days=-1)
     # Seed an abandoned failure with can_retry=True
     with Session(engine) as s:
         game = s.get(Game, game_id)
         game.completeness_status = "abandoned"
-        failure = GameSyncFailure(game_id=game_id, season_id=season_id, missing_fields=["score"], can_retry=True)
+        failure = GameSyncFailure(
+            game_id=game_id, season_id=season_id, missing_fields=["score"], can_retry=True
+        )
         s.add(failure)
         s.commit()
     indexer._fetch_and_store_game_data = MagicMock()
     indexer.index_post_game_completion(season_id)
     with Session(engine) as s:
         game = s.get(Game, game_id)
-        assert game.completeness_status in ("post_game", "complete", "abandoned")  # was reset and re-processed
+        assert game.completeness_status in (
+            "post_game",
+            "complete",
+            "abandoned",
+        )  # was reset and re-processed
         from sqlalchemy import select as sa_select
-        failure = s.execute(sa_select(GameSyncFailure).where(GameSyncFailure.game_id == game_id)).scalar_one()
+
+        failure = s.execute(
+            sa_select(GameSyncFailure).where(GameSyncFailure.game_id == game_id)
+        ).scalar_one()
         assert failure.can_retry is False
         assert failure.retried_at is not None

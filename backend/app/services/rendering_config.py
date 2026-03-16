@@ -12,6 +12,7 @@ Supported filters (all optional, default to empty lists = "hide nothing"):
   excluded_team_ids      – list of int  (DB team id)
   excluded_team_names    – list of str  (exact ``text``/``name`` match)
 """
+
 from __future__ import annotations
 
 import json
@@ -25,12 +26,12 @@ from app.config import settings as _settings
 logger = logging.getLogger(__name__)
 
 _DEFAULT_CONFIG: dict[str, list] = {
-    "excluded_league_ids":   [],
-    "excluded_league_names": ["Herren Test"],   # pre-populate the existing hardcoded exclusion
-    "excluded_club_ids":     [],
-    "excluded_club_names":   [],
-    "excluded_team_ids":     [],
-    "excluded_team_names":   [],
+    "excluded_league_ids": [],
+    "excluded_league_names": ["Herren Test"],  # pre-populate the existing hardcoded exclusion
+    "excluded_club_ids": [],
+    "excluded_club_names": [],
+    "excluded_team_ids": [],
+    "excluded_team_names": [],
 }
 
 # Data directory derived from settings.DATABASE_PATH so it works both locally
@@ -64,7 +65,9 @@ def _load() -> dict[str, list]:
         _save_to_disk(_DEFAULT_CONFIG)
         return dict(_DEFAULT_CONFIG)
     except Exception as exc:
-        logger.warning("rendering_config: failed to load %s: %s — using defaults", _CONFIG_PATH, exc)
+        logger.warning(
+            "rendering_config: failed to load %s: %s — using defaults", _CONFIG_PATH, exc
+        )
         return dict(_DEFAULT_CONFIG)
 
 
@@ -100,6 +103,7 @@ def set_config(new_cfg: dict[str, list]) -> dict[str, list]:
 
 # ─── Convenience helpers used by route handlers ──────────────────────────────
 
+
 def filter_leagues(leagues: list[dict]) -> list[dict]:
     """Remove excluded leagues from a list of league dicts.
     Each dict must have ``league_id`` (int) and ``name`` (str).
@@ -110,9 +114,9 @@ def filter_leagues(leagues: list[dict]) -> list[dict]:
     if not exc_ids and not exc_names:
         return leagues
     return [
-        lg for lg in leagues
-        if lg.get("league_id") not in exc_ids
-        and lg.get("name") not in exc_names
+        lg
+        for lg in leagues
+        if lg.get("league_id") not in exc_ids and lg.get("name") not in exc_names
     ]
 
 
@@ -126,9 +130,9 @@ def filter_teams(teams: list[dict]) -> list[dict]:
     if not exc_ids and not exc_names:
         return teams
     return [
-        t for t in teams
-        if t.get("id") not in exc_ids
-        and (t.get("text") or t.get("name", "")) not in exc_names
+        t
+        for t in teams
+        if t.get("id") not in exc_ids and (t.get("text") or t.get("name", "")) not in exc_names
     ]
 
 
@@ -141,8 +145,4 @@ def filter_clubs(clubs: list[dict]) -> list[dict]:
     exc_names = set(cfg.get("excluded_club_names") or [])
     if not exc_ids and not exc_names:
         return clubs
-    return [
-        c for c in clubs
-        if c.get("id") not in exc_ids
-        and c.get("text", "") not in exc_names
-    ]
+    return [c for c in clubs if c.get("id") not in exc_ids and c.get("text", "") not in exc_names]

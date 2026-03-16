@@ -1,6 +1,7 @@
 """
 Unit tests for DataCache (no network calls).
 """
+
 import pytest
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta
@@ -22,6 +23,7 @@ def _make_client_mock():
 def cache():
     """Return a fresh DataCache instance for each test."""
     from app.services.data_cache import DataCache
+
     return DataCache()
 
 
@@ -79,36 +81,35 @@ class TestDataCacheLeagues:
 class TestDataCacheTeamExtraction:
     def test_extract_teams_nested_structure(self):
         from app.services.data_cache import DataCache
-        data = {
-            "data": {
-                "regions": [
-                    {"rows": [{"id": 1, "cells": [{"text": ["Team A"]}]}]}
-                ]
-            }
-        }
+
+        data = {"data": {"regions": [{"rows": [{"id": 1, "cells": [{"text": ["Team A"]}]}]}]}}
         rows = DataCache._extract_teams(data)
         assert len(rows) == 1
 
     def test_extract_teams_flat_entries(self):
         from app.services.data_cache import DataCache
+
         data = {"entries": [{"id": 10}, {"id": 20}]}
         rows = DataCache._extract_teams(data)
         assert len(rows) == 2
 
     def test_normalize_teams_extracts_name(self):
         from app.services.data_cache import DataCache
+
         raw = [{"id": 5, "cells": [{"text": ["Eagles"]}]}]
         result = DataCache._normalize_teams(raw)
         assert result[0]["text"] == "Eagles"
 
     def test_normalize_teams_string_text(self):
         from app.services.data_cache import DataCache
+
         raw = [{"id": 6, "cells": [{"text": "Falcons"}]}]
         result = DataCache._normalize_teams(raw)
         assert result[0]["text"] == "Falcons"
 
     def test_normalize_teams_missing_cells_uses_unknown(self):
         from app.services.data_cache import DataCache
+
         raw = [{"id": 7}]
         result = DataCache._normalize_teams(raw)
         assert result[0]["text"] == "Unknown Team"
@@ -129,7 +130,7 @@ class TestPlayerSearch:
         cache._players_indexed = True
         cache._players = {
             1: {"id": 1, "name": "Alice Smith", "text": "Alice Smith"},
-            2: {"id": 2, "name": "Bob Jones",   "text": "Bob Jones"},
+            2: {"id": 2, "name": "Bob Jones", "text": "Bob Jones"},
         }
         result = await cache.search_players("alice")
         assert len(result) == 1
@@ -145,7 +146,9 @@ class TestPlayerSearch:
 
     async def test_search_players_respects_limit(self, cache):
         cache._players_indexed = True
-        cache._players = {i: {"id": i, "name": f"Player {i}", "text": f"Player {i}"} for i in range(20)}
+        cache._players = {
+            i: {"id": i, "name": f"Player {i}", "text": f"Player {i}"} for i in range(20)
+        }
         result = await cache.search_players("player", limit=5)
         assert len(result) == 5
 
@@ -154,9 +157,17 @@ class TestCacheStats:
     def test_get_stats_returns_expected_keys(self, cache):
         stats = cache.get_stats()
         expected = {
-            "teams_loaded", "teams_popular_loaded", "leagues_loaded",
-            "clubs_loaded", "players_indexed", "all_loaded",
-            "last_updated", "teams_count", "leagues_count",
-            "clubs_count", "players_count", "games_count",
+            "teams_loaded",
+            "teams_popular_loaded",
+            "leagues_loaded",
+            "clubs_loaded",
+            "players_indexed",
+            "all_loaded",
+            "last_updated",
+            "teams_count",
+            "leagues_count",
+            "clubs_count",
+            "players_count",
+            "games_count",
         }
         assert expected.issubset(set(stats.keys()))

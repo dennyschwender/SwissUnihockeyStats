@@ -1,6 +1,7 @@
 """
 Tests for admin indexing jobs API.
 """
+
 import pytest
 
 
@@ -12,7 +13,9 @@ class TestAdminIndexingAPI:
 
     def test_valid_task_returns_job_id(self, admin_client):
         """Posting a seasons task creates a job immediately."""
-        r = admin_client.post("/admin/api/index", json={"season": 0, "task": "seasons", "force": True})
+        r = admin_client.post(
+            "/admin/api/index", json={"season": 0, "task": "seasons", "force": True}
+        )
         assert r.status_code == 200
         data = r.json()
         assert "job_id" in data
@@ -20,7 +23,9 @@ class TestAdminIndexingAPI:
 
     def test_job_status_endpoint_exists(self, admin_client):
         # First create a job
-        r = admin_client.post("/admin/api/index", json={"season": 0, "task": "seasons", "force": True})
+        r = admin_client.post(
+            "/admin/api/index", json={"season": 0, "task": "seasons", "force": True}
+        )
         job_id = r.json()["job_id"]
 
         # Poll its status
@@ -45,12 +50,17 @@ class TestAdminIndexingAPI:
 
     def test_future_season_guard_rejects(self, admin_client):
         """Indexing a season beyond the current flagged season should warn and stop, not error."""
-        r = admin_client.post("/admin/api/index", json={"season": 9999, "task": "clubs", "force": False})
+        r = admin_client.post(
+            "/admin/api/index", json={"season": 9999, "task": "clubs", "force": False}
+        )
         # Job is created (200), but will stop with a warning — not a 400
         assert r.status_code == 200
 
     def test_max_tier_accepted(self, admin_client):
-        r = admin_client.post("/admin/api/index", json={"season": 2025, "task": "events", "force": False, "max_tier": 2})
+        r = admin_client.post(
+            "/admin/api/index",
+            json={"season": 2025, "task": "events", "force": False, "max_tier": 2},
+        )
         assert r.status_code == 200
 
     def test_repair_task_is_recognised(self, admin_client):
@@ -104,13 +114,17 @@ class TestAdminSeasonAPI:
 
 def test_upcoming_games_task_is_recognised(admin_client):
     """upcoming_games task should be dispatched without 422/404."""
-    r = admin_client.post("/admin/api/index", json={"season": 2025, "task": "upcoming_games", "force": False})
+    r = admin_client.post(
+        "/admin/api/index", json={"season": 2025, "task": "upcoming_games", "force": False}
+    )
     assert r.status_code in (200, 202, 204), f"Got {r.status_code}: {r.text}"
 
 
 def test_post_game_completion_task_is_recognised(admin_client):
     """post_game_completion task should be dispatched without 422/404."""
-    r = admin_client.post("/admin/api/index", json={"season": 2025, "task": "post_game_completion", "force": False})
+    r = admin_client.post(
+        "/admin/api/index", json={"season": 2025, "task": "post_game_completion", "force": False}
+    )
     assert r.status_code in (200, 202, 204), f"Got {r.status_code}: {r.text}"
 
 

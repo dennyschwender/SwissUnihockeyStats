@@ -1,4 +1,5 @@
 """Tests for game lifecycle scheduler policies."""
+
 import pytest
 from app.services.scheduler import POLICIES
 
@@ -26,14 +27,23 @@ def test_upcoming_games_policies_exist():
 
 def test_post_game_completion_policy_exists():
     names = _policy_names()
-    assert any("post_game_completion" in str(n) for n in names), "post_game_completion policy must exist"
+    assert any(
+        "post_game_completion" in str(n) for n in names
+    ), "post_game_completion policy must exist"
 
 
 def test_upcoming_games_has_three_daily_triggers():
     """There should be exactly 3 upcoming_games policies (noon, evening, night)."""
     if isinstance(POLICIES, list):
-        upcoming = [p for p in POLICIES if "upcoming_games" in str(p.get("name", "")) or "upcoming_games" in str(p.get("task", ""))]
-        assert len(upcoming) == 3, f"Expected 3 upcoming_games policies, got {len(upcoming)}: {upcoming}"
+        upcoming = [
+            p
+            for p in POLICIES
+            if "upcoming_games" in str(p.get("name", ""))
+            or "upcoming_games" in str(p.get("task", ""))
+        ]
+        assert (
+            len(upcoming) == 3
+        ), f"Expected 3 upcoming_games policies, got {len(upcoming)}: {upcoming}"
     elif isinstance(POLICIES, dict):
         upcoming = [k for k in POLICIES if "upcoming_games" in k]
         assert len(upcoming) == 3
@@ -43,11 +53,17 @@ def test_post_game_completion_runs_every_2_hours():
     """post_game_completion policy should have max_age of 2 hours."""
     if isinstance(POLICIES, list):
         post_game = next(
-            (p for p in POLICIES if "post_game_completion" in str(p.get("name", "")) or "post_game_completion" in str(p.get("task", ""))),
+            (
+                p
+                for p in POLICIES
+                if "post_game_completion" in str(p.get("name", ""))
+                or "post_game_completion" in str(p.get("task", ""))
+            ),
             None,
         )
         assert post_game is not None
         from datetime import timedelta
+
         max_age = post_game.get("max_age")
         assert max_age == timedelta(hours=2), f"Expected 2-hour interval, got {max_age}"
 
@@ -55,6 +71,11 @@ def test_post_game_completion_runs_every_2_hours():
 def test_upcoming_games_run_at_hours():
     """upcoming_games policies should run at hours 12, 18, and 23."""
     if isinstance(POLICIES, list):
-        upcoming = [p for p in POLICIES if "upcoming_games" in str(p.get("name", "")) or "upcoming_games" in str(p.get("task", ""))]
+        upcoming = [
+            p
+            for p in POLICIES
+            if "upcoming_games" in str(p.get("name", ""))
+            or "upcoming_games" in str(p.get("task", ""))
+        ]
         hours = {p.get("run_at_hour") for p in upcoming}
         assert hours == {12, 18, 23}, f"Expected run hours {{12, 18, 23}}, got {hours}"

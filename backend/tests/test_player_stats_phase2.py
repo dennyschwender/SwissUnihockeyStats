@@ -10,23 +10,27 @@ def test_apply_player_stats_result_upserts_rows():
     # Minimal raw response — one row with stats
     raw = {
         "data": {
-            "regions": [{
-                "rows": [{
-                    "cells": [
-                        {"text": "2025/26"},   # season label
-                        {"text": "NLA"},        # league
-                        {"text": "Team A"},     # team
-                        {"text": "30"},         # games
-                        {"text": "10"},         # goals
-                        {"text": "5"},          # assists
-                        {"text": "15"},         # points
-                        {"text": "2"},          # pen_2min
-                        {"text": "0"},          # pen_5min
-                        {"text": "0"},          # pen_10min
-                        {"text": "0"},          # pen_match
+            "regions": [
+                {
+                    "rows": [
+                        {
+                            "cells": [
+                                {"text": "2025/26"},  # season label
+                                {"text": "NLA"},  # league
+                                {"text": "Team A"},  # team
+                                {"text": "30"},  # games
+                                {"text": "10"},  # goals
+                                {"text": "5"},  # assists
+                                {"text": "15"},  # points
+                                {"text": "2"},  # pen_2min
+                                {"text": "0"},  # pen_5min
+                                {"text": "0"},  # pen_10min
+                                {"text": "0"},  # pen_match
+                            ]
+                        }
                     ]
-                }]
-            }]
+                }
+            ]
         }
     }
 
@@ -108,8 +112,10 @@ def test_player_stats_phase2_uses_batch_sessions():
         for i in range(n_players)
     ]
 
-    with patch.object(indexer, "_mark_sync_complete"), \
-         patch.object(indexer, "_apply_player_stats_result", return_value=0):
+    with (
+        patch.object(indexer, "_mark_sync_complete"),
+        patch.object(indexer, "_apply_player_stats_result", return_value=0),
+    ):
         indexer._run_player_stats_phase2(
             fetch_results=results,
             season_id=2025,
@@ -133,7 +139,9 @@ def test_index_player_stats_for_season_uses_parallel_phase1():
     session = MagicMock()
     # For player IDs query
     session.query.return_value.filter.return_value.distinct.return_value.all.return_value = [
-        (1,), (2,), (3,),
+        (1,),
+        (2,),
+        (3,),
     ]
     # For api_skip_until query (no skipped players)
     session.query.return_value.filter.return_value.all.return_value = []
@@ -155,8 +163,10 @@ def test_index_player_stats_for_season_uses_parallel_phase1():
 
     fetch_results = [MagicMock(player_id=i, api_error=False, raw_data={}) for i in (1, 2, 3)]
 
-    with patch.object(indexer, "_fetch_player_stats_raw", side_effect=fetch_results) as mock_fetch, \
-         patch.object(indexer, "_run_player_stats_phase2", return_value=3) as mock_phase2:
+    with (
+        patch.object(indexer, "_fetch_player_stats_raw", side_effect=fetch_results) as mock_fetch,
+        patch.object(indexer, "_run_player_stats_phase2", return_value=3) as mock_phase2,
+    ):
         result = indexer.index_player_stats_for_season(season_id=2025, force=False)
 
     assert mock_fetch.call_count == 3

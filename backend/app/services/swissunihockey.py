@@ -1,10 +1,10 @@
 """
 SwissUnihockey API integration service — thread-safe singleton wrapper around SwissUnihockeyClient.
 """
+
 import threading
 from app.services.api_client import SwissUnihockeyClient
 from app.config import settings
-
 
 # Global client instance (singleton pattern)
 _client: SwissUnihockeyClient | None = None

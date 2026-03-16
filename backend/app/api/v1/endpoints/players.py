@@ -1,6 +1,7 @@
 """
 Players API endpoints
 """
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
@@ -15,7 +16,7 @@ async def search_players(
     name: Optional[str] = Query(None, description="Search by player name"),
     team: Optional[int] = Query(None, description="Filter by team ID"),
     club: Optional[int] = Query(None, description="Filter by club ID"),
-    limit: Optional[int] = Query(100, description="Limit number of results", ge=1, le=1000)
+    limit: Optional[int] = Query(100, description="Limit number of results", ge=1, le=1000),
 ):
     """
     Search for players
@@ -27,6 +28,7 @@ async def search_players(
     """
     try:
         import asyncio
+
         loop = asyncio.get_running_loop()
         client = get_swissunihockey_client()
         players_data = await loop.run_in_executor(
@@ -63,6 +65,7 @@ async def get_player(player_id: int):
     """
     try:
         import asyncio
+
         loop = asyncio.get_running_loop()
         client = get_swissunihockey_client()
         player_data = await loop.run_in_executor(
@@ -81,7 +84,7 @@ async def get_player(player_id: int):
         return {
             "player_id": player_id,
             "name": player.get("text", ""),
-            **player.get("set_in_context", {})
+            **player.get("set_in_context", {}),
         }
 
     except HTTPException:

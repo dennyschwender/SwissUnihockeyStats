@@ -1,4 +1,5 @@
 """Unit tests for local_stats_aggregator."""
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -6,12 +7,23 @@ from unittest.mock import MagicMock
 from contextlib import contextmanager
 
 from app.models.db_models import (
-    Base, Season, Club, Team, League, LeagueGroup,
-    Game, GamePlayer, GameEvent, Player, PlayerStatistics,
-    UnresolvedPlayerEvent, _utcnow,
+    Base,
+    Season,
+    Club,
+    Team,
+    League,
+    LeagueGroup,
+    Game,
+    GamePlayer,
+    GameEvent,
+    Player,
+    PlayerStatistics,
+    UnresolvedPlayerEvent,
+    _utcnow,
 )
 from app.services.local_stats_aggregator import (
-    _pen_bucket, aggregate_player_stats_for_season,
+    _pen_bucket,
+    aggregate_player_stats_for_season,
 )
 
 
@@ -26,11 +38,13 @@ def engine():
 @pytest.fixture
 def mock_db(engine):
     db = MagicMock()
+
     @contextmanager
     def session_scope():
         with Session(engine) as s:
             yield s
             s.commit()
+
     db.session_scope = session_scope
     db.engine = engine
     return db
@@ -58,30 +72,54 @@ def _seed_complete_game(engine, tier=1):
         s.add(player)
         s.flush()
         game = Game(
-            id=1, season_id=1,
-            home_team_id=1, away_team_id=1,
-            status="finished", completeness_status="complete",
-            home_score=3, away_score=1,
+            id=1,
+            season_id=1,
+            home_team_id=1,
+            away_team_id=1,
+            status="finished",
+            completeness_status="complete",
+            home_score=3,
+            away_score=1,
             group_id=10,
         )
         s.add(game)
         s.flush()
         gp = GamePlayer(
-            game_id=1, player_id=42, team_id=1, season_id=1,
-            is_home_team=True, goals=2, assists=1, penalty_minutes=2,
+            game_id=1,
+            player_id=42,
+            team_id=1,
+            season_id=1,
+            is_home_team=True,
+            goals=2,
+            assists=1,
+            penalty_minutes=2,
         )
         s.add(gp)
         # Goal event with matching player name
         ge_goal = GameEvent(
-            game_id=1, team_id=1, season_id=1,
+            game_id=1,
+            team_id=1,
+            season_id=1,
             event_type="Torschütze",
-            raw_data={"player": "Max Muster", "event_type": "Torschütze", "time": "10:00", "team": "TestTeam"},
+            raw_data={
+                "player": "Max Muster",
+                "event_type": "Torschütze",
+                "time": "10:00",
+                "team": "TestTeam",
+            },
         )
         # Penalty event
         ge_pen = GameEvent(
-            game_id=1, team_id=1, season_id=1,
+            game_id=1,
+            team_id=1,
+            season_id=1,
             event_type="2'-Strafe",
-            raw_data={"player": "Max Muster", "event_type": "2'-Strafe", "time": "15:00", "team": "TestTeam"},
+            raw_data={
+                "player": "Max Muster",
+                "event_type": "2'-Strafe",
+                "time": "15:00",
+                "team": "TestTeam",
+            },
         )
         s.add_all([ge_goal, ge_pen])
         s.commit()
@@ -89,26 +127,33 @@ def _seed_complete_game(engine, tier=1):
 
 # ── _pen_bucket tests ─────────────────────────────────────────────────────────
 
+
 def test_pen_bucket_2min():
     assert _pen_bucket("2'-Strafe") == "2min"
+
 
 def test_pen_bucket_5min():
     assert _pen_bucket("5'-Strafe") == "5min"
 
+
 def test_pen_bucket_10min():
     assert _pen_bucket("10'-Strafe") == "10min"
+
 
 def test_pen_bucket_match():
     assert _pen_bucket("Matchstrafe") == "match"
 
+
 def test_pen_bucket_technische():
     assert _pen_bucket("Technische Matchstrafe") == "match"
+
 
 def test_pen_bucket_unknown():
     assert _pen_bucket("Timeout") is None
 
 
 # ── aggregate_player_stats_for_season tests ───────────────────────────────────
+
 
 def test_aggregate_creates_player_statistics_row(engine, mock_db):
     _seed_complete_game(engine)
@@ -157,9 +202,16 @@ def test_unresolved_event_created_for_unknown_player(engine, mock_db):
     # Add a penalty event with a name that doesn't match any GamePlayer
     with Session(engine) as s:
         ge = GameEvent(
-            game_id=1, team_id=1, season_id=1,
+            game_id=1,
+            team_id=1,
+            season_id=1,
             event_type="2'-Strafe",
-            raw_data={"player": "Unknown Player", "event_type": "2'-Strafe", "time": "20:00", "team": "TestTeam"},
+            raw_data={
+                "player": "Unknown Player",
+                "event_type": "2'-Strafe",
+                "time": "20:00",
+                "team": "TestTeam",
+            },
         )
         s.add(ge)
         s.commit()

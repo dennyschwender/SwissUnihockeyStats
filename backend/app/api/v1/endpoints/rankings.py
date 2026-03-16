@@ -1,6 +1,7 @@
 """
 Rankings API endpoints
 """
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
@@ -16,7 +17,7 @@ async def get_rankings(
     game_class: Optional[int] = Query(None, description="Game class ID"),
     group: Optional[int] = Query(None, description="Group ID"),
     season: Optional[int] = Query(None, description="Season year", le=2030),
-    mode: Optional[int] = Query(None, description="Mode (e.g., 1=championship, 2=cup)")
+    mode: Optional[int] = Query(None, description="Mode (e.g., 1=championship, 2=cup)"),
 ):
     """
     Get league standings/rankings
@@ -31,18 +32,19 @@ async def get_rankings(
     """
     try:
         import asyncio
+
         loop = asyncio.get_running_loop()
         client = get_swissunihockey_client()
         rankings_data = await loop.run_in_executor(
-            None, lambda: client.get_rankings(
+            None,
+            lambda: client.get_rankings(
                 league=league, game_class=game_class, group=group, season=season, mode=mode
-            )
+            ),
         )
 
         if not rankings_data or "entries" not in rankings_data:
             raise HTTPException(
-                status_code=404,
-                detail="No rankings found for the specified criteria"
+                status_code=404, detail="No rankings found for the specified criteria"
             )
 
         return {
@@ -54,7 +56,7 @@ async def get_rankings(
                 "group": group,
                 "season": season,
                 "mode": mode,
-            }
+            },
         }
 
     except HTTPException:
@@ -69,7 +71,7 @@ async def get_topscorers(
     league: Optional[int] = Query(None, description="League ID"),
     game_class: Optional[int] = Query(None, description="Game class ID"),
     season: Optional[int] = Query(None, description="Season year"),
-    limit: Optional[int] = Query(50, description="Limit number of results", ge=1, le=500)
+    limit: Optional[int] = Query(50, description="Limit number of results", ge=1, le=500),
 ):
     """
     Get top scorers for a league
@@ -81,18 +83,16 @@ async def get_topscorers(
     """
     try:
         import asyncio
+
         loop = asyncio.get_running_loop()
         client = get_swissunihockey_client()
         topscorers_data = await loop.run_in_executor(
-            None, lambda: client.get_topscorers(
-                league=league, game_class=game_class, season=season
-            )
+            None, lambda: client.get_topscorers(league=league, game_class=game_class, season=season)
         )
 
         if not topscorers_data or "entries" not in topscorers_data:
             raise HTTPException(
-                status_code=404,
-                detail="No top scorers found for the specified criteria"
+                status_code=404, detail="No top scorers found for the specified criteria"
             )
 
         scorers = topscorers_data["entries"]
@@ -103,7 +103,7 @@ async def get_topscorers(
         return {
             "total": len(scorers),
             "topscorers": scorers,
-            "filters": {"league": league, "game_class": game_class, "season": season}
+            "filters": {"league": league, "game_class": game_class, "season": season},
         }
 
     except HTTPException:

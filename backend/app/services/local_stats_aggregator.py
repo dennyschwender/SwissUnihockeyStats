@@ -8,6 +8,7 @@ Penalty breakdown (pen_2min/pen_5min/pen_10min/pen_match) is only computed
 for T1/T2 because T3 games don't include detailed event data.
 plus_minus is not computed (requires ice-time tracking not available locally).
 """
+
 from __future__ import annotations
 
 import logging
@@ -18,8 +19,14 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.db_models import (
-    Game, GameEvent, GamePlayer, League, LeagueGroup,
-    Player as PlayerModel, PlayerStatistics, UnresolvedPlayerEvent,
+    Game,
+    GameEvent,
+    GamePlayer,
+    League,
+    LeagueGroup,
+    Player as PlayerModel,
+    PlayerStatistics,
+    UnresolvedPlayerEvent,
 )
 from app.services.data_indexer import LEAGUE_TIERS
 
@@ -197,14 +204,16 @@ def aggregate_player_stats_for_season(
                         .first()
                     )
                     if existing is None:
-                        session.add(UnresolvedPlayerEvent(
-                            game_id=evt.game_id,
-                            team_id=evt.team_id,
-                            season_id=evt.season_id,
-                            raw_name=raw_name,
-                            event_type=evt.event_type,
-                            created_at=_now(),
-                        ))
+                        session.add(
+                            UnresolvedPlayerEvent(
+                                game_id=evt.game_id,
+                                team_id=evt.team_id,
+                                season_id=evt.season_id,
+                                raw_name=raw_name,
+                                event_type=evt.event_type,
+                                created_at=_now(),
+                            )
+                        )
                 continue
             tid = evt.team_id
             pen_breakdown.setdefault((pid, tid), {"2min": 0, "5min": 0, "10min": 0, "match": 0})
@@ -261,7 +270,9 @@ def aggregate_player_stats_for_season(
 
         logger.info(
             "Local stats aggregation: %d PlayerStatistics rows upserted for season %s (tiers %s)",
-            updated, season_id, sorted(tiers_set),
+            updated,
+            season_id,
+            sorted(tiers_set),
         )
 
     return updated

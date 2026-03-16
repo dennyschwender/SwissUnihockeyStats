@@ -24,14 +24,15 @@ logger = logging.getLogger(__name__)
 # Cache manager
 # ---------------------------------------------------------------------------
 
+
 class CacheManager:
     """Manage file-based caching for API responses."""
 
     TTL_CONFIG = {
-        "static":      30 * 24 * 60 * 60,  # 30 days
-        "semi_static":  7 * 24 * 60 * 60,  # 7 days
-        "dynamic":           60 * 60,       # 1 hour
-        "realtime":          5 * 60,        # 5 minutes
+        "static": 30 * 24 * 60 * 60,  # 30 days
+        "semi_static": 7 * 24 * 60 * 60,  # 7 days
+        "dynamic": 60 * 60,  # 1 hour
+        "realtime": 5 * 60,  # 5 minutes
     }
 
     def __init__(self, cache_dir: str = "data/cache"):
@@ -97,7 +98,9 @@ class CacheManager:
             return self.TTL_CONFIG["realtime"]
         return self.TTL_CONFIG["dynamic"]
 
-    def get(self, endpoint: str, params: Optional[Dict] = None, category: str = "general") -> Optional[Dict[str, Any]]:
+    def get(
+        self, endpoint: str, params: Optional[Dict] = None, category: str = "general"
+    ) -> Optional[Dict[str, Any]]:
         cache_key = self._get_cache_key(endpoint, params)
         cache_path = self._get_cache_path(cache_key, category)
         if not cache_path.exists():
@@ -116,7 +119,14 @@ class CacheManager:
             logger.error(f"Failed to read cache: {e}")
             return None
 
-    def set(self, endpoint: str, params: Optional[Dict], data: Dict[str, Any], category: str = "general", ttl: Optional[int] = None):
+    def set(
+        self,
+        endpoint: str,
+        params: Optional[Dict],
+        data: Dict[str, Any],
+        category: str = "general",
+        ttl: Optional[int] = None,
+    ):
         cache_key = self._get_cache_key(endpoint, params)
         cache_path = self._get_cache_path(cache_key, category)
         try:
@@ -141,7 +151,9 @@ class CacheManager:
                 for file in category_dir.glob("*.json"):
                     file.unlink()
             with self._lock:
-                self.metadata = {k: v for k, v in self.metadata.items() if v.get("category") != category}
+                self.metadata = {
+                    k: v for k, v in self.metadata.items() if v.get("category") != category
+                }
         else:
             for file in self.cache_dir.glob("**/*.json"):
                 if file.name != "metadata.json":
@@ -152,7 +164,9 @@ class CacheManager:
 
     def get_stats(self) -> Dict[str, Any]:
         total_files = sum(1 for _ in self.cache_dir.glob("**/*.json") if _.name != "metadata.json")
-        total_size = sum(f.stat().st_size for f in self.cache_dir.glob("**/*.json") if f.name != "metadata.json")
+        total_size = sum(
+            f.stat().st_size for f in self.cache_dir.glob("**/*.json") if f.name != "metadata.json"
+        )
         categories: Dict[str, int] = {}
         for meta in self.metadata.values():
             cat = meta.get("category", "general")
@@ -168,6 +182,7 @@ class CacheManager:
 # ---------------------------------------------------------------------------
 # API client
 # ---------------------------------------------------------------------------
+
 
 class SwissUnihockeyClient:
     """HTTP client for the SwissUnihockey API v2."""
@@ -196,7 +211,14 @@ class SwissUnihockeyClient:
         self.use_cache = use_cache
         self.cache = CacheManager(cache_dir) if use_cache else None
 
-    def _make_request(self, endpoint: str, params: Optional[Dict[str, Any]] = None, category: str = "general", force_refresh: bool = False, timeout: int | None = None) -> Dict[str, Any]:
+    def _make_request(
+        self,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None,
+        category: str = "general",
+        force_refresh: bool = False,
+        timeout: int | None = None,
+    ) -> Dict[str, Any]:
         if params is None:
             params = {}
         params["locale"] = self.locale
@@ -221,7 +243,9 @@ class SwissUnihockeyClient:
                 # 4xx errors are client errors — retrying will never help.
                 # Raise immediately without wasting time on retries.
                 if e.response is not None and 400 <= e.response.status_code < 500:
-                    logger.warning(f"Client error {e.response.status_code} for {endpoint}, not retrying")
+                    logger.warning(
+                        f"Client error {e.response.status_code} for {endpoint}, not retrying"
+                    )
                     raise
                 last_exc = e
                 logger.warning(f"Request failed (attempt {attempt+1}/{self.retry_attempts}): {e}")
@@ -240,11 +264,15 @@ class SwissUnihockeyClient:
         return self._make_request("/api/seasons", category="seasons", force_refresh=force_refresh)
 
     def get_clubs(self, force_refresh: bool = False, **params) -> Dict[str, Any]:
-        return self._make_request("/api/clubs", params, category="clubs", force_refresh=force_refresh)
+        return self._make_request(
+            "/api/clubs", params, category="clubs", force_refresh=force_refresh
+        )
 
     # --- Leagues & Groups ---
     def get_leagues(self, force_refresh: bool = False, **params) -> Dict[str, Any]:
-        return self._make_request("/api/leagues", params, category="leagues", force_refresh=force_refresh)
+        return self._make_request(
+            "/api/leagues", params, category="leagues", force_refresh=force_refresh
+        )
 
     def get_groups(self, **params) -> Dict[str, Any]:
         return self._make_request("/api/groups", params)
@@ -272,8 +300,12 @@ class SwissUnihockeyClient:
     def get_player_stats(self, player_id: int, **params) -> Dict[str, Any]:
         return self._make_request(f"/api/players/{player_id}/statistics", params)
 
-    def get_player_overview(self, player_id: int, *, request_timeout: int | None = None, **params) -> Dict[str, Any]:
-        return self._make_request(f"/api/players/{player_id}/overview", params, timeout=request_timeout)
+    def get_player_overview(
+        self, player_id: int, *, request_timeout: int | None = None, **params
+    ) -> Dict[str, Any]:
+        return self._make_request(
+            f"/api/players/{player_id}/overview", params, timeout=request_timeout
+        )
 
     # --- Games ---
     def get_games(self, **params) -> Dict[str, Any]:
@@ -296,10 +328,14 @@ class SwissUnihockeyClient:
 
     # --- Rankings & Scores ---
     def get_rankings(self, force_refresh: bool = False, **params) -> Dict[str, Any]:
-        return self._make_request("/api/rankings", params, category="rankings", force_refresh=force_refresh)
+        return self._make_request(
+            "/api/rankings", params, category="rankings", force_refresh=force_refresh
+        )
 
     def get_topscorers(self, force_refresh: bool = False, **params) -> Dict[str, Any]:
-        return self._make_request("/api/topscorers", params, category="topscorers", force_refresh=force_refresh)
+        return self._make_request(
+            "/api/topscorers", params, category="topscorers", force_refresh=force_refresh
+        )
 
     # --- Misc ---
     def get_national_players(self, **params) -> Dict[str, Any]:

@@ -1,6 +1,7 @@
 """
 Main FastAPI application entry point
 """
+
 from pathlib import Path
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
@@ -30,14 +31,19 @@ from app.config import settings
 from app.api.v1.router import api_router
 from app.lib.i18n import get_translations, get_locale_from_path, DEFAULT_LOCALE
 from app.services.swissunihockey import get_swissunihockey_client
-from app.services.data_cache import preload_common_data, preload_data, get_cached_teams, get_cached_leagues, get_cached_clubs
+from app.services.data_cache import (
+    preload_common_data,
+    preload_data,
+    get_cached_teams,
+    get_cached_leagues,
+    get_cached_clubs,
+)
 from app.services import rendering_config as _rcfg
 from app.services.season_utils import get_current_season as _get_current_season_impl
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -68,12 +74,14 @@ async def lifespan(app: FastAPI):
     try:
         logger.info("🗄️ Initializing database...")
         from app.services.database import get_database_service
+
         db_service = get_database_service()
         db_service.initialize()
         logger.info("✓ Database initialized")
 
         # Reset any sync rows that were left in_progress by a prior server process
         from app.services.data_indexer import DataIndexer as _DI
+
         _stale = _DI().cleanup_stale_sync_status()
         if _stale:
             logger.warning(f"⚠️ Reset {_stale} stale in_progress sync row(s) to failed")
@@ -96,10 +104,9 @@ async def lifespan(app: FastAPI):
     # no 503 on /admin/api/scheduler endpoints.
     try:
         from app.services.scheduler import init_scheduler
+
         _sched_instance = init_scheduler(_admin_jobs, _submit_job)
-        _sched_task = asyncio.create_task(
-            _sched_instance.run(), name="scheduler"
-        )
+        _sched_task = asyncio.create_task(_sched_instance.run(), name="scheduler")
         logger.info("✓ Scheduler started")
     except Exception as e:
         logger.error(f"❌ Failed to start scheduler: {e}")
@@ -139,6 +146,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down application...")
     try:
         from app.services.scheduler import get_scheduler
+
         sched = get_scheduler()
         if sched:
             sched.stop()
@@ -149,6 +157,7 @@ async def lifespan(app: FastAPI):
         logger.error(f"Error stopping scheduler: {e}")
     try:
         from app.services.database import get_database_service
+
         db_service = get_database_service()
         db_service.close()
     except Exception as e:
@@ -159,6 +168,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app with lifespan
 class _AdminNotAuthenticated(Exception):
     """Raised by require_admin dependency when session is not authenticated."""
+
     pass
 
 
@@ -237,14 +247,16 @@ async def _admin_not_auth_handler(request: Request, exc: _AdminNotAuthenticated)
 # AUTH HELPERS
 # ============================================================================
 
+
 def _pin_hash(pin: str) -> str:
     """Stable hash of the PIN so we never store it plaintext in session."""
     return hashlib.pbkdf2_hmac(
-        'sha256',
+        "sha256",
         pin.encode(),
         settings.SESSION_SECRET.encode(),
         100_000,
     ).hex()
+
 
 # Computed once at import time — blocks import for ~200 ms on Pi ARM but
 # acceptable: done before the server accepts any connections, so
@@ -258,7 +270,7 @@ _ADMIN_TOKEN_KEY = "admin_authed"
 # Login rate limiting (in-memory, per client IP)
 # ---------------------------------------------------------------------------
 _LOGIN_MAX_ATTEMPTS = 10
-_LOGIN_WINDOW_SECS  = 300  # 5 minutes
+_LOGIN_WINDOW_SECS = 300  # 5 minutes
 _login_attempts: dict = {}  # ip -> (count, window_start)
 
 
@@ -320,10 +332,12 @@ def require_admin(request: Request):
 
 # DEBUG endpoints — only registered when DEBUG=True, admin-only
 if settings.DEBUG:
+
     @app.get("/debug/player-index")
     async def debug_player_index(_: None = Depends(require_admin)):
         """Debug endpoint to see player index status."""
         from app.services.data_cache import get_data_cache
+
         cache = get_data_cache()
         return {
             "players_indexed": cache._players_indexed,
@@ -336,6 +350,7 @@ if settings.DEBUG:
     async def debug_force_reindex(_: None = Depends(require_admin)):
         """Force player reindexing and return detailed logs."""
         from app.services.data_cache import get_data_cache
+
         cache = get_data_cache()
         try:
             players_teams = await cache.index_players_from_teams()
@@ -355,6 +370,7 @@ if settings.DEBUG:
         """Debug endpoint to test various API endpoints."""
         client = get_swissunihockey_client()
         from app.services.data_cache import get_data_cache
+
         cache = get_data_cache()
 
         results = {}
@@ -391,17 +407,25 @@ if settings.DEBUG:
                             "has_data": bool(players_data),
                         }
                     except Exception as e:
-                        results["team_players"] = {"success": False, "team_id": team_id, "error": str(e)}
+                        results["team_players"] = {
+                            "success": False,
+                            "team_id": team_id,
+                            "error": str(e),
+                        }
             except Exception as e:
                 results["team_players"] = {"success": False, "error": str(e)}
 
         # Test games endpoint
         try:
-            games_data = client.get_games(mode="list", season=current_season, league=1, game_class=11)
+            games_data = client.get_games(
+                mode="list", season=current_season, league=1, game_class=11
+            )
             results["games_mode_list"] = {
                 "success": True,
                 "has_data": bool(games_data),
-                "game_count": len(games_data.get("entries", [])) if isinstance(games_data, dict) else 0,
+                "game_count": (
+                    len(games_data.get("entries", [])) if isinstance(games_data, dict) else 0
+                ),
             }
         except Exception as e:
             results["games_mode_list"] = {"success": False, "error": str(e)}
@@ -413,6 +437,7 @@ if settings.DEBUG:
 # HTML Template Routes (Python Full-Stack with Jinja2 + htmx)
 # ============================================================================
 
+
 @app.get("/", response_class=HTMLResponse)
 async def root_redirect(request: Request):
     """Redirect root to default locale"""
@@ -422,6 +447,7 @@ async def root_redirect(request: Request):
 # ============================================================================
 # ADMIN LOGIN / LOGOUT
 # ============================================================================
+
 
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
@@ -441,7 +467,7 @@ async def admin_login_submit(request: Request):
             status_code=429,
         )
     form = await request.form()
-    pin  = str(form.get("pin", "")).strip()
+    pin = str(form.get("pin", "")).strip()
     if hmac.compare_digest(_pin_hash(pin), _ADMIN_PIN_HASH):
         _reset_login_rate_limit(client_ip)
         request.session[_ADMIN_TOKEN_KEY] = _ADMIN_PIN_HASH
@@ -462,6 +488,7 @@ async def admin_logout(request: Request):
 
 # ==================== ADMIN ROUTES ====================
 # Must be registered BEFORE the /{locale} catch-all route.
+
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request, _: None = Depends(require_admin)):
@@ -504,16 +531,20 @@ async def admin_stats_history(
     from sqlalchemy import text
     from datetime import datetime, timezone, timedelta
     from app.services.database import get_database_service
+
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     db_service = get_database_service()
     with db_service.engine.connect() as conn:
-        rows = conn.execute(text("""
+        rows = conn.execute(
+            text("""
             SELECT ts, db_size_bytes, games, players, events, player_stats,
                    jobs_run, jobs_errors, avg_job_duration_s
             FROM admin_stats_snapshots
             WHERE ts >= :cutoff
             ORDER BY ts DESC
-        """), {"cutoff": cutoff}).fetchall()
+        """),
+            {"cutoff": cutoff},
+        ).fetchall()
     return [dict(r._mapping) for r in rows]
 
 
@@ -545,22 +576,26 @@ async def admin_db_info(_: None = Depends(require_admin)):
     if is_sqlite:
         try:
             loop = asyncio.get_running_loop()
+
             def _read_pragma():
                 with db_service.session_scope() as s:
+
                     def pg(name):
                         try:
                             return s.execute(_text(f"PRAGMA {name}")).scalar()
                         except Exception:
                             return None
+
                     return {
-                        "page_count":    pg("page_count"),
-                        "page_size":     pg("page_size"),
+                        "page_count": pg("page_count"),
+                        "page_size": pg("page_size"),
                         "freelist_count": pg("freelist_count"),
-                        "journal_mode":  pg("journal_mode"),
+                        "journal_mode": pg("journal_mode"),
                         "wal_checkpoint": pg("wal_autocheckpoint"),
                         # integrity_ok intentionally omitted — quick_check is
                         # slow and can block other requests on a Pi
                     }
+
             pragma_info = await loop.run_in_executor(None, _read_pragma)
         except Exception as e:
             pragma_info = {"error": str(e)}
@@ -591,8 +626,10 @@ async def admin_vacuum(_: None = Depends(require_admin)):
 
     async def _run_vacuum():
         import time
+
         t0 = time.time()
         try:
+
             def _vacuum():
                 with engine.connect() as conn:
                     conn.execute(_text("PRAGMA wal_checkpoint(TRUNCATE)"))
@@ -653,19 +690,24 @@ async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
             # reference them to the surviving (min) row — otherwise the FK
             # constraint fails.
             non_min_ids = [
-                r[0] for r in conn.execute(_text(
-                    "SELECT id FROM league_groups "
-                    "WHERE id NOT IN ("
-                    "  SELECT MIN(id) FROM league_groups "
-                    "  GROUP BY league_id, group_id, COALESCE(phase, '')"
-                    ")"
-                )).fetchall()
+                r[0]
+                for r in conn.execute(
+                    _text(
+                        "SELECT id FROM league_groups "
+                        "WHERE id NOT IN ("
+                        "  SELECT MIN(id) FROM league_groups "
+                        "  GROUP BY league_id, group_id, COALESCE(phase, '')"
+                        ")"
+                    )
+                ).fetchall()
             ]
             if non_min_ids:
                 # Build old_id → new_id (min sibling) mapping
-                id_map_rows = conn.execute(_text(
-                    "SELECT id, league_id, group_id, COALESCE(phase,'') as ph FROM league_groups"
-                )).fetchall()
+                id_map_rows = conn.execute(
+                    _text(
+                        "SELECT id, league_id, group_id, COALESCE(phase,'') as ph FROM league_groups"
+                    )
+                ).fetchall()
                 min_for: dict[tuple, int] = {}
                 for row_id, lid, gid, ph in id_map_rows:
                     key = (lid, gid, ph)
@@ -703,37 +745,44 @@ async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
             # (game_id, event_type, period, time, player_id).
             # Batched by game_id to avoid holding the write lock over 300k+ rows
             # in a single statement.
-            game_id_rows = conn.execute(_text(
-                "SELECT DISTINCT game_id FROM game_events "
-                "GROUP BY game_id, event_type, period, time, player_id "
-                "HAVING COUNT(*) > 1"
-            )).fetchall()
+            game_id_rows = conn.execute(
+                _text(
+                    "SELECT DISTINCT game_id FROM game_events "
+                    "GROUP BY game_id, event_type, period, time, player_id "
+                    "HAVING COUNT(*) > 1"
+                )
+            ).fetchall()
             dup_game_ids = [r[0] for r in game_id_rows]
             event_deleted = 0
             _CHUNK = 200
             for _i in range(0, len(dup_game_ids), _CHUNK):
-                chunk = dup_game_ids[_i: _i + _CHUNK]
+                chunk = dup_game_ids[_i : _i + _CHUNK]
                 placeholders = ",".join("?" * len(chunk))
-                r = conn.execute(_text(
-                    f"DELETE FROM game_events "
-                    f"WHERE game_id IN ({placeholders}) "
-                    f"AND id NOT IN ("
-                    f"  SELECT MIN(id) FROM game_events "
-                    f"  WHERE game_id IN ({placeholders}) "
-                    f"  GROUP BY game_id, event_type, period, time, player_id"
-                    f")"
-                ), chunk + chunk)
+                r = conn.execute(
+                    _text(
+                        f"DELETE FROM game_events "
+                        f"WHERE game_id IN ({placeholders}) "
+                        f"AND id NOT IN ("
+                        f"  SELECT MIN(id) FROM game_events "
+                        f"  WHERE game_id IN ({placeholders}) "
+                        f"  GROUP BY game_id, event_type, period, time, player_id"
+                        f")"
+                    ),
+                    chunk + chunk,
+                )
                 event_deleted += r.rowcount
                 conn.commit()
             counts["game_events"] = event_deleted
 
             # ── stale sync_status entries ────────────────────────────────────
             # Remove completed/failed records older than 7 days — pure clutter.
-            r = conn.execute(_text(
-                "DELETE FROM sync_status "
-                "WHERE sync_status IN ('completed', 'failed', 'stale') "
-                "  AND last_sync < datetime('now', '-7 days')"
-            ))
+            r = conn.execute(
+                _text(
+                    "DELETE FROM sync_status "
+                    "WHERE sync_status IN ('completed', 'failed', 'stale') "
+                    "  AND last_sync < datetime('now', '-7 days')"
+                )
+            )
             counts["sync_status"] = r.rowcount
 
             conn.commit()
@@ -746,8 +795,11 @@ async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
         logger.info(
             "Admin cleanup: removed %d league_group dups (remapped %d games), "
             "%d game_event dups, %d stale sync_status rows in %.2fs",
-            result["league_groups"], result.get("games_remapped", 0),
-            result["game_events"], result["sync_status"], result["elapsed_s"],
+            result["league_groups"],
+            result.get("games_remapped", 0),
+            result["game_events"],
+            result["sync_status"],
+            result["elapsed_s"],
         )
         return {"ok": True, **result}
     except Exception as e:
@@ -759,6 +811,7 @@ async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
 async def admin_repair(_: None = Depends(require_admin)):
     """Run conservative DB repairs immediately and return summary + health report."""
     from app.services.repair_service import get_repair_service
+
     try:
         svc = get_repair_service()
         result = await asyncio.to_thread(svc.run_nightly)
@@ -777,15 +830,14 @@ async def admin_repair_report(_: None = Depends(require_admin)):
     """Return the health report (read-only, no fixes applied)."""
     from app.services.repair_service import get_repair_service
     from app.models.db_models import SyncStatus
+
     try:
         svc = get_repair_service()
         db = svc.db_service
         last_run = None
         last_fixed = 0
         with db.session_scope() as session:
-            row = session.query(SyncStatus).filter_by(
-                entity_type="repair", entity_id="all"
-            ).first()
+            row = session.query(SyncStatus).filter_by(entity_type="repair", entity_id="all").first()
             if row:
                 last_run = row.last_sync.isoformat() if row.last_sync else None
                 last_fixed = row.records_synced or 0
@@ -805,51 +857,56 @@ async def admin_repair_report(_: None = Depends(require_admin)):
 async def admin_api_system(_: None = Depends(require_admin)):
     """Return system / container performance metrics for the admin System tab."""
     import os as _os
+
     try:
         import psutil
     except ImportError:
         return {"ok": False, "error": "psutil not installed — run: pip install psutil"}
 
     try:
-        cpu_pct   = psutil.cpu_percent(interval=0.2)
+        cpu_pct = psutil.cpu_percent(interval=0.2)
         cpu_count = psutil.cpu_count(logical=True)
-        _freq     = psutil.cpu_freq()
-        cpu_freq  = round(_freq.current, 1) if _freq else None
+        _freq = psutil.cpu_freq()
+        cpu_freq = round(_freq.current, 1) if _freq else None
 
-        vm  = psutil.virtual_memory()
+        vm = psutil.virtual_memory()
         mem = {
-            "total":     vm.total,
-            "used":      vm.used,
+            "total": vm.total,
+            "used": vm.used,
             "available": vm.available,
-            "percent":   vm.percent,
+            "percent": vm.percent,
         }
 
         disk = None
         for _path in ["/app/data", "/"]:
             try:
-                du   = psutil.disk_usage(_path)
+                du = psutil.disk_usage(_path)
                 disk = {
-                    "path":    _path,
-                    "total":   du.total,
-                    "used":    du.used,
-                    "free":    du.free,
+                    "path": _path,
+                    "total": du.total,
+                    "used": du.used,
+                    "free": du.free,
                     "percent": du.percent,
                 }
                 break
             except Exception:
                 pass
 
-        _net   = psutil.net_io_counters()
-        net_io = {
-            "bytes_sent":   _net.bytes_sent,
-            "bytes_recv":   _net.bytes_recv,
-            "packets_sent": _net.packets_sent,
-            "packets_recv": _net.packets_recv,
-        } if _net else {}
+        _net = psutil.net_io_counters()
+        net_io = (
+            {
+                "bytes_sent": _net.bytes_sent,
+                "bytes_recv": _net.bytes_recv,
+                "packets_sent": _net.packets_sent,
+                "packets_recv": _net.packets_recv,
+            }
+            if _net
+            else {}
+        )
 
         proc = psutil.Process(_os.getpid())
         with proc.oneshot():
-            proc_rss     = proc.memory_info().rss
+            proc_rss = proc.memory_info().rss
             proc_cpu_pct = proc.cpu_percent(interval=None)
             proc_threads = proc.num_threads()
 
@@ -857,9 +914,8 @@ async def admin_api_system(_: None = Depends(require_admin)):
 
         # cgroup v2 (and v1 fallback) memory limit — only meaningful inside a container
         cgroup_mem_limit = None
-        cgroup_mem_used  = None
-        for _p in ("/sys/fs/cgroup/memory.max",
-                   "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
+        cgroup_mem_used = None
+        for _p in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
             try:
                 val = Path(_p).read_text().strip()
                 if val not in ("max", "0", ""):
@@ -867,8 +923,7 @@ async def admin_api_system(_: None = Depends(require_admin)):
                 break
             except Exception:
                 pass
-        for _p in ("/sys/fs/cgroup/memory.current",
-                   "/sys/fs/cgroup/memory/memory.usage_in_bytes"):
+        for _p in ("/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory/memory.usage_in_bytes"):
             try:
                 cgroup_mem_used = int(Path(_p).read_text().strip())
                 break
@@ -876,21 +931,21 @@ async def admin_api_system(_: None = Depends(require_admin)):
                 pass
 
         return {
-            "ok":  True,
+            "ok": True,
             "cpu": {"percent": cpu_pct, "count": cpu_count, "freq_mhz": cpu_freq},
             "mem": mem,
             "disk": disk,
             "net_io": net_io,
             "process": {
-                "pid":     _os.getpid(),
-                "rss":     proc_rss,
+                "pid": _os.getpid(),
+                "rss": proc_rss,
                 "cpu_pct": proc_cpu_pct,
                 "threads": proc_threads,
             },
-            "uptime_s":         uptime_s,
-            "hostname":         _os.environ.get("HOSTNAME", "unknown"),
+            "uptime_s": uptime_s,
+            "hostname": _os.environ.get("HOSTNAME", "unknown"),
             "cgroup_mem_limit": cgroup_mem_limit,
-            "cgroup_mem_used":  cgroup_mem_used,
+            "cgroup_mem_used": cgroup_mem_used,
         }
     except Exception as exc:
         logger.error("System stats error: %s", exc, exc_info=True)
@@ -914,13 +969,16 @@ async def admin_scheduler_diag(_: None = Depends(require_admin)):
         now = _utcnow()
         rows = []
         with db.session_scope() as session:
-            season_rows = (session.query(Season.id, Season.highlighted)
-                           .order_by(Season.id.desc()).limit(20).all())
+            season_rows = (
+                session.query(Season.id, Season.highlighted)
+                .order_by(Season.id.desc())
+                .limit(20)
+                .all()
+            )
             current_sid = next((r[0] for r in season_rows if r[1]), None)
             # Respect scheduler season filter — excluded/below-min seasons are not managed
             indexed_sids = [
-                r[0] for r in season_rows
-                if not (_sched and _sched._season_filtered(r[0]))
+                r[0] for r in season_rows if not (_sched and _sched._season_filtered(r[0]))
             ]
 
             for policy in POLICIES:
@@ -954,25 +1012,31 @@ async def admin_scheduler_diag(_: None = Depends(require_admin)):
                             m = rem // 60
                             status = "FRESH"
                             next_run = f"in {h}h {m}m"
-                    rows.append({
-                        "policy":       policy["name"],
-                        "entity_type":  policy["entity_type"],
-                        "scope":        policy["scope"],
-                        "season":       sid,
-                        "is_current":   is_current,
-                        "current_only": policy.get("current_only", False),
-                        "max_age_h":    round(policy["max_age"].total_seconds() / 3600, 1),
-                        "last_sync":    last_sync.strftime("%Y-%m-%d %H:%M") if last_sync else None,
-                        "status":       status,
-                        "next_run":     next_run,
-                    })
+                    rows.append(
+                        {
+                            "policy": policy["name"],
+                            "entity_type": policy["entity_type"],
+                            "scope": policy["scope"],
+                            "season": sid,
+                            "is_current": is_current,
+                            "current_only": policy.get("current_only", False),
+                            "max_age_h": round(policy["max_age"].total_seconds() / 3600, 1),
+                            "last_sync": (
+                                last_sync.strftime("%Y-%m-%d %H:%M") if last_sync else None
+                            ),
+                            "status": status,
+                            "next_run": next_run,
+                        }
+                    )
         return rows
 
     try:
         result = await asyncio.get_event_loop().run_in_executor(None, _run)
-        sf = _sched.get_season_filter() if _sched else {
-            "min_season": None, "excluded_seasons": [], "max_concurrent": 2
-        }
+        sf = (
+            _sched.get_season_filter()
+            if _sched
+            else {"min_season": None, "excluded_seasons": [], "max_concurrent": 2}
+        )
         return {"ok": True, "rows": result, "season_filter": sf}
     except Exception as exc:
         logger.error("scheduler-diag error: %s", exc, exc_info=True)
@@ -983,8 +1047,18 @@ def _admin_stats_sync():
     """Synchronous DB work for admin stats (called via run_in_executor)."""
     from app.services.database import get_database_service
     from app.models.db_models import (
-        Season, Club, Team, Player, TeamPlayer,
-        League, LeagueGroup, Game, GamePlayer, GameEvent, PlayerStatistics, SyncStatus
+        Season,
+        Club,
+        Team,
+        Player,
+        TeamPlayer,
+        League,
+        LeagueGroup,
+        Game,
+        GamePlayer,
+        GameEvent,
+        PlayerStatistics,
+        SyncStatus,
     )
     from sqlalchemy import func, text
 
@@ -1005,7 +1079,12 @@ def _admin_stats_sync():
 
         def safe_group_by(col, season_col):
             try:
-                return {sid: n for sid, n in session.query(season_col, func.count(col)).group_by(season_col).all()}
+                return {
+                    sid: n
+                    for sid, n in session.query(season_col, func.count(col))
+                    .group_by(season_col)
+                    .all()
+                }
             except Exception:
                 return {}
 
@@ -1014,31 +1093,34 @@ def _admin_stats_sync():
         # leagues: COUNT(DISTINCT league_id, game_class) — unique league type
         # league_groups: COUNT(DISTINCT group_id) — unique API group
         totals = {
-            "seasons":       safe_count(session.query(func.count(Season.id))),
-            "clubs":         safe_count(session.query(func.count(func.distinct(Club.id)))),
-            "teams":         safe_count(session.query(func.count(func.distinct(Team.id)))),
-            "players":       safe_count(session.query(func.count(Player.person_id))),
-            "team_players":  safe_count(session.query(func.count(TeamPlayer.id))),
-            "leagues":       safe_count(session.query(func.count(func.distinct(League.league_id)))),
-            "league_groups": safe_count(session.query(func.count(func.distinct(LeagueGroup.group_id)))),
-            "games":         safe_count(session.query(func.count(Game.id))),
-            "game_events":   safe_count(session.query(func.count(GameEvent.id))),
-            "game_players":  safe_count(session.query(func.count(GamePlayer.id))),
-            "player_stats":  safe_count(session.query(func.count(PlayerStatistics.id))),
+            "seasons": safe_count(session.query(func.count(Season.id))),
+            "clubs": safe_count(session.query(func.count(func.distinct(Club.id)))),
+            "teams": safe_count(session.query(func.count(func.distinct(Team.id)))),
+            "players": safe_count(session.query(func.count(Player.person_id))),
+            "team_players": safe_count(session.query(func.count(TeamPlayer.id))),
+            "leagues": safe_count(session.query(func.count(func.distinct(League.league_id)))),
+            "league_groups": safe_count(
+                session.query(func.count(func.distinct(LeagueGroup.group_id)))
+            ),
+            "games": safe_count(session.query(func.count(Game.id))),
+            "game_events": safe_count(session.query(func.count(GameEvent.id))),
+            "game_players": safe_count(session.query(func.count(GamePlayer.id))),
+            "player_stats": safe_count(session.query(func.count(PlayerStatistics.id))),
         }
 
         # ── Per-season aggregates via GROUP BY ─────────────────────────────
-        clubs_by_s   = safe_group_by(Club.id,            Club.season_id)
-        teams_by_s   = safe_group_by(Team.id,            Team.season_id)
-        tp_by_s      = safe_group_by(TeamPlayer.id,      TeamPlayer.season_id)
-        leagues_by_s = safe_group_by(League.id,          League.season_id)
-        games_by_s   = safe_group_by(Game.id,            Game.season_id)
-        gp_by_s      = safe_group_by(GamePlayer.id,      GamePlayer.season_id)
-        pstats_by_s  = safe_group_by(PlayerStatistics.id, PlayerStatistics.season_id)
+        clubs_by_s = safe_group_by(Club.id, Club.season_id)
+        teams_by_s = safe_group_by(Team.id, Team.season_id)
+        tp_by_s = safe_group_by(TeamPlayer.id, TeamPlayer.season_id)
+        leagues_by_s = safe_group_by(League.id, League.season_id)
+        games_by_s = safe_group_by(Game.id, Game.season_id)
+        gp_by_s = safe_group_by(GamePlayer.id, GamePlayer.season_id)
+        pstats_by_s = safe_group_by(PlayerStatistics.id, PlayerStatistics.season_id)
 
         try:
-            groups_by_s = {r[0]: r[1] for r in
-                session.query(League.season_id, func.count(LeagueGroup.id))
+            groups_by_s = {
+                r[0]: r[1]
+                for r in session.query(League.season_id, func.count(LeagueGroup.id))
                 .join(LeagueGroup, LeagueGroup.league_id == League.id)
                 .group_by(League.season_id)
                 .all()
@@ -1047,8 +1129,9 @@ def _admin_stats_sync():
             groups_by_s = {}
 
         try:
-            events_by_s = {r[0]: r[1] for r in
-                session.query(Game.season_id, func.count(GameEvent.id))
+            events_by_s = {
+                r[0]: r[1]
+                for r in session.query(Game.season_id, func.count(GameEvent.id))
                 .join(GameEvent, GameEvent.game_id == Game.id)
                 .group_by(Game.season_id)
                 .all()
@@ -1057,42 +1140,43 @@ def _admin_stats_sync():
             events_by_s = {}
 
         try:
-            season_rows = (session.query(Season.id, Season.text, Season.highlighted)
-                           .order_by(Season.id.desc()).all())
+            season_rows = (
+                session.query(Season.id, Season.text, Season.highlighted)
+                .order_by(Season.id.desc())
+                .all()
+            )
         except Exception:
             season_rows = []
 
         by_season = [
             {
-                "season_id":     sid,
-                "season_text":   stext or str(sid),
-                "clubs":         clubs_by_s.get(sid, 0),
-                "teams":         teams_by_s.get(sid, 0),
-                "team_players":  tp_by_s.get(sid, 0),
-                "leagues":       leagues_by_s.get(sid, 0),
+                "season_id": sid,
+                "season_text": stext or str(sid),
+                "clubs": clubs_by_s.get(sid, 0),
+                "teams": teams_by_s.get(sid, 0),
+                "team_players": tp_by_s.get(sid, 0),
+                "leagues": leagues_by_s.get(sid, 0),
                 "league_groups": groups_by_s.get(sid, 0),
-                "games":         games_by_s.get(sid, 0),
-                "game_events":   events_by_s.get(sid, 0),
-                "game_players":  gp_by_s.get(sid, 0),
-                "player_stats":  pstats_by_s.get(sid, 0),
-                "is_current":    bool(shighlighted),
+                "games": games_by_s.get(sid, 0),
+                "game_events": events_by_s.get(sid, 0),
+                "game_players": gp_by_s.get(sid, 0),
+                "player_stats": pstats_by_s.get(sid, 0),
+                "is_current": bool(shighlighted),
             }
             for sid, stext, shighlighted in season_rows
         ]
 
         # ── Recent sync records ────────────────────────────────────────────
         try:
-            syncs = (session.query(SyncStatus)
-                     .order_by(SyncStatus.last_sync.desc())
-                     .limit(100).all())
+            syncs = session.query(SyncStatus).order_by(SyncStatus.last_sync.desc()).limit(100).all()
             sync_status = [
                 {
                     "entity_type": s.entity_type,
-                    "entity_id":   s.entity_id,
-                    "status":      s.sync_status,
-                    "last_sync":   s.last_sync.strftime("%Y-%m-%d %H:%M") if s.last_sync else None,
-                    "records":     s.records_synced or 0,
-                    "error":       s.error_message,
+                    "entity_id": s.entity_id,
+                    "status": s.sync_status,
+                    "last_sync": s.last_sync.strftime("%Y-%m-%d %H:%M") if s.last_sync else None,
+                    "records": s.records_synced or 0,
+                    "error": s.error_message,
                 }
                 for s in syncs
             ]
@@ -1131,55 +1215,60 @@ async def _refresh_stats_cache() -> None:
 
 
 # In-memory job registry for background indexing tasks
-_admin_jobs: dict  = {}
+_admin_jobs: dict = {}
 _admin_tasks: dict = {}  # job_id → asyncio.Task (running only)
 
 
-async def _submit_job(job_id: str, season: int | None, task: str, force: bool = False, max_tier: int = 7):
+async def _submit_job(
+    job_id: str, season: int | None, task: str, force: bool = False, max_tier: int = 7
+):
     """Bridge used by the scheduler to start an _run() coroutine for a pre-registered job."""
-    t = asyncio.create_task(_run(job_id, season, task, force, max_tier=max_tier), name=f"job-{job_id}")
+    t = asyncio.create_task(
+        _run(job_id, season, task, force, max_tier=max_tier), name=f"job-{job_id}"
+    )
     _admin_tasks[job_id] = t
+
 
 # Task definitions: human label + which tasks it maps to internally
 _TASK_META = {
-    "seasons":           "Index Seasons",
-    "clubs":             "Index Clubs",
-    "teams":             "Index Teams (all clubs)",
-    "players":           "Index Players (all teams)",
-    "clubs_path":        "Index Clubs Path (clubs + teams + players)",
-    "leagues":           "Index Leagues",
-    "groups":            "Index League Groups",
-    "games":             "Index Games",
-    "events":            "Index Game Events (finished games)",
-    "player_stats":      "Index Player Statistics",
+    "seasons": "Index Seasons",
+    "clubs": "Index Clubs",
+    "teams": "Index Teams (all clubs)",
+    "players": "Index Players (all teams)",
+    "clubs_path": "Index Clubs Path (clubs + teams + players)",
+    "leagues": "Index Leagues",
+    "groups": "Index League Groups",
+    "games": "Index Games",
+    "events": "Index Game Events (finished games)",
+    "player_stats": "Index Player Statistics",
     "player_game_stats": "Index Player Game Stats (G/A/PIM per game)",
-    "game_lineups":      "Index Game Lineups (player appearances per game)",
-    "team_names":        "Backfill Team Names (from rankings API)",
-    "leagues_path":      "Index Leagues Path (leagues + groups + games)",
-    "full":              "Full Index (clubs path + leagues path + lineups + game stats)",
-    "repair":            "DB Repair",
-    "upcoming_games":        "Index Upcoming Games",
-    "post_game_completion":  "Index Post-Game Completion",
+    "game_lineups": "Index Game Lineups (player appearances per game)",
+    "team_names": "Backfill Team Names (from rankings API)",
+    "leagues_path": "Index Leagues Path (leagues + groups + games)",
+    "full": "Full Index (clubs path + leagues path + lineups + game stats)",
+    "repair": "DB Repair",
+    "upcoming_games": "Index Upcoming Games",
+    "post_game_completion": "Index Post-Game Completion",
     "compute_player_stats": "Compute Player Stats (local)",
 }
 
 # Minimum minutes before the same (task, season) can be re-triggered without force=True.
 _TASK_COOLDOWN_MINS: dict[str, int] = {
-    "full":              30,
-    "clubs_path":        60,
-    "leagues_path":      30,
-    "leagues":           30,
-    "groups":            30,
-    "games":             15,
-    "events":            10,
-    "players":           60,
-    "teams":             60,
-    "clubs":             120,
-    "player_stats":      30,
+    "full": 30,
+    "clubs_path": 60,
+    "leagues_path": 30,
+    "leagues": 30,
+    "groups": 30,
+    "games": 15,
+    "events": 10,
+    "players": 60,
+    "teams": 60,
+    "clubs": 120,
+    "player_stats": 30,
     "player_game_stats": 30,
-    "game_lineups":      30,
-    "team_names":        60,
-    "seasons":           60,
+    "game_lineups": 30,
+    "team_names": 60,
+    "seasons": 60,
     "compute_player_stats": 30,
 }
 # Tracks when each (task, season) last finished successfully (in-memory).
@@ -1190,6 +1279,7 @@ def _load_cooldowns() -> None:
     """Populate _job_last_done from scheduler_config.json on startup."""
     try:
         from app.services.scheduler import _CONFIG_PATH
+
         with open(_CONFIG_PATH) as f:
             data = json.load(f)
         raw = data.get("cooldowns", {})
@@ -1215,6 +1305,7 @@ def _persist_cooldowns() -> None:
     """Write _job_last_done to the cooldowns section of scheduler_config.json."""
     try:
         from app.services.scheduler import _CONFIG_PATH
+
         # Read-modify-write to avoid clobbering scheduler's own keys
         try:
             with open(_CONFIG_PATH) as f:
@@ -1222,8 +1313,7 @@ def _persist_cooldowns() -> None:
         except (FileNotFoundError, json.JSONDecodeError):
             data = {}
         data["cooldowns"] = {
-            f"{task}:{season}": dt.isoformat()
-            for (task, season), dt in _job_last_done.items()
+            f"{task}:{season}": dt.isoformat() for (task, season), dt in _job_last_done.items()
         }
         tmp = _CONFIG_PATH + ".tmp"
         with open(tmp, "w") as f:
@@ -1245,13 +1335,15 @@ async def admin_start_indexing(payload: dict, _: None = Depends(require_admin)):
     max_tier: 1–7 — only index events for leagues at or below this tier
                (1=L-UPL only … 7=all incl. youth/regional, default 7)
     """
-    season   = int(payload.get("season", get_current_season()))
-    task     = payload.get("task", "full")
-    force    = bool(payload.get("force", False))
+    season = int(payload.get("season", get_current_season()))
+    task = payload.get("task", "full")
+    force = bool(payload.get("force", False))
     max_tier = int(payload.get("max_tier", 7))
 
     if task not in _TASK_META:
-        raise HTTPException(status_code=400, detail=f"Unknown task '{task}'. Valid: {list(_TASK_META)}")
+        raise HTTPException(
+            status_code=400, detail=f"Unknown task '{task}'. Valid: {list(_TASK_META)}"
+        )
 
     # Cooldown guard — skip if data was indexed recently and force is not set.
     if not force:
@@ -1266,7 +1358,7 @@ async def admin_start_indexing(payload: dict, _: None = Depends(require_admin)):
                     detail=(
                         f"Data is fresh — last run {age_mins:.0f} min ago "
                         f"(cooldown {cooldown} min, {remaining:.0f} min left). "
-                        f"Enable \"Force\" to override."
+                        f'Enable "Force" to override.'
                     ),
                 )
 
@@ -1276,20 +1368,28 @@ async def admin_start_indexing(payload: dict, _: None = Depends(require_admin)):
     job_id = str(uuid.uuid4())[:8]
     _started_at = datetime.now(timezone.utc).isoformat()
     _admin_jobs[job_id] = {
-        "job_id":     job_id,
-        "season":     season,
-        "task":       task,
-        "label":      _TASK_META[task],
-        "status":     "running",
-        "progress":   0,
-        "stats":      {},
-        "log_lines":  [],
-        "error":      None,
+        "job_id": job_id,
+        "season": season,
+        "task": task,
+        "label": _TASK_META[task],
+        "status": "running",
+        "progress": 0,
+        "stats": {},
+        "log_lines": [],
+        "error": None,
         "started_at": _started_at,
     }
-    t = asyncio.create_task(_run(job_id, season, task, force, max_tier=max_tier), name=f"job-{job_id}")
+    t = asyncio.create_task(
+        _run(job_id, season, task, force, max_tier=max_tier), name=f"job-{job_id}"
+    )
     _admin_tasks[job_id] = t
-    return {"job_id": job_id, "season": season, "task": task, "label": _TASK_META[task], "started_at": _started_at}
+    return {
+        "job_id": job_id,
+        "season": season,
+        "task": task,
+        "label": _TASK_META[task],
+        "started_at": _started_at,
+    }
 
 
 _JOB_EXPIRY_SECS = 300  # auto-purge finished jobs after 5 minutes
@@ -1306,7 +1406,8 @@ def _purge_expired_jobs():
     """Remove finished _admin_jobs older than _JOB_EXPIRY_SECS."""
     now = datetime.now(timezone.utc)
     expired = [
-        jid for jid, j in list(_admin_jobs.items())
+        jid
+        for jid, j in list(_admin_jobs.items())
         if j.get("status") in ("done", "error", "stopped")
         and "finished_at" in j
         and (now - datetime.fromisoformat(j["finished_at"])).total_seconds() > _JOB_EXPIRY_SECS
@@ -1335,7 +1436,7 @@ async def admin_job_status(job_id: str, _: None = Depends(require_admin)):
     history = job.setdefault("log_history", [])
     history.extend(log_lines)
     if len(history) > 400:
-        del history[:len(history) - 400]
+        del history[: len(history) - 400]
     return {**job, "log_lines": log_lines, "log_history": history_snapshot}
 
 
@@ -1351,7 +1452,7 @@ async def admin_stop_job(job_id: str, _: None = Depends(require_admin)):
     if task and not task.done():
         task.cancel()
     job["status"] = "stopped"
-    job["error"]  = "Cancelled by user"
+    job["error"] = "Cancelled by user"
     job["log_lines"].append({"level": "warn", "msg": "Job cancelled by user"})
     _admin_tasks.pop(job_id, None)
     logger.info("Admin job %s cancelled by user", job_id)
@@ -1360,27 +1461,27 @@ async def admin_stop_job(job_id: str, _: None = Depends(require_admin)):
 
 _LAYER_DELETE_ORDER = [
     # (model_class, filter_col) — ordered leaf-first so FK constraints aren't violated
-    ("GameEvent",         "season_id"),
-    ("GamePlayer",        "season_id"),
-    ("Game",              "season_id"),
-    ("LeagueGroup",       None),          # handled via League cascade
-    ("League",            "season_id"),
-    ("PlayerStatistics",  "season_id"),
-    ("TeamPlayer",        "season_id"),
-    ("Team",              "season_id"),
-    ("Club",              "season_id"),
+    ("GameEvent", "season_id"),
+    ("GamePlayer", "season_id"),
+    ("Game", "season_id"),
+    ("LeagueGroup", None),  # handled via League cascade
+    ("League", "season_id"),
+    ("PlayerStatistics", "season_id"),
+    ("TeamPlayer", "season_id"),
+    ("Team", "season_id"),
+    ("Club", "season_id"),
 ]
 
 _LAYER_SETS: dict[str, list[str]] = {
-    "events":       ["GameEvent"],
-    "games":        ["GameEvent", "GamePlayer", "Game"],
-    "groups":       ["GameEvent", "GamePlayer", "Game", "LeagueGroup"],
-    "leagues":      ["GameEvent", "GamePlayer", "Game", "LeagueGroup", "League"],
+    "events": ["GameEvent"],
+    "games": ["GameEvent", "GamePlayer", "Game"],
+    "groups": ["GameEvent", "GamePlayer", "Game", "LeagueGroup"],
+    "leagues": ["GameEvent", "GamePlayer", "Game", "LeagueGroup", "League"],
     "player_stats": ["PlayerStatistics"],
-    "players":      ["PlayerStatistics", "TeamPlayer"],
-    "teams":        ["PlayerStatistics", "TeamPlayer", "Team"],
-    "clubs":        ["PlayerStatistics", "TeamPlayer", "Team", "Club"],
-    "all":          [m for m, _ in _LAYER_DELETE_ORDER],
+    "players": ["PlayerStatistics", "TeamPlayer"],
+    "teams": ["PlayerStatistics", "TeamPlayer", "Team"],
+    "clubs": ["PlayerStatistics", "TeamPlayer", "Team", "Club"],
+    "all": [m for m, _ in _LAYER_DELETE_ORDER],
 }
 
 
@@ -1389,6 +1490,7 @@ async def admin_set_current_season(season_id: int, _: None = Depends(require_adm
     """Mark a season as the current active season (clears flag on all others)."""
     from app.services.database import get_database_service
     from app.models.db_models import Season
+
     db = get_database_service()
     with db.session_scope() as session:
         if not session.query(Season).filter(Season.id == season_id).first():
@@ -1399,30 +1501,49 @@ async def admin_set_current_season(season_id: int, _: None = Depends(require_adm
 
 
 @app.delete("/admin/api/season/{season_id}")
-async def admin_delete_season_layer(season_id: int, layer: str = "all", _: None = Depends(require_admin)):
+async def admin_delete_season_layer(
+    season_id: int, layer: str = "all", _: None = Depends(require_admin)
+):
     """Delete indexed data for a season layer.
 
     layer values: all | clubs | teams | players | player_stats |
                   leagues | groups | games | events
     """
     from app.models.db_models import (
-        Club, League, LeagueGroup, Team, TeamPlayer, PlayerStatistics,
-        Game, GamePlayer, GameEvent, SyncStatus
+        Club,
+        League,
+        LeagueGroup,
+        Team,
+        TeamPlayer,
+        PlayerStatistics,
+        Game,
+        GamePlayer,
+        GameEvent,
+        SyncStatus,
     )
+
     model_map = {
-        "Club": Club, "League": League, "LeagueGroup": LeagueGroup,
-        "Team": Team, "TeamPlayer": TeamPlayer,
+        "Club": Club,
+        "League": League,
+        "LeagueGroup": LeagueGroup,
+        "Team": Team,
+        "TeamPlayer": TeamPlayer,
         "PlayerStatistics": PlayerStatistics,
-        "Game": Game, "GamePlayer": GamePlayer, "GameEvent": GameEvent,
+        "Game": Game,
+        "GamePlayer": GamePlayer,
+        "GameEvent": GameEvent,
     }
 
     layer = layer.lower()
     if layer not in _LAYER_SETS:
-        raise HTTPException(status_code=400, detail=f"Unknown layer '{layer}'. Valid: {list(_LAYER_SETS)}")
+        raise HTTPException(
+            status_code=400, detail=f"Unknown layer '{layer}'. Valid: {list(_LAYER_SETS)}"
+        )
 
     targets = _LAYER_SETS[layer]
 
     from app.services.database import get_database_service
+
     db = get_database_service()
     totals: dict[str, int] = {}
 
@@ -1435,23 +1556,30 @@ async def admin_delete_season_layer(season_id: int, layer: str = "all", _: None 
             if model_name == "LeagueGroup":
                 # Delete via parent league IDs to respect FK
                 league_ids = [
-                    r[0] for r in session.query(League.id).filter(League.season_id == season_id).all()
+                    r[0]
+                    for r in session.query(League.id).filter(League.season_id == season_id).all()
                 ]
                 if league_ids:
-                    n = session.query(LeagueGroup).filter(LeagueGroup.league_id.in_(league_ids)).delete(synchronize_session=False)
+                    n = (
+                        session.query(LeagueGroup)
+                        .filter(LeagueGroup.league_id.in_(league_ids))
+                        .delete(synchronize_session=False)
+                    )
                 else:
                     n = 0
             else:
-                n = session.query(model_cls).filter(
-                    getattr(model_cls, filter_col) == season_id
-                ).delete(synchronize_session=False)
+                n = (
+                    session.query(model_cls)
+                    .filter(getattr(model_cls, filter_col) == season_id)
+                    .delete(synchronize_session=False)
+                )
             totals[model_name] = n
 
         # Also clean up SyncStatus rows for this season
         if layer == "all":
-            session.query(SyncStatus).filter(
-                SyncStatus.entity_id == f"season:{season_id}"
-            ).delete(synchronize_session=False)
+            session.query(SyncStatus).filter(SyncStatus.entity_id == f"season:{season_id}").delete(
+                synchronize_session=False
+            )
 
     logger.info("Admin deleted season=%s layer=%s — %s", season_id, layer, totals)
     return {"ok": True, "season_id": season_id, "layer": layer, "deleted": totals}
@@ -1461,12 +1589,13 @@ async def admin_delete_season_layer(season_id: int, layer: str = "all", _: None 
 async def admin_scheduler_status(_: None = Depends(require_admin)):
     """Return the scheduler queue and recent history."""
     from app.services.scheduler import get_scheduler
+
     sched = get_scheduler()
     if not sched:
         return {"enabled": False, "queue": [], "history": []}
     return {
         "enabled": sched.enabled,
-        "queue":   sched.get_schedule(),
+        "queue": sched.get_schedule(),
         "history": sched.get_history(200),
         "season_filter": sched.get_season_filter(),
         "policy_tiers": sched.get_policy_tiers(),
@@ -1484,6 +1613,7 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
       { "action": "trigger", "policy": "clubs", "season": 2025 }  – run now
     """
     from app.services.scheduler import get_scheduler
+
     sched = get_scheduler()
     if not sched:
         raise HTTPException(status_code=503, detail="Scheduler not running")
@@ -1497,11 +1627,13 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
         return {"ok": True, "enabled": False}
     if action == "season_filter":
         min_season = payload.get("min_season")  # int or null
-        excluded   = payload.get("excluded_seasons", [])
+        excluded = payload.get("excluded_seasons", [])
         if min_season is not None and not isinstance(min_season, int):
             raise HTTPException(status_code=400, detail="min_season must be an integer or null")
         if not isinstance(excluded, list) or not all(isinstance(s, int) for s in excluded):
-            raise HTTPException(status_code=400, detail="excluded_seasons must be a list of integers")
+            raise HTTPException(
+                status_code=400, detail="excluded_seasons must be a list of integers"
+            )
         sched.set_season_filter(min_season, excluded)
         return {"ok": True, **sched.get_season_filter()}
     if action == "max_concurrent":
@@ -1519,11 +1651,15 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
     if action == "policy_tiers":
         tiers_raw = payload.get("tiers", {})
         if not isinstance(tiers_raw, dict):
-            raise HTTPException(status_code=400, detail="tiers must be a dict mapping policy name to tier (1-6)")
+            raise HTTPException(
+                status_code=400, detail="tiers must be a dict mapping policy name to tier (1-6)"
+            )
         tiers: dict[str, int] = {}
         for k, v in tiers_raw.items():
             if not isinstance(v, int) or not 1 <= v <= 6:
-                raise HTTPException(status_code=400, detail=f"tier for '{k}' must be an integer 1–6")
+                raise HTTPException(
+                    status_code=400, detail=f"tier for '{k}' must be an integer 1–6"
+                )
             tiers[k] = v
         sched.set_policy_tiers(tiers)
         return {"ok": True, "policy_tiers": sched.get_policy_tiers()}
@@ -1536,14 +1672,11 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
         # Once _watch() has seen "done" and exited it sets the JobRecord to
         # "done"/"error" — at that point removing the _admin_jobs entry is safe.
         # We therefore protect only entries whose JobRecord is still running.
-        active_watch_ids = {
-            r.job_id for r in sched._history
-            if r.status in ("pending", "running")
-        }
+        active_watch_ids = {r.job_id for r in sched._history if r.status in ("pending", "running")}
         finished_ids = [
-            jid for jid, j in list(_admin_jobs.items())
-            if j.get("status") in ("done", "error", "stopped")
-            and jid not in active_watch_ids
+            jid
+            for jid, j in list(_admin_jobs.items())
+            if j.get("status") in ("done", "error", "stopped") and jid not in active_watch_ids
         ]
         for jid in finished_ids:
             _admin_jobs.pop(jid, None)
@@ -1559,12 +1692,12 @@ async def admin_scheduler_control(payload: dict, _: None = Depends(require_admin
         # Return enough info for the UI to register and poll the job
         job_entry = _admin_jobs.get(job_id, {})
         return {
-            "ok":     True,
+            "ok": True,
             "policy": policy,
             "season": season,
             "job_id": job_id,
-            "label":  job_entry.get("label", f"{policy} S{season}"),
-            "task":   job_entry.get("task", policy),
+            "label": job_entry.get("label", f"{policy} S{season}"),
+            "task": job_entry.get("task", policy),
         }
     raise HTTPException(status_code=400, detail=f"Unknown action '{action}'")
 
@@ -1603,8 +1736,8 @@ async def admin_purge_seasons(payload: dict, _: None = Depends(require_admin)):
     payload:
       { "season": 2022, "mode": "exact|older|older-or-equal|newer|newer-or-equal", "dry_run": false }
     """
-    season  = payload.get("season")
-    mode    = payload.get("mode", "exact")
+    season = payload.get("season")
+    mode = payload.get("mode", "exact")
     dry_run = bool(payload.get("dry_run", False))
 
     VALID_MODES = {"exact", "older", "older-or-equal", "newer", "newer-or-equal"}
@@ -1614,24 +1747,26 @@ async def admin_purge_seasons(payload: dict, _: None = Depends(require_admin)):
         raise HTTPException(status_code=400, detail=f"mode must be one of {VALID_MODES}")
 
     job_id = str(uuid.uuid4())[:8]
-    label  = f"purge season {season} [{mode}]" + (" (dry-run)" if dry_run else "")
+    label = f"purge season {season} [{mode}]" + (" (dry-run)" if dry_run else "")
     _admin_jobs[job_id] = {
-        "job_id":    job_id,
-        "season":    season,
-        "task":      "purge",
-        "label":     label,
-        "status":    "running",
-        "progress":  0,
-        "stats":     {},
+        "job_id": job_id,
+        "season": season,
+        "task": "purge",
+        "label": label,
+        "status": "running",
+        "progress": 0,
+        "stats": {},
         "log_lines": [],
-        "error":     None,
+        "error": None,
     }
     task = asyncio.create_task(
         _run_purge(job_id, season, mode, dry_run),
         name=f"purge-{job_id}",
     )
     _admin_tasks[job_id] = task
-    logger.info("Admin purge job %s started — season=%s mode=%s dry_run=%s", job_id, season, mode, dry_run)
+    logger.info(
+        "Admin purge job %s started — season=%s mode=%s dry_run=%s", job_id, season, mode, dry_run
+    )
     return {"ok": True, "job_id": job_id, "label": label}
 
 
@@ -1646,8 +1781,18 @@ async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
     try:
         from app.services.database import get_database_service
         from app.models.db_models import (
-            Season, Club, League, LeagueGroup, Team, Player,
-            TeamPlayer, Game, GamePlayer, GameEvent, PlayerStatistics, SyncStatus,
+            Season,
+            Club,
+            League,
+            LeagueGroup,
+            Team,
+            Player,
+            TeamPlayer,
+            Game,
+            GamePlayer,
+            GameEvent,
+            PlayerStatistics,
+            SyncStatus,
         )
         from sqlalchemy import func, or_ as sa_or
 
@@ -1658,9 +1803,10 @@ async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
                 return 0
             total = 0
             for i in range(0, len(ids), CHUNK):
-                total += session.query(func.count(model.id)).filter(
-                    col.in_(ids[i: i + CHUNK])
-                ).scalar() or 0
+                total += (
+                    session.query(func.count(model.id)).filter(col.in_(ids[i : i + CHUNK])).scalar()
+                    or 0
+                )
             return total
 
         def batched_delete(session, model, col, ids: list) -> int:
@@ -1668,16 +1814,18 @@ async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
                 return 0
             total = 0
             for i in range(0, len(ids), CHUNK):
-                total += session.query(model).filter(
-                    col.in_(ids[i: i + CHUNK])
-                ).delete(synchronize_session=False)
+                total += (
+                    session.query(model)
+                    .filter(col.in_(ids[i : i + CHUNK]))
+                    .delete(synchronize_session=False)
+                )
             return total
 
         op_map = {
-            "exact":          lambda col: col == season,
-            "older":          lambda col: col < season,
+            "exact": lambda col: col == season,
+            "older": lambda col: col < season,
             "older-or-equal": lambda col: col <= season,
-            "newer":          lambda col: col > season,
+            "newer": lambda col: col > season,
             "newer-or-equal": lambda col: col >= season,
         }
         season_filter = op_map[mode]
@@ -1700,27 +1848,43 @@ async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
 
         # Fetch IDs once — reused for both counting and deleting to avoid TOCTOU.
         with db.session_scope() as session:
-            game_ids = [r[0] for r in session.query(Game.id).filter(Game.season_id.in_(target_ids)).all()]
-            league_ids = [r[0] for r in session.query(League.id).filter(League.season_id.in_(target_ids)).all()]
+            game_ids = [
+                r[0] for r in session.query(Game.id).filter(Game.season_id.in_(target_ids)).all()
+            ]
+            league_ids = [
+                r[0]
+                for r in session.query(League.id).filter(League.season_id.in_(target_ids)).all()
+            ]
 
-        sync_filters = sa_or(*[
-            SyncStatus.entity_id.like(f"%:{s}:%") | SyncStatus.entity_id.like(f"%:{s}")
-            for s in target_ids
-        ]) if target_ids else (SyncStatus.id == -1)
+        sync_filters = (
+            sa_or(
+                *[
+                    SyncStatus.entity_id.like(f"%:{s}:%") | SyncStatus.entity_id.like(f"%:{s}")
+                    for s in target_ids
+                ]
+            )
+            if target_ids
+            else (SyncStatus.id == -1)
+        )
 
         with db.session_scope() as session:
             counts = {
-                "GameEvent":        batched_count(session, GameEvent,        GameEvent.game_id,           game_ids),
-                "GamePlayer":       batched_count(session, GamePlayer,       GamePlayer.game_id,          game_ids),
-                "PlayerStatistics": batched_count(session, PlayerStatistics, PlayerStatistics.season_id,  target_ids),
-                "TeamPlayer":       batched_count(session, TeamPlayer,       TeamPlayer.season_id,        target_ids),
-                "Game":             len(game_ids),
-                "LeagueGroup":      batched_count(session, LeagueGroup,      LeagueGroup.league_id,       league_ids),
-                "Team":             batched_count(session, Team,             Team.season_id,              target_ids),
-                "Club":             batched_count(session, Club,             Club.season_id,              target_ids),
-                "League":           len(league_ids),
-                "SyncStatus":       session.query(func.count(SyncStatus.id)).filter(sync_filters).scalar() or 0,
-                "Season":           len(target_ids),
+                "GameEvent": batched_count(session, GameEvent, GameEvent.game_id, game_ids),
+                "GamePlayer": batched_count(session, GamePlayer, GamePlayer.game_id, game_ids),
+                "PlayerStatistics": batched_count(
+                    session, PlayerStatistics, PlayerStatistics.season_id, target_ids
+                ),
+                "TeamPlayer": batched_count(session, TeamPlayer, TeamPlayer.season_id, target_ids),
+                "Game": len(game_ids),
+                "LeagueGroup": batched_count(
+                    session, LeagueGroup, LeagueGroup.league_id, league_ids
+                ),
+                "Team": batched_count(session, Team, Team.season_id, target_ids),
+                "Club": batched_count(session, Club, Club.season_id, target_ids),
+                "League": len(league_ids),
+                "SyncStatus": session.query(func.count(SyncStatus.id)).filter(sync_filters).scalar()
+                or 0,
+                "Season": len(target_ids),
             }
 
         total_rows = sum(counts.values())
@@ -1731,9 +1895,9 @@ async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
 
         if dry_run:
             push("warn", "[dry-run] Nothing deleted.")
-            job["status"]   = "done"
+            job["status"] = "done"
             job["progress"] = 100
-            job["stats"]    = counts
+            job["stats"] = counts
             return
 
         push("info", "Deleting...")
@@ -1742,15 +1906,26 @@ async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
         # only for the duration of that step, not the entire purge.
         deleted: dict[str, int] = {}
         steps = [
-            ("GameEvent",        lambda s: batched_delete(s, GameEvent,        GameEvent.game_id,           game_ids)),
-            ("GamePlayer",       lambda s: batched_delete(s, GamePlayer,       GamePlayer.game_id,          game_ids)),
-            ("PlayerStatistics", lambda s: batched_delete(s, PlayerStatistics, PlayerStatistics.season_id,  target_ids)),
-            ("TeamPlayer",       lambda s: batched_delete(s, TeamPlayer,       TeamPlayer.season_id,        target_ids)),
-            ("Game",             lambda s: batched_delete(s, Game,             Game.season_id,              target_ids)),
-            ("LeagueGroup",      lambda s: batched_delete(s, LeagueGroup,      LeagueGroup.league_id,       league_ids)),
-            ("Team",             lambda s: batched_delete(s, Team,             Team.season_id,              target_ids)),
-            ("Club",             lambda s: batched_delete(s, Club,             Club.season_id,              target_ids)),
-            ("League",           lambda s: batched_delete(s, League,           League.season_id,            target_ids)),
+            ("GameEvent", lambda s: batched_delete(s, GameEvent, GameEvent.game_id, game_ids)),
+            ("GamePlayer", lambda s: batched_delete(s, GamePlayer, GamePlayer.game_id, game_ids)),
+            (
+                "PlayerStatistics",
+                lambda s: batched_delete(
+                    s, PlayerStatistics, PlayerStatistics.season_id, target_ids
+                ),
+            ),
+            (
+                "TeamPlayer",
+                lambda s: batched_delete(s, TeamPlayer, TeamPlayer.season_id, target_ids),
+            ),
+            ("Game", lambda s: batched_delete(s, Game, Game.season_id, target_ids)),
+            (
+                "LeagueGroup",
+                lambda s: batched_delete(s, LeagueGroup, LeagueGroup.league_id, league_ids),
+            ),
+            ("Team", lambda s: batched_delete(s, Team, Team.season_id, target_ids)),
+            ("Club", lambda s: batched_delete(s, Club, Club.season_id, target_ids)),
+            ("League", lambda s: batched_delete(s, League, League.season_id, target_ids)),
         ]
         for i, (name, fn) in enumerate(steps, 1):
             with db.session_scope() as session:
@@ -1776,8 +1951,8 @@ async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
         # Run after all season data is deleted so the joins reflect final state.
         with db.session_scope() as session:
             orphan_ids = [
-                r[0] for r in
-                session.query(Player.person_id)
+                r[0]
+                for r in session.query(Player.person_id)
                 .outerjoin(TeamPlayer, TeamPlayer.player_id == Player.person_id)
                 .outerjoin(GamePlayer, GamePlayer.player_id == Player.person_id)
                 .filter(TeamPlayer.player_id.is_(None))
@@ -1790,17 +1965,20 @@ async def _run_purge(job_id: str, season: int, mode: str, dry_run: bool):
                 push("ok", f"  Deleted {n:,} orphaned Player rows")
 
         total_deleted = sum(deleted.values())
-        push("ok", f"✓ Purge complete — {total_deleted:,} rows deleted across {len(target_ids)} season(s).")
+        push(
+            "ok",
+            f"✓ Purge complete — {total_deleted:,} rows deleted across {len(target_ids)} season(s).",
+        )
         logger.info("Admin purge %s complete — %s rows", job_id, total_deleted)
-        job["status"]   = "done"
+        job["status"] = "done"
         job["progress"] = 100
-        job["stats"]    = deleted
+        job["stats"] = deleted
 
     except Exception as exc:
         push("error", f"Purge failed: {exc}")
         logger.exception("Purge job %s failed", job_id)
         job["status"] = "error"
-        job["error"]  = str(exc)
+        job["error"] = str(exc)
         job["progress"] = 100
 
 
@@ -1829,8 +2007,9 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         from app.services.database import get_database_service
         from app.services.repair_service import get_repair_service
         from app.models.db_models import Club, Team, League, Game
-        indexer        = get_data_indexer()
-        db_service     = get_database_service()
+
+        indexer = get_data_indexer()
+        db_service = get_database_service()
         repair_service = get_repair_service()
 
         stats: dict = {}
@@ -1843,10 +2022,13 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         if task != "seasons" and season is not None:
             current = get_current_season()
             if season > current:
-                push("warn", f"Season {season} is beyond the flagged current season ({current}). Skipping.")
-                job["status"]   = "done"
+                push(
+                    "warn",
+                    f"Season {season} is beyond the flagged current season ({current}). Skipping.",
+                )
+                job["status"] = "done"
                 job["progress"] = 100
-                job["stats"]    = stats
+                job["stats"] = stats
                 return
 
         # ── SEASONS ────────────────────────────────────────────────────────
@@ -1868,15 +2050,18 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         # ── TEAMS ──────────────────────────────────────────────────────────
         if task in ("teams", "clubs_path", "full"):
             with db_service.session_scope() as s:
-                club_list = [(c.id, c.name) for c in
-                             s.query(Club).filter(Club.season_id == season).all()]
+                club_list = [
+                    (c.id, c.name) for c in s.query(Club).filter(Club.season_id == season).all()
+                ]
             total = len(club_list)
             push("info", f"Indexing teams for {total} clubs...")
             teams_n = 0
             team_id_list = []
             for i, (cid, cname) in enumerate(club_list, 1):
                 await _backoff_if_busy()
-                cnt, tids = await asyncio.to_thread(indexer.index_teams_for_club, cid, season, force=force)
+                cnt, tids = await asyncio.to_thread(
+                    indexer.index_teams_for_club, cid, season, force=force
+                )
                 teams_n += cnt
                 team_id_list.extend(tids)
                 set_progress(10 + int(i / total * 25))
@@ -1887,25 +2072,40 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         # ── PLAYERS ────────────────────────────────────────────────────────
         if task in ("players", "clubs_path", "full"):
             from app.services.data_indexer import league_tier as _lt
+
             # Auto-detect effective tier from leagues already indexed for this season
             effective_tier_p = max_tier
             if max_tier == 7:
                 with db_service.session_scope() as _sp:
-                    _lids = [r[0] for r in
-                             _sp.query(League.league_id).filter(League.season_id == season).all()]
+                    _lids = [
+                        r[0]
+                        for r in _sp.query(League.league_id)
+                        .filter(League.season_id == season)
+                        .all()
+                    ]
                 if _lids:
                     effective_tier_p = max(_lt(lid) for lid in _lids)
             # Build tier-filtered team list fresh (ensures newly indexed teams are included)
             with db_service.session_scope() as s:
-                _t_rows = s.query(Team.id, Team.league_id).filter(Team.season_id == season).distinct().all()
+                _t_rows = (
+                    s.query(Team.id, Team.league_id)
+                    .filter(Team.season_id == season)
+                    .distinct()
+                    .all()
+                )
             team_id_list = [r[0] for r in _t_rows if _lt(r[1] or 0) <= effective_tier_p]
             auto_lbl_p = " (auto)" if max_tier == 7 else ""
             total = len(team_id_list)
-            push("info", f"Indexing players for {total} teams (tier ≤ {effective_tier_p}{auto_lbl_p})...")
+            push(
+                "info",
+                f"Indexing players for {total} teams (tier ≤ {effective_tier_p}{auto_lbl_p})...",
+            )
             players_n = 0
             for i, tid in enumerate(team_id_list, 1):
                 await _backoff_if_busy()
-                players_n += await asyncio.to_thread(indexer.index_players_for_team, tid, season, force=force)
+                players_n += await asyncio.to_thread(
+                    indexer.index_players_for_team, tid, season, force=force
+                )
                 set_progress(35 + int(i / total * 25) if total else 60)
             stats["players"] = players_n
             push("ok", f"Players: {players_n}")
@@ -1914,11 +2114,13 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         # ── PLAYER STATS ───────────────────────────────────────────────────
         if task in ("player_stats", "clubs_path", "full"):
             _exact_tier_ps = max_tier if max_tier < 7 else None
-            _tier_lbl_ps   = f" (tier {max_tier} only)" if _exact_tier_ps else ""
+            _tier_lbl_ps = f" (tier {max_tier} only)" if _exact_tier_ps else ""
             push("info", f"Indexing player statistics for season {season}{_tier_lbl_ps}...")
             stats_n = await asyncio.to_thread(
                 indexer.index_player_stats_for_season,
-                season, force=force, exact_tier=_exact_tier_ps,
+                season,
+                force=force,
+                exact_tier=_exact_tier_ps,
                 on_progress=set_progress,
             )
             stats["player_stats"] = stats_n
@@ -1929,24 +2131,35 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         # ── GAME LINEUPS (standalone — without events) ─────────────────────
         if task == "game_lineups":
             from app.services.data_indexer import league_tier
+
             effective_tier_gl = max_tier if max_tier != 7 else 3
             with db_service.session_scope() as s:
-                t_rows = s.query(Team.id, Team.league_id).filter(Team.season_id == season).distinct().all()
+                t_rows = (
+                    s.query(Team.id, Team.league_id)
+                    .filter(Team.season_id == season)
+                    .distinct()
+                    .all()
+                )
             t_ids = {r[0] for r in t_rows if league_tier(r[1] or 0) <= effective_tier_gl}
             with db_service.session_scope() as s:
                 game_ids_gl = [
-                    g.id for g in s.query(Game.id).filter(
+                    g.id
+                    for g in s.query(Game.id)
+                    .filter(
                         Game.season_id == season,
                         Game.home_score.isnot(None),
                         (Game.home_team_id.in_(t_ids)) | (Game.away_team_id.in_(t_ids)),
-                    ).all()
+                    )
+                    .all()
                 ]
             total_gl = len(game_ids_gl)
             push("info", f"Indexing lineups for {total_gl} games (tier ≤ {effective_tier_gl})...")
             lineup_n2 = 0
             for i, gid in enumerate(game_ids_gl, 1):
                 await _backoff_if_busy()
-                lineup_n2 += max(0, await asyncio.to_thread(indexer.index_game_lineup, gid, season, force=force))
+                lineup_n2 += max(
+                    0, await asyncio.to_thread(indexer.index_game_lineup, gid, season, force=force)
+                )
                 set_progress(int(i / total_gl * 95) if total_gl else 99)
             stats["game_lineups"] = lineup_n2
             push("ok", f"Game lineups: {lineup_n2}")
@@ -1956,19 +2169,24 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         if task in ("player_game_stats", "full"):
             # max_tier < 7 means this is a tier-specific scheduler policy run
             _exact_tier = max_tier if max_tier < 7 else None
-            _tier_lbl   = f" (tier {max_tier} only)" if _exact_tier else ""
+            _tier_lbl = f" (tier {max_tier} only)" if _exact_tier else ""
             push("info", f"Updating per-game G/A/PIM for season {season}{_tier_lbl}...")
             from app.services.scheduler import get_scheduler as _get_sched
+
             pgstats_n = await asyncio.to_thread(
                 indexer.index_player_game_stats_for_season,
-                season_id=season, force=force, exact_tier=_exact_tier,
+                season_id=season,
+                force=force,
+                exact_tier=_exact_tier,
                 on_progress=set_progress,
                 max_workers=getattr(_get_sched(), "_player_game_stats_workers", 10),
             )
             stats["player_game_stats"] = pgstats_n
             push("ok", f"Player game stats: {pgstats_n}")
             if not _exact_tier:  # scheduler tier-runs use their own entity_type keys
-                await asyncio.to_thread(indexer.record_season_sync, "player_game_stats", season, pgstats_n)
+                await asyncio.to_thread(
+                    indexer.record_season_sync, "player_game_stats", season, pgstats_n
+                )
 
         # ── LEAGUES ────────────────────────────────────────────────────────
         if task in ("leagues", "groups", "games", "leagues_path", "full"):
@@ -1982,14 +2200,18 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         lg_list: list[tuple] = []
         if task in ("groups", "games", "leagues_path", "full"):
             with db_service.session_scope() as s:
-                lg_list = [(lg.id, lg.league_id, lg.game_class) for lg in
-                           s.query(League).filter(League.season_id == season).all()]
-            total  = len(lg_list)
+                lg_list = [
+                    (lg.id, lg.league_id, lg.game_class)
+                    for lg in s.query(League).filter(League.season_id == season).all()
+                ]
+            total = len(lg_list)
             groups_n = 0
             push("info", f"Indexing groups for {total} leagues...")
             for i, (ldb, lid, gc) in enumerate(lg_list, 1):
                 await _backoff_if_busy()
-                groups_n += await asyncio.to_thread(indexer.index_groups_for_league, ldb, season, lid, gc, force=force)
+                groups_n += await asyncio.to_thread(
+                    indexer.index_groups_for_league, ldb, season, lid, gc, force=force
+                )
                 set_progress(62 + int(i / total * 13))
             stats["league_groups"] = groups_n
             push("ok", f"Groups: {groups_n}")
@@ -2001,10 +2223,13 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         # ── GAMES ──────────────────────────────────────────────────────────
         if task in ("games", "leagues_path", "full"):
             from app.models.db_models import LeagueGroup
+
             if not lg_list:
                 with db_service.session_scope() as s:
-                    lg_list = [(lg.id, lg.league_id, lg.game_class) for lg in
-                               s.query(League).filter(League.season_id == season).all()]
+                    lg_list = [
+                        (lg.id, lg.league_id, lg.game_class)
+                        for lg in s.query(League).filter(League.season_id == season).all()
+                    ]
             # Build per-group work list so each group gets its own API call
             work: list[tuple] = []  # (league_db_id, league_id, game_class, group_db_id, group_name)
             with db_service.session_scope() as s:
@@ -2015,22 +2240,32 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                             work.append((ldb, lid, gc, grp.id, grp.name))
                     else:
                         work.append((ldb, lid, gc, None, None))
-            total  = len(work)
+            total = len(work)
             games_n = 0
-            push("info", f"Indexing games for {total} groups across {len(lg_list)} leagues (batch concurrency=2)...")
+            push(
+                "info",
+                f"Indexing games for {total} groups across {len(lg_list)} leagues (batch concurrency=2)...",
+            )
 
             # Process in small batches so the event loop stays responsive
             _GAMES_BATCH = 4
             for batch_start in range(0, max(total, 1), _GAMES_BATCH):
                 await _backoff_if_busy()
-                batch = work[batch_start:batch_start + _GAMES_BATCH]
+                batch = work[batch_start : batch_start + _GAMES_BATCH]
                 batch_results = await asyncio.gather(
-                    *(asyncio.to_thread(
-                        indexer.index_games_for_league,
-                        ldb, season, lid, gc,
-                        group_name=grp_name, group_db_id=grp_db_id,
-                        force=force,
-                    ) for ldb, lid, gc, grp_db_id, grp_name in batch),
+                    *(
+                        asyncio.to_thread(
+                            indexer.index_games_for_league,
+                            ldb,
+                            season,
+                            lid,
+                            gc,
+                            group_name=grp_name,
+                            group_db_id=grp_db_id,
+                            force=force,
+                        )
+                        for ldb, lid, gc, grp_db_id, grp_name in batch
+                    ),
                     return_exceptions=True,
                 )
                 for r in batch_results:
@@ -2054,6 +2289,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         if task in ("events", "full"):
             from app.services.data_indexer import league_tier
             from app.models.db_models import LeagueGroup, League as _League
+
             _now = datetime.now(timezone.utc)
 
             # Auto-detect effective tier from leagues actually indexed for this season
@@ -2074,6 +2310,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                 # Also include games with NULL game_date that are finished or
                 # already have a score — these were played but date parsing failed.
                 from sqlalchemy import or_
+
                 rows = (
                     s.query(Game.id, Game.season_id, _League.league_id)
                     .join(LeagueGroup, Game.group_id == LeagueGroup.id, isouter=True)
@@ -2082,8 +2319,8 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                         Game.season_id == season,
                         or_(
                             Game.game_date < _now,
-                            Game.home_score.isnot(None),   # scored but date missing
-                            Game.status == "finished",     # finished but date missing
+                            Game.home_score.isnot(None),  # scored but date missing
+                            Game.status == "finished",  # finished but date missing
                         ),
                     )
                     .all()
@@ -2093,7 +2330,7 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                     for r in rows
                     if league_tier(r.league_id or 0) <= effective_tier
                 ]
-            total    = len(finished)
+            total = len(finished)
             auto_lbl = " (auto)" if max_tier == 7 else ""
             tier_lbl = f"tier ≤ {effective_tier}{auto_lbl}"
 
@@ -2105,16 +2342,19 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
                 fresh_ln = indexer.bulk_already_indexed("game_lineup", lineup_eids, 720)
                 pre_count = len(finished)
                 finished = [
-                    (gid, sid) for gid, sid in finished
-                    if f"game:{gid}:events" not in fresh_ev
-                    or f"game:{gid}:lineup" not in fresh_ln
+                    (gid, sid)
+                    for gid, sid in finished
+                    if f"game:{gid}:events" not in fresh_ev or f"game:{gid}:lineup" not in fresh_ln
                 ]
                 skipped = pre_count - len(finished)
                 if skipped:
                     push("info", f"  Skipping {skipped} already-indexed game(s).")
 
-            total    = len(finished)
-            push("info", f"Indexing events + lineups for {total} past games ({tier_lbl}, batch concurrency=2)...")
+            total = len(finished)
+            push(
+                "info",
+                f"Indexing events + lineups for {total} past games ({tier_lbl}, batch concurrency=2)...",
+            )
             events_n = 0
             lineup_n = 0
 
@@ -2123,16 +2363,23 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             _EV_BATCH = 6
             for batch_start in range(0, max(total, 1), _EV_BATCH):
                 await _backoff_if_busy()
-                batch = finished[batch_start:batch_start + _EV_BATCH]
+                batch = finished[batch_start : batch_start + _EV_BATCH]
                 batch_results = await asyncio.gather(
-                    *(asyncio.gather(
-                        asyncio.to_thread(indexer.index_game_events, gid, sid_, force=force),
-                        asyncio.to_thread(indexer.index_game_lineup, gid, sid_, force=force),
-                    ) for gid, sid_ in batch),
+                    *(
+                        asyncio.gather(
+                            asyncio.to_thread(indexer.index_game_events, gid, sid_, force=force),
+                            asyncio.to_thread(indexer.index_game_lineup, gid, sid_, force=force),
+                        )
+                        for gid, sid_ in batch
+                    ),
                     return_exceptions=True,
                 )
                 for r in batch_results:
-                    if not isinstance(r, Exception) and isinstance(r, (list, tuple)) and len(r) == 2:
+                    if (
+                        not isinstance(r, Exception)
+                        and isinstance(r, (list, tuple))
+                        and len(r) == 2
+                    ):
                         events_n += r[0]
                         lineup_n += r[1]
                 done = min(batch_start + _EV_BATCH, total)
@@ -2172,30 +2419,33 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
             push("info", "Running nightly DB repair...")
             result = await asyncio.to_thread(repair_service.run_nightly)
             stats.update(result)
-            push("ok", (
-                f"Repair complete: {result['total_fixed']} rows fixed "
-                f"(stuck={result['stuck_in_progress']}, "
-                f"dates={result['null_game_dates']}, "
-                f"events={result['missing_events']}, "
-                f"period={result['null_period_fixed']}, "
-                f"failed={result['stale_failed']})"
-            ))
+            push(
+                "ok",
+                (
+                    f"Repair complete: {result['total_fixed']} rows fixed "
+                    f"(stuck={result['stuck_in_progress']}, "
+                    f"dates={result['null_game_dates']}, "
+                    f"events={result['missing_events']}, "
+                    f"period={result['null_period_fixed']}, "
+                    f"failed={result['stale_failed']})"
+                ),
+            )
             set_progress(100)
 
-        job["stats"]    = stats
+        job["stats"] = stats
         job["progress"] = 100
-        job["status"]   = "done"
+        job["status"] = "done"
         summary = "  ".join(f"{k}={v}" for k, v in stats.items())
         push("ok", f"Done — {summary}")
 
     except asyncio.CancelledError:
         job["status"] = "stopped"
-        job["error"]  = "Cancelled"
+        job["error"] = "Cancelled"
         logger.info("Admin indexing job %s was cancelled", job_id)
         raise  # let asyncio clean up properly
     except Exception as exc:
         job["status"] = "error"
-        job["error"]  = f"{type(exc).__name__}: {exc}\n\n{traceback.format_exc()}"
+        job["error"] = f"{type(exc).__name__}: {exc}\n\n{traceback.format_exc()}"
         logger.error("Admin indexing job %s failed: %s", job_id, exc, exc_info=True)
     finally:
         if job.get("status") in ("done", "error", "stopped"):
@@ -2217,6 +2467,7 @@ async def health_check():
 async def cache_status():
     """Cache status endpoint - shows hybrid cache statistics"""
     from app.services.data_cache import get_data_cache
+
     cache = get_data_cache()
     stats = cache.get_stats()
 
@@ -2237,30 +2488,31 @@ async def cache_status():
         "clubs_count": stats["clubs_count"],
         "leagues_count": stats["leagues_count"],
         "last_updated": stats["last_updated"],
-        "total_records": stats["teams_count"] + stats["clubs_count"] + stats["leagues_count"]
+        "total_records": stats["teams_count"] + stats["clubs_count"] + stats["leagues_count"],
     }
 
 
 @app.get("/{locale}", response_class=HTMLResponse)
 async def home(request: Request, locale: str, league_category: str = "all"):
     """Homepage with upcoming games + overall top scorers"""
-    from app.services.stats_service import get_upcoming_games, get_latest_results, get_overall_top_scorers
+    from app.services.stats_service import (
+        get_upcoming_games,
+        get_latest_results,
+        get_overall_top_scorers,
+    )
     from app.services.database import get_database_service
     from app.models.db_models import League, PlayerStatistics
     from app.services.data_indexer import league_tier
     from sqlalchemy import distinct, func
-    
+
     # Active season = the highlighted (current) season that has any player stats;
     # fall back to the season with most stats rows (avoids showing last year while
     # current season indexing is still in progress).
     db = get_database_service()
     with db.session_scope() as session:
         from app.models.db_models import Season as SeasonModel
-        highlighted = (
-            session.query(SeasonModel.id)
-            .filter(SeasonModel.highlighted == True)
-            .scalar()
-        )
+
+        highlighted = session.query(SeasonModel.id).filter(SeasonModel.highlighted == True).scalar()
         if highlighted:
             has_stats = (
                 session.query(PlayerStatistics.id)
@@ -2272,50 +2524,49 @@ async def home(request: Request, locale: str, league_category: str = "all"):
             # fallback: season with most stats rows
             row = (
                 session.query(
-                    PlayerStatistics.season_id,
-                    func.count(PlayerStatistics.id).label('count')
+                    PlayerStatistics.season_id, func.count(PlayerStatistics.id).label("count")
                 )
                 .group_by(PlayerStatistics.season_id)
                 .order_by(func.count(PlayerStatistics.id).desc())
                 .first()
             )
             active_season = row[0] if row else get_current_season()
-    
+
     # Get upcoming games (filtered by league category if specified)
     upcoming = get_upcoming_games(
-        limit=12, 
+        limit=12,
         league_category=league_category if league_category != "all" else None,
-        season_id=active_season
+        season_id=active_season,
     )
-    
+
     # Get recent completed games (filtered by league category if specified)
     recent = get_latest_results(
-        limit=12, 
+        limit=12,
         league_category=league_category if league_category != "all" else None,
-        season_id=active_season
+        season_id=active_season,
     )
-    
+
     # Get overall top scorers across all leagues
     overall_scorers = get_overall_top_scorers(season_id=active_season, limit=10)
-    
+
     # Get unique league categories for filtering - include both upcoming and recent games
-    upcoming_league_cats = set(g.get('league_category', '') for g in upcoming if g.get('league_category'))
-    recent_league_cats = set(g.get('league_category', '') for g in recent if g.get('league_category'))
+    upcoming_league_cats = set(
+        g.get("league_category", "") for g in upcoming if g.get("league_category")
+    )
+    recent_league_cats = set(
+        g.get("league_category", "") for g in recent if g.get("league_category")
+    )
     all_game_cats = upcoming_league_cats | recent_league_cats
-    
+
     with db.session_scope() as session:
         league_categories = (
-            session.query(
-                League.league_id,
-                League.game_class,
-                League.name
-            )
+            session.query(League.league_id, League.game_class, League.name)
             .filter(League.season_id == active_season)
             .distinct()
             .order_by(League.league_id, League.game_class)
             .all()
         )
-        
+
         # Group by league_id for cleaner display - only include if has games
         leagues_grouped = {}
         for league_id, game_class, name in league_categories:
@@ -2323,28 +2574,26 @@ async def home(request: Request, locale: str, league_category: str = "all"):
             # Only include if this category has games (upcoming or recent)
             if key not in all_game_cats:
                 continue
-                
+
             if league_id not in leagues_grouped:
                 # Extract base name (e.g., "NLB" from "Herren NLB")
                 base_name = name.split()[-1] if name else f"League {league_id}"
                 leagues_grouped[league_id] = {
-                    "name": base_name, 
+                    "name": base_name,
                     "classes": [],
-                    "tier": league_tier(league_id)
+                    "tier": league_tier(league_id),
                 }
-            
-            leagues_grouped[league_id]["classes"].append({
-                "id": key,
-                "game_class": game_class,
-                "full_name": name
-            })
-    
+
+            leagues_grouped[league_id]["classes"].append(
+                {"id": key, "game_class": game_class, "full_name": name}
+            )
+
     # Sort leagues by tier (lower tier = higher priority leagues like NLA, NLB)
     league_filters = [
         {"id": lid, "name": data["name"], "classes": data["classes"], "tier": data["tier"]}
         for lid, data in sorted(leagues_grouped.items(), key=lambda x: (x[1]["tier"], x[0]))
     ]
-    
+
     return templates.TemplateResponse(
         request,
         "home.html",
@@ -2356,7 +2605,7 @@ async def home(request: Request, locale: str, league_category: str = "all"):
             "overall_top_scorers": overall_scorers,
             "league_filters": league_filters,
             "league_category": league_category,
-        }
+        },
     )
 
 
@@ -2367,35 +2616,34 @@ async def upcoming_games_partial(request: Request, locale: str, league_category:
     from app.services.database import get_database_service
     from app.models.db_models import PlayerStatistics
     from sqlalchemy import func
-    
+
     # Get active season
     db = get_database_service()
     with db.session_scope() as session:
         active_season_row = (
             session.query(
-                PlayerStatistics.season_id,
-                func.count(PlayerStatistics.id).label('count')
+                PlayerStatistics.season_id, func.count(PlayerStatistics.id).label("count")
             )
             .group_by(PlayerStatistics.season_id)
             .order_by(func.count(PlayerStatistics.id).desc())
             .first()
         )
         active_season = active_season_row[0] if active_season_row else get_current_season()
-    
+
     # Get upcoming games filtered by league category
     upcoming = get_upcoming_games(
-        limit=12, 
+        limit=12,
         league_category=league_category if league_category != "all" else None,
-        season_id=active_season
+        season_id=active_season,
     )
-    
+
     return templates.TemplateResponse(
         request,
         "partials/upcoming_games_list.html",
         {
             "locale": locale,
             "upcoming_games": upcoming,
-        }
+        },
     )
 
 
@@ -2406,35 +2654,34 @@ async def recent_games_partial(request: Request, locale: str, league_category: s
     from app.services.database import get_database_service
     from app.models.db_models import PlayerStatistics
     from sqlalchemy import func
-    
+
     # Get active season
     db = get_database_service()
     with db.session_scope() as session:
         active_season_row = (
             session.query(
-                PlayerStatistics.season_id,
-                func.count(PlayerStatistics.id).label('count')
+                PlayerStatistics.season_id, func.count(PlayerStatistics.id).label("count")
             )
             .group_by(PlayerStatistics.season_id)
             .order_by(func.count(PlayerStatistics.id).desc())
             .first()
         )
         active_season = active_season_row[0] if active_season_row else get_current_season()
-    
+
     # Get recent games filtered by league category
     recent = get_latest_results(
-        limit=12, 
+        limit=12,
         league_category=league_category if league_category != "all" else None,
-        season_id=active_season
+        season_id=active_season,
     )
-    
+
     return templates.TemplateResponse(
         request,
         "partials/recent_games_list.html",
         {
             "locale": locale,
             "recent_games": recent,
-        }
+        },
     )
 
 
@@ -2452,8 +2699,10 @@ async def clubs_page(request: Request, locale: str):
         {
             "locale": locale,
             "t": get_translations(locale),
-            "clubs": clubs_list[:100] if isinstance(clubs_list, list) else []  # Limit to 100 for initial display
-        }
+            "clubs": (
+                clubs_list[:100] if isinstance(clubs_list, list) else []
+            ),  # Limit to 100 for initial display
+        },
     )
 
 
@@ -2462,38 +2711,42 @@ async def clubs_search(request: Request, locale: str, q: str = ""):
     """HTMX endpoint for club search"""
     # Use cached data instead of API call - instant results!
     all_clubs = await get_cached_clubs()
-    
+
     # Apply rendering exclusions, then filter by search query
     all_clubs = _rcfg.filter_clubs(all_clubs)
     filtered_clubs = all_clubs
     if q:
         filtered_clubs = [
-            club for club in filtered_clubs
-            if q.lower() in club.get("text", "").lower()
+            club for club in filtered_clubs if q.lower() in club.get("text", "").lower()
         ]
-    
+
     filtered_clubs = filtered_clubs[:50]  # Limit results
-    
+
     # Return partial HTML for htmx — same card structure as the full clubs listing
     from urllib.parse import quote_plus
+
     cards = ""
     for club in filtered_clubs:
         club_name = club.get("text", "Unknown")
         region = club.get("region") or club.get("set_in_context", {}).get("region", "")
         href = f"/{locale}/teams?club={quote_plus(club_name)}"
-        region_html = f'<p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">📍 {region}</p>' if region else ""
+        region_html = (
+            f'<p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">📍 {region}</p>'
+            if region
+            else ""
+        )
         cards += (
             f'<div class="card" onclick="window.location=\'{href}\'" style="cursor: pointer;">'
             f'<h3 style="margin: 0;">{club_name}</h3>'
-            f'{region_html}'
-            f'</div>'
+            f"{region_html}"
+            f"</div>"
         )
 
     if filtered_clubs:
         html = f'<div class="cards-grid">{cards}</div>'
     else:
         html = '<div style="text-align: center; padding: 3rem; color: var(--text-muted); grid-column: 1/-1;">No clubs found.</div>'
-    
+
     return HTMLResponse(content=html)
 
 
@@ -2504,17 +2757,16 @@ async def club_detail(request: Request, locale: str, club_id: int):
     club_data = {}
     teams = []
     players = []
-    
+
     try:
         # Get club from cache
         all_clubs = await get_cached_clubs()
-        
+
         # Find the club with matching ID
         matching_clubs = [
-            c for c in all_clubs 
-            if c.get("set_in_context", {}).get("club_id") == club_id
+            c for c in all_clubs if c.get("set_in_context", {}).get("club_id") == club_id
         ]
-        
+
         if matching_clubs:
             club_data = matching_clubs[0]
             club_name = club_data.get("text", "")
@@ -2527,6 +2779,7 @@ async def club_detail(request: Request, locale: str, club_id: int):
                 from app.services.database import get_database_service
                 from app.services.data_indexer import league_tier as _league_tier
                 from sqlalchemy import and_, text as sa_text
+
                 _db = get_database_service()
                 with _db.session_scope() as session:
                     rows = (
@@ -2537,7 +2790,7 @@ async def club_detail(request: Request, locale: str, club_id: int):
                                 League.league_id == Team.league_id,
                                 League.season_id == Team.season_id,
                                 League.game_class == Team.game_class,
-                            )
+                            ),
                         )
                         .filter(
                             Team.name.like(f"%{club_name}%"),
@@ -2547,11 +2800,13 @@ async def club_detail(request: Request, locale: str, club_id: int):
                     )
 
                     # Sort by tier (same ordering as the teams page), then league name, then team name
-                    rows.sort(key=lambda r: (
-                        _league_tier(r[0].league_id or 0),
-                        (r[1].name or "~~~~") if r[1] else "~~~~",
-                        r[0].name,
-                    ))
+                    rows.sort(
+                        key=lambda r: (
+                            _league_tier(r[0].league_id or 0),
+                            (r[1].name or "~~~~") if r[1] else "~~~~",
+                            r[0].name,
+                        )
+                    )
 
                     # Fetch group names per team via games → league_groups
                     team_ids = [t.id for t, _lg in rows]
@@ -2559,8 +2814,7 @@ async def club_detail(request: Request, locale: str, club_id: int):
                     groups_per_league: dict[int, int] = {}
                     if team_ids:
                         id_list = ",".join(str(i) for i in team_ids)
-                        grp_rows = session.execute(
-                            sa_text(f"""
+                        grp_rows = session.execute(sa_text(f"""
                                 SELECT t_id, lg.name
                                 FROM (
                                     SELECT home_team_id AS t_id, group_id
@@ -2571,8 +2825,7 @@ async def club_detail(request: Request, locale: str, club_id: int):
                                 ) g
                                 JOIN league_groups lg ON lg.id = g.group_id
                                 GROUP BY t_id
-                            """)
-                        ).fetchall()
+                            """)).fetchall()
                         group_by_team = {r[0]: r[1] for r in grp_rows}
 
                         # Count groups per league — same logic as leagues page:
@@ -2580,16 +2833,14 @@ async def club_detail(request: Request, locale: str, club_id: int):
                         league_db_ids = list({lg.id for _, lg in rows if lg is not None})
                         if league_db_ids:
                             lg_id_list = ",".join(str(i) for i in league_db_ids)
-                            cnt_rows = session.execute(
-                                sa_text(f"""
+                            cnt_rows = session.execute(sa_text(f"""
                                     SELECT league_id,
                                            COUNT(DISTINCT CASE WHEN COALESCE(NULLIF(name,''), text, '') != ''
                                                                THEN COALESCE(NULLIF(name,''), text) END)
                                     FROM league_groups
                                     WHERE league_id IN ({lg_id_list})
                                     GROUP BY league_id
-                                """)
-                            ).fetchall()
+                                """)).fetchall()
                             groups_per_league = {r[0]: r[1] for r in cnt_rows}
 
                     teams = [
@@ -2611,15 +2862,17 @@ async def club_detail(request: Request, locale: str, club_id: int):
                         for t, lg in rows
                     ]
             except Exception as team_error:
-                logger.warning(f"Could not load teams for club {club_id} ({club_name}): {team_error}")
+                logger.warning(
+                    f"Could not load teams for club {club_id} ({club_name}): {team_error}"
+                )
         else:
             error_message = f"Club with ID {club_id} not found"
             logger.warning(error_message)
-    
+
     except Exception as e:
         logger.error(f"Error fetching club {club_id}: {e}")
         error_message = f"Could not load club details: {str(e)}"
-    
+
     return templates.TemplateResponse(
         request,
         "club_detail.html",
@@ -2629,8 +2882,8 @@ async def club_detail(request: Request, locale: str, club_id: int):
             "club": club_data,
             "teams": teams,
             "players": players,
-            "error_message": error_message
-        }
+            "error_message": error_message,
+        },
     )
 
 
@@ -2665,11 +2918,22 @@ async def leagues_page(request: Request, locale: str, season: Optional[int] = No
     # Age-group mapping for youth/junior/senior leagues (non-senior competitions).
     # User rule: U21=U21, U18=U18+A, U16=U16+B, U14=U14+C, U12=D
     _AGE_GROUP_MAP = {
-        19: "U21", 26: "U21",
-        18: "U18", 31: "U18", 41: "U18",
-        16: "U16", 28: "U16", 32: "U16", 42: "U16",
-        14: "U14", 33: "U14", 43: "U14", 49: "U14",
-        34: "U12", 36: "U12", 44: "U12",
+        19: "U21",
+        26: "U21",
+        18: "U18",
+        31: "U18",
+        41: "U18",
+        16: "U16",
+        28: "U16",
+        32: "U16",
+        42: "U16",
+        14: "U14",
+        33: "U14",
+        43: "U14",
+        49: "U14",
+        34: "U12",
+        36: "U12",
+        44: "U12",
         35: "U10",
         51: "Senioren",
     }
@@ -2706,16 +2970,18 @@ async def leagues_page(request: Request, locale: str, season: Optional[int] = No
         else:
             tier = 0
             tier_label = None
-        leagues_flat.append({
-            "id": lg["id"],
-            "name": lg["name"],
-            "gender": gender,
-            "sex": sex,
-            "field": field,
-            "tier": tier,
-            "tier_label": tier_label,
-            "group_count": lg["group_count"],
-        })
+        leagues_flat.append(
+            {
+                "id": lg["id"],
+                "name": lg["name"],
+                "gender": gender,
+                "sex": sex,
+                "field": field,
+                "tier": tier,
+                "tier_label": tier_label,
+                "group_count": lg["group_count"],
+            }
+        )
 
     # Resolve display name for selected season
     selected_season_name = next((s["name"] for s in all_seasons if s["id"] == season), str(season))
@@ -2741,7 +3007,8 @@ def _zone_cutoffs(league_name: str) -> tuple[int, int]:
     """
     _ZONE_TABLE: dict[str, tuple[int, int]] = {
         # ── Men senior ────────────────────────────────────────────────────────
-        "herren nla": (8, 4), "herren prime league": (8, 4),
+        "herren nla": (8, 4),
+        "herren prime league": (8, 4),
         "herren nlb": (8, 4),
         "herren l-upl": (8, 4),
         "herren 1. liga": (8, 4),
@@ -2750,7 +3017,8 @@ def _zone_cutoffs(league_name: str) -> tuple[int, int]:
         "herren 4. liga": (1, 0),
         "herren 5. liga": (1, 0),
         # ── Women senior ──────────────────────────────────────────────────────
-        "damen nla": (8, 2), "damen prime league": (8, 2),
+        "damen nla": (8, 2),
+        "damen prime league": (8, 2),
         "damen nlb": (8, 2),
         "damen l-upl": (8, 2),
         "damen 1. liga": (1, 1),
@@ -2840,7 +3108,8 @@ async def league_detail(request: Request, locale: str, league_id: int):
     _season_to_db = {r.season_id: r.id for r in _siblings}
     available_seasons = [
         {"id": sz["id"], "name": sz["name"], "league_db_id": _season_to_db[sz["id"]]}
-        for sz in _all_seasons if sz["id"] in _season_to_db
+        for sz in _all_seasons
+        if sz["id"] in _season_to_db
     ]
     selected_season_name = next(
         (sz["name"] for sz in _all_seasons if sz["id"] == league_data.get("season_id")),
@@ -2852,9 +3121,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
     # standings_by_group computed below after phase groups are mapped
     # flat lookup: DB group_id → display name (for annotating game records)
     _group_id_to_name: dict[int | None, str] = {
-        gid: grp["name"]
-        for grp in groups
-        for gid in grp["ids"]
+        gid: grp["name"] for grp in groups for gid in grp["ids"]
     }
     topscorers = get_league_top_scorers(league_id, limit=100)
     top_penalties = get_league_top_penalties(league_id, limit=100)
@@ -2876,6 +3143,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
 
     # Upcoming (unscored) games for this league
     from app.services.stats_service import get_upcoming_games
+
     group_ids_for_league = [gid for grp in league_data.get("groups", []) for gid in grp["ids"]]
 
     # Build group_id → canonical phase mapping for annotating game cards
@@ -2898,36 +3166,54 @@ async def league_detail(request: Request, locale: str, league_id: int):
 
     # --- Regular season standings (only regular-phase group IDs) ---
     _regular_group_ids = _phase_to_group_ids.get("regular", [])
-    standings = get_league_standings(league_id, only_group_ids=_regular_group_ids if _regular_group_ids else None)
+    standings = get_league_standings(
+        league_id, only_group_ids=_regular_group_ids if _regular_group_ids else None
+    )
 
     # Restrict standings_by_group to regular groups only
     _regular_group_id_set = set(_regular_group_ids)
 
     # Detect "Spielfortführung" groups (replayed/delayed games) and merge them into
     # the corresponding main group instead of showing them as a separate filter chip.
-    _spielfort_names: set[str] = {grp["name"] for grp in groups if "spielfort" in grp["name"].lower()}
+    _spielfort_names: set[str] = {
+        grp["name"] for grp in groups if "spielfort" in grp["name"].lower()
+    }
     _spielfort_gids: set[int] = {
-        gid for grp in groups if grp["name"] in _spielfort_names
-        for gid in grp["ids"] if gid in _regular_group_id_set
+        gid
+        for grp in groups
+        if grp["name"] in _spielfort_names
+        for gid in grp["ids"]
+        if gid in _regular_group_id_set
     }
     _grp_extra: dict[str, set[int]] = {}
     if _spielfort_gids:
         from sqlalchemy import or_ as _or_sf
+
         with db.session_scope() as _sfsess:
-            _sf_rows = _sfsess.query(Game.home_team_id, Game.away_team_id).filter(
-                Game.group_id.in_(_spielfort_gids)
-            ).all()
+            _sf_rows = (
+                _sfsess.query(Game.home_team_id, Game.away_team_id)
+                .filter(Game.group_id.in_(_spielfort_gids))
+                .all()
+            )
             _sf_teams = {r.home_team_id for r in _sf_rows} | {r.away_team_id for r in _sf_rows}
             for _grp in groups:
                 if _grp["name"] in _spielfort_names:
                     continue
-                _base_ids = [g for g in _grp["ids"] if g in _regular_group_id_set and g not in _spielfort_gids]
+                _base_ids = [
+                    g
+                    for g in _grp["ids"]
+                    if g in _regular_group_id_set and g not in _spielfort_gids
+                ]
                 if not _base_ids:
                     continue
-                _has = _sfsess.query(Game.id).filter(
-                    Game.group_id.in_(_base_ids),
-                    _or_sf(Game.home_team_id.in_(_sf_teams), Game.away_team_id.in_(_sf_teams))
-                ).first()
+                _has = (
+                    _sfsess.query(Game.id)
+                    .filter(
+                        Game.group_id.in_(_base_ids),
+                        _or_sf(Game.home_team_id.in_(_sf_teams), Game.away_team_id.in_(_sf_teams)),
+                    )
+                    .first()
+                )
                 if _has:
                     _grp_extra.setdefault(_grp["name"], set()).update(_spielfort_gids)
 
@@ -2947,6 +3233,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
     # --- Series data per phase (playoff / playout) ---
     from datetime import date as _date
     from app.models.db_models import Team as _TmModel
+
     # Build regular-season rank map: team_id → rank (1-based position in standings)
     _reg_rank: dict[int, int] = {}
     for _ri, _rs in enumerate(standings, 1):
@@ -2967,16 +3254,22 @@ async def league_detail(request: Request, locale: str, league_id: int):
             _sti = {g.home_team_id for g in _sgames} | {g.away_team_id for g in _sgames}
             _snm: dict[int, str] = {}
             _slogo: dict[int, str] = {}
-            for _t in _ssess.query(_TmModel).filter(
-                _TmModel.id.in_(_sti), _TmModel.season_id == league_data["season_id"]
-            ).all():
+            for _t in (
+                _ssess.query(_TmModel)
+                .filter(_TmModel.id.in_(_sti), _TmModel.season_id == league_data["season_id"])
+                .all()
+            ):
                 _snm[_t.id] = _t.name or _t.text or f"Team {_t.id}"
                 if _t.logo_url:
                     _slogo[_t.id] = _t.logo_url
             # Fallback: find names from any season
             _missing = _sti - _snm.keys()
             if _missing:
-                for _t in _ssess.query(_TmModel).filter(_TmModel.id.in_(_missing), _TmModel.name.isnot(None)).all():
+                for _t in (
+                    _ssess.query(_TmModel)
+                    .filter(_TmModel.id.in_(_missing), _TmModel.name.isnot(None))
+                    .all()
+                ):
                     _snm.setdefault(_t.id, _t.name)
                     if _t.logo_url:
                         _slogo.setdefault(_t.id, _t.logo_url)
@@ -2990,8 +3283,8 @@ async def league_detail(request: Request, locale: str, league_id: int):
             for _key, _pgames in sorted(_pairs.items(), key=lambda x: _snm.get(x[0], "")):
                 _sorted_pgames = sorted(_pgames, key=lambda x: x.game_date or datetime.min)
                 _first_g = _sorted_pgames[0]
-                _ta = _first_g.home_team_id   # home of game 1 = team A
-                _tb = _first_g.away_team_id   # away of game 1 = team B
+                _ta = _first_g.home_team_id  # home of game 1 = team A
+                _tb = _first_g.away_team_id  # away of game 1 = team B
                 _ta_wins = 0
                 _tb_wins = 0
                 _games_list = []
@@ -3009,31 +3302,35 @@ async def league_detail(request: Request, locale: str, league_id: int):
                                 _tb_wins += 1
                             else:
                                 _ta_wins += 1
-                    _games_list.append({
-                        "game_id": _g.id,
-                        "date": _g.game_date.strftime("%d.%m.%Y") if _g.game_date else "",
-                        "weekday": _g.game_date.strftime("%a") if _g.game_date else "",
-                        "home_team": _snm.get(_g.home_team_id, f"Team {_g.home_team_id}"),
-                        "away_team": _snm.get(_g.away_team_id, f"Team {_g.away_team_id}"),
-                        "home_team_id": _g.home_team_id,
-                        "away_team_id": _g.away_team_id,
-                        "home_score": _g.home_score,
-                        "away_score": _g.away_score,
-                        "played": _played,
-                    })
-                _series_list.append({
-                    "team_a_id": _ta,
-                    "team_b_id": _tb,
-                    "team_a_name": _snm.get(_ta, f"Team {_ta}"),
-                    "team_b_name": _snm.get(_tb, f"Team {_tb}"),
-                    "team_a_logo": _slogo.get(_ta),
-                    "team_b_logo": _slogo.get(_tb),
-                    "team_a_rank": _reg_rank.get(_ta),
-                    "team_b_rank": _reg_rank.get(_tb),
-                    "team_a_wins": _ta_wins,
-                    "team_b_wins": _tb_wins,
-                    "games": _games_list,
-                })
+                    _games_list.append(
+                        {
+                            "game_id": _g.id,
+                            "date": _g.game_date.strftime("%d.%m.%Y") if _g.game_date else "",
+                            "weekday": _g.game_date.strftime("%a") if _g.game_date else "",
+                            "home_team": _snm.get(_g.home_team_id, f"Team {_g.home_team_id}"),
+                            "away_team": _snm.get(_g.away_team_id, f"Team {_g.away_team_id}"),
+                            "home_team_id": _g.home_team_id,
+                            "away_team_id": _g.away_team_id,
+                            "home_score": _g.home_score,
+                            "away_score": _g.away_score,
+                            "played": _played,
+                        }
+                    )
+                _series_list.append(
+                    {
+                        "team_a_id": _ta,
+                        "team_b_id": _tb,
+                        "team_a_name": _snm.get(_ta, f"Team {_ta}"),
+                        "team_b_name": _snm.get(_tb, f"Team {_tb}"),
+                        "team_a_logo": _slogo.get(_ta),
+                        "team_b_logo": _slogo.get(_tb),
+                        "team_a_rank": _reg_rank.get(_ta),
+                        "team_b_rank": _reg_rank.get(_tb),
+                        "team_a_wins": _ta_wins,
+                        "team_b_wins": _tb_wins,
+                        "games": _games_list,
+                    }
+                )
             series_by_phase[_sph] = _series_list
 
     # Standings per non-regular phase (for potential fallback table)
@@ -3042,9 +3339,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             standings_by_phase[_ph] = get_league_standings(league_id, only_group_ids=_gids)
 
     # Per-phase top scorer aggregation (only when GamePlayer rows exist)
-    topscorers_by_phase = get_league_top_scorers_by_phase(
-        league_id, _phase_to_group_ids, limit=100
-    )
+    topscorers_by_phase = get_league_top_scorers_by_phase(league_id, _phase_to_group_ids, limit=100)
 
     upcoming_games: list[dict] = []
     if group_ids_for_league:
@@ -3052,6 +3347,7 @@ async def league_detail(request: Request, locale: str, league_id: int):
             from app.models.db_models import LeagueGroup as LG
             from datetime import date as _date
             from app.models.db_models import Team as TM
+
             today = _date.today()
             uq = (
                 sess.query(Game)
@@ -3067,30 +3363,37 @@ async def league_detail(request: Request, locale: str, league_id: int):
             )
             u_team_ids = {g.home_team_id for g in uq} | {g.away_team_id for g in uq}
             u_names: dict = {}
-            for t in sess.query(TM).filter(TM.id.in_(u_team_ids), TM.season_id == league_data["season_id"]).all():
+            for t in (
+                sess.query(TM)
+                .filter(TM.id.in_(u_team_ids), TM.season_id == league_data["season_id"])
+                .all()
+            ):
                 u_names[t.id] = t.name or t.text or f"Team {t.id}"
             missing = u_team_ids - u_names.keys()
             if missing:
                 for t in sess.query(TM).filter(TM.id.in_(missing), TM.name.isnot(None)).all():
                     u_names.setdefault(t.id, t.name)
             for g in uq:
-                upcoming_games.append({
-                    "game_id": g.id,
-                    "group_name": _group_id_to_name.get(g.group_id, ""),
-                    "phase": _group_id_to_phase.get(g.group_id, "regular"),
-                    "date": g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
-                    "weekday": g.game_date.strftime("%a") if g.game_date else "",
-                    "time": g.game_time or "",
-                    "home_team": u_names.get(g.home_team_id, f"Team {g.home_team_id}"),
-                    "away_team": u_names.get(g.away_team_id, f"Team {g.away_team_id}"),
-                    "home_team_id": g.home_team_id,
-                    "away_team_id": g.away_team_id,
-                })
+                upcoming_games.append(
+                    {
+                        "game_id": g.id,
+                        "group_name": _group_id_to_name.get(g.group_id, ""),
+                        "phase": _group_id_to_phase.get(g.group_id, "regular"),
+                        "date": g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
+                        "weekday": g.game_date.strftime("%a") if g.game_date else "",
+                        "time": g.game_time or "",
+                        "home_team": u_names.get(g.home_team_id, f"Team {g.home_team_id}"),
+                        "away_team": u_names.get(g.away_team_id, f"Team {g.away_team_id}"),
+                        "home_team_id": g.home_team_id,
+                        "away_team_id": g.away_team_id,
+                    }
+                )
 
     # Recent results for this league
     recent_games = []
     with db.session_scope() as session:
         from app.models.db_models import Team
+
         group_ids = [gid for grp in league_data.get("groups", []) for gid in grp["ids"]]
         if group_ids:
             games_raw = (
@@ -3108,26 +3411,32 @@ async def league_detail(request: Request, locale: str, league_id: int):
                 team_ids.add(g.home_team_id)
                 team_ids.add(g.away_team_id)
             team_names: dict = {}
-            for t in session.query(Team).filter(
-                Team.id.in_(team_ids),
-                Team.season_id == league_data["season_id"],
-            ).all():
+            for t in (
+                session.query(Team)
+                .filter(
+                    Team.id.in_(team_ids),
+                    Team.season_id == league_data["season_id"],
+                )
+                .all()
+            ):
                 team_names[t.id] = t.name or t.text or f"Team {t.id}"
 
             for g in games_raw:
-                recent_games.append({
-                    "game_id": g.id,
-                    "group_name": _group_id_to_name.get(g.group_id, ""),
-                    "phase": _group_id_to_phase.get(g.group_id, "regular"),
-                    "date": g.game_date.strftime("%Y-%m-%d") if g.game_date else "",
-                    "time": g.game_time or "",
-                    "home_team": team_names.get(g.home_team_id, f"Team {g.home_team_id}"),
-                    "away_team": team_names.get(g.away_team_id, f"Team {g.away_team_id}"),
-                    "home_team_id": g.home_team_id,
-                    "away_team_id": g.away_team_id,
-                    "home_score": g.home_score,
-                    "away_score": g.away_score,
-                })
+                recent_games.append(
+                    {
+                        "game_id": g.id,
+                        "group_name": _group_id_to_name.get(g.group_id, ""),
+                        "phase": _group_id_to_phase.get(g.group_id, "regular"),
+                        "date": g.game_date.strftime("%Y-%m-%d") if g.game_date else "",
+                        "time": g.game_time or "",
+                        "home_team": team_names.get(g.home_team_id, f"Team {g.home_team_id}"),
+                        "away_team": team_names.get(g.away_team_id, f"Team {g.away_team_id}"),
+                        "home_team_id": g.home_team_id,
+                        "away_team_id": g.away_team_id,
+                        "home_score": g.home_score,
+                        "away_score": g.away_score,
+                    }
+                )
 
     _playoff_spots, _playout_spots = _zone_cutoffs(league_data.get("name", ""))
     return templates.TemplateResponse(
@@ -3162,11 +3471,14 @@ async def teams_page(request: Request, locale: str, season: Optional[int] = None
     import re as _re
     from app.services.stats_service import get_teams_list, get_seasons_with_teams
     from app.services.data_indexer import LEAGUE_TIERS, _DEFAULT_TIER
-    _LEVEL_RE = _re.compile(r'\b([A-E])\b')
+
+    _LEVEL_RE = _re.compile(r"\b([A-E])\b")
     try:
         seasons = get_seasons_with_teams()
         if season is None:
-            season = next((s["id"] for s in seasons if s["current"]), seasons[0]["id"] if seasons else None)
+            season = next(
+                (s["id"] for s in seasons if s["current"]), seasons[0]["id"] if seasons else None
+            )
 
         limit = 50 if club else 5000
         teams_list = get_teams_list(season_id=season, sort="league", limit=limit, q=club)
@@ -3175,27 +3487,48 @@ async def teams_page(request: Request, locale: str, season: Optional[int] = None
             # DB is empty (fresh install) — fall back to API cache
             cached = await get_cached_teams()
             teams_list = [
-                {"id": t.get("id"), "text": t.get("text", ""), "game_class": None, "league_id": None, "league_name": None}
+                {
+                    "id": t.get("id"),
+                    "text": t.get("text", ""),
+                    "game_class": None,
+                    "league_id": None,
+                    "league_name": None,
+                }
                 for t in cached[:200]
             ]
 
         # Enrich teams with the same gender/sex/field/tier fields as the leagues page
         _AGE_GROUP_MAP: dict[int, str] = {
-            19: "U21", 26: "U21",
-            18: "U18", 31: "U18", 41: "U18",
-            16: "U16", 28: "U16", 32: "U16", 42: "U16",
-            14: "U14", 33: "U14", 43: "U14", 49: "U14",
-            34: "U12", 36: "U12", 44: "U12",
+            19: "U21",
+            26: "U21",
+            18: "U18",
+            31: "U18",
+            41: "U18",
+            16: "U16",
+            28: "U16",
+            32: "U16",
+            42: "U16",
+            14: "U14",
+            33: "U14",
+            43: "U14",
+            49: "U14",
+            34: "U12",
+            36: "U12",
+            44: "U12",
             35: "U10",
             51: "Senioren",
         }
         TIER_DISPLAY: dict[int, str] = {
-            1: "NLA / L-UPL", 2: "NLB", 3: "1. Liga",
-            4: "2. Liga", 5: "3. Liga", 6: "4. / 5. Liga & Cups",
+            1: "NLA / L-UPL",
+            2: "NLB",
+            3: "1. Liga",
+            4: "2. Liga",
+            5: "3. Liga",
+            6: "4. / 5. Liga & Cups",
         }
         _rc = _rcfg.get_config()
         _excl_lg_names = set(_rc.get("excluded_league_names") or [])
-        _excl_lg_ids   = set(_rc.get("excluded_league_ids") or [])
+        _excl_lg_ids = set(_rc.get("excluded_league_ids") or [])
         teams_list = _rcfg.filter_teams(teams_list)
         teams_flat: list[dict] = []
         for t in teams_list:
@@ -3230,17 +3563,19 @@ async def teams_page(request: Request, locale: str, season: Optional[int] = None
                 level = lm.group(1) if lm else None
             else:
                 level = None
-            teams_flat.append({
-                "id": t["id"],
-                "text": t["text"],
-                "league_name": ln,
-                "gender": gender,
-                "sex": sex,
-                "field": field,
-                "tier": tier,
-                "tier_label": tier_label,
-                "level": level,
-            })
+            teams_flat.append(
+                {
+                    "id": t["id"],
+                    "text": t["text"],
+                    "league_name": ln,
+                    "gender": gender,
+                    "sex": sex,
+                    "field": field,
+                    "tier": tier,
+                    "tier_label": tier_label,
+                    "level": level,
+                }
+            )
 
         return templates.TemplateResponse(
             request,
@@ -3252,7 +3587,7 @@ async def teams_page(request: Request, locale: str, season: Optional[int] = None
                 "seasons": seasons,
                 "current_season_id": season,
                 "club": club,
-            }
+            },
         )
     except Exception as e:
         logger.error(f"Error in teams_page: {type(e).__name__}: {e}", exc_info=True)
@@ -3260,16 +3595,26 @@ async def teams_page(request: Request, locale: str, season: Optional[int] = None
 
 
 @app.get("/{locale}/teams/search", response_class=HTMLResponse)
-async def teams_search(request: Request, locale: str, q: str = "", sort: str = "league", leagues: str = "", season: Optional[int] = None):
+async def teams_search(
+    request: Request,
+    locale: str,
+    q: str = "",
+    sort: str = "league",
+    leagues: str = "",
+    season: Optional[int] = None,
+):
     """HTMX endpoint for team search"""
     from app.services.stats_service import get_teams_list
 
-    all_seasons = (season == 0)
+    all_seasons = season == 0
     league_names = [n.strip() for n in leagues.split(",") if n.strip()] if leagues else None
     teams = get_teams_list(
         season_id=None if all_seasons else season,
         all_seasons=all_seasons,
-        q=q, sort=sort, league_names=league_names, limit=400 if all_seasons else 200
+        q=q,
+        sort=sort,
+        league_names=league_names,
+        limit=400 if all_seasons else 200,
     )
 
     if not teams and not any([q, league_names]):
@@ -3285,15 +3630,17 @@ async def teams_search(request: Request, locale: str, q: str = "", sort: str = "
     cat_colors = {"Men": "#3b82f6", "Women": "#ec4899", "Mixed": "#8b5cf6"}
 
     if not teams:
-        return HTMLResponse(content='<div style="text-align:center;padding:3rem;color:var(--gray-600);"><p>No teams found matching your filters.</p></div>')
+        return HTMLResponse(
+            content='<div style="text-align:center;padding:3rem;color:var(--gray-600);"><p>No teams found matching your filters.</p></div>'
+        )
 
     list_class = "teams-list teams-list--all-seasons" if all_seasons else "teams-list"
     html = f'<div class="teams-list-meta">{len(teams)} team{"s" if len(teams) != 1 else ""}</div><div class="{list_class}">'
     for team in teams:
-        team_id   = team.get("id", "")
-        name      = team.get("text", "")
-        category  = team.get("category") or ""
-        league    = team.get("league_name") or ""
+        team_id = team.get("id", "")
+        name = team.get("text", "")
+        category = team.get("category") or ""
+        league = team.get("league_name") or ""
         season_nm = team.get("season_name") or ""
         cat_color = cat_colors.get(category, "var(--gray-400)")
         cat_label = category or "\u2014"
@@ -3303,16 +3650,17 @@ async def teams_search(request: Request, locale: str, q: str = "", sort: str = "
             f'<span class="teams-list-badge" style="color:{cat_color}">{cat_label}</span>'
             f'<span class="teams-list-name">{name}</span>'
             f'<span class="teams-list-league">{league}</span>'
-            f'{season_span}'
+            f"{season_span}"
             f'<span class="teams-list-arrow">\u203a</span>'
-            f'</a>'
+            f"</a>"
         )
-    html += '</div>'
+    html += "</div>"
 
     return HTMLResponse(content=html)
 
 
 # ==================== Detail Pages ====================
+
 
 @app.get("/{locale}/team/{team_id}", response_class=HTMLResponse)
 async def team_detail(request: Request, locale: str, team_id: int, season: Optional[int] = None):
@@ -3339,14 +3687,28 @@ async def team_detail(request: Request, locale: str, team_id: int, season: Optio
 
 
 @app.get("/{locale}/schedule", response_class=HTMLResponse)
-async def schedule_page(request: Request, locale: str, sex: str = "all", age: str = "all", field: str = "all", page: int = 1):
+async def schedule_page(
+    request: Request,
+    locale: str,
+    sex: str = "all",
+    age: str = "all",
+    field: str = "all",
+    page: int = 1,
+):
     """Redirect /schedule → /games?mode=schedule (preserving filters)."""
     params = f"mode=schedule&sex={sex}&age={age}&field={field}&page={page}"
     return RedirectResponse(url=f"/{locale}/games?{params}", status_code=301)
 
 
 @app.get("/{locale}/players", response_class=HTMLResponse)
-async def players_page(request: Request, locale: str, order_by: str = "points", page: int = 1, season: Optional[int] = None, gender: str = "all"):
+async def players_page(
+    request: Request,
+    locale: str,
+    order_by: str = "points",
+    page: int = 1,
+    season: Optional[int] = None,
+    gender: str = "all",
+):
     """Players leaderboard page — DB-backed with pagination, season and gender filters"""
     from app.services.stats_service import get_player_leaderboard, get_seasons_with_player_stats
     from app.services.database import get_database_service
@@ -3370,7 +3732,7 @@ async def players_page(request: Request, locale: str, order_by: str = "points", 
         db = get_database_service()
         with db.session_scope() as session:
             row = (
-                session.query(_PS.season_id, _func.count(_PS.id).label('cnt'))
+                session.query(_PS.season_id, _func.count(_PS.id).label("cnt"))
                 .group_by(_PS.season_id)
                 .order_by(_func.count(_PS.id).desc())
                 .first()
@@ -3507,11 +3869,12 @@ async def player_detail(request: Request, locale: str, player_id: int):
 
 # ==================== Other Pages ====================
 
+
 @app.get("/{locale}/games", response_class=HTMLResponse)
 async def games_page(
     request: Request,
     locale: str,
-    mode: str = "results",   # "results" | "schedule"
+    mode: str = "results",  # "results" | "schedule"
     sex: str = "all",
     age: str = "all",
     field: str = "all",
@@ -3530,8 +3893,13 @@ async def games_page(
     per_page = 50
     offset = (page - 1) * per_page
     data = get_recent_games(
-        mode=mode, sex=sex, age=age, field=field, level=level,
-        limit=per_page, offset=offset,
+        mode=mode,
+        sex=sex,
+        age=age,
+        field=field,
+        level=level,
+        limit=per_page,
+        offset=offset,
     )
     total_pages = max(1, (data["total"] + per_page - 1) // per_page)
     return templates.TemplateResponse(
@@ -3582,11 +3950,14 @@ async def game_detail(request: Request, locale: str, game_id: int):
 # Universal Search
 # ============================================================================
 
+
 @app.get("/{locale}/search", response_class=HTMLResponse)
 async def universal_search(request: Request, locale: str, q: str = ""):
     """Universal search across players, teams, and leagues — DB-backed."""
     if not q or len(q) < 2:
-        return HTMLResponse('<div class="search-results"><p style="text-align:center;padding:2rem;color:var(--gray-500)">Enter at least 2 characters to search…</p></div>')
+        return HTMLResponse(
+            '<div class="search-results"><p style="text-align:center;padding:2rem;color:var(--gray-500)">Enter at least 2 characters to search…</p></div>'
+        )
 
     from app.services.database import get_database_service
     from app.models.db_models import Player, Team, League
@@ -3597,24 +3968,23 @@ async def universal_search(request: Request, locale: str, q: str = ""):
 
     with db.session_scope() as session:
         # --- Players ---
-        players = (
-            session.query(Player)
-            .filter(Player.full_name.ilike(f"%{q}%"))
-            .limit(8).all()
-        )
+        players = session.query(Player).filter(Player.full_name.ilike(f"%{q}%")).limit(8).all()
         if players:
-            html_parts.append('<div class="search-category"><h3>🏒 Players</h3><div class="search-items">')
+            html_parts.append(
+                '<div class="search-category"><h3>🏒 Players</h3><div class="search-items">'
+            )
             for pl in players:
                 name = pl.full_name or f"Player {pl.person_id}"
                 html_parts.append(
                     f'<div class="search-item" onclick="window.location.href=\'/{locale}/player/{pl.person_id}\'">'
-                    f'<strong>{name}</strong></div>'
+                    f"<strong>{name}</strong></div>"
                 )
-            html_parts.append('</div></div>')
+            html_parts.append("</div></div>")
 
         # --- Teams ---
         from sqlalchemy import func
         from app.services.data_indexer import league_tier as _league_tier
+
         # Subquery: for each unique team id, get the most recent season
         team_subq = (
             session.query(Team.id, func.max(Team.season_id).label("max_season"))
@@ -3628,7 +3998,9 @@ async def universal_search(request: Request, locale: str, q: str = ""):
         )
         unique_teams_rows = (
             session.query(Team, League)
-            .join(team_subq, (Team.id == team_subq.c.id) & (Team.season_id == team_subq.c.max_season))
+            .join(
+                team_subq, (Team.id == team_subq.c.id) & (Team.season_id == team_subq.c.max_season)
+            )
             .outerjoin(
                 League,
                 (League.league_id == Team.league_id)
@@ -3637,13 +4009,17 @@ async def universal_search(request: Request, locale: str, q: str = ""):
             )
             .all()
         )
-        unique_teams_rows.sort(key=lambda r: (
-            _league_tier(r[0].league_id or 0),
-            (r[1].name or r[1].text or "~~~~") if r[1] else "~~~~",
-            r[0].name or "",
-        ))
+        unique_teams_rows.sort(
+            key=lambda r: (
+                _league_tier(r[0].league_id or 0),
+                (r[1].name or r[1].text or "~~~~") if r[1] else "~~~~",
+                r[0].name or "",
+            )
+        )
         if unique_teams_rows:
-            html_parts.append('<div class="search-category"><h3>👥 Teams</h3><div class="search-items">')
+            html_parts.append(
+                '<div class="search-category"><h3>👥 Teams</h3><div class="search-items">'
+            )
             for t, lg in unique_teams_rows:
                 tname = t.name or t.text or f"Team {t.id}"
                 lgname = (lg.name or lg.text or "") if lg else ""
@@ -3652,14 +4028,15 @@ async def universal_search(request: Request, locale: str, q: str = ""):
                     f'<div class="search-item" onclick="window.location.href=\'/{locale}/team/{t.id}\'">'
                     f'<span class="search-item-main"><strong>{tname}</strong>{subtitle}</span></div>'
                 )
-            html_parts.append('</div></div>')
+            html_parts.append("</div></div>")
 
         # --- Leagues ---
         leagues = (
             session.query(League)
             .filter(or_(League.name.ilike(f"%{q}%"), League.text.ilike(f"%{q}%")))
             .order_by(League.season_id.desc())
-            .limit(5).all()
+            .limit(5)
+            .all()
         )
         seen_league_names: set[str] = set()
         unique_leagues = []
@@ -3670,31 +4047,32 @@ async def universal_search(request: Request, locale: str, q: str = ""):
                 unique_leagues.append(lg)
         unique_leagues = unique_leagues[:5]
         if unique_leagues:
-            html_parts.append('<div class="search-category"><h3>🏆 Leagues</h3><div class="search-items">')
+            html_parts.append(
+                '<div class="search-category"><h3>🏆 Leagues</h3><div class="search-items">'
+            )
             for lg in unique_leagues:
                 lgname = lg.name or lg.text or f"League {lg.id}"
                 html_parts.append(
                     f'<div class="search-item" onclick="window.location.href=\'/{locale}/league/{lg.id}\'">'
-                    f'<strong>{lgname}</strong></div>'
+                    f"<strong>{lgname}</strong></div>"
                 )
-            html_parts.append('</div></div>')
+            html_parts.append("</div></div>")
 
     if not html_parts:
-        return HTMLResponse('<div class="search-results"><p style="text-align:center;padding:2rem;color:var(--gray-500)">No results found for <em>' + q + '</em></p></div>')
+        return HTMLResponse(
+            '<div class="search-results"><p style="text-align:center;padding:2rem;color:var(--gray-500)">No results found for <em>'
+            + q
+            + "</em></p></div>"
+        )
 
-    return HTMLResponse('<div class="search-results">' + "".join(html_parts) + '</div>')
+    return HTMLResponse('<div class="search-results">' + "".join(html_parts) + "</div>")
 
 
 @app.get("/{locale}/favorites", response_class=HTMLResponse)
 async def favorites_page(request: Request, locale: str):
     """Favorites page"""
     return templates.TemplateResponse(
-        request,
-        "favorites.html",
-        {
-            "locale": locale,
-            "t": get_translations(locale)
-        }
+        request, "favorites.html", {"locale": locale, "t": get_translations(locale)}
     )
 
 
@@ -3713,7 +4091,7 @@ async def contact_page(request: Request, locale: str, sent: str = ""):
             "form_email": "",
             "form_subject": "",
             "form_message": "",
-        }
+        },
     )
 
 
@@ -3755,7 +4133,7 @@ async def contact_submit(request: Request, locale: str):
         and len(email_val) <= 254
         and len(subject) <= 200
         and len(message) <= 4000
-        and re.match(r'^[^@\r\n]+@[^@\r\n]+\.[^@\r\n]+$', email_val)
+        and re.match(r"^[^@\r\n]+@[^@\r\n]+\.[^@\r\n]+$", email_val)
     )
     if not valid:
         return templates.TemplateResponse(
@@ -3770,12 +4148,12 @@ async def contact_submit(request: Request, locale: str):
                 "form_email": email_val,
                 "form_subject": subject,
                 "form_message": message,
-            }
+            },
         )
 
     # Strip newlines to prevent email header injection
-    safe_subject = subject.replace('\r', '').replace('\n', '')
-    safe_email = email_val.replace('\r', '').replace('\n', '')
+    safe_subject = subject.replace("\r", "").replace("\n", "")
+    safe_email = email_val.replace("\r", "").replace("\n", "")
 
     # Send email if SMTP is configured
     if settings.SMTP_HOST and settings.CONTACT_EMAIL:
@@ -3785,9 +4163,7 @@ async def contact_submit(request: Request, locale: str):
             msg["From"] = settings.SMTP_USER or settings.CONTACT_EMAIL
             msg["To"] = settings.CONTACT_EMAIL
             msg["Reply-To"] = safe_email
-            msg.set_content(
-                f"Name: {name}\nEmail: {email_val}\n\n{message}"
-            )
+            msg.set_content(f"Name: {name}\nEmail: {email_val}\n\n{message}")
 
             def _send_email() -> None:
                 with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
@@ -3812,7 +4188,7 @@ async def contact_submit(request: Request, locale: str):
                     "form_email": email_val,
                     "form_subject": subject,
                     "form_message": message,
-                }
+                },
             )
 
     return RedirectResponse(url=f"/{locale}/contact?sent=1", status_code=303)
@@ -3828,7 +4204,7 @@ async def privacy_page(request: Request, locale: str):
             "locale": locale,
             "t": get_translations(locale),
             "privacy_last_updated": PRIVACY_POLICY_LAST_UPDATED,
-        }
+        },
     )
 
 
@@ -3836,12 +4212,14 @@ async def privacy_page(request: Request, locale: str):
 # GameSyncFailure Admin Routes
 # ============================================================================
 
+
 @app.get("/admin/sync-failures", response_class=HTMLResponse)
 async def admin_sync_failures(request: Request, _: None = Depends(require_admin)):
     """Admin page showing all GameSyncFailure rows with retry controls."""
     from sqlalchemy import select
     from app.models.db_models import GameSyncFailure, Game
     from app.services.database import get_database_service
+
     locale = get_locale_from_path(request.url.path)
     t = get_translations(locale)
     with get_database_service().session_scope() as session:
@@ -3872,10 +4250,13 @@ async def admin_sync_failures(request: Request, _: None = Depends(require_admin)
 
 
 @app.post("/admin/sync-failures/{failure_id}/retry")
-async def admin_retry_sync_failure(failure_id: int, request: Request, _: None = Depends(require_admin)):
+async def admin_retry_sync_failure(
+    failure_id: int, request: Request, _: None = Depends(require_admin)
+):
     """Queue a GameSyncFailure for retry by setting can_retry=True."""
     from app.models.db_models import GameSyncFailure
     from app.services.database import get_database_service
+
     with get_database_service().session_scope() as session:
         failure = session.get(GameSyncFailure, failure_id)
         if failure is None:
@@ -3887,6 +4268,8 @@ async def admin_retry_sync_failure(failure_id: int, request: Request, _: None = 
 @app.get("/admin/unresolved-events", response_class=HTMLResponse)
 async def admin_unresolved_events(request: Request, _: None = Depends(require_admin)):
     from app.models.db_models import UnresolvedPlayerEvent
+    from app.services.database import get_database_service
+
     db = get_database_service()
     with db.session_scope() as session:
         rows = (
@@ -3921,6 +4304,8 @@ async def admin_dismiss_unresolved_event(
 ):
     from app.models.db_models import UnresolvedPlayerEvent
     from datetime import datetime, timezone
+    from app.services.database import get_database_service
+
     db = get_database_service()
     try:
         with db.session_scope() as session:
@@ -3937,24 +4322,23 @@ async def admin_dismiss_unresolved_event(
 # Error Handlers
 # ============================================================================
 
+
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """Handle HTTP exceptions (404, etc.)"""
     locale = get_locale_from_path(request.url.path)
-    
+
     if exc.status_code == 404:
         return templates.TemplateResponse(
             request,
             "error_404.html",
-            {
-                "locale": locale,
-                "t": get_translations(locale)
-            },
-            status_code=404
+            {"locale": locale, "t": get_translations(locale)},
+            status_code=404,
         )
-    
+
     # For other HTTP errors, return JSON
     from fastapi.responses import JSONResponse
+
     return JSONResponse(content={"detail": exc.detail}, status_code=exc.status_code)
 
 
@@ -3964,10 +4348,10 @@ async def general_exception_handler(request: Request, exc: Exception):
     locale = get_locale_from_path(request.url.path)
     error_id = str(uuid.uuid4())[:8]
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     # Log error (in production, send to logging service)
     print(f"[ERROR {error_id}] {exc}")
-    
+
     return templates.TemplateResponse(
         request,
         "error_500.html",
@@ -3975,14 +4359,15 @@ async def general_exception_handler(request: Request, exc: Exception):
             "locale": locale,
             "t": get_translations(locale),
             "error_id": error_id,
-            "timestamp": timestamp
+            "timestamp": timestamp,
         },
-        status_code=500
+        status_code=500,
     )
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "app.main:app",
         host=settings.HOST,

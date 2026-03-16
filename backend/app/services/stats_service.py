@@ -4,6 +4,7 @@ DB-backed stats service for Swiss Unihockey Stats frontend.
 All functions query the local SQLite database (via SQLAlchemy) and return
 plain Python dicts / lists ready to be passed to Jinja2 templates.
 """
+
 from __future__ import annotations
 
 import re
@@ -27,33 +28,32 @@ from app.models.db_models import (
 )
 from app.services.database import get_database_service
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 # Compact position abbreviations used in the game roster table.
 _POS_ABBREV: dict[str, str] = {
-    "goalie":              "G",
-    "torhüter":            "G",
-    "torhüterin":          "G",
-    "goalkeeper":          "G",
-    "verteidiger":         "D",
-    "verteidigerin":       "D",
-    "defender":            "D",
-    "stürmer":             "A",
-    "stürmerin":           "A",
-    "stürmer (mitte)":     "C",
-    "stürmerin (mitte)":   "C",
-    "stürmer (links)":     "A",
-    "stürmer (rechts)":    "A",
-    "stürmerin (links)":   "A",
-    "stürmerin (rechts)":  "A",
-    "forward":             "A",
-    "center":              "C",
-    "attaquant":           "A",
-    "défenseur":           "D",
-    "gardien":             "G",
+    "goalie": "G",
+    "torhüter": "G",
+    "torhüterin": "G",
+    "goalkeeper": "G",
+    "verteidiger": "D",
+    "verteidigerin": "D",
+    "defender": "D",
+    "stürmer": "A",
+    "stürmerin": "A",
+    "stürmer (mitte)": "C",
+    "stürmerin (mitte)": "C",
+    "stürmer (links)": "A",
+    "stürmer (rechts)": "A",
+    "stürmerin (links)": "A",
+    "stürmerin (rechts)": "A",
+    "forward": "A",
+    "center": "C",
+    "attaquant": "A",
+    "défenseur": "D",
+    "gardien": "G",
 }
 
 # Position values that are considered unknown / placeholder.
@@ -73,6 +73,7 @@ def _get_current_season_id(session) -> int:
 # 1. Language-list helpers
 # ---------------------------------------------------------------------------
 
+
 def get_all_seasons() -> list[dict]:
     """Return all seasons ordered descending, with current flag."""
     db = get_database_service()
@@ -80,8 +81,7 @@ def get_all_seasons() -> list[dict]:
         rows = session.query(Season).order_by(Season.id.desc()).all()
         current_id = _get_current_season_id(session)
         return [
-            {"id": s.id, "name": s.text or str(s.id), "current": s.id == current_id}
-            for s in rows
+            {"id": s.id, "name": s.text or str(s.id), "current": s.id == current_id} for s in rows
         ]
 
 
@@ -99,8 +99,7 @@ def get_seasons_with_teams() -> list[dict]:
             .all()
         )
         return [
-            {"id": r.id, "name": r.text or str(r.id), "current": r.id == current_id}
-            for r in rows
+            {"id": r.id, "name": r.text or str(r.id), "current": r.id == current_id} for r in rows
         ]
 
 
@@ -118,8 +117,7 @@ def get_seasons_with_player_stats() -> list[dict]:
             .all()
         )
         return [
-            {"id": r.id, "name": r.text or str(r.id), "current": r.id == current_id}
-            for r in rows
+            {"id": r.id, "name": r.text or str(r.id), "current": r.id == current_id} for r in rows
         ]
 
 
@@ -251,14 +249,10 @@ def get_teams_list(
 
         # Multi-select league name filter — each value used as ilike prefix
         if league_names:
-            query = query.filter(
-                or_(*[League.name.ilike(f"{n}%") for n in league_names])
-            )
+            query = query.filter(or_(*[League.name.ilike(f"{n}%") for n in league_names]))
 
         if q:
-            query = query.filter(
-                or_(Team.name.ilike(f"%{q}%"), League.name.ilike(f"%{q}%"))
-            )
+            query = query.filter(or_(Team.name.ilike(f"%{q}%"), League.name.ilike(f"%{q}%")))
 
         if sort == "league":
             # Sort by tier level first, then by league_id (proxy for A/B/C/D level),
@@ -321,6 +315,7 @@ def get_league_by_id(db_league_id: int) -> Optional[dict]:
 # 2. League standings  (computed from games table)
 # ---------------------------------------------------------------------------
 
+
 def _get_standings_from_api(session, league, only_group_ids: list[int] | None) -> list[dict]:
     """Fallback: fetch official standings from the Swiss Unihockey rankings API.
 
@@ -331,15 +326,14 @@ def _get_standings_from_api(session, league, only_group_ids: list[int] | None) -
     """
     try:
         from app.services.swissunihockey import get_swissunihockey_client
+
         client = get_swissunihockey_client()
 
         # Resolve group name(s) so we can filter the API call correctly.
         # When only_group_ids is given, find the distinct group names for those ids.
         group_names: list[str | None] = [None]  # None = no group filter (all teams)
         if only_group_ids:
-            grp_rows = session.query(LeagueGroup).filter(
-                LeagueGroup.id.in_(only_group_ids)
-            ).all()
+            grp_rows = session.query(LeagueGroup).filter(LeagueGroup.id.in_(only_group_ids)).all()
             names = list({(g.name or g.text or None) for g in grp_rows} - {None})
             if names:
                 group_names = names  # typically a single name like "Gruppe 2"
@@ -382,10 +376,10 @@ def _get_standings_from_api(session, league, only_group_ids: list[int] | None) -
                             return 0
 
                     gp = _int(3)
-                    w  = _int(5)
+                    w = _int(5)
                     otw = _int(6)
                     otl = _int(7)
-                    l  = _int(8)
+                    l = _int(8)
                     pts = _int(12) if len(cells) > 12 else (_int(10))
 
                     gfga = cells[9].get("text", []) if len(cells) > 9 else []
@@ -394,20 +388,22 @@ def _get_standings_from_api(session, league, only_group_ids: list[int] | None) -
                     gf = int(m.group(1)) if m else 0
                     ga = int(m.group(2)) if m else 0
 
-                    all_rows.append({
-                        "rank":      rank_val,
-                        "team_id":   team_id,
-                        "team_name": team_name,
-                        "gp":  gp,
-                        "w":   w,     # regulation wins
-                        "otw": otw,   # OT/SO wins
-                        "otl": otl,   # OT/SO losses
-                        "l":   l,     # regulation losses
-                        "gf":  gf,
-                        "ga":  ga,
-                        "gd":  gf - ga,
-                        "pts": pts,
-                    })
+                    all_rows.append(
+                        {
+                            "rank": rank_val,
+                            "team_id": team_id,
+                            "team_name": team_name,
+                            "gp": gp,
+                            "w": w,  # regulation wins
+                            "otw": otw,  # OT/SO wins
+                            "otl": otl,  # OT/SO losses
+                            "l": l,  # regulation losses
+                            "gf": gf,
+                            "ga": ga,
+                            "gd": gf - ga,
+                            "pts": pts,
+                        }
+                    )
 
         # Sort by pts desc, then gd desc, then gf desc (same as DB path)
         all_rows.sort(key=lambda x: (-x["pts"], -x["gd"], -x["gf"]))
@@ -417,6 +413,7 @@ def _get_standings_from_api(session, league, only_group_ids: list[int] | None) -
 
     except Exception as exc:
         import logging
+
         logging.getLogger(__name__).warning(f"API standings fallback failed: {exc}")
         return []
 
@@ -450,11 +447,7 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
             return []
 
         # All games that have a score
-        total_games = (
-            session.query(Game)
-            .filter(Game.group_id.in_(group_ids))
-            .count()
-        )
+        total_games = session.query(Game).filter(Game.group_id.in_(group_ids)).count()
         games = (
             session.query(Game)
             .filter(
@@ -485,10 +478,10 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
                     "team_id": team_id,
                     "team_name": team_name,
                     "gp": 0,
-                    "w": 0,    # regulation wins
+                    "w": 0,  # regulation wins
                     "otw": 0,  # OT/SO wins
                     "otl": 0,  # OT/SO losses
-                    "l": 0,    # regulation losses
+                    "l": 0,  # regulation losses
                     "gf": 0,
                     "ga": 0,
                     "pts": 0,
@@ -503,20 +496,28 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
 
         team_names: dict[int, str] = {}
         # 1) same-season rows
-        for t in session.query(Team).filter(
-            Team.id.in_(team_ids),
-            Team.season_id == league.season_id,
-        ).all():
+        for t in (
+            session.query(Team)
+            .filter(
+                Team.id.in_(team_ids),
+                Team.season_id == league.season_id,
+            )
+            .all()
+        ):
             if t.name is not None or t.text is not None:
                 team_names[int(t.id)] = str(t.name or t.text)
 
         # 2) any season (for stubs that were created without a name)
         missing = team_ids - set(team_names)
         if missing:
-            for t in session.query(Team).filter(
-                Team.id.in_(missing),
-                Team.name.isnot(None),
-            ).all():
+            for t in (
+                session.query(Team)
+                .filter(
+                    Team.id.in_(missing),
+                    Team.name.isnot(None),
+                )
+                .all()
+            ):
                 team_names[int(t.id)] = str(t.name)
 
         # 3) live rankings API for anything still unresolved
@@ -524,6 +525,7 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
         if still_missing:
             try:
                 from app.services.swissunihockey import get_swissunihockey_client
+
                 client = get_swissunihockey_client()
                 data = client.get_rankings(
                     league=league.league_id,
@@ -606,6 +608,7 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
 # 3. Top scorers per league
 # ---------------------------------------------------------------------------
 
+
 def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
     """
     Top scorers for a league.
@@ -624,6 +627,7 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
     from the DB league name so it matches what the API returns (e.g. "L-UPL").
     """
     import re as _re
+
     db = get_database_service()
     with db.session_scope() as session:
         league = session.query(League).filter(League.id == db_league_id).first()
@@ -635,17 +639,14 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
             return []
 
         # All game IDs in this league
-        game_ids = [
-            r[0] for r in
-            session.query(Game.id).filter(Game.group_id.in_(group_ids)).all()
-        ]
+        game_ids = [r[0] for r in session.query(Game.id).filter(Game.group_id.in_(group_ids)).all()]
 
         # Derive league_abbrev from the DB name by stripping the gender/age prefix
         # so it matches what the API returns (e.g. "Junioren U21 B" → "U21 B").
         # Order matters: "Junioren/-innen" must be tried before "Junioren".
         league_abbrev = _re.sub(
-            r'^(Junioren/-innen|Junioren|Juniorinnen|Herren|Damen|Senioren)\s+',
-            '',
+            r"^(Junioren/-innen|Junioren|Juniorinnen|Herren|Damen|Senioren)\s+",
+            "",
             str(league.name or ""),
         ).strip()
 
@@ -653,8 +654,8 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
         player_ids = []
         if game_ids:
             player_ids = [
-                r[0] for r in
-                session.query(GamePlayer.player_id)
+                r[0]
+                for r in session.query(GamePlayer.player_id)
                 .filter(GamePlayer.game_id.in_(game_ids))
                 .distinct()
                 .all()
@@ -695,8 +696,14 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
             #     NULL game_class rows are excluded to prevent gender bleed from
             #     same-named clubs that field both a male and female team.
 
-            home_ids = {r[0] for r in session.query(Game.home_team_id).filter(Game.group_id.in_(group_ids)).all()}
-            away_ids = {r[0] for r in session.query(Game.away_team_id).filter(Game.group_id.in_(group_ids)).all()}
+            home_ids = {
+                r[0]
+                for r in session.query(Game.home_team_id).filter(Game.group_id.in_(group_ids)).all()
+            }
+            away_ids = {
+                r[0]
+                for r in session.query(Game.away_team_id).filter(Game.group_id.in_(group_ids)).all()
+            }
             all_team_ids = list((home_ids | away_ids) - {None})
             if not all_team_ids:
                 return []
@@ -720,8 +727,8 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
             if not stats:
                 # Tier 2: TeamPlayer roster (gender-exact via team_id)
                 roster_player_ids = [
-                    r[0] for r in
-                    session.query(TeamPlayer.player_id)
+                    r[0]
+                    for r in session.query(TeamPlayer.player_id)
                     .filter(
                         TeamPlayer.team_id.in_(all_team_ids),
                         TeamPlayer.season_id == league.season_id,
@@ -731,13 +738,21 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
                 ]
                 if roster_player_ids:
                     gc_clause = (
-                        (PlayerStatistics.game_class == league.game_class)
-                        | (PlayerStatistics.game_class == None)  # noqa: E711
-                    ) if league.game_class else True
-                    stats = base_q.filter(
-                        PlayerStatistics.player_id.in_(roster_player_ids),
-                        gc_clause,
-                    ).limit(limit).all()
+                        (
+                            (PlayerStatistics.game_class == league.game_class)
+                            | (PlayerStatistics.game_class == None)  # noqa: E711
+                        )
+                        if league.game_class
+                        else True
+                    )
+                    stats = (
+                        base_q.filter(
+                            PlayerStatistics.player_id.in_(roster_player_ids),
+                            gc_clause,
+                        )
+                        .limit(limit)
+                        .all()
+                    )
 
             if not stats:
                 # Tier 3: team_name with OR-NULL game_class filter.
@@ -747,8 +762,8 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
                 # excluded. Once the roster indexer runs, team_id will be set and
                 # Tier 1 will handle all of this correctly without any bleed.
                 team_names = [
-                    r[0] for r in
-                    session.query(Team.name)
+                    r[0]
+                    for r in session.query(Team.name)
                     .filter(Team.id.in_(all_team_ids), Team.name.isnot(None))
                     .distinct()
                     .all()
@@ -756,15 +771,21 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
                 if not team_names:
                     return []
                 gc_clause = (
-                    (PlayerStatistics.game_class == league.game_class)
-                    | (PlayerStatistics.game_class == None)  # noqa: E711
-                ) if league.game_class else True
-                stats = base_q.filter(
-                    PlayerStatistics.team_name.in_(team_names),
-                    gc_clause,
-                ).limit(limit).all()
-
-
+                    (
+                        (PlayerStatistics.game_class == league.game_class)
+                        | (PlayerStatistics.game_class == None)  # noqa: E711
+                    )
+                    if league.game_class
+                    else True
+                )
+                stats = (
+                    base_q.filter(
+                        PlayerStatistics.team_name.in_(team_names),
+                        gc_clause,
+                    )
+                    .limit(limit)
+                    .all()
+                )
 
         result = []
         for i, (ps, pl) in enumerate(stats, 1):
@@ -780,10 +801,10 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
                     "a": ps.assists,
                     "pts": ps.points,
                     "pim": ps.penalty_minutes,
-                    "pen_2": getattr(ps, 'pen_2min', 0) or 0,
-                    "pen_5": getattr(ps, 'pen_5min', 0) or 0,
-                    "pen_10": getattr(ps, 'pen_10min', 0) or 0,
-                    "pen_match": getattr(ps, 'pen_match', 0) or 0,
+                    "pen_2": getattr(ps, "pen_2min", 0) or 0,
+                    "pen_5": getattr(ps, "pen_5min", 0) or 0,
+                    "pen_10": getattr(ps, "pen_10min", 0) or 0,
+                    "pen_match": getattr(ps, "pen_match", 0) or 0,
                 }
             )
         return result
@@ -792,6 +813,7 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
 # ---------------------------------------------------------------------------
 # 4a. Per-phase top scorer aggregation from GamePlayer rows
 # ---------------------------------------------------------------------------
+
 
 def get_league_top_scorers_by_phase(
     db_league_id: int,
@@ -836,9 +858,7 @@ def get_league_top_scorers_by_phase(
             return {}
 
         game_id_to_phase: dict[int, str] = {
-            g.id: gid_to_phase[g.group_id]
-            for g in games_in_groups
-            if g.group_id in gid_to_phase
+            g.id: gid_to_phase[g.group_id] for g in games_in_groups if g.group_id in gid_to_phase
         }
         all_game_ids = list(game_id_to_phase.keys())
         if not all_game_ids:
@@ -871,13 +891,13 @@ def get_league_top_scorers_by_phase(
             if key not in agg:
                 agg[key] = {"gp": 0, "g": 0, "a": 0, "pim": 0}
             agg[key]["gp"] += 1
-            agg[key]["g"]   += row.goals or 0
-            agg[key]["a"]   += row.assists or 0
+            agg[key]["g"] += row.goals or 0
+            agg[key]["a"] += row.assists or 0
             agg[key]["pim"] += row.penalty_minutes or 0
 
         # Resolve player names and team names
         player_ids = {k[1] for k in agg}
-        team_ids   = {k[2] for k in agg if k[2]}
+        team_ids = {k[2] for k in agg if k[2]}
 
         player_names: dict[int, str] = {}
         for pl in session.query(Player).filter(Player.person_id.in_(player_ids)).all():
@@ -897,9 +917,9 @@ def get_league_top_scorers_by_phase(
             # fallback: any season
             missing = team_ids - team_names.keys()
             if missing:
-                for t in session.query(Team).filter(
-                    Team.id.in_(missing), Team.name.isnot(None)
-                ).all():
+                for t in (
+                    session.query(Team).filter(Team.id.in_(missing), Team.name.isnot(None)).all()
+                ):
                     team_names.setdefault(t.id, t.name)
 
         # Build phase → sorted list
@@ -907,17 +927,19 @@ def get_league_top_scorers_by_phase(
         for (ph, pid, tid), stats in agg.items():
             if ph not in phase_lists:
                 phase_lists[ph] = []
-            phase_lists[ph].append({
-                "player_id":   pid,
-                "player_name": player_names.get(pid, f"Player {pid}"),
-                "team_name":   team_names.get(tid, "Unknown") if tid else "Unknown",
-                "team_id":     tid,
-                "gp":  stats["gp"],
-                "g":   stats["g"],
-                "a":   stats["a"],
-                "pts": stats["g"] + stats["a"],
-                "pim": stats["pim"],
-            })
+            phase_lists[ph].append(
+                {
+                    "player_id": pid,
+                    "player_name": player_names.get(pid, f"Player {pid}"),
+                    "team_name": team_names.get(tid, "Unknown") if tid else "Unknown",
+                    "team_id": tid,
+                    "gp": stats["gp"],
+                    "g": stats["g"],
+                    "a": stats["a"],
+                    "pts": stats["g"] + stats["a"],
+                    "pim": stats["pim"],
+                }
+            )
 
         result: dict[str, list[dict]] = {}
         for ph, rows in phase_lists.items():
@@ -934,6 +956,7 @@ def get_league_top_scorers_by_phase(
 # 4. Top penalties per league
 # ---------------------------------------------------------------------------
 
+
 def get_league_top_penalties(db_league_id: int, limit: int = 100) -> list[dict]:
     """
     Top penalty-minute leaders for a league, ordered by PIM descending.
@@ -943,6 +966,7 @@ def get_league_top_penalties(db_league_id: int, limit: int = 100) -> list[dict]:
     only returns rows where penalty_minutes > 0.
     """
     import re as _re
+
     db = get_database_service()
     with db.session_scope() as session:
         league = session.query(League).filter(League.id == db_league_id).first()
@@ -953,22 +977,19 @@ def get_league_top_penalties(db_league_id: int, limit: int = 100) -> list[dict]:
         if not group_ids:
             return []
 
-        game_ids = [
-            r[0] for r in
-            session.query(Game.id).filter(Game.group_id.in_(group_ids)).all()
-        ]
+        game_ids = [r[0] for r in session.query(Game.id).filter(Game.group_id.in_(group_ids)).all()]
 
         league_abbrev = _re.sub(
-            r'^(Junioren/-innen|Junioren|Juniorinnen|Herren|Damen|Senioren)\s+',
-            '',
+            r"^(Junioren/-innen|Junioren|Juniorinnen|Herren|Damen|Senioren)\s+",
+            "",
             str(league.name or ""),
         ).strip()
 
         player_ids = []
         if game_ids:
             player_ids = [
-                r[0] for r in
-                session.query(GamePlayer.player_id)
+                r[0]
+                for r in session.query(GamePlayer.player_id)
                 .filter(GamePlayer.game_id.in_(game_ids))
                 .distinct()
                 .all()
@@ -1000,8 +1021,14 @@ def get_league_top_penalties(db_league_id: int, limit: int = 100) -> list[dict]:
                 .all()
             )
         else:
-            home_ids = {r[0] for r in session.query(Game.home_team_id).filter(Game.group_id.in_(group_ids)).all()}
-            away_ids = {r[0] for r in session.query(Game.away_team_id).filter(Game.group_id.in_(group_ids)).all()}
+            home_ids = {
+                r[0]
+                for r in session.query(Game.home_team_id).filter(Game.group_id.in_(group_ids)).all()
+            }
+            away_ids = {
+                r[0]
+                for r in session.query(Game.away_team_id).filter(Game.group_id.in_(group_ids)).all()
+            }
             all_team_ids = list((home_ids | away_ids) - {None})
             if not all_team_ids:
                 return []
@@ -1024,8 +1051,8 @@ def get_league_top_penalties(db_league_id: int, limit: int = 100) -> list[dict]:
 
             if not stats:
                 roster_player_ids = [
-                    r[0] for r in
-                    session.query(TeamPlayer.player_id)
+                    r[0]
+                    for r in session.query(TeamPlayer.player_id)
                     .filter(
                         TeamPlayer.team_id.in_(all_team_ids),
                         TeamPlayer.season_id == league.season_id,
@@ -1035,18 +1062,26 @@ def get_league_top_penalties(db_league_id: int, limit: int = 100) -> list[dict]:
                 ]
                 if roster_player_ids:
                     gc_clause = (
-                        (PlayerStatistics.game_class == league.game_class)
-                        | (PlayerStatistics.game_class == None)  # noqa: E711
-                    ) if league.game_class else True
-                    stats = base_q.filter(
-                        PlayerStatistics.player_id.in_(roster_player_ids),
-                        gc_clause,
-                    ).limit(limit).all()
+                        (
+                            (PlayerStatistics.game_class == league.game_class)
+                            | (PlayerStatistics.game_class == None)  # noqa: E711
+                        )
+                        if league.game_class
+                        else True
+                    )
+                    stats = (
+                        base_q.filter(
+                            PlayerStatistics.player_id.in_(roster_player_ids),
+                            gc_clause,
+                        )
+                        .limit(limit)
+                        .all()
+                    )
 
             if not stats:
                 team_names = [
-                    r[0] for r in
-                    session.query(Team.name)
+                    r[0]
+                    for r in session.query(Team.name)
                     .filter(Team.id.in_(all_team_ids), Team.name.isnot(None))
                     .distinct()
                     .all()
@@ -1054,39 +1089,49 @@ def get_league_top_penalties(db_league_id: int, limit: int = 100) -> list[dict]:
                 if not team_names:
                     return []
                 gc_clause = (
-                    (PlayerStatistics.game_class == league.game_class)
-                    | (PlayerStatistics.game_class == None)  # noqa: E711
-                ) if league.game_class else True
-                stats = base_q.filter(
-                    PlayerStatistics.team_name.in_(team_names),
-                    gc_clause,
-                ).limit(limit).all()
+                    (
+                        (PlayerStatistics.game_class == league.game_class)
+                        | (PlayerStatistics.game_class == None)  # noqa: E711
+                    )
+                    if league.game_class
+                    else True
+                )
+                stats = (
+                    base_q.filter(
+                        PlayerStatistics.team_name.in_(team_names),
+                        gc_clause,
+                    )
+                    .limit(limit)
+                    .all()
+                )
 
         result = []
         for i, (ps, pl) in enumerate(stats, 1):
-            result.append({
-                "rank": i,
-                "player_id": pl.person_id,
-                "player_name": pl.full_name or f"Player {pl.person_id}",
-                "team_name": ps.team_name or "Unknown",
-                "team_id": ps.team_id,
-                "gp": ps.games_played,
-                "g": ps.goals,
-                "a": ps.assists,
-                "pts": ps.points,
-                "pim": ps.penalty_minutes,
-                "pen_2": getattr(ps, 'pen_2min', 0) or 0,
-                "pen_5": getattr(ps, 'pen_5min', 0) or 0,
-                "pen_10": getattr(ps, 'pen_10min', 0) or 0,
-                "pen_match": getattr(ps, 'pen_match', 0) or 0,
-            })
+            result.append(
+                {
+                    "rank": i,
+                    "player_id": pl.person_id,
+                    "player_name": pl.full_name or f"Player {pl.person_id}",
+                    "team_name": ps.team_name or "Unknown",
+                    "team_id": ps.team_id,
+                    "gp": ps.games_played,
+                    "g": ps.goals,
+                    "a": ps.assists,
+                    "pts": ps.points,
+                    "pim": ps.penalty_minutes,
+                    "pen_2": getattr(ps, "pen_2min", 0) or 0,
+                    "pen_5": getattr(ps, "pen_5min", 0) or 0,
+                    "pen_10": getattr(ps, "pen_10min", 0) or 0,
+                    "pen_match": getattr(ps, "pen_match", 0) or 0,
+                }
+            )
         return result
 
 
 def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) -> list[dict]:
     """
     Overall top scorers across all leagues in a season.
-    
+
     Returns players with the highest points from PlayerStatistics,
     aggregating across all teams they played for in the season.
     Includes the league where they played most games.
@@ -1094,11 +1139,12 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
     from app.services.database import get_database_service
     from app.models.db_models import PlayerStatistics, Player, League
     from sqlalchemy import func
-    
+
     if season_id is None:
         from app.main import get_current_season
+
         season_id = get_current_season()
-    
+
     db = get_database_service()
     with db.session_scope() as session:
         # Build team_name → gender via Game→LeagueGroup→League (avoids ambiguous abbrev)
@@ -1106,10 +1152,13 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
         team_gender: dict[str, str] = {}
         for _tname, _gc in (
             session.query(Team.name, League.game_class)
-            .join(Game, or_(
-                (Game.home_team_id == Team.id) & (Game.season_id == Team.season_id),
-                (Game.away_team_id == Team.id) & (Game.season_id == Team.season_id)
-            ))
+            .join(
+                Game,
+                or_(
+                    (Game.home_team_id == Team.id) & (Game.season_id == Team.season_id),
+                    (Game.away_team_id == Team.id) & (Game.season_id == Team.season_id),
+                ),
+            )
             .join(LeagueGroup, LeagueGroup.id == Game.group_id)
             .join(League, League.id == LeagueGroup.league_id)
             .filter(League.season_id == season_id, League.game_class.in_([11, 21]))
@@ -1124,20 +1173,22 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
             session.query(
                 PlayerStatistics.player_id,
                 Player.full_name,
-                func.sum(PlayerStatistics.games_played).label('gp'),
-                func.sum(PlayerStatistics.goals).label('g'),
-                func.sum(PlayerStatistics.assists).label('a'),
-                func.sum(PlayerStatistics.points).label('pts'),
-                func.sum(PlayerStatistics.penalty_minutes).label('pim')
+                func.sum(PlayerStatistics.games_played).label("gp"),
+                func.sum(PlayerStatistics.goals).label("g"),
+                func.sum(PlayerStatistics.assists).label("a"),
+                func.sum(PlayerStatistics.points).label("pts"),
+                func.sum(PlayerStatistics.penalty_minutes).label("pim"),
             )
             .join(Player, PlayerStatistics.player_id == Player.person_id)
             .filter(PlayerStatistics.season_id == season_id)
             .group_by(PlayerStatistics.player_id, Player.full_name)
-            .order_by(func.sum(PlayerStatistics.points).desc(), func.sum(PlayerStatistics.goals).desc())
+            .order_by(
+                func.sum(PlayerStatistics.points).desc(), func.sum(PlayerStatistics.goals).desc()
+            )
             .limit(limit)
             .all()
         )
-        
+
         result = []
         for i, (player_id, full_name, gp, g, a, pts, pim) in enumerate(stats, 1):
             # For each player, find the team/league where they played most games
@@ -1146,42 +1197,44 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
                     PlayerStatistics.team_name,
                     PlayerStatistics.team_id,
                     PlayerStatistics.league_abbrev,
-                    PlayerStatistics.games_played
+                    PlayerStatistics.games_played,
                 )
                 .filter(
-                    PlayerStatistics.player_id == player_id,
-                    PlayerStatistics.season_id == season_id
+                    PlayerStatistics.player_id == player_id, PlayerStatistics.season_id == season_id
                 )
                 .order_by(PlayerStatistics.games_played.desc())
                 .first()
             )
-            
+
             if primary_stats:
                 team_name, team_id, league_abbrev, _ = primary_stats
             else:
                 team_name, team_id, league_abbrev = "Unknown", None, None
 
-            result.append({
-                "rank": i,
-                "player_id": player_id,
-                "player_name": full_name or f"Player {player_id}",
-                "team_name": team_name or "Unknown",
-                "team_id": team_id,
-                "league": league_abbrev or "",
-                "gender": team_gender.get(team_name or "", ""),
-                "gp": gp or 0,
-                "g": g or 0,
-                "a": a or 0,
-                "pts": pts or 0,
-                "pim": pim or 0,
-            })
-        
+            result.append(
+                {
+                    "rank": i,
+                    "player_id": player_id,
+                    "player_name": full_name or f"Player {player_id}",
+                    "team_name": team_name or "Unknown",
+                    "team_id": team_id,
+                    "league": league_abbrev or "",
+                    "gender": team_gender.get(team_name or "", ""),
+                    "gp": gp or 0,
+                    "g": g or 0,
+                    "a": a or 0,
+                    "pts": pts or 0,
+                    "pim": pim or 0,
+                }
+            )
+
         return result
 
 
 # ---------------------------------------------------------------------------
 # 4. Player stats leaderboard (all teams / season)
 # ---------------------------------------------------------------------------
+
 
 def get_player_leaderboard(
     season_id: Optional[int] = None,
@@ -1197,28 +1250,29 @@ def get_player_leaderboard(
     order_by: 'points' | 'goals' | 'assists' | 'pim'
     """
     from sqlalchemy import func as _func
+
     db = get_database_service()
     with db.session_scope() as session:
         if season_id is None:
             season_id = _get_current_season_id(session)
 
-        gp_sum  = _func.sum(PlayerStatistics.games_played)
-        g_sum   = _func.sum(PlayerStatistics.goals)
-        a_sum   = _func.sum(PlayerStatistics.assists)
+        gp_sum = _func.sum(PlayerStatistics.games_played)
+        g_sum = _func.sum(PlayerStatistics.goals)
+        a_sum = _func.sum(PlayerStatistics.assists)
         pts_sum = _func.sum(PlayerStatistics.points)
         pim_sum = _func.sum(PlayerStatistics.penalty_minutes)
 
         order_expr = {
-            "goals":   g_sum.desc(),
+            "goals": g_sum.desc(),
             "assists": a_sum.desc(),
-            "pim":     pim_sum.desc(),
+            "pim": pim_sum.desc(),
         }.get(order_by, pts_sum.desc())
 
         base_filter = [PlayerStatistics.season_id == season_id]
         if team_id is not None:
-            base_filter.append(PlayerStatistics.team_name.in_(
-                session.query(Team.name).filter(Team.id == team_id)
-            ))
+            base_filter.append(
+                PlayerStatistics.team_name.in_(session.query(Team.name).filter(Team.id == team_id))
+            )
         if game_class is not None:
             gc_team_names = (
                 session.query(Team.name)
@@ -1241,11 +1295,11 @@ def get_player_leaderboard(
             session.query(
                 PlayerStatistics.player_id,
                 Player.full_name,
-                gp_sum.label('gp'),
-                g_sum.label('g'),
-                a_sum.label('a'),
-                pts_sum.label('pts'),
-                pim_sum.label('pim'),
+                gp_sum.label("gp"),
+                g_sum.label("g"),
+                a_sum.label("a"),
+                pts_sum.label("pts"),
+                pim_sum.label("pim"),
             )
             .join(Player, PlayerStatistics.player_id == Player.person_id)
             .filter(*base_filter)
@@ -1261,10 +1315,13 @@ def get_player_leaderboard(
         team_gender: dict[str, str] = {}
         for _tname, _gc in (
             session.query(Team.name, League.game_class)
-            .join(Game, or_(
-                (Game.home_team_id == Team.id) & (Game.season_id == Team.season_id),
-                (Game.away_team_id == Team.id) & (Game.season_id == Team.season_id)
-            ))
+            .join(
+                Game,
+                or_(
+                    (Game.home_team_id == Team.id) & (Game.season_id == Team.season_id),
+                    (Game.away_team_id == Team.id) & (Game.season_id == Team.season_id),
+                ),
+            )
             .join(LeagueGroup, LeagueGroup.id == Game.group_id)
             .join(League, League.id == LeagueGroup.league_id)
             .filter(League.season_id == season_id, League.game_class.in_([11, 21]))
@@ -1278,31 +1335,35 @@ def get_player_leaderboard(
         for i, (player_id, full_name, gp, g, a, pts, pim) in enumerate(rows, offset + 1):
             primary = (
                 session.query(PlayerStatistics.team_name, PlayerStatistics.league_abbrev)
-                .filter(PlayerStatistics.player_id == player_id,
-                        PlayerStatistics.season_id == season_id)
+                .filter(
+                    PlayerStatistics.player_id == player_id, PlayerStatistics.season_id == season_id
+                )
                 .order_by(PlayerStatistics.games_played.desc())
                 .first()
             )
             _abbrev = (primary[1] if primary else None) or ""
-            result.append({
-                "rank": i,
-                "player_id": player_id,
-                "player_name": full_name or f"Player {player_id}",
-                "team_name": (primary[0] if primary else None) or "—",
-                "league": _abbrev,
-                "gender": team_gender.get((primary[0] if primary else None) or "", ""),
-                "gp": gp or 0,
-                "g": g or 0,
-                "a": a or 0,
-                "pts": pts or 0,
-                "pim": pim or 0,
-            })
+            result.append(
+                {
+                    "rank": i,
+                    "player_id": player_id,
+                    "player_name": full_name or f"Player {player_id}",
+                    "team_name": (primary[0] if primary else None) or "—",
+                    "league": _abbrev,
+                    "gender": team_gender.get((primary[0] if primary else None) or "", ""),
+                    "gp": gp or 0,
+                    "g": g or 0,
+                    "a": a or 0,
+                    "pts": pts or 0,
+                    "pim": pim or 0,
+                }
+            )
         return {"players": result, "total": total, "offset": offset, "limit": limit}
 
 
 # ---------------------------------------------------------------------------
 # 5. Team page data
 # ---------------------------------------------------------------------------
+
 
 def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
     """
@@ -1333,14 +1394,20 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
         if season_id is None:
             # Prefer the highlighted (current) season; fall back to most recent
             highlighted = next((r[0] for r in all_season_rows if r[2]), None)
-            season_id = highlighted or (all_season_rows[0][0] if all_season_rows else _get_current_season_id(session))
+            season_id = highlighted or (
+                all_season_rows[0][0] if all_season_rows else _get_current_season_id(session)
+            )
         elif season_id not in valid_season_ids and all_season_rows:
             season_id = all_season_rows[0][0]
 
-        team = session.query(Team).filter(
-            Team.id == team_id,
-            Team.season_id == season_id,
-        ).first()
+        team = (
+            session.query(Team)
+            .filter(
+                Team.id == team_id,
+                Team.season_id == season_id,
+            )
+            .first()
+        )
 
         if team is None:
             return {}
@@ -1349,17 +1416,17 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
         season_row = session.get(Season, season_id)
         season_name = season_row.text if season_row else str(season_id)
         league_row = (
-            session.query(League).filter(
+            session.query(League)
+            .filter(
                 League.league_id == team.league_id,
                 League.season_id == team.season_id,
                 League.game_class == team.game_class,
-            ).first()
-            if team.league_id is not None else None
+            )
+            .first()
+            if team.league_id is not None
+            else None
         )
-        league_name = (
-            (league_row.name or league_row.text if league_row else None)
-            or ""
-        )
+        league_name = (league_row.name or league_row.text if league_row else None) or ""
 
         # ── Step 1: game_players lookup ──────────────────────────────────────
         # Aggregate all lineup appearances for this team/season so we can:
@@ -1380,17 +1447,22 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                 gp_agg[pid] = {
                     "player_id": pid,
                     "name": pl.full_name or f"Player {pid}",
-                    "number": None, "position": None,
-                    "gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0,
+                    "number": None,
+                    "position": None,
+                    "gp": 0,
+                    "g": 0,
+                    "a": 0,
+                    "pts": 0,
+                    "pim": 0,
                 }
             entry = gp_agg[pid]
             if gp.jersey_number and not entry["number"]:
                 entry["number"] = gp.jersey_number
             if gp.position and gp.position.lower() not in _UNKNOWN_POS and not entry["position"]:
                 entry["position"] = gp.position
-            entry["gp"]  += 1
-            entry["g"]   += gp.goals or 0
-            entry["a"]   += gp.assists or 0
+            entry["gp"] += 1
+            entry["g"] += gp.goals or 0
+            entry["a"] += gp.assists or 0
             entry["pts"] += (gp.goals or 0) + (gp.assists or 0)
             entry["pim"] += gp.penalty_minutes or 0
 
@@ -1440,6 +1512,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             # league the team itself plays in. We find it by majority vote across
             # all official roster players.
             from collections import Counter
+
             abbrev_votes: Counter = Counter()
             for ps in (
                 session.query(
@@ -1472,9 +1545,9 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                 pid = int(ps.player_id)
                 if pid not in player_stat_map:
                     player_stat_map[pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0}
-                player_stat_map[pid]["gp"]  += ps.games_played or 0
-                player_stat_map[pid]["g"]   += ps.goals or 0
-                player_stat_map[pid]["a"]   += ps.assists or 0
+                player_stat_map[pid]["gp"] += ps.games_played or 0
+                player_stat_map[pid]["g"] += ps.goals or 0
+                player_stat_map[pid]["a"] += ps.assists or 0
                 player_stat_map[pid]["pts"] += ps.points or 0
                 player_stat_map[pid]["pim"] += ps.penalty_minutes or 0
 
@@ -1485,7 +1558,8 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                 number = tp.jersey_number or gp_info.get("number")
                 pos_raw = tp.position or ""
                 position = (
-                    pos_raw if pos_raw.lower() not in _UNKNOWN_POS
+                    pos_raw
+                    if pos_raw.lower() not in _UNKNOWN_POS
                     else (gp_info.get("position") or "")
                 )
                 position = _POS_ABBREV.get(position.lower(), position)
@@ -1493,9 +1567,9 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                 # accumulation from GamePlayer (populated by player_game_stats task)
                 # so that the roster shows real numbers even when PlayerStatistics
                 # hasn't been indexed yet or has a team-name mismatch.
-                gp_val  = ps.get("gp") or gp_info.get("gp", 0)
-                g_val   = ps.get("g")  if ps.get("g")  else gp_info.get("g",   0)
-                a_val   = ps.get("a")  if ps.get("a")  else gp_info.get("a",   0)
+                gp_val = ps.get("gp") or gp_info.get("gp", 0)
+                g_val = ps.get("g") if ps.get("g") else gp_info.get("g", 0)
+                a_val = ps.get("a") if ps.get("a") else gp_info.get("a", 0)
                 pts_val = ps.get("pts") if ps.get("pts") else (g_val + a_val)
                 pim_val = ps.get("pim") if ps.get("pim") else gp_info.get("pim", 0)
                 roster.append(
@@ -1504,9 +1578,9 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                         "name": pl.full_name or f"Player {pl.person_id}",
                         "number": number,
                         "position": position,
-                        "gp":  gp_val,
-                        "g":   g_val,
-                        "a":   a_val,
+                        "gp": gp_val,
+                        "g": g_val,
+                        "a": a_val,
                         "pts": pts_val,
                         "pim": pim_val,
                     }
@@ -1516,8 +1590,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             # Exclude players who are officially registered on a DIFFERENT team this
             # season — they are guests/loan players and don't belong here.
             extras_pids = [
-                pid for pid in gp_agg
-                if pid not in official_pids and pid not in other_team_pids
+                pid for pid in gp_agg if pid not in official_pids and pid not in other_team_pids
             ]
             # Look up PlayerStatistics for these extras (same as official path)
             extras_stat_map: dict[int, dict] = {}
@@ -1528,23 +1601,21 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                     PlayerStatistics.team_name == team.name,
                 ]
                 if team_league_abbrev:
-                    ps_filter_extras.append(
-                        PlayerStatistics.league_abbrev == team_league_abbrev
-                    )
+                    ps_filter_extras.append(PlayerStatistics.league_abbrev == team_league_abbrev)
                 for ps in session.query(PlayerStatistics).filter(*ps_filter_extras).all():
                     pid = int(ps.player_id)
                     if pid not in extras_stat_map:
                         extras_stat_map[pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0, "pim": 0}
-                    extras_stat_map[pid]["gp"]  += ps.games_played or 0
-                    extras_stat_map[pid]["g"]   += ps.goals or 0
-                    extras_stat_map[pid]["a"]   += ps.assists or 0
+                    extras_stat_map[pid]["gp"] += ps.games_played or 0
+                    extras_stat_map[pid]["g"] += ps.goals or 0
+                    extras_stat_map[pid]["a"] += ps.assists or 0
                     extras_stat_map[pid]["pts"] += ps.points or 0
                     extras_stat_map[pid]["pim"] += ps.penalty_minutes or 0
             for pid in extras_pids:
                 info = gp_agg[pid]
                 ps = extras_stat_map.get(pid) or {}
-                g_val   = ps.get("g")   if ps.get("g")   else info["g"]
-                a_val   = ps.get("a")   if ps.get("a")   else info["a"]
+                g_val = ps.get("g") if ps.get("g") else info["g"]
+                a_val = ps.get("a") if ps.get("a") else info["a"]
                 pts_val = ps.get("pts") if ps.get("pts") else (g_val + a_val)
                 pim_val = ps.get("pim") if ps.get("pim") else info["pim"]
                 roster.append(
@@ -1552,10 +1623,12 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                         "player_id": pid,
                         "name": info["name"],
                         "number": info["number"],
-                        "position": _POS_ABBREV.get((info["position"] or "").lower(), info["position"] or ""),
-                        "gp":  ps.get("gp") or info["gp"],
-                        "g":   g_val,
-                        "a":   a_val,
+                        "position": _POS_ABBREV.get(
+                            (info["position"] or "").lower(), info["position"] or ""
+                        ),
+                        "gp": ps.get("gp") or info["gp"],
+                        "g": g_val,
+                        "a": a_val,
                         "pts": pts_val,
                         "pim": pim_val,
                         "from_games": True,
@@ -1573,10 +1646,12 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                         "player_id": pid,
                         "name": info["name"],
                         "number": info["number"],
-                        "position": _POS_ABBREV.get((info["position"] or "").lower(), info["position"] or ""),
+                        "position": _POS_ABBREV.get(
+                            (info["position"] or "").lower(), info["position"] or ""
+                        ),
                         "gp": info["gp"],
-                        "g":  info["g"],
-                        "a":  info["a"],
+                        "g": info["g"],
+                        "a": info["a"],
                         "pts": info["pts"],
                         "pim": info["pim"],
                     }
@@ -1599,13 +1674,15 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
         # Preload opponent names
         opp_ids = set()
         for g in recent_games_raw:
-            opp_ids.add(int(g.home_team_id) if int(g.away_team_id) == team_id else int(g.away_team_id))
+            opp_ids.add(
+                int(g.home_team_id) if int(g.away_team_id) == team_id else int(g.away_team_id)
+            )
 
         opp_names: dict[int, str] = {}
         opp_logos: dict[int, str] = {}
-        for t in session.query(Team).filter(
-            Team.id.in_(opp_ids), Team.season_id == season_id
-        ).all():
+        for t in (
+            session.query(Team).filter(Team.id.in_(opp_ids), Team.season_id == season_id).all()
+        ):
             if t.name is not None or t.text is not None:
                 opp_names[int(t.id)] = str(t.name or t.text)
             if t.logo_url:
@@ -1613,9 +1690,9 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
         # Cross-season fallback for nameless stubs
         missing_opp = {tid for tid in opp_ids if tid not in opp_names}
         if missing_opp:
-            for t in session.query(Team).filter(
-                Team.id.in_(missing_opp), Team.name.isnot(None)
-            ).all():
+            for t in (
+                session.query(Team).filter(Team.id.in_(missing_opp), Team.name.isnot(None)).all()
+            ):
                 opp_names[int(t.id)] = str(t.name)
                 if t.logo_url and int(t.id) not in opp_logos:
                     opp_logos[int(t.id)] = str(t.logo_url)
@@ -1699,6 +1776,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
 def _get_team_upcoming(session, team_id: int, season_id: int) -> list[dict]:
     """Return upcoming (unscored) games for a team."""
     from datetime import date as _date
+
     uq = (
         session.query(Game)
         .filter(
@@ -1724,16 +1802,18 @@ def _get_team_upcoming(session, team_id: int, season_id: int) -> list[dict]:
     for g in uq:
         is_home = g.home_team_id == team_id
         opp_id = g.away_team_id if is_home else g.home_team_id
-        result.append({
-            "game_id": g.id,
-            "date": g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
-            "weekday": g.game_date.strftime("%a") if g.game_date else "",
-            "time": g.game_time or "",
-            "home_away": "H" if is_home else "A",
-            "opponent_id": opp_id,
-            "opponent_name": opp_names.get(opp_id, f"Team {opp_id}"),
-            "opponent_logo": opp_logos.get(opp_id, ""),
-        })
+        result.append(
+            {
+                "game_id": g.id,
+                "date": g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
+                "weekday": g.game_date.strftime("%a") if g.game_date else "",
+                "time": g.game_time or "",
+                "home_away": "H" if is_home else "A",
+                "opponent_id": opp_id,
+                "opponent_name": opp_names.get(opp_id, f"Team {opp_id}"),
+                "opponent_logo": opp_logos.get(opp_id, ""),
+            }
+        )
     return result
 
 
@@ -1741,15 +1821,23 @@ def _get_team_upcoming(session, team_id: int, season_id: int) -> list[dict]:
 # 6. Player detail
 # ---------------------------------------------------------------------------
 
+
 def get_player_detail(person_id: int) -> dict:
     """
     Return player profile + per-season stats across all seasons.
     Uses team_name / league_abbrev text columns (populated since schema migration).
     """
     from app.services.data_indexer import LEAGUE_TIERS
+
     _DEFAULT_TIER = 99
-    _STRIP_PREFIXES = ("herren ", "damen ", "junioren ", "juniorinnen ",
-                       "junioren/-innen ", "senioren ")
+    _STRIP_PREFIXES = (
+        "herren ",
+        "damen ",
+        "junioren ",
+        "juniorinnen ",
+        "junioren/-innen ",
+        "senioren ",
+    )
 
     db = get_database_service()
     with db.session_scope() as session:
@@ -1763,16 +1851,14 @@ def get_player_detail(person_id: int) -> dict:
         # the API stats page; League.name stores the full name like "Herren NLB".
         # We strip common gender/age prefixes to produce the short form.
         abbrev_tier: dict[str, int] = {}
-        for (lname, lid) in (
-            session.query(League.name, League.league_id).distinct().all()
-        ):
+        for lname, lid in session.query(League.name, League.league_id).distinct().all():
             if not lname:
                 continue
             t = LEAGUE_TIERS.get(lid, _DEFAULT_TIER)
             short = lname
             for pfx in _STRIP_PREFIXES:
                 if short.lower().startswith(pfx):
-                    short = short[len(pfx):]
+                    short = short[len(pfx) :]
                     break
             # Store both full name and short name; keep the best (lowest) tier
             for key in (lname, short):
@@ -1800,7 +1886,7 @@ def get_player_detail(person_id: int) -> dict:
             short = lname
             for pfx in _STRIP_PREFIXES:
                 if short.lower().startswith(pfx):
-                    short = short[len(pfx):]
+                    short = short[len(pfx) :]
                     break
             key = (lsid, short)
             # keep lowest game_class (most senior/first match)
@@ -1810,7 +1896,9 @@ def get_player_detail(person_id: int) -> dict:
                 _league_lookup[key] = (ldb_id, lgc or 999, lapi_id)
         league_id_lookup = {k: v[0] for k, v in _league_lookup.items()}
         # Also: db_league_id → game_class (for gender-exact team disambiguation)
-        db_league_to_gc: dict[int, int] = {v[0]: v[1] for v in _league_lookup.values() if v[1] != 999}
+        db_league_to_gc: dict[int, int] = {
+            v[0]: v[1] for v in _league_lookup.values() if v[1] != 999
+        }
 
         # Build (league_db_id, team_name) → team_db_id from actual game participation.
         # This is authoritative: a team named "Zug United" in Herren L-UPL games
@@ -1820,10 +1908,13 @@ def get_player_detail(person_id: int) -> dict:
         for _lg_dbid, _t_id, _t_name in (
             session.query(LeagueGroup.league_id, Team.id, Team.name)
             .join(Game, Game.group_id == LeagueGroup.id)
-            .join(Team, or_(
-                (Team.id == Game.home_team_id) & (Team.season_id == Game.season_id),
-                (Team.id == Game.away_team_id) & (Team.season_id == Game.season_id),
-            ))
+            .join(
+                Team,
+                or_(
+                    (Team.id == Game.home_team_id) & (Team.season_id == Game.season_id),
+                    (Team.id == Game.away_team_id) & (Team.season_id == Game.season_id),
+                ),
+            )
             .filter(Team.name.isnot(None))
             .distinct()
             .all()
@@ -1836,7 +1927,7 @@ def get_player_detail(person_id: int) -> dict:
             .filter(Team.name.isnot(None))
             .all()
         )
-        team_id_by_gc: dict[tuple, int] = {}    # (season_id, team_name, game_class) → team_db_id
+        team_id_by_gc: dict[tuple, int] = {}  # (season_id, team_name, game_class) → team_db_id
         team_id_fallback: dict[tuple, int] = {}  # (season_id, team_name) → team_db_id
         for t_id, t_sid, t_name, t_gc in _all_teams:
             if t_gc:
@@ -1892,6 +1983,7 @@ def get_player_detail(person_id: int) -> dict:
 
         # Recent game appearances (last 10 across all seasons, most recent first)
         from app.models.db_models import Game as _Game, Team as _Team
+
         recent_game_rows = (
             session.query(GamePlayer, _Game)
             .join(_Game, GamePlayer.game_id == _Game.id)
@@ -1906,8 +1998,7 @@ def get_player_detail(person_id: int) -> dict:
             team_ids_needed.add(g.home_team_id)
             team_ids_needed.add(g.away_team_id)
         team_names = {
-            t.id: t.name
-            for t in session.query(_Team).filter(_Team.id.in_(team_ids_needed)).all()
+            t.id: t.name for t in session.query(_Team).filter(_Team.id.in_(team_ids_needed)).all()
         }
 
         # Preload group_id → league short name
@@ -1915,6 +2006,7 @@ def get_player_detail(person_id: int) -> dict:
         group_league_abbrev: dict[int, str] = {}
         if group_ids_needed:
             from app.models.db_models import LeagueGroup as _LG, League as _League2
+
             for grp, lg in (
                 session.query(_LG, _League2)
                 .join(_League2, _LG.league_id == _League2.id)
@@ -1924,13 +2016,13 @@ def get_player_detail(person_id: int) -> dict:
                 lname = lg.name or lg.text or ""
                 for pfx in _STRIP_PREFIXES:
                     if lname.lower().startswith(pfx):
-                        lname = lname[len(pfx):]
+                        lname = lname[len(pfx) :]
                         break
                 group_league_abbrev[grp.id] = lname
 
         recent_games: list[dict] = []
         for gp, g in recent_game_rows:
-            is_home = (gp.team_id == g.home_team_id)
+            is_home = gp.team_id == g.home_team_id
             opp_id = g.away_team_id if is_home else g.home_team_id
             opp_name = team_names.get(opp_id, f"Team {opp_id}")
             if g.home_score is not None and g.away_score is not None:
@@ -1947,20 +2039,22 @@ def get_player_detail(person_id: int) -> dict:
             else:
                 result_label = ""
                 score_str = ""
-            recent_games.append({
-                "game_id": g.id,
-                "date": g.game_date.strftime("%Y-%m-%d") if g.game_date else "",
-                "home_away": "H" if is_home else "A",
-                "opponent": opp_name,
-                "opponent_id": opp_id,
-                "score": score_str,
-                "result": result_label,
-                "season_id": g.season_id,
-                "league": group_league_abbrev.get(g.group_id, "") if g.group_id else "",
-                "g": gp.goals,           # None = not yet indexed (distinct from 0 goals)
-                "a": gp.assists,
-                "pim": gp.penalty_minutes,
-            })
+            recent_games.append(
+                {
+                    "game_id": g.id,
+                    "date": g.game_date.strftime("%Y-%m-%d") if g.game_date else "",
+                    "home_away": "H" if is_home else "A",
+                    "opponent": opp_name,
+                    "opponent_id": opp_id,
+                    "score": score_str,
+                    "result": result_label,
+                    "season_id": g.season_id,
+                    "league": group_league_abbrev.get(g.group_id, "") if g.group_id else "",
+                    "g": gp.goals,  # None = not yet indexed (distinct from 0 goals)
+                    "a": gp.assists,
+                    "pim": gp.penalty_minutes,
+                }
+            )
 
         result = {
             "person_id": player.person_id,
@@ -1977,6 +2071,7 @@ def get_player_detail(person_id: int) -> dict:
     # Fetch photo URL from API outside the DB session (HTTP call)
     try:
         from app.services.swissunihockey import get_swissunihockey_client
+
         client = get_swissunihockey_client()
         api_data = client.get_player_details(person_id)
         regions = api_data.get("data", {}).get("regions", [])
@@ -1995,6 +2090,7 @@ def get_player_detail(person_id: int) -> dict:
 # 7. Upcoming games
 # ---------------------------------------------------------------------------
 
+
 def get_upcoming_games(
     limit: int = 10,
     league_ids: Optional[list] = None,
@@ -2003,7 +2099,7 @@ def get_upcoming_games(
 ) -> list[dict]:
     """
     Return next scheduled games (no score yet), ordered soonest first.
-    
+
     Args:
         limit: Maximum number of games to return
         league_ids: Filter by league IDs (legacy parameter)
@@ -2011,33 +2107,33 @@ def get_upcoming_games(
         season_id: Season ID to filter by
     """
     from datetime import date as _date
+
     db = get_database_service()
     with db.session_scope() as session:
         if season_id is None:
             season_id = _get_current_season_id(session)
 
         today = _date.today()
-        q = (
-            session.query(Game)
-            .filter(
-                Game.season_id == season_id,
-                Game.home_score.is_(None),
-                Game.game_date.isnot(None),
-                Game.game_date >= today,
-            )
+        q = session.query(Game).filter(
+            Game.season_id == season_id,
+            Game.home_score.is_(None),
+            Game.game_date.isnot(None),
+            Game.game_date >= today,
         )
-        
+
         # Filter by league category (e.g., "2_11" = NLB Men)
-        if league_category and league_category != 'all':
-            parts = league_category.split('_')
+        if league_category and league_category != "all":
+            parts = league_category.split("_")
             if len(parts) == 2:
                 try:
                     league_id = int(parts[0])
                     game_class = int(parts[1])
                     # Join through LeagueGroup to League
-                    q = (q.join(LeagueGroup, Game.group_id == LeagueGroup.id)
-                          .join(League, LeagueGroup.league_id == League.id)
-                          .filter(League.league_id == league_id, League.game_class == game_class))
+                    q = (
+                        q.join(LeagueGroup, Game.group_id == LeagueGroup.id)
+                        .join(League, LeagueGroup.league_id == League.id)
+                        .filter(League.league_id == league_id, League.game_class == game_class)
+                    )
                 except ValueError:
                     pass  # Invalid format, ignore filter
         elif league_ids:
@@ -2045,7 +2141,7 @@ def get_upcoming_games(
             q = q.join(LeagueGroup, Game.group_id == LeagueGroup.id).filter(
                 LeagueGroup.league_id.in_(league_ids)
             )
-            
+
         games_raw = q.order_by(Game.game_date.asc()).limit(limit).all()
 
         if not games_raw:
@@ -2053,9 +2149,9 @@ def get_upcoming_games(
 
         team_ids = {g.home_team_id for g in games_raw} | {g.away_team_id for g in games_raw}
         t_names: dict = {}
-        for t in session.query(Team).filter(
-            Team.id.in_(team_ids), Team.season_id == season_id
-        ).all():
+        for t in (
+            session.query(Team).filter(Team.id.in_(team_ids), Team.season_id == season_id).all()
+        ):
             t_names[t.id] = t.name or t.text or f"Team {t.id}"
         missing = team_ids - t_names.keys()
         if missing:
@@ -2119,21 +2215,21 @@ def get_schedule(
     # Map filter dimensions → sets of valid game_class values
     _SEX_GC: dict[str, set[int]] = {
         "women": {21, 22, 26, 28, 41, 42, 43, 44},
-        "mixed":  {49},
-        "men":   {11, 12, 14, 16, 18, 19, 31, 32, 33, 34, 35, 51},
+        "mixed": {49},
+        "men": {11, 12, 14, 16, 18, 19, 31, 32, 33, 34, 35, 51},
     }
     _AGE_GC: dict[str, set[int]] = {
-        "senior":   {11, 12, 21, 22},
-        "U21":      {19, 26},
-        "U18":      {18, 31, 41},
-        "U16":      {16, 28, 32, 42},
-        "U14":      {14, 33, 43, 49},
-        "U12":      {34, 36, 44},
-        "U10":      {35},
+        "senior": {11, 12, 21, 22},
+        "U21": {19, 26},
+        "U18": {18, 31, 41},
+        "U16": {16, 28, 32, 42},
+        "U14": {14, 33, 43, 49},
+        "U12": {34, 36, 44},
+        "U10": {35},
         "senioren": {51},
     }
     _FIELD_GC: dict[str, set[int]] = {
-        "big":   {11, 21, 14, 16, 18, 19, 26, 28, 49},
+        "big": {11, 21, 14, 16, 18, 19, 26, 28, 49},
         "small": {12, 22, 31, 32, 33, 34, 35, 36, 41, 42, 43, 44, 51},
     }
 
@@ -2149,28 +2245,23 @@ def get_schedule(
             season_id = _get_current_season_id(session)
 
         today = _date.today()
-        base_q = (
-            session.query(Game)
-            .filter(
-                Game.season_id == season_id,
-                Game.home_score.is_(None),
-                Game.game_date.isnot(None),
-                Game.game_date >= today,
-            )
+        base_q = session.query(Game).filter(
+            Game.season_id == season_id,
+            Game.home_score.is_(None),
+            Game.game_date.isnot(None),
+            Game.game_date >= today,
         )
 
         if active_gc is not None:
             base_q = (
-                base_q
-                .join(LeagueGroup, Game.group_id == LeagueGroup.id)
+                base_q.join(LeagueGroup, Game.group_id == LeagueGroup.id)
                 .join(League, LeagueGroup.league_id == League.id)
                 .filter(League.game_class.in_(list(active_gc)))
             )
 
         total = base_q.count()
         games_raw = (
-            base_q
-            .order_by(Game.game_date.asc(), Game.game_time.asc())
+            base_q.order_by(Game.game_date.asc(), Game.game_time.asc())
             .offset(offset)
             .limit(limit)
             .all()
@@ -2181,15 +2272,13 @@ def get_schedule(
 
         team_ids = {g.home_team_id for g in games_raw} | {g.away_team_id for g in games_raw}
         t_names: dict = {}
-        for t in session.query(Team).filter(
-            Team.id.in_(team_ids), Team.season_id == season_id
-        ).all():
+        for t in (
+            session.query(Team).filter(Team.id.in_(team_ids), Team.season_id == season_id).all()
+        ):
             t_names[t.id] = t.name or t.text or f"Team {t.id}"
         missing = team_ids - t_names.keys()
         if missing:
-            for t in session.query(Team).filter(
-                Team.id.in_(missing), Team.name.isnot(None)
-            ).all():
+            for t in session.query(Team).filter(Team.id.in_(missing), Team.name.isnot(None)).all():
                 t_names.setdefault(t.id, t.name)
 
         group_ids = {g.group_id for g in games_raw}
@@ -2243,7 +2332,7 @@ def get_latest_results(
 ) -> list[dict]:
     """
     Return recently completed games (with scores), ordered most recent first.
-    
+
     Args:
         limit: Maximum number of games to return
         league_ids: Filter by league IDs (legacy parameter)
@@ -2251,33 +2340,33 @@ def get_latest_results(
         season_id: Season ID to filter by
     """
     from datetime import date as _date
+
     db = get_database_service()
     with db.session_scope() as session:
         if season_id is None:
             season_id = _get_current_season_id(session)
 
         today = _date.today()
-        q = (
-            session.query(Game)
-            .filter(
-                Game.season_id == season_id,
-                Game.home_score.isnot(None),  # Has score = completed
-                Game.game_date.isnot(None),
-                Game.game_date <= today,
-            )
+        q = session.query(Game).filter(
+            Game.season_id == season_id,
+            Game.home_score.isnot(None),  # Has score = completed
+            Game.game_date.isnot(None),
+            Game.game_date <= today,
         )
-        
+
         # Filter by league category (e.g., "2_11" = NLB Men)
-        if league_category and league_category != 'all':
-            parts = league_category.split('_')
+        if league_category and league_category != "all":
+            parts = league_category.split("_")
             if len(parts) == 2:
                 try:
                     league_id = int(parts[0])
                     game_class = int(parts[1])
                     # Join through LeagueGroup to League
-                    q = (q.join(LeagueGroup, Game.group_id == LeagueGroup.id)
-                          .join(League, LeagueGroup.league_id == League.id)
-                          .filter(League.league_id == league_id, League.game_class == game_class))
+                    q = (
+                        q.join(LeagueGroup, Game.group_id == LeagueGroup.id)
+                        .join(League, LeagueGroup.league_id == League.id)
+                        .filter(League.league_id == league_id, League.game_class == game_class)
+                    )
                 except ValueError:
                     pass  # Invalid format, ignore filter
         elif league_ids:
@@ -2285,7 +2374,7 @@ def get_latest_results(
             q = q.join(LeagueGroup, Game.group_id == LeagueGroup.id).filter(
                 LeagueGroup.league_id.in_(league_ids)
             )
-            
+
         games_raw = q.order_by(Game.game_date.desc()).limit(limit).all()
 
         if not games_raw:
@@ -2293,9 +2382,9 @@ def get_latest_results(
 
         team_ids = {g.home_team_id for g in games_raw} | {g.away_team_id for g in games_raw}
         t_names: dict = {}
-        for t in session.query(Team).filter(
-            Team.id.in_(team_ids), Team.season_id == season_id
-        ).all():
+        for t in (
+            session.query(Team).filter(Team.id.in_(team_ids), Team.season_id == season_id).all()
+        ):
             t_names[t.id] = t.name or t.text or f"Team {t.id}"
         missing = team_ids - t_names.keys()
         if missing:
@@ -2412,8 +2501,8 @@ def _period_offset(period) -> int:
         return 0
 
 
-_REGULAR_DURATION = 3600   # 60 minutes in seconds
-_OT_DURATION      = 4200   # 70 minutes in seconds (10-min OT)
+_REGULAR_DURATION = 3600  # 60 minutes in seconds
+_OT_DURATION = 4200  # 70 minutes in seconds (10-min OT)
 
 
 def _parse_time_seconds(time_str: str) -> int:
@@ -2440,6 +2529,7 @@ def build_timeline_events(
       - events is sorted by pct ascending
       - total_seconds is 3600 (regular) or 4200 (OT present)
     """
+
     def _is_ot_period(period, time_str: str = "") -> bool:
         if isinstance(period, str) and period.upper() in ("OT", "SO"):
             return True
@@ -2453,8 +2543,9 @@ def build_timeline_events(
             return derived is not None and derived.upper() in ("OT", "PS")
         return False
 
-    has_ot = any(_is_ot_period(g.get("period"), g.get("time", "")) for g in goals) or \
-             any(_is_ot_period(p.get("period"), p.get("time", "")) for p in penalties)
+    has_ot = any(_is_ot_period(g.get("period"), g.get("time", "")) for g in goals) or any(
+        _is_ot_period(p.get("period"), p.get("time", "")) for p in penalties
+    )
     total_seconds = _OT_DURATION if has_ot else _REGULAR_DURATION
 
     def _team_side(team_label: str) -> str:
@@ -2480,13 +2571,15 @@ def build_timeline_events(
         label = f"GOAL - {g.get('time', '')} — {team}"
         if player:
             label += f" · {player}"
-        events.append({
-            "id":        f"goal-{i}",
-            "kind":      "goal",
-            "team_side": _team_side(team),
-            "pct":       round(pct, 4),
-            "label":     label,
-        })
+        events.append(
+            {
+                "id": f"goal-{i}",
+                "kind": "goal",
+                "team_side": _team_side(team),
+                "pct": round(pct, 4),
+                "label": label,
+            }
+        )
 
     for i, p in enumerate(penalties):
         abs_s = _period_offset(p.get("period")) + _parse_time_seconds(p.get("time", ""))
@@ -2502,13 +2595,15 @@ def build_timeline_events(
         if player:
             label += f" · {player}"
         label += f" ({minutes} min, {infraction})" if infraction else f" ({minutes} min)"
-        events.append({
-            "id":        f"pen-{i}",
-            "kind":      "penalty",
-            "team_side": _team_side(team),
-            "pct":       round(pct, 4),
-            "label":     label,
-        })
+        events.append(
+            {
+                "id": f"pen-{i}",
+                "kind": "penalty",
+                "team_side": _team_side(team),
+                "pct": round(pct, 4),
+                "label": label,
+            }
+        )
 
     events.sort(key=lambda e: e["pct"])
     return events, total_seconds
@@ -2526,11 +2621,17 @@ def get_game_box_score(game_id: int) -> dict:
 
         # Load team names + logos
         _team_cache: dict[int, Team] = {}
+
         def _get_team(tid: int):
             if tid not in _team_cache:
-                _team_cache[tid] = session.query(Team).filter(
-                    Team.id == tid, Team.season_id == game.season_id,
-                ).first()
+                _team_cache[tid] = (
+                    session.query(Team)
+                    .filter(
+                        Team.id == tid,
+                        Team.season_id == game.season_id,
+                    )
+                    .first()
+                )
             return _team_cache.get(tid)
 
         def _team_name(tid: int) -> str:
@@ -2615,7 +2716,9 @@ def get_game_box_score(game_id: int) -> dict:
                 )
 
             elif kind == "period":
-                period_markers.append({"time": time_str, "label": ev_type, "period": derived_period})
+                period_markers.append(
+                    {"time": time_str, "label": ev_type, "period": derived_period}
+                )
 
             elif kind == "best_player":
                 # Resolve which side by team_id first, then by substring match.
@@ -2624,6 +2727,7 @@ def get_game_box_score(game_id: int) -> dict:
                 # ("Langenthal Aarwangen II").  Check both directions so either
                 # form resolves correctly.
                 import re as _re
+
                 def _norm(s: str) -> str:
                     return _re.sub(r"\s+", " ", s).strip().lower()
 
@@ -2639,7 +2743,9 @@ def get_game_box_score(game_id: int) -> dict:
                         _is_home = False
                     else:
                         _is_home = None  # unresolved; fixed up below
-                best_players.append({"team": team_label, "player": player_name, "is_home": _is_home})
+                best_players.append(
+                    {"team": team_label, "player": player_name, "is_home": _is_home}
+                )
 
         # ── Fix up unresolved best-player sides ──────────────────────────────
         # If name matching failed (is_home=None), or both players ended up on
@@ -2659,7 +2765,9 @@ def get_game_box_score(game_id: int) -> dict:
                     else:
                         bp["is_home"] = False
                         resolved_away += 1
-            elif len(best_players) == 2 and best_players[0]["is_home"] == best_players[1]["is_home"]:
+            elif (
+                len(best_players) == 2 and best_players[0]["is_home"] == best_players[1]["is_home"]
+            ):
                 # Both matched the same side — flip the second one.
                 best_players[1]["is_home"] = not best_players[0]["is_home"]
 
@@ -2682,7 +2790,7 @@ def get_game_box_score(game_id: int) -> dict:
         h_score, a_score = 0, 0
         dc_h, dc_a = 0, 0  # running doubled-counter from API embedded scores
         for g in deduped_goals:
-            is_home = (g["team"] == home_name)
+            is_home = g["team"] == home_name
             m_emb = _GOAL_RE.match(g.get("_ev_type", ""))
             emb_h = int(m_emb.group(2)) if m_emb else None
             emb_a = int(m_emb.group(3)) if m_emb else None
@@ -2717,6 +2825,7 @@ def get_game_box_score(game_id: int) -> dict:
 
         # ── Period scores ────────────────────────────────────────────────────
         from collections import defaultdict as _defaultdict
+
         _ph: dict = _defaultdict(int)
         _pa: dict = _defaultdict(int)
         for g in goals:
@@ -2736,10 +2845,7 @@ def get_game_box_score(game_id: int) -> dict:
                 else:
                     _pa[_p] += 1
         _all_periods = sorted(set(list(_ph.keys()) + list(_pa.keys())))
-        period_scores = [
-            {"period": _p, "home": _ph[_p], "away": _pa[_p]}
-            for _p in _all_periods
-        ]
+        period_scores = [{"period": _p, "home": _ph[_p], "away": _pa[_p]} for _p in _all_periods]
 
         # ── Deduplicate penalties ────────────────────────────────────────────
         # The API also emits 2 identical rows per penalty.
@@ -2753,14 +2859,18 @@ def get_game_box_score(game_id: int) -> dict:
         penalties = deduped_penalties
 
         # ── Game summary stats ────────────────────────────────────────────────
-        game_summary = {
-            "home_goals": game.home_score,
-            "away_goals": game.away_score,
-            "home_penalties": sum(1 for p in penalties if p["team"] == home_name),
-            "away_penalties": sum(1 for p in penalties if p["team"] == away_name),
-            "home_pim": sum(p["minutes"] for p in penalties if p["team"] == home_name),
-            "away_pim": sum(p["minutes"] for p in penalties if p["team"] == away_name),
-        } if game.home_score is not None else None
+        game_summary = (
+            {
+                "home_goals": game.home_score,
+                "away_goals": game.away_score,
+                "home_penalties": sum(1 for p in penalties if p["team"] == home_name),
+                "away_penalties": sum(1 for p in penalties if p["team"] == away_name),
+                "home_pim": sum(p["minutes"] for p in penalties if p["team"] == home_name),
+                "away_pim": sum(p["minutes"] for p in penalties if p["team"] == away_name),
+            }
+            if game.home_score is not None
+            else None
+        )
 
         # ── Roster ──────────────────────────────────────────────────────────
         roster_home: list[dict] = []
@@ -2796,6 +2906,7 @@ def get_game_box_score(game_id: int) -> dict:
             # games_played) so that cup / second-team rows are excluded and only
             # the league this game belongs to is counted.
             from collections import Counter as _Counter
+
             abbrev_votes: _Counter = _Counter()
             for _row in all_rows:
                 abbrev_votes[_row.league_abbrev] += _row.games_played or 1
@@ -2807,8 +2918,8 @@ def get_game_box_score(game_id: int) -> dict:
                 if _pid not in smap:
                     smap[_pid] = {"gp": 0, "g": 0, "a": 0, "pts": 0}
                 smap[_pid]["gp"] += _sr.games_played or 0
-                smap[_pid]["g"]  += _sr.goals or 0
-                smap[_pid]["a"]  += _sr.assists or 0
+                smap[_pid]["g"] += _sr.goals or 0
+                smap[_pid]["a"] += _sr.assists or 0
                 smap[_pid]["pts"] += _sr.points or 0
             return smap
 
@@ -2829,7 +2940,11 @@ def get_game_box_score(game_id: int) -> dict:
                 )
                 .all()
             ):
-                if _tp.player_id not in _tp_pos_map and _tp.position and _tp.position.lower() not in _UNKNOWN_POS:
+                if (
+                    _tp.player_id not in _tp_pos_map
+                    and _tp.position
+                    and _tp.position.lower() not in _UNKNOWN_POS
+                ):
                     _tp_pos_map[_tp.player_id] = _tp.position
 
         # Detect whether player_game_stats has been indexed for this game.
@@ -2837,11 +2952,13 @@ def get_game_box_score(game_id: int) -> dict:
         # score is non-zero, the per-player stats are just the lineup-indexer
         # default (0) and haven't been populated yet → show None (→ "—").
         _gp_goal_sum = sum(gp.goals or 0 for gp in gp_rows)
-        _actual_goals = (game.home_score or 0) + (game.away_score or 0) if game.home_score is not None else None
+        _actual_goals = (
+            (game.home_score or 0) + (game.away_score or 0) if game.home_score is not None else None
+        )
         _game_stats_indexed = (
-            _actual_goals is None           # unscored game — don't know
-            or _actual_goals == 0           # 0-0 game — all zeros are correct
-            or _gp_goal_sum > 0             # at least one scorer found → indexed
+            _actual_goals is None  # unscored game — don't know
+            or _actual_goals == 0  # 0-0 game — all zeros are correct
+            or _gp_goal_sum > 0  # at least one scorer found → indexed
         )
 
         # When game_players rows have all-zero goals despite a scored game,
@@ -2851,7 +2968,7 @@ def get_game_box_score(game_id: int) -> dict:
         _ev_goals: dict[str, int] = defaultdict(int)
         _ev_assists: dict[str, int] = defaultdict(int)
         if not _game_stats_indexed and goals:
-            _SCORER_SPLIT = re.compile(r'^(.+?)(?:\s*\((.+?)\))?\s*$')
+            _SCORER_SPLIT = re.compile(r"^(.+?)(?:\s*\((.+?)\))?\s*$")
             for _g in goals:
                 _ps = (_g.get("player") or "").strip()
                 if not _ps:
@@ -2898,9 +3015,11 @@ def get_game_box_score(game_id: int) -> dict:
                 ),
                 "player": name,
                 "player_id": gp.player_id,
-                "game_g":   _gg,
-                "game_a":   _ga,
-                "game_pts": ((_gg or 0) + (_ga or 0)) if (_gg is not None or _ga is not None) else None,
+                "game_g": _gg,
+                "game_a": _ga,
+                "game_pts": (
+                    ((_gg or 0) + (_ga or 0)) if (_gg is not None or _ga is not None) else None
+                ),
                 "season_gp": _st.get("gp"),
                 "season_g": _st.get("g"),
                 "season_a": _st.get("a"),
@@ -2920,12 +3039,15 @@ def get_game_box_score(game_id: int) -> dict:
 
         # ── Head-to-head ─────────────────────────────────────────────────────
         from sqlalchemy import or_ as _or2
+
         _h2h_raw = (
             session.query(Game)
             .filter(
                 _or2(
-                    (Game.home_team_id == game.home_team_id) & (Game.away_team_id == game.away_team_id),
-                    (Game.home_team_id == game.away_team_id) & (Game.away_team_id == game.home_team_id),
+                    (Game.home_team_id == game.home_team_id)
+                    & (Game.away_team_id == game.away_team_id),
+                    (Game.home_team_id == game.away_team_id)
+                    & (Game.away_team_id == game.home_team_id),
                 ),
                 Game.id != game_id,
                 Game.home_score.isnot(None),
@@ -2937,26 +3059,31 @@ def get_game_box_score(game_id: int) -> dict:
         )
         h2h_games: list[dict] = []
         for _hg in _h2h_raw:
-            h2h_games.append({
-                "game_id": _hg.id,
-                "date": _hg.game_date.strftime("%Y-%m-%d") if _hg.game_date else "",
-                "home_team": _team_name(_hg.home_team_id),
-                "away_team": _team_name(_hg.away_team_id),
-                "home_team_id": _hg.home_team_id,
-                "away_team_id": _hg.away_team_id,
-                "home_score": _hg.home_score,
-                "away_score": _hg.away_score,
-            })
+            h2h_games.append(
+                {
+                    "game_id": _hg.id,
+                    "date": _hg.game_date.strftime("%Y-%m-%d") if _hg.game_date else "",
+                    "home_team": _team_name(_hg.home_team_id),
+                    "away_team": _team_name(_hg.away_team_id),
+                    "home_team_id": _hg.home_team_id,
+                    "away_team_id": _hg.away_team_id,
+                    "home_score": _hg.home_score,
+                    "away_score": _hg.away_score,
+                }
+            )
 
         # H2H record summary (from home team's perspective)
         _h2h_w = _h2h_d = _h2h_l = 0
         for _hg in h2h_games:
             _home_is_ours = _hg["home_team_id"] == game.home_team_id
-            _my  = _hg["home_score"] if _home_is_ours else _hg["away_score"]
+            _my = _hg["home_score"] if _home_is_ours else _hg["away_score"]
             _opp = _hg["away_score"] if _home_is_ours else _hg["home_score"]
-            if _my > _opp:   _h2h_w += 1
-            elif _my < _opp: _h2h_l += 1
-            else:             _h2h_d += 1
+            if _my > _opp:
+                _h2h_w += 1
+            elif _my < _opp:
+                _h2h_l += 1
+            else:
+                _h2h_d += 1
         h2h_record = {"w": _h2h_w, "d": _h2h_d, "l": _h2h_l, "total": len(h2h_games)}
 
         # ── Team form (last 5 scored games before this game) ─────────────────
@@ -2967,13 +3094,10 @@ def get_game_box_score(game_id: int) -> dict:
                 _loc_filter = (Game.away_team_id == tid,)
             else:
                 _loc_filter = (_or2(Game.home_team_id == tid, Game.away_team_id == tid),)
-            _q = (
-                session.query(Game)
-                .filter(
-                    *_loc_filter,
-                    Game.id != game_id,
-                    Game.home_score.isnot(None),
-                )
+            _q = session.query(Game).filter(
+                *_loc_filter,
+                Game.id != game_id,
+                Game.home_score.isnot(None),
             )
             if game.game_date:
                 _q = _q.filter(Game.game_date <= game.game_date)
@@ -2985,35 +3109,35 @@ def get_game_box_score(game_id: int) -> dict:
                 _op = (_fg.away_score if _is_h else _fg.home_score) or 0
                 _opp_tid = _fg.away_team_id if _is_h else _fg.home_team_id
                 _res = "W" if _my > _op else ("L" if _my < _op else "D")
-                _form.append({
-                    "game_id": _fg.id,
-                    "date": _fg.game_date.strftime("%Y-%m-%d") if _fg.game_date else "",
-                    "home_away": "H" if _is_h else "A",
-                    "opponent": _team_name(_opp_tid),
-                    "opponent_id": _opp_tid,
-                    "score": f"{_my}–{_op}",
-                    "result": _res,
-                })
+                _form.append(
+                    {
+                        "game_id": _fg.id,
+                        "date": _fg.game_date.strftime("%Y-%m-%d") if _fg.game_date else "",
+                        "home_away": "H" if _is_h else "A",
+                        "opponent": _team_name(_opp_tid),
+                        "opponent_id": _opp_tid,
+                        "score": f"{_my}–{_op}",
+                        "result": _res,
+                    }
+                )
             return _form
 
-        home_form   = _team_form(game.home_team_id)
-        away_form   = _team_form(game.away_team_id)
-        home_h_form = _team_form(game.home_team_id, home_only=True,  n=8)
+        home_form = _team_form(game.home_team_id)
+        away_form = _team_form(game.away_team_id)
+        home_h_form = _team_form(game.home_team_id, home_only=True, n=8)
         home_a_form = _team_form(game.home_team_id, home_only=False, n=8)
-        away_h_form = _team_form(game.away_team_id, home_only=True,  n=8)
+        away_h_form = _team_form(game.away_team_id, home_only=True, n=8)
         away_a_form = _team_form(game.away_team_id, home_only=False, n=8)
 
         # ── Season record (W-D-L, GF, GA, PIM, averages) up to this game ─────
         from sqlalchemy import func as _sqlfunc
+
         def _season_record(tid: int) -> dict:
-            _q = (
-                session.query(Game)
-                .filter(
-                    _or2(Game.home_team_id == tid, Game.away_team_id == tid),
-                    Game.season_id == game.season_id,
-                    Game.home_score.isnot(None),
-                    Game.id != game_id,
-                )
+            _q = session.query(Game).filter(
+                _or2(Game.home_team_id == tid, Game.away_team_id == tid),
+                Game.season_id == game.season_id,
+                Game.home_score.isnot(None),
+                Game.id != game_id,
             )
             if game.game_date:
                 _q = _q.filter(Game.game_date <= game.game_date)
@@ -3024,21 +3148,33 @@ def get_game_box_score(game_id: int) -> dict:
                 _is_h = _rg.home_team_id == tid
                 _my = (_rg.home_score if _is_h else _rg.away_score) or 0
                 _op = (_rg.away_score if _is_h else _rg.home_score) or 0
-                _gf += _my; _ga += _op
-                _res = ("w" if _my > _op else ("l" if _my < _op else "d"))
+                _gf += _my
+                _ga += _op
+                _res = "w" if _my > _op else ("l" if _my < _op else "d")
                 if _is_h:
-                    _gf_h += _my; _ga_h += _op
-                    if _res == "w": _w_h += 1
-                    elif _res == "l": _l_h += 1
-                    else: _d_h += 1
+                    _gf_h += _my
+                    _ga_h += _op
+                    if _res == "w":
+                        _w_h += 1
+                    elif _res == "l":
+                        _l_h += 1
+                    else:
+                        _d_h += 1
                 else:
-                    _gf_a += _my; _ga_a += _op
-                    if _res == "w": _w_a += 1
-                    elif _res == "l": _l_a += 1
-                    else: _d_a += 1
-                if _res == "w": _w += 1
-                elif _res == "l": _l += 1
-                else: _d += 1
+                    _gf_a += _my
+                    _ga_a += _op
+                    if _res == "w":
+                        _w_a += 1
+                    elif _res == "l":
+                        _l_a += 1
+                    else:
+                        _d_a += 1
+                if _res == "w":
+                    _w += 1
+                elif _res == "l":
+                    _l += 1
+                else:
+                    _d += 1
             _gp = _w + _d + _l
             # total team PIM from game_players for this season
             _pim_q = (
@@ -3055,14 +3191,33 @@ def get_game_box_score(game_id: int) -> dict:
                 _pim_q = _pim_q.filter(Game.game_date <= game.game_date)
             _total_pim = _pim_q.scalar() or 0
             return {
-                "w":  _w,  "d":  _d,  "l":  _l,  "gf":  _gf,  "ga":  _ga,  "gp":  _gp,
-                "avg_gf":    round(_gf / _gp, 1) if _gp else "—",
-                "avg_ga":    round(_ga / _gp, 1) if _gp else "—",
+                "w": _w,
+                "d": _d,
+                "l": _l,
+                "gf": _gf,
+                "ga": _ga,
+                "gp": _gp,
+                "avg_gf": round(_gf / _gp, 1) if _gp else "—",
+                "avg_ga": round(_ga / _gp, 1) if _gp else "—",
                 "avg_total": round((_gf + _ga) / _gp, 1) if _gp else "—",
                 "total_pim": _total_pim,
-                "avg_pim":   round(_total_pim / _gp, 1) if _gp else "—",
-                "home": {"w": _w_h, "d": _d_h, "l": _l_h, "gf": _gf_h, "ga": _ga_h, "gp": _w_h + _d_h + _l_h},
-                "away": {"w": _w_a, "d": _d_a, "l": _l_a, "gf": _gf_a, "ga": _ga_a, "gp": _w_a + _d_a + _l_a},
+                "avg_pim": round(_total_pim / _gp, 1) if _gp else "—",
+                "home": {
+                    "w": _w_h,
+                    "d": _d_h,
+                    "l": _l_h,
+                    "gf": _gf_h,
+                    "ga": _ga_h,
+                    "gp": _w_h + _d_h + _l_h,
+                },
+                "away": {
+                    "w": _w_a,
+                    "d": _d_a,
+                    "l": _l_a,
+                    "gf": _gf_a,
+                    "ga": _ga_a,
+                    "gp": _w_a + _d_a + _l_a,
+                },
             }
 
         home_record = _season_record(game.home_team_id)
@@ -3070,12 +3225,14 @@ def get_game_box_score(game_id: int) -> dict:
 
         # ── Group / league standings ──────────────────────────────────────────
         _db_league_id = game.group.league_id if game.group else None
-        _db_group_id  = game.group_id
-        _group_name   = (game.group.name or game.group.text or "") if game.group else ""
-        _phase        = (game.group.phase or "") if game.group else ""
-        _league_name  = (
-            game.group.league.name or game.group.league.text or ""
-        ) if (game.group and game.group.league) else ""
+        _db_group_id = game.group_id
+        _group_name = (game.group.name or game.group.text or "") if game.group else ""
+        _phase = (game.group.phase or "") if game.group else ""
+        _league_name = (
+            (game.group.league.name or game.group.league.text or "")
+            if (game.group and game.group.league)
+            else ""
+        )
 
         _timeline_events, _total_seconds = build_timeline_events(
             goals, penalties, home_name, away_name
@@ -3088,7 +3245,9 @@ def get_game_box_score(game_id: int) -> dict:
             canonical = _canonical_phase(phase)
             if canonical == "regular":
                 # Already a regular-season game — use own group
-                return get_league_standings(league_id, only_group_ids=[group_id] if group_id else None)
+                return get_league_standings(
+                    league_id, only_group_ids=[group_id] if group_id else None
+                )
             # Find the Regelsaison group for the same league
             reg_group = (
                 db_session.query(LeagueGroup)
@@ -3136,18 +3295,21 @@ def get_game_box_score(game_id: int) -> dict:
             "game_summary": game_summary,
             "home_record": home_record,
             "away_record": away_record,
-            "group_standings": _get_regular_season_standings(session, _db_league_id, _db_group_id, _phase),
+            "group_standings": _get_regular_season_standings(
+                session, _db_league_id, _db_group_id, _phase
+            ),
             "group_name": _group_name,
             "phase": _phase,
             "league_name": _league_name,
-            "timeline_events":   _timeline_events,
-            "total_seconds":     _total_seconds,
+            "timeline_events": _timeline_events,
+            "total_seconds": _total_seconds,
         }
 
 
 # ---------------------------------------------------------------------------
 # 7b. Playoff series data for a single game
 # ---------------------------------------------------------------------------
+
 
 def _canonical_phase(phase_str: str | None) -> str:
     """Normalise a raw phase string to one of: regular / playoff / playout / promotion."""
@@ -3194,9 +3356,7 @@ def get_playoff_series_for_game(game_id: int) -> dict | None:
 
         # All LeagueGroup rows in the same League with the same canonical phase
         sibling_groups = (
-            session.query(LeagueGroup)
-            .filter(LeagueGroup.league_id == league_fk_id)
-            .all()
+            session.query(LeagueGroup).filter(LeagueGroup.league_id == league_fk_id).all()
         )
         phase_groups = [g for g in sibling_groups if _canonical_phase(g.phase) == canonical]
         phase_group_ids = [g.id for g in phase_groups]
@@ -3221,17 +3381,19 @@ def get_playoff_series_for_game(game_id: int) -> dict | None:
         all_team_ids = {g.home_team_id for g in phase_games} | {g.away_team_id for g in phase_games}
         _snm: dict[int, str] = {}
         _slogo: dict[int, str | None] = {}
-        for _t in session.query(Team).filter(
-            Team.id.in_(all_team_ids), Team.season_id == game.season_id
-        ).all():
+        for _t in (
+            session.query(Team)
+            .filter(Team.id.in_(all_team_ids), Team.season_id == game.season_id)
+            .all()
+        ):
             _snm[_t.id] = _t.name or _t.text or f"Team {_t.id}"
             if _t.logo_url:
                 _slogo[_t.id] = _t.logo_url
         _missing = all_team_ids - _snm.keys()
         if _missing:
-            for _t in session.query(Team).filter(
-                Team.id.in_(_missing), Team.name.isnot(None)
-            ).all():
+            for _t in (
+                session.query(Team).filter(Team.id.in_(_missing), Team.name.isnot(None)).all()
+            ):
                 _snm.setdefault(_t.id, _t.name)
                 if _t.logo_url:
                     _slogo.setdefault(_t.id, _t.logo_url)
@@ -3261,7 +3423,10 @@ def get_playoff_series_for_game(game_id: int) -> dict | None:
         phases: list[dict] = []
         for _grp in ordered_groups:
             group_series: list[dict] = []
-            for _key, _pgames in sorted(_pairs_by_group[_grp.id].items(), key=lambda x: _snm.get(x[0][0] if isinstance(x[0], tuple) else x[0], "")):
+            for _key, _pgames in sorted(
+                _pairs_by_group[_grp.id].items(),
+                key=lambda x: _snm.get(x[0][0] if isinstance(x[0], tuple) else x[0], ""),
+            ):
                 _sorted = sorted(_pgames, key=lambda x: x.game_date or datetime.min)
                 _first_g = _sorted[0]
                 _ta = _first_g.home_team_id
@@ -3282,37 +3447,43 @@ def get_playoff_series_for_game(game_id: int) -> dict | None:
                                 _tb_wins += 1
                             else:
                                 _ta_wins += 1
-                    _games_list.append({
-                        "game_id": _g.id,
-                        "date": _g.game_date.strftime("%d.%m.%Y") if _g.game_date else "",
-                        "weekday": _g.game_date.strftime("%a") if _g.game_date else "",
-                        "home_team": _snm.get(_g.home_team_id, f"Team {_g.home_team_id}"),
-                        "away_team": _snm.get(_g.away_team_id, f"Team {_g.away_team_id}"),
-                        "home_team_id": _g.home_team_id,
-                        "away_team_id": _g.away_team_id,
-                        "home_score": _g.home_score,
-                        "away_score": _g.away_score,
-                        "played": _played,
-                        "is_current": _g.id == game_id,
-                    })
-                group_series.append({
-                    "team_a_id": _ta,
-                    "team_b_id": _tb,
-                    "team_a_name": _snm.get(_ta, f"Team {_ta}"),
-                    "team_b_name": _snm.get(_tb, f"Team {_tb}"),
-                    "team_a_logo": _slogo.get(_ta),
-                    "team_b_logo": _slogo.get(_tb),
-                    "team_a_rank": None,
-                    "team_b_rank": None,
-                    "team_a_wins": _ta_wins,
-                    "team_b_wins": _tb_wins,
-                    "games": _games_list,
-                    "is_current_series": _key == current_pair,
-                })
-            phases.append({
-                "phase_name": _grp.phase or canonical.capitalize(),
-                "series_list": group_series,
-            })
+                    _games_list.append(
+                        {
+                            "game_id": _g.id,
+                            "date": _g.game_date.strftime("%d.%m.%Y") if _g.game_date else "",
+                            "weekday": _g.game_date.strftime("%a") if _g.game_date else "",
+                            "home_team": _snm.get(_g.home_team_id, f"Team {_g.home_team_id}"),
+                            "away_team": _snm.get(_g.away_team_id, f"Team {_g.away_team_id}"),
+                            "home_team_id": _g.home_team_id,
+                            "away_team_id": _g.away_team_id,
+                            "home_score": _g.home_score,
+                            "away_score": _g.away_score,
+                            "played": _played,
+                            "is_current": _g.id == game_id,
+                        }
+                    )
+                group_series.append(
+                    {
+                        "team_a_id": _ta,
+                        "team_b_id": _tb,
+                        "team_a_name": _snm.get(_ta, f"Team {_ta}"),
+                        "team_b_name": _snm.get(_tb, f"Team {_tb}"),
+                        "team_a_logo": _slogo.get(_ta),
+                        "team_b_logo": _slogo.get(_tb),
+                        "team_a_rank": None,
+                        "team_b_rank": None,
+                        "team_a_wins": _ta_wins,
+                        "team_b_wins": _tb_wins,
+                        "games": _games_list,
+                        "is_current_series": _key == current_pair,
+                    }
+                )
+            phases.append(
+                {
+                    "phase_name": _grp.phase or canonical.capitalize(),
+                    "series_list": group_series,
+                }
+            )
 
         return {"phases": phases}
 
@@ -3321,16 +3492,17 @@ def get_playoff_series_for_game(game_id: int) -> dict | None:
 # 8. Games list page
 # ---------------------------------------------------------------------------
 
+
 def get_recent_games(
     season_id: Optional[int] = None,
-    mode: str = "results",      # "results" = scored, date DESC  |  "schedule" = upcoming, date ASC
+    mode: str = "results",  # "results" = scored, date DESC  |  "schedule" = upcoming, date ASC
     sex: str = "all",
     age: str = "all",
     field: str = "all",
     level: str = "all",
     limit: int = 50,
     offset: int = 0,
-    with_score_only: bool = False,   # kept for backward compat; overridden when mode is explicit
+    with_score_only: bool = False,  # kept for backward compat; overridden when mode is explicit
 ) -> dict:
     """Return games for the combined Games/Schedule page with sex/age/field/level filters."""
     from datetime import date as _date
@@ -3338,27 +3510,31 @@ def get_recent_games(
     # ---------- game_class filter sets (same as schedule/teams) ----------
     _SEX_GC: dict[str, set[int]] = {
         "women": {21, 22, 26, 28, 41, 42, 43, 44},
-        "mixed":  {49},
-        "men":   {11, 12, 14, 16, 18, 19, 31, 32, 33, 34, 35, 51},
+        "mixed": {49},
+        "men": {11, 12, 14, 16, 18, 19, 31, 32, 33, 34, 35, 51},
     }
     _AGE_GC: dict[str, set[int]] = {
-        "senior":   {11, 12, 21, 22},
-        "U21":      {19, 26},
-        "U18":      {18, 31, 41},
-        "U16":      {16, 28, 32, 42},
-        "U14":      {14, 33, 43, 49},
-        "U12":      {34, 36, 44},
-        "U10":      {35},
+        "senior": {11, 12, 21, 22},
+        "U21": {19, 26},
+        "U18": {18, 31, 41},
+        "U16": {16, 28, 32, 42},
+        "U14": {14, 33, 43, 49},
+        "U12": {34, 36, 44},
+        "U10": {35},
         "senioren": {51},
     }
     _FIELD_GC: dict[str, set[int]] = {
-        "big":   {11, 21, 14, 16, 18, 19, 26, 28, 49},
+        "big": {11, 21, 14, 16, 18, 19, 26, 28, 49},
         "small": {12, 22, 31, 32, 33, 34, 35, 36, 41, 42, 43, 44, 51},
     }
     # level → (national league_id, regional game_classes)
     _LEVEL_LID: dict[str, int] = {"A": 13, "B": 14, "C": 15, "D": 16}
     _LEVEL_REGIONAL_GCS: dict[str, list[int]] = {
-        "A": [31, 41], "B": [32, 42], "C": [33, 43], "D": [34, 44], "E": [35],
+        "A": [31, 41],
+        "B": [32, 42],
+        "C": [33, 43],
+        "D": [34, 44],
+        "E": [35],
     }
 
     active_gc: Optional[set] = None
@@ -3383,10 +3559,8 @@ def get_recent_games(
 
         need_league_join = active_gc is not None or (level and level != "all")
         if need_league_join:
-            base_q = (
-                base_q
-                .join(LeagueGroup, Game.group_id == LeagueGroup.id)
-                .join(League, LeagueGroup.league_id == League.id)
+            base_q = base_q.join(LeagueGroup, Game.group_id == LeagueGroup.id).join(
+                League, LeagueGroup.league_id == League.id
             )
             if active_gc is not None:
                 base_q = base_q.filter(League.game_class.in_(list(active_gc)))
@@ -3394,8 +3568,10 @@ def get_recent_games(
                 lvl_conds = []
                 if level in _LEVEL_LID:
                     lvl_conds.append(
-                        and_(League.league_id == _LEVEL_LID[level],
-                             League.game_class.notin_([11, 12, 21, 22]))
+                        and_(
+                            League.league_id == _LEVEL_LID[level],
+                            League.game_class.notin_([11, 12, 21, 22]),
+                        )
                     )
                 if level in _LEVEL_REGIONAL_GCS:
                     lvl_conds.append(League.game_class.in_(_LEVEL_REGIONAL_GCS[level]))
@@ -3413,7 +3589,9 @@ def get_recent_games(
         team_ids = {g.home_team_id for g in games_raw} | {g.away_team_id for g in games_raw}
         t_names: dict[int, str] = {}
         t_logos: dict[int, str] = {}
-        for t in session.query(Team).filter(Team.id.in_(team_ids), Team.season_id == season_id).all():
+        for t in (
+            session.query(Team).filter(Team.id.in_(team_ids), Team.season_id == season_id).all()
+        ):
             if t.name or t.text:
                 t_names[t.id] = str(t.name or t.text or "")
             if t.logo_url:
@@ -3446,20 +3624,22 @@ def get_recent_games(
 
         result = []
         for g in games_raw:
-            result.append({
-                "game_id":      g.id,
-                "date":         g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
-                "weekday":      g.game_date.strftime("%a") if g.game_date else "",
-                "time":         g.game_time or "",
-                "home_team":      t_names.get(g.home_team_id, f"Team {g.home_team_id}"),
-                "away_team":      t_names.get(g.away_team_id, f"Team {g.away_team_id}"),
-                "home_team_id":   g.home_team_id,
-                "away_team_id":   g.away_team_id,
-                "home_team_logo": t_logos.get(g.home_team_id, ""),
-                "away_team_logo": t_logos.get(g.away_team_id, ""),
-                "home_score":     g.home_score,
-                "away_score":     g.away_score,
-                "has_score":      g.home_score is not None,
-                "league_label":   grp_label.get(g.group_id, "") if g.group_id else "",
-            })
+            result.append(
+                {
+                    "game_id": g.id,
+                    "date": g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
+                    "weekday": g.game_date.strftime("%a") if g.game_date else "",
+                    "time": g.game_time or "",
+                    "home_team": t_names.get(g.home_team_id, f"Team {g.home_team_id}"),
+                    "away_team": t_names.get(g.away_team_id, f"Team {g.away_team_id}"),
+                    "home_team_id": g.home_team_id,
+                    "away_team_id": g.away_team_id,
+                    "home_team_logo": t_logos.get(g.home_team_id, ""),
+                    "away_team_logo": t_logos.get(g.away_team_id, ""),
+                    "home_score": g.home_score,
+                    "away_score": g.away_score,
+                    "has_score": g.home_score is not None,
+                    "league_label": grp_label.get(g.group_id, "") if g.group_id else "",
+                }
+            )
         return {"games": result, "total": total, "offset": offset, "limit": limit}

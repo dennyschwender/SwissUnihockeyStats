@@ -2,6 +2,7 @@
 Tests for public-facing HTML and API routes.
 External API calls are mocked via the session-scoped `app` fixture in conftest.py.
 """
+
 import pytest
 
 
@@ -176,12 +177,18 @@ class TestContactAndPrivacyRoutes:
 
     def test_contact_submit_valid_redirects(self, client):
         from unittest.mock import patch, MagicMock
+
         with patch("smtplib.SMTP") as mock_smtp:
             mock_smtp.return_value.__enter__ = MagicMock(return_value=MagicMock())
             mock_smtp.return_value.__exit__ = MagicMock(return_value=False)
             r = client.post(
                 "/en/contact",
-                data={"name": "Test User", "email": "user@example.com", "subject": "Hi", "message": "Hello world"},
+                data={
+                    "name": "Test User",
+                    "email": "user@example.com",
+                    "subject": "Hi",
+                    "message": "Hello world",
+                },
                 follow_redirects=False,
             )
         assert r.status_code == 303
@@ -195,7 +202,12 @@ class TestContactAndPrivacyRoutes:
         for _ in range(6):
             last_response = client.post(
                 "/en/contact",
-                data={"name": "Test User", "email": "user@example.com", "subject": "Hi", "message": "Hello world"},
+                data={
+                    "name": "Test User",
+                    "email": "user@example.com",
+                    "subject": "Hi",
+                    "message": "Hello world",
+                },
                 follow_redirects=False,
             )
         assert last_response is not None

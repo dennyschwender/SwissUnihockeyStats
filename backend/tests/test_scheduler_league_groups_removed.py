@@ -13,10 +13,12 @@ def test_league_groups_policy_not_in_policies():
 def test_groups_task_meta_still_exists():
     """'groups' key must remain in _TASK_META so the manual trigger is preserved."""
     from app.main import _TASK_META
+
     assert "groups" in _TASK_META
 
 
 def test_index_groups_function_still_exists():
     """DataIndexer.index_groups_for_league must still exist for manual / CLI use."""
     from app.services.data_indexer import DataIndexer
+
     assert hasattr(DataIndexer, "index_groups_for_league")

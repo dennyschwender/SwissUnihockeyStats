@@ -1,6 +1,7 @@
 """
 Clubs API endpoints
 """
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 async def get_clubs(
     name: Optional[str] = Query(None, description="Filter by club name"),
     region: Optional[str] = Query(None, description="Filter by region"),
-    limit: Optional[int] = Query(None, description="Limit number of results", ge=1, le=1000)
+    limit: Optional[int] = Query(None, description="Limit number of results", ge=1, le=1000),
 ):
     """
     Get list of all clubs
@@ -25,6 +26,7 @@ async def get_clubs(
     """
     try:
         import asyncio
+
         loop = asyncio.get_running_loop()
         client = get_swissunihockey_client()
         clubs_data = await loop.run_in_executor(None, client.get_clubs)
@@ -63,6 +65,7 @@ async def get_club(club_id: int):
     """
     try:
         import asyncio
+
         loop = asyncio.get_running_loop()
         client = get_swissunihockey_client()
         clubs_data = await loop.run_in_executor(None, client.get_clubs)

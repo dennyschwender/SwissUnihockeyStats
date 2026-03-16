@@ -1,18 +1,19 @@
 """
 Tests for admin authentication (login / logout / PIN protection).
 """
+
 import os
 import pytest
 from fastapi.testclient import TestClient
 
-
 CORRECT_PIN = os.environ.get("ADMIN_PIN", "testpin")
-WRONG_PIN   = "wrongpin-xyz"
+WRONG_PIN = "wrongpin-xyz"
 
 
 # ---------------------------------------------------------------------------
 # Login page
 # ---------------------------------------------------------------------------
+
 
 class TestAdminLoginPage:
     def test_login_page_returns_200(self, client):
@@ -21,13 +22,14 @@ class TestAdminLoginPage:
 
     def test_login_page_contains_form(self, client):
         r = client.get("/admin/login")
-        assert b'<form' in r.content
+        assert b"<form" in r.content
         assert b'name="pin"' in r.content
 
 
 # ---------------------------------------------------------------------------
 # Login submit
 # ---------------------------------------------------------------------------
+
 
 class TestAdminLoginSubmit:
     def test_correct_pin_redirects_to_admin(self, app):
@@ -58,11 +60,12 @@ class TestAdminLoginSubmit:
 # Protected routes — unauthenticated
 # ---------------------------------------------------------------------------
 
+
 class TestAdminProtectedRoutes:
     PROTECTED = [
-        ("/admin",          "GET"),
-        ("/admin/api/stats","GET"),
-        ("/admin/api/index","POST"),
+        ("/admin", "GET"),
+        ("/admin/api/stats", "GET"),
+        ("/admin/api/index", "POST"),
     ]
 
     @pytest.mark.parametrize("path,method", PROTECTED)
@@ -78,6 +81,7 @@ class TestAdminProtectedRoutes:
 # ---------------------------------------------------------------------------
 # Protected routes — authenticated
 # ---------------------------------------------------------------------------
+
 
 class TestAdminAuthenticatedRoutes:
     def test_admin_page_accessible_after_login(self, admin_client):
@@ -102,6 +106,7 @@ class TestAdminAuthenticatedRoutes:
 # ---------------------------------------------------------------------------
 # Logout
 # ---------------------------------------------------------------------------
+
 
 class TestAdminLogout:
     def test_logout_clears_session(self, app):

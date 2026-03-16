@@ -22,6 +22,7 @@ used by the admin POST /admin/api/index endpoint.
 All scheduling state is in-memory; the *actual* freshness source of
 truth is SyncStatus in the database, which is consulted every tick.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -46,6 +47,7 @@ logger = logging.getLogger(__name__)
 # Each entry: (entity_type_prefix, max_age_timedelta, task_name, scope)
 # scope: "global" = not per-season, "season" = repeat for each indexed season
 
+
 def _snap_to_hour(dt: datetime, hour: int) -> datetime:
     """Return the earliest datetime > dt whose UTC hour == hour and minutes/seconds == 0.
 
@@ -58,93 +60,95 @@ def _snap_to_hour(dt: datetime, hour: int) -> datetime:
     if candidate <= dt:
         candidate += timedelta(days=1)
     return candidate
+
+
 POLICIES: list[dict] = [
     # ── Weekly / multi-day policies — run at 03:00 UTC ──────────────────────
     # Snapped to 03:00 UTC (04:00–05:00 Swiss local) so nightly runs never
     # drift into the afternoon and are always finished before evening games.
     {
-        "name":        "seasons",
+        "name": "seasons",
         "entity_type": "seasons",
-        "max_age":     timedelta(days=30),
-        "task":        "seasons",       # special: calls index_seasons directly
-        "scope":       "global",
-        "label":       "Seasons refresh",
-        "priority":    10,              # lower = higher prio
+        "max_age": timedelta(days=30),
+        "task": "seasons",  # special: calls index_seasons directly
+        "scope": "global",
+        "label": "Seasons refresh",
+        "priority": 10,  # lower = higher prio
         "run_at_hour": 3,
     },
     {
-        "name":        "clubs",
+        "name": "clubs",
         "entity_type": "clubs",
-        "max_age":     timedelta(days=7),
-        "task":        "clubs",
-        "scope":       "season",
-        "label":       "Clubs refresh",
-        "priority":    20,
+        "max_age": timedelta(days=7),
+        "task": "clubs",
+        "scope": "season",
+        "label": "Clubs refresh",
+        "priority": 20,
         "run_at_hour": 3,
     },
     {
-        "name":        "teams",
+        "name": "teams",
         "entity_type": "teams",
-        "max_age":     timedelta(days=3),
-        "task":        "teams",
-        "scope":       "season",
-        "label":       "Teams refresh",
-        "priority":    30,
+        "max_age": timedelta(days=3),
+        "task": "teams",
+        "scope": "season",
+        "label": "Teams refresh",
+        "priority": 30,
         "run_at_hour": 3,
     },
     {
-        "name":        "players",
+        "name": "players",
         "entity_type": "players",
-        "max_age":     timedelta(hours=24),
-        "task":        "players",
-        "scope":       "season",
-        "label":       "Players refresh",
-        "priority":    40,
-        "max_tier":    2,   # NLA/L-UPL + NLB only — /api/teams/{id}/players returns 400 for any lower league
+        "max_age": timedelta(hours=24),
+        "task": "players",
+        "scope": "season",
+        "label": "Players refresh",
+        "priority": 40,
+        "max_tier": 2,  # NLA/L-UPL + NLB only — /api/teams/{id}/players returns 400 for any lower league
         "run_at_hour": 3,
     },
     {
-        "name":        "leagues",
+        "name": "leagues",
         "entity_type": "leagues",
-        "max_age":     timedelta(days=7),
-        "task":        "leagues",
-        "scope":       "season",
-        "label":       "Leagues refresh",
-        "priority":    50,
+        "max_age": timedelta(days=7),
+        "task": "leagues",
+        "scope": "season",
+        "label": "Leagues refresh",
+        "priority": 50,
         "run_at_hour": 3,
     },
     # ── Upcoming games polling — schedule changes (noon / evening / night) ───
     # Runs 3× daily so any postponements or venue changes are caught promptly.
     {
-        "name":        "upcoming_games_noon",
+        "name": "upcoming_games_noon",
         "entity_type": "upcoming_games_noon",
-        "max_age":     timedelta(hours=23),
-        "task":        "upcoming_games",
-        "scope":       "season",
-        "label":       "Poll upcoming games for schedule changes (noon)",
-        "priority":    70,
+        "max_age": timedelta(hours=23),
+        "task": "upcoming_games",
+        "scope": "season",
+        "label": "Poll upcoming games for schedule changes (noon)",
+        "priority": 70,
         "run_at_hour": 12,
         "current_only": True,  # past seasons have no upcoming games
     },
     {
-        "name":        "upcoming_games_evening",
+        "name": "upcoming_games_evening",
         "entity_type": "upcoming_games_evening",
-        "max_age":     timedelta(hours=23),
-        "task":        "upcoming_games",
-        "scope":       "season",
-        "label":       "Poll upcoming games for schedule changes (evening)",
-        "priority":    70,
+        "max_age": timedelta(hours=23),
+        "task": "upcoming_games",
+        "scope": "season",
+        "label": "Poll upcoming games for schedule changes (evening)",
+        "priority": 70,
         "run_at_hour": 18,
         "current_only": True,  # past seasons have no upcoming games
     },
     {
-        "name":        "upcoming_games_night",
+        "name": "upcoming_games_night",
         "entity_type": "upcoming_games_night",
-        "max_age":     timedelta(hours=23),
-        "task":        "upcoming_games",
-        "scope":       "season",
-        "label":       "Poll upcoming games for schedule changes (night)",
-        "priority":    70,
+        "max_age": timedelta(hours=23),
+        "task": "upcoming_games",
+        "scope": "season",
+        "label": "Poll upcoming games for schedule changes (night)",
+        "priority": 70,
         "run_at_hour": 23,
         "current_only": True,  # past seasons have no upcoming games
     },
@@ -152,24 +156,24 @@ POLICIES: list[dict] = [
     # Fetches lineups, events and best-player data for recently finished games
     # until all data is complete or the window expires.
     {
-        "name":        "post_game_completion",
+        "name": "post_game_completion",
         "entity_type": "post_game_completion",
-        "max_age":     timedelta(hours=2),
-        "task":        "post_game_completion",
-        "scope":       "season",
-        "label":       "Poll post-game data until complete or abandoned",
-        "priority":    75,
+        "max_age": timedelta(hours=2),
+        "task": "post_game_completion",
+        "scope": "season",
+        "label": "Poll post-game data until complete or abandoned",
+        "priority": 75,
         # no run_at_hour — runs throughout the day every 2 hours
     },
     {
-        "name":        "compute_player_stats",
+        "name": "compute_player_stats",
         "entity_type": "compute_player_stats",
-        "max_age":     timedelta(hours=6),
-        "task":        "compute_player_stats",
-        "priority":    4,
-        "scope":       "season",
+        "max_age": timedelta(hours=6),
+        "task": "compute_player_stats",
+        "priority": 4,
+        "scope": "season",
         "current_only": True,
-        "label":       "Compute local player stats (T1–T3)",
+        "label": "Compute local player stats (T1–T3)",
     },
     # ── Player season stats: cascade T1 → T2 → … → T6 ──────────────────────
     # current_only is NOT set: these run once for past seasons too (frozen after
@@ -177,174 +181,173 @@ POLICIES: list[dict] = [
     # 0 players and freeze immediately via the empty-tier stamp.
     # run_at_hour=4: runs in the early morning so stats reflect last night's games.
     {
-        "name":        "player_stats_t1",
+        "name": "player_stats_t1",
         "entity_type": "player_stats_t1",
-        "max_age":     timedelta(hours=24),
-        "task":        "player_stats",
-        "scope":       "season",
-        "label":       "Player stats \u2013 T1 (NLA/L-UPL)",
-        "priority":    85,
-        "max_tier":    1,
-        "fixed_tier":  True,
+        "max_age": timedelta(hours=24),
+        "task": "player_stats",
+        "scope": "season",
+        "label": "Player stats \u2013 T1 (NLA/L-UPL)",
+        "priority": 85,
+        "max_tier": 1,
+        "fixed_tier": True,
         "run_at_hour": 4,
     },
     {
-        "name":        "player_stats_t2",
+        "name": "player_stats_t2",
         "entity_type": "player_stats_t2",
-        "max_age":     timedelta(hours=24),
-        "task":        "player_stats",
-        "scope":       "season",
-        "label":       "Player stats \u2013 T2 (NLB)",
-        "priority":    85,
-        "max_tier":    2,
-        "fixed_tier":  True,
-        "requires":    "player_stats_t1",
+        "max_age": timedelta(hours=24),
+        "task": "player_stats",
+        "scope": "season",
+        "label": "Player stats \u2013 T2 (NLB)",
+        "priority": 85,
+        "max_tier": 2,
+        "fixed_tier": True,
+        "requires": "player_stats_t1",
         "run_at_hour": 4,
     },
     {
-        "name":        "player_stats_t3",
+        "name": "player_stats_t3",
         "entity_type": "player_stats_t3",
-        "max_age":     timedelta(hours=24),
-        "task":        "player_stats",
-        "scope":       "season",
-        "label":       "Player stats \u2013 T3 (1.Liga)",
-        "priority":    85,
-        "max_tier":    3,
-        "fixed_tier":  True,
-        "requires":    "player_stats_t2",
+        "max_age": timedelta(hours=24),
+        "task": "player_stats",
+        "scope": "season",
+        "label": "Player stats \u2013 T3 (1.Liga)",
+        "priority": 85,
+        "max_tier": 3,
+        "fixed_tier": True,
+        "requires": "player_stats_t2",
         "run_at_hour": 4,
     },
     {
-        "name":        "player_stats_t4",
+        "name": "player_stats_t4",
         "entity_type": "player_stats_t4",
-        "max_age":     timedelta(hours=24),
-        "task":        "player_stats",
-        "scope":       "season",
-        "label":       "Player stats \u2013 T4 (2.Liga)",
-        "priority":    85,
-        "max_tier":    4,
-        "fixed_tier":  True,
-        "requires":    "player_stats_t3",
+        "max_age": timedelta(hours=24),
+        "task": "player_stats",
+        "scope": "season",
+        "label": "Player stats \u2013 T4 (2.Liga)",
+        "priority": 85,
+        "max_tier": 4,
+        "fixed_tier": True,
+        "requires": "player_stats_t3",
         "run_at_hour": 4,
     },
     {
-        "name":        "player_stats_t5",
+        "name": "player_stats_t5",
         "entity_type": "player_stats_t5",
-        "max_age":     timedelta(hours=24),
-        "task":        "player_stats",
-        "scope":       "season",
-        "label":       "Player stats \u2013 T5 (3.Liga)",
-        "priority":    85,
-        "max_tier":    5,
-        "fixed_tier":  True,
-        "requires":    "player_stats_t4",
+        "max_age": timedelta(hours=24),
+        "task": "player_stats",
+        "scope": "season",
+        "label": "Player stats \u2013 T5 (3.Liga)",
+        "priority": 85,
+        "max_tier": 5,
+        "fixed_tier": True,
+        "requires": "player_stats_t4",
         "run_at_hour": 4,
     },
     {
-        "name":        "player_stats_t6",
+        "name": "player_stats_t6",
         "entity_type": "player_stats_t6",
-        "max_age":     timedelta(hours=24),
-        "task":        "player_stats",
-        "scope":       "season",
-        "label":       "Player stats \u2013 T6 (4./5.Liga, Regional)",
-        "priority":    85,
-        "max_tier":    6,
-        "fixed_tier":  True,
-        "requires":    "player_stats_t5",
+        "max_age": timedelta(hours=24),
+        "task": "player_stats",
+        "scope": "season",
+        "label": "Player stats \u2013 T6 (4./5.Liga, Regional)",
+        "priority": 85,
+        "max_tier": 6,
+        "fixed_tier": True,
+        "requires": "player_stats_t5",
         "run_at_hour": 4,
     },
     # ── Per-game G/A/PIM: cascade T1 → T2 → … → T6 ──────────────────────────
     # current_only is NOT set: same rationale as player_stats above.
     # run_at_hour=4: runs after game_events (03:xx) so stats reflect last night's games.
     {
-        "name":        "player_game_stats_t1",
+        "name": "player_game_stats_t1",
         "entity_type": "player_game_stats_t1",
-        "max_age":     timedelta(hours=24),
-        "task":        "player_game_stats",
-        "scope":       "season",
-        "label":       "Per-game G/A/PIM \u2013 T1 (NLA/L-UPL)",
-        "priority":    86,
-        "max_tier":    1,
-        "fixed_tier":  True,
+        "max_age": timedelta(hours=24),
+        "task": "player_game_stats",
+        "scope": "season",
+        "label": "Per-game G/A/PIM \u2013 T1 (NLA/L-UPL)",
+        "priority": 86,
+        "max_tier": 1,
+        "fixed_tier": True,
         "run_at_hour": 4,
     },
     {
-        "name":        "player_game_stats_t2",
+        "name": "player_game_stats_t2",
         "entity_type": "player_game_stats_t2",
-        "max_age":     timedelta(hours=24),
-        "task":        "player_game_stats",
-        "scope":       "season",
-        "label":       "Per-game G/A/PIM \u2013 T2 (NLB)",
-        "priority":    86,
-        "max_tier":    2,
-        "fixed_tier":  True,
-        "requires":    "player_game_stats_t1",
+        "max_age": timedelta(hours=24),
+        "task": "player_game_stats",
+        "scope": "season",
+        "label": "Per-game G/A/PIM \u2013 T2 (NLB)",
+        "priority": 86,
+        "max_tier": 2,
+        "fixed_tier": True,
+        "requires": "player_game_stats_t1",
         "run_at_hour": 4,
     },
     {
-        "name":        "player_game_stats_t3",
+        "name": "player_game_stats_t3",
         "entity_type": "player_game_stats_t3",
-        "max_age":     timedelta(hours=24),
-        "task":        "player_game_stats",
-        "scope":       "season",
-        "label":       "Per-game G/A/PIM \u2013 T3 (1.Liga)",
-        "priority":    86,
-        "max_tier":    3,
-        "fixed_tier":  True,
-        "requires":    "player_game_stats_t2",
+        "max_age": timedelta(hours=24),
+        "task": "player_game_stats",
+        "scope": "season",
+        "label": "Per-game G/A/PIM \u2013 T3 (1.Liga)",
+        "priority": 86,
+        "max_tier": 3,
+        "fixed_tier": True,
+        "requires": "player_game_stats_t2",
         "run_at_hour": 4,
     },
     {
-        "name":        "player_game_stats_t4",
+        "name": "player_game_stats_t4",
         "entity_type": "player_game_stats_t4",
-        "max_age":     timedelta(hours=24),
-        "task":        "player_game_stats",
-        "scope":       "season",
-        "label":       "Per-game G/A/PIM \u2013 T4 (2.Liga)",
-        "priority":    86,
-        "max_tier":    4,
-        "fixed_tier":  True,
-        "requires":    "player_game_stats_t3",
+        "max_age": timedelta(hours=24),
+        "task": "player_game_stats",
+        "scope": "season",
+        "label": "Per-game G/A/PIM \u2013 T4 (2.Liga)",
+        "priority": 86,
+        "max_tier": 4,
+        "fixed_tier": True,
+        "requires": "player_game_stats_t3",
         "run_at_hour": 4,
     },
     {
-        "name":        "player_game_stats_t5",
+        "name": "player_game_stats_t5",
         "entity_type": "player_game_stats_t5",
-        "max_age":     timedelta(hours=24),
-        "task":        "player_game_stats",
-        "scope":       "season",
-        "label":       "Per-game G/A/PIM \u2013 T5 (3.Liga)",
-        "priority":    86,
-        "max_tier":    5,
-        "fixed_tier":  True,
-        "requires":    "player_game_stats_t4",
+        "max_age": timedelta(hours=24),
+        "task": "player_game_stats",
+        "scope": "season",
+        "label": "Per-game G/A/PIM \u2013 T5 (3.Liga)",
+        "priority": 86,
+        "max_tier": 5,
+        "fixed_tier": True,
+        "requires": "player_game_stats_t4",
         "run_at_hour": 4,
     },
     {
-        "name":        "player_game_stats_t6",
+        "name": "player_game_stats_t6",
         "entity_type": "player_game_stats_t6",
-        "max_age":     timedelta(hours=24),
-        "task":        "player_game_stats",
-        "scope":       "season",
-        "label":       "Per-game G/A/PIM \u2013 T6 (4./5.Liga, Regional)",
-        "priority":    86,
-        "max_tier":    6,
-        "fixed_tier":  True,
-        "requires":    "player_game_stats_t5",
+        "max_age": timedelta(hours=24),
+        "task": "player_game_stats",
+        "scope": "season",
+        "label": "Per-game G/A/PIM \u2013 T6 (4./5.Liga, Regional)",
+        "priority": 86,
+        "max_tier": 6,
+        "fixed_tier": True,
+        "requires": "player_game_stats_t5",
         "run_at_hour": 4,
     },
-
     # ── Nightly DB repair ─────────────────────────────────────────────────
     # Runs at 03:30 UTC — after nightly indexing jobs (03:00) so repairs
     # catch anything they left behind.  Global scope: no season argument.
     {
-        "name":        "repair",
+        "name": "repair",
         "entity_type": "repair",
-        "max_age":     timedelta(hours=24),
-        "task":        "repair",
-        "scope":       "global",
-        "label":       "Nightly DB repair",
-        "priority":    90,
+        "max_age": timedelta(hours=24),
+        "task": "repair",
+        "scope": "global",
+        "label": "Nightly DB repair",
+        "priority": 90,
         "run_at_hour": 3,
     },
 ]
@@ -360,9 +363,12 @@ if _DATA_DIR_ENV:
     _CONFIG_PATH = os.path.join(_DATA_DIR_ENV, "scheduler_config.json")
 else:
     _CONFIG_PATH = os.path.join(
-        os.path.dirname(__file__),   # .../backend/app/services
-        "..", "..", "..",            # up to SwissUnihockeyStats/
-        "data", "scheduler_config.json",
+        os.path.dirname(__file__),  # .../backend/app/services
+        "..",
+        "..",
+        "..",  # up to SwissUnihockeyStats/
+        "data",
+        "scheduler_config.json",
     )
 _CONFIG_PATH = os.path.normpath(_CONFIG_PATH)
 
@@ -371,27 +377,30 @@ _CONFIG_PATH = os.path.normpath(_CONFIG_PATH)
 # Data classes
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass(order=True)
 class ScheduledJob:
     """A job waiting in the queue."""
+
     run_at: datetime
     priority: int
     # fields below are not used for ordering
     policy_name: str = field(compare=False)
-    task: str        = field(compare=False)
+    task: str = field(compare=False)
     season: int | None = field(compare=False, default=None)
-    label: str       = field(compare=False, default="")
-    max_tier: int    = field(compare=False, default=7)
+    label: str = field(compare=False, default="")
+    max_tier: int = field(compare=False, default=7)
 
 
 @dataclass
 class JobRecord:
     """Runtime record for a submitted job."""
+
     job_id: str
     policy_name: str
     task: str
     season: int | None
-    status: str          # pending / running / done / error
+    status: str  # pending / running / done / error
     scheduled_at: datetime
     started_at: datetime | None = None
     finished_at: datetime | None = None
@@ -402,6 +411,7 @@ class JobRecord:
 # ─────────────────────────────────────────────────────────────────────────────
 # Scheduler
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class Scheduler:
     """
@@ -430,7 +440,7 @@ class Scheduler:
         self._running = False
         self._queue: list[ScheduledJob] = []
         self._history: list[JobRecord] = []
-        self._cold_start = True   # run all jobs immediately on first enable
+        self._cold_start = True  # run all jobs immediately on first enable
         self._enabled = self._load_state()
         self._last_snapshot_ts: float = 0.0
         self._deferred_tick_pending: bool = False
@@ -445,7 +455,9 @@ class Scheduler:
                 self._min_season: int | None = data.get("min_season", None)
                 self._excluded_seasons: list[int] = data.get("excluded_seasons", [])
                 self._max_concurrent: int = max(1, int(data.get("max_concurrent", 2)))
-                self._player_game_stats_workers: int = max(1, int(data.get("player_game_stats_workers", 10)))
+                self._player_game_stats_workers: int = max(
+                    1, int(data.get("player_game_stats_workers", 10))
+                )
                 self._policy_tiers: dict[str, int] = data.get("policy_tiers", {})
                 return bool(data.get("enabled", True))
         except (FileNotFoundError, json.JSONDecodeError):
@@ -462,14 +474,18 @@ class Scheduler:
             os.makedirs(os.path.dirname(_CONFIG_PATH), exist_ok=True)
             tmp = _CONFIG_PATH + ".tmp"
             with open(tmp, "w") as f:
-                json.dump({
-                    "enabled": self._enabled,
-                    "min_season": self._min_season,
-                    "excluded_seasons": self._excluded_seasons,
-                    "max_concurrent": self._max_concurrent,
-                    "player_game_stats_workers": self._player_game_stats_workers,
-                    "policy_tiers": self._policy_tiers,
-                }, f, indent=2)
+                json.dump(
+                    {
+                        "enabled": self._enabled,
+                        "min_season": self._min_season,
+                        "excluded_seasons": self._excluded_seasons,
+                        "max_concurrent": self._max_concurrent,
+                        "player_game_stats_workers": self._player_game_stats_workers,
+                        "policy_tiers": self._policy_tiers,
+                    },
+                    f,
+                    indent=2,
+                )
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp, _CONFIG_PATH)  # atomic on POSIX
@@ -512,7 +528,7 @@ class Scheduler:
     # single non-cascade POLICY entry.  These control the manual season-card
     # dropdowns and are displayed in the Settings tier editor.
     _EXTRA_TIER_DEFAULTS: dict[str, int] = {
-        "player_stats":      3,
+        "player_stats": 3,
         "player_game_stats": 3,
     }
 
@@ -554,14 +570,13 @@ class Scheduler:
         """Set the thread-pool size for player_game_stats Phase 1 API fetches."""
         self._player_game_stats_workers = max(1, n)
         self._save_state()
-        logger.info("[scheduler] player_game_stats_workers set to %d", self._player_game_stats_workers)
+        logger.info(
+            "[scheduler] player_game_stats_workers set to %d", self._player_game_stats_workers
+        )
 
     def _count_running(self) -> int:
         """Count jobs currently in pending/running state."""
-        return sum(
-            1 for r in self._history
-            if r.status in ("pending", "running")
-        )
+        return sum(1 for r in self._history if r.status in ("pending", "running"))
 
     def set_season_filter(self, min_season: int | None, excluded_seasons: list[int]):
         """Persist season filter settings and clear any queued jobs for filtered seasons."""
@@ -576,7 +591,8 @@ class Scheduler:
             logger.info("[scheduler] dropped %d queued job(s) for filtered seasons", dropped)
         logger.info(
             "[scheduler] season filter updated: min=%s excluded=%s",
-            min_season, excluded_seasons,
+            min_season,
+            excluded_seasons,
         )
 
     def _season_filtered(self, season: int | None) -> bool:
@@ -615,7 +631,8 @@ class Scheduler:
             self._queue.remove(j)
             logger.info(
                 "[scheduler] cancelled stale job %s season=%s (was due %s)",
-                j.policy_name, j.season,
+                j.policy_name,
+                j.season,
                 j.run_at.strftime("%Y-%m-%d %H:%M UTC"),
             )
 
@@ -624,29 +641,31 @@ class Scheduler:
         now = _utcnow()
         out = []
         for job in sorted(self._queue):
-            out.append({
-                "policy":   job.policy_name,
-                "task":     job.task,
-                "season":   job.season,
-                "label":    job.label,
-                "run_at":   job.run_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "due_in_s": max(0, int((job.run_at - now).total_seconds())),
-            })
+            out.append(
+                {
+                    "policy": job.policy_name,
+                    "task": job.task,
+                    "season": job.season,
+                    "label": job.label,
+                    "run_at": job.run_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "due_in_s": max(0, int((job.run_at - now).total_seconds())),
+                }
+            )
         return out
 
     def get_history(self, limit: int = 50) -> list[dict]:
         return [
             {
-                "job_id":       r.job_id,
-                "policy":       r.policy_name,
-                "task":         r.task,
-                "season":       r.season,
-                "status":       r.status,
+                "job_id": r.job_id,
+                "policy": r.policy_name,
+                "task": r.task,
+                "season": r.season,
+                "status": r.status,
                 "scheduled_at": _fmt(r.scheduled_at),
-                "started_at":   _fmt(r.started_at),
-                "finished_at":  _fmt(r.finished_at),
-                "error":        r.error,
-                "stats":        r.stats,
+                "started_at": _fmt(r.started_at),
+                "finished_at": _fmt(r.finished_at),
+                "error": r.error,
+                "stats": r.stats,
             }
             for r in reversed(self._history[-limit:])
         ]
@@ -695,19 +714,21 @@ class Scheduler:
 
         logger.info(
             "[scheduler] launching job_id=%s  task=%s  season=%s",
-            job_id, job.task, job.season,
+            job_id,
+            job.task,
+            job.season,
         )
 
         self._admin_jobs[job_id] = {
-            "job_id":    job_id,
-            "season":    job.season,
-            "task":      job.task,
-            "label":     job.label,
-            "status":    "running",
-            "progress":  0,
-            "stats":     {},
+            "job_id": job_id,
+            "season": job.season,
+            "task": job.task,
+            "label": job.label,
+            "status": "running",
+            "progress": 0,
+            "stats": {},
             "log_lines": [],
-            "error":     None,
+            "error": None,
             "scheduled": True,
         }
 
@@ -722,7 +743,7 @@ class Scheduler:
             )
         except Exception as exc:
             record.status = "error"
-            record.error  = str(exc)
+            record.error = str(exc)
             record.finished_at = _utcnow()
             logger.error("[scheduler] launch failed %s: %s", job_id, exc)
         return job_id
@@ -761,6 +782,7 @@ class Scheduler:
             try:
                 from app.services.stats_snapshot import write_stats_snapshot
                 from app.services.database import get_database_service
+
                 recent = [j for j in list(self._history)[-200:] if j.status == "done"]
                 durations = [
                     (j.finished_at - j.started_at).total_seconds()
@@ -768,7 +790,7 @@ class Scheduler:
                     if j.finished_at is not None and j.started_at is not None
                 ]
                 avg_dur = sum(durations) / len(durations) if durations else 0.0
-                errors  = sum(1 for j in list(self._history)[-200:] if j.error)
+                errors = sum(1 for j in list(self._history)[-200:] if j.error)
                 write_stats_snapshot(
                     get_database_service(),
                     jobs_run=len(recent),
@@ -788,19 +810,16 @@ class Scheduler:
         try:
             from app.services.database import get_database_service
             from app.models.db_models import Season, SyncStatus
+
             db_service = get_database_service()
 
             with db_service.session_scope() as session:
                 # Seasons that have been at least partially indexed
                 season_rows = (
-                    session.query(Season.id, Season.highlighted)
-                    .order_by(Season.id.desc())
-                    .all()
+                    session.query(Season.id, Season.highlighted).order_by(Season.id.desc()).all()
                 )
                 # Identify the current (highlighted) season — only it gets recurring updates
-                current_season_id: int | None = next(
-                    (r[0] for r in season_rows if r[1]), None
-                )
+                current_season_id: int | None = next((r[0] for r in season_rows if r[1]), None)
                 indexed_seasons: list[int] = [r[0] for r in season_rows]
 
                 # Yield to the event loop every N iterations so that HTTP
@@ -820,7 +839,9 @@ class Scheduler:
                             if self._season_filtered(sid):
                                 continue
                             self._maybe_schedule(
-                                session, policy, season=sid,
+                                session,
+                                policy,
+                                season=sid,
                                 is_current_season=(sid == current_season_id),
                             )
                             _itr += 1
@@ -853,7 +874,8 @@ class Scheduler:
 
         # Don't re-queue if still running
         if any(
-            r.policy_name == policy["name"] and r.season == season
+            r.policy_name == policy["name"]
+            and r.season == season
             and r.status in ("pending", "running")
             for r in self._history
         ):
@@ -940,7 +962,9 @@ class Scheduler:
         self._queue.append(job)
         logger.debug(
             "[scheduler] queued %s season=%s run_at=%s",
-            policy["name"], season, run_at.strftime("%Y-%m-%d %H:%M UTC"),
+            policy["name"],
+            season,
+            run_at.strftime("%Y-%m-%d %H:%M UTC"),
         )
 
     async def _dispatch_due(self):
@@ -960,7 +984,7 @@ class Scheduler:
         # re-enqueue overflow with a short stagger so they fire quickly.
         slots = max(0, self._max_concurrent - self._count_running())
         to_launch = due[:slots]
-        to_defer  = due[slots:]
+        to_defer = due[slots:]
 
         for i, j in enumerate(to_defer):
             j.run_at = now + timedelta(seconds=5 + i * 3)
@@ -969,7 +993,9 @@ class Scheduler:
         if to_defer:
             logger.info(
                 "[scheduler] deferred %d job(s) (max_concurrent=%d, running=%d)",
-                len(to_defer), self._max_concurrent, self._count_running(),
+                len(to_defer),
+                self._max_concurrent,
+                self._count_running(),
             )
             # Schedule a fast follow-up tick so deferred jobs aren't waiting
             # the full TICK_SECONDS interval before the next dispatch attempt.
@@ -1014,7 +1040,7 @@ class Scheduler:
                 consecutive_missing += 1
                 if consecutive_missing >= 3:
                     record.status = "error"
-                    record.error  = "job entry vanished (server may have restarted)"
+                    record.error = "job entry vanished (server may have restarted)"
                     record.finished_at = _utcnow()
                     logger.warning("[scheduler] job %s lost from registry", job_id)
                     return
@@ -1022,12 +1048,13 @@ class Scheduler:
             consecutive_missing = 0
             status = entry.get("status", "running")
             if status == "done":
-                record.status      = "done"
-                record.stats       = entry.get("stats", {})
+                record.status = "done"
+                record.stats = entry.get("stats", {})
                 record.finished_at = _utcnow()
                 logger.info(
                     "[scheduler] job %s done  stats=%s",
-                    job_id, record.stats,
+                    job_id,
+                    record.stats,
                 )
                 # Immediately refresh the queue so any newly-available
                 # entities (e.g. season-scoped jobs after seasons run)
@@ -1035,12 +1062,14 @@ class Scheduler:
                 asyncio.create_task(self._tick())
                 return
             if status in ("error", "stopped"):
-                record.status      = status
-                record.error       = entry.get("error", "unknown")
+                record.status = status
+                record.error = entry.get("error", "unknown")
                 record.finished_at = _utcnow()
                 logger.warning(
                     "[scheduler] job %s %s: %s",
-                    job_id, status, record.error,
+                    job_id,
+                    status,
+                    record.error,
                 )
                 asyncio.create_task(self._tick())
                 return
@@ -1049,6 +1078,7 @@ class Scheduler:
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)  # naive UTC
@@ -1069,18 +1099,16 @@ def _last_sync_for(session, entity_type: str, season: int | None):
     """
     from app.models.db_models import SyncStatus
 
-    q = (session.query(SyncStatus.last_sync)
-         .filter(
-             SyncStatus.entity_type == entity_type,
-             SyncStatus.sync_status == "completed",
-         ))
+    q = session.query(SyncStatus.last_sync).filter(
+        SyncStatus.entity_type == entity_type,
+        SyncStatus.sync_status == "completed",
+    )
 
     if season is not None:
         # entity_id is stored as "clubs:2025" or just "2025".
         # Use exact-match alternatives to avoid season 202 matching 2025.
         q = q.filter(
-            (SyncStatus.entity_id == str(season)) |
-            SyncStatus.entity_id.like(f"%:{season}")
+            (SyncStatus.entity_id == str(season)) | SyncStatus.entity_id.like(f"%:{season}")
         )
 
     row = q.order_by(SyncStatus.last_sync.desc()).first()
@@ -1096,13 +1124,11 @@ def _last_attempt_for(session, entity_type: str, season: int | None):
     """
     from app.models.db_models import SyncStatus
 
-    q = (session.query(SyncStatus.last_sync)
-         .filter(SyncStatus.entity_type == entity_type))
+    q = session.query(SyncStatus.last_sync).filter(SyncStatus.entity_type == entity_type)
 
     if season is not None:
         q = q.filter(
-            (SyncStatus.entity_id == str(season)) |
-            SyncStatus.entity_id.like(f"%:{season}")
+            (SyncStatus.entity_id == str(season)) | SyncStatus.entity_id.like(f"%:{season}")
         )
 
     row = q.order_by(SyncStatus.last_sync.desc()).first()

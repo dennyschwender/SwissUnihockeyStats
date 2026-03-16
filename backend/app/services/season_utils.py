@@ -4,6 +4,7 @@ Utility for determining the current Swiss Unihockey season.
 Extracted from main.py into its own module to avoid circular imports
 (data_cache → main → data_cache).
 """
+
 from datetime import datetime
 
 
@@ -16,6 +17,7 @@ def get_current_season() -> int:
     try:
         from app.services.database import get_database_service
         from app.models.db_models import Season as _Season
+
         db = get_database_service()
         with db.session_scope() as session:
             row = session.query(_Season.id).filter(_Season.highlighted == True).first()

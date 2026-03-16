@@ -11,18 +11,18 @@ API call (20–60 s), starving concurrent writers.
 Fix: all API calls must complete in Phase 1 (no DB session open), then
 a single short session_scope() in Phase 2 writes all collected data.
 """
+
 from contextlib import contextmanager
 from unittest.mock import Mock, MagicMock
 
 from app.services.data_indexer import DataIndexer
-
 
 # Minimal API response that terminates the pagination loop immediately:
 # - no "prev" in slider → backward loop stops after one call
 # - no "next" in slider → forward_start_round stays None → forward loop never runs
 _EMPTY_ROUND = {
     "data": {
-        "slider": {},   # no prev, no next
+        "slider": {},  # no prev, no next
         "regions": [],  # no rows → no DB writes needed
     }
 }
@@ -122,8 +122,11 @@ class TestIndexGamesForLeagueLockOrder:
         indexer.client = mock_client
 
         indexer.index_games_for_league(
-            league_db_id=1, season_id=2025, league_id=100,
-            game_class=1, force=True,
+            league_db_id=1,
+            season_id=2025,
+            league_id=100,
+            game_class=1,
+            force=True,
         )
 
         assert mock_client.get_games.call_count == 1

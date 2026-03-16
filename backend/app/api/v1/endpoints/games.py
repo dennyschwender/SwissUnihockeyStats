@@ -1,6 +1,7 @@
 """
 Games API endpoints
 """
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
@@ -16,7 +17,7 @@ async def get_games(
     league: Optional[int] = Query(None, description="Filter by league ID"),
     season: Optional[int] = Query(None, description="Filter by season"),
     mode: Optional[int] = Query(None, description="Filter by mode"),
-    limit: Optional[int] = Query(None, description="Limit number of results", ge=1, le=1000)
+    limit: Optional[int] = Query(None, description="Limit number of results", ge=1, le=1000),
 ):
     """
     Get list of games with optional filters
@@ -29,6 +30,7 @@ async def get_games(
     """
     try:
         import asyncio
+
         loop = asyncio.get_running_loop()
         client = get_swissunihockey_client()
         games_data = await loop.run_in_executor(
@@ -61,9 +63,12 @@ async def get_game(game_id: int):
     """
     try:
         import asyncio
+
         loop = asyncio.get_running_loop()
         client = get_swissunihockey_client()
-        game_data = await loop.run_in_executor(None, lambda: client.get_game_events(game_id=game_id))
+        game_data = await loop.run_in_executor(
+            None, lambda: client.get_game_events(game_id=game_id)
+        )
 
         if not game_data:
             raise HTTPException(status_code=404, detail=f"Game {game_id} not found")
@@ -86,9 +91,12 @@ async def get_game_events(game_id: int):
     """
     try:
         import asyncio
+
         loop = asyncio.get_running_loop()
         client = get_swissunihockey_client()
-        events_data = await loop.run_in_executor(None, lambda: client.get_game_events(game_id=game_id))
+        events_data = await loop.run_in_executor(
+            None, lambda: client.get_game_events(game_id=game_id)
+        )
 
         if not events_data or "entries" not in events_data:
             raise HTTPException(status_code=404, detail=f"No events found for game {game_id}")

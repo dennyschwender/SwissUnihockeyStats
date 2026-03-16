@@ -1,4 +1,5 @@
 """Tests for game completeness service."""
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -74,8 +75,16 @@ def _make_game(session, api_id=1, status="finished", home_score=None, away_score
 
 # ── TIER_COMPLETENESS_FIELDS ────────────────────────────────────────────────
 
+
 def test_tier1_requires_all_fields():
-    assert TIER_COMPLETENESS_FIELDS[1] == {"score", "referees", "spectators", "events", "lineup", "best_players"}
+    assert TIER_COMPLETENESS_FIELDS[1] == {
+        "score",
+        "referees",
+        "spectators",
+        "events",
+        "lineup",
+        "best_players",
+    }
 
 
 def test_tier3_requires_only_score():
@@ -87,6 +96,7 @@ def test_tier6_requires_only_score():
 
 
 # ── _resolve_game_tier ──────────────────────────────────────────────────────
+
 
 def test_resolve_tier_null_group_id_returns_6(session):
     game = _make_game(session, api_id=10)
@@ -102,6 +112,7 @@ def test_resolve_tier_missing_league_group_returns_6(session):
 
 
 # ── _is_game_complete — tier 6 (score only) ─────────────────────────────────
+
 
 def test_score_present_tier6_complete(session):
     game = _make_game(session, api_id=20, home_score=3, away_score=1)
@@ -126,17 +137,42 @@ def test_only_home_score_tier6_incomplete(session):
 
 # ── _is_game_complete — tier 1 (all fields) ─────────────────────────────────
 
+
 def test_tier1_all_fields_present_complete(session):
     game = _make_game(session, api_id=30, home_score=2, away_score=0)
     game.referee_1 = "Ref A"
     game.spectators = 500
     session.flush()
     # Add a non-best_player event
-    session.add(GameEvent(game_id=game.id, event_type="goal", period=1, team_id=game.home_team_id, season_id=_SEASON_ID))
+    session.add(
+        GameEvent(
+            game_id=game.id,
+            event_type="goal",
+            period=1,
+            team_id=game.home_team_id,
+            season_id=_SEASON_ID,
+        )
+    )
     # Add a best_player event
-    session.add(GameEvent(game_id=game.id, event_type="best_player", period=0, team_id=game.home_team_id, season_id=_SEASON_ID))
+    session.add(
+        GameEvent(
+            game_id=game.id,
+            event_type="best_player",
+            period=0,
+            team_id=game.home_team_id,
+            season_id=_SEASON_ID,
+        )
+    )
     # Add lineup entry
-    session.add(GamePlayer(game_id=game.id, team_id=game.home_team_id, player_id=1, season_id=_SEASON_ID, is_home_team=True))
+    session.add(
+        GamePlayer(
+            game_id=game.id,
+            team_id=game.home_team_id,
+            player_id=1,
+            season_id=_SEASON_ID,
+            is_home_team=True,
+        )
+    )
     session.flush()
     ok, missing = _is_game_complete(game, 1, session)
     assert ok is True
@@ -147,9 +183,33 @@ def test_tier1_missing_referees(session):
     game = _make_game(session, api_id=31, home_score=2, away_score=0)
     game.spectators = 500
     session.flush()
-    session.add(GameEvent(game_id=game.id, event_type="goal", period=1, team_id=game.home_team_id, season_id=_SEASON_ID))
-    session.add(GameEvent(game_id=game.id, event_type="best_player", period=0, team_id=game.home_team_id, season_id=_SEASON_ID))
-    session.add(GamePlayer(game_id=game.id, team_id=game.home_team_id, player_id=2, season_id=_SEASON_ID, is_home_team=True))
+    session.add(
+        GameEvent(
+            game_id=game.id,
+            event_type="goal",
+            period=1,
+            team_id=game.home_team_id,
+            season_id=_SEASON_ID,
+        )
+    )
+    session.add(
+        GameEvent(
+            game_id=game.id,
+            event_type="best_player",
+            period=0,
+            team_id=game.home_team_id,
+            season_id=_SEASON_ID,
+        )
+    )
+    session.add(
+        GamePlayer(
+            game_id=game.id,
+            team_id=game.home_team_id,
+            player_id=2,
+            season_id=_SEASON_ID,
+            is_home_team=True,
+        )
+    )
     session.flush()
     ok, missing = _is_game_complete(game, 1, session)
     assert ok is False
@@ -162,8 +222,24 @@ def test_tier1_missing_events(session):
     game.spectators = 500
     session.flush()
     # No non-best_player event
-    session.add(GameEvent(game_id=game.id, event_type="best_player", period=0, team_id=game.home_team_id, season_id=_SEASON_ID))
-    session.add(GamePlayer(game_id=game.id, team_id=game.home_team_id, player_id=3, season_id=_SEASON_ID, is_home_team=True))
+    session.add(
+        GameEvent(
+            game_id=game.id,
+            event_type="best_player",
+            period=0,
+            team_id=game.home_team_id,
+            season_id=_SEASON_ID,
+        )
+    )
+    session.add(
+        GamePlayer(
+            game_id=game.id,
+            team_id=game.home_team_id,
+            player_id=3,
+            season_id=_SEASON_ID,
+            is_home_team=True,
+        )
+    )
     session.flush()
     ok, missing = _is_game_complete(game, 1, session)
     assert ok is False
@@ -175,8 +251,24 @@ def test_tier1_missing_lineup(session):
     game.referee_1 = "Ref C"
     game.spectators = 500
     session.flush()
-    session.add(GameEvent(game_id=game.id, event_type="goal", period=1, team_id=game.home_team_id, season_id=_SEASON_ID))
-    session.add(GameEvent(game_id=game.id, event_type="best_player", period=0, team_id=game.home_team_id, season_id=_SEASON_ID))
+    session.add(
+        GameEvent(
+            game_id=game.id,
+            event_type="goal",
+            period=1,
+            team_id=game.home_team_id,
+            season_id=_SEASON_ID,
+        )
+    )
+    session.add(
+        GameEvent(
+            game_id=game.id,
+            event_type="best_player",
+            period=0,
+            team_id=game.home_team_id,
+            season_id=_SEASON_ID,
+        )
+    )
     # No GamePlayer
     session.flush()
     ok, missing = _is_game_complete(game, 1, session)
@@ -189,9 +281,25 @@ def test_tier1_missing_best_players(session):
     game.referee_1 = "Ref D"
     game.spectators = 500
     session.flush()
-    session.add(GameEvent(game_id=game.id, event_type="goal", period=1, team_id=game.home_team_id, season_id=_SEASON_ID))
+    session.add(
+        GameEvent(
+            game_id=game.id,
+            event_type="goal",
+            period=1,
+            team_id=game.home_team_id,
+            season_id=_SEASON_ID,
+        )
+    )
     # No best_player event
-    session.add(GamePlayer(game_id=game.id, team_id=game.home_team_id, player_id=4, season_id=_SEASON_ID, is_home_team=True))
+    session.add(
+        GamePlayer(
+            game_id=game.id,
+            team_id=game.home_team_id,
+            player_id=4,
+            season_id=_SEASON_ID,
+            is_home_team=True,
+        )
+    )
     session.flush()
     ok, missing = _is_game_complete(game, 1, session)
     assert ok is False
@@ -203,9 +311,33 @@ def test_tier1_missing_spectators(session):
     game.referee_1 = "Ref E"
     # spectators deliberately left as None
     session.flush()
-    session.add(GameEvent(game_id=game.id, event_type="goal", period=1, team_id=game.home_team_id, season_id=_SEASON_ID))
-    session.add(GameEvent(game_id=game.id, event_type="best_player", period=0, team_id=game.home_team_id, season_id=_SEASON_ID))
-    session.add(GamePlayer(game_id=game.id, team_id=game.home_team_id, player_id=5, season_id=_SEASON_ID, is_home_team=True))
+    session.add(
+        GameEvent(
+            game_id=game.id,
+            event_type="goal",
+            period=1,
+            team_id=game.home_team_id,
+            season_id=_SEASON_ID,
+        )
+    )
+    session.add(
+        GameEvent(
+            game_id=game.id,
+            event_type="best_player",
+            period=0,
+            team_id=game.home_team_id,
+            season_id=_SEASON_ID,
+        )
+    )
+    session.add(
+        GamePlayer(
+            game_id=game.id,
+            team_id=game.home_team_id,
+            player_id=5,
+            season_id=_SEASON_ID,
+            is_home_team=True,
+        )
+    )
     session.flush()
     ok, missing = _is_game_complete(game, 1, session)
     assert ok is False

@@ -1,4 +1,5 @@
 """Tests for RepairService — conservative DB repairs and health reports."""
+
 import pytest
 from datetime import datetime, timedelta
 from sqlalchemy import text
@@ -75,10 +76,13 @@ def test_fix_null_game_dates_deletes_sync_rows(db, repair):
             INSERT INTO games (id, season_id, status, home_score, away_score, home_team_id, away_team_id)
             VALUES (1001, 2025, 'finished', 3, 2, 1, 2)
         """))
-        session.execute(text("""
+        session.execute(
+            text("""
             INSERT INTO sync_status (entity_type, entity_id, sync_status, last_sync)
             VALUES ('game_events', 'game:1001:events', 'completed', :now)
-        """), {"now": datetime.utcnow()})
+        """),
+            {"now": datetime.utcnow()},
+        )
 
     n = repair.fix_null_game_dates()
     assert n == 1
@@ -96,10 +100,13 @@ def test_fix_missing_events_deletes_sync_rows(db, repair):
             VALUES (1002, 2025, 'finished', 2, 1, '2025-10-01', 1, 2)
         """))
         # sync_status exists (completed) but no game_events rows
-        session.execute(text("""
+        session.execute(
+            text("""
             INSERT INTO sync_status (entity_type, entity_id, sync_status, last_sync)
             VALUES ('game_events', 'game:1002:events', 'completed', :now)
-        """), {"now": datetime.utcnow()})
+        """),
+            {"now": datetime.utcnow()},
+        )
 
     n = repair.fix_missing_events()
     assert n == 1
@@ -180,8 +187,6 @@ def test_run_nightly_writes_sync_status(db, repair):
     """run_nightly() should write a completed sync_status row."""
     repair.run_nightly()
     with db.session_scope() as session:
-        row = session.query(SyncStatus).filter_by(
-            entity_type="repair", entity_id="all"
-        ).first()
+        row = session.query(SyncStatus).filter_by(entity_type="repair", entity_id="all").first()
         assert row is not None
         assert row.sync_status == "completed"

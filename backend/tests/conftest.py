@@ -1,6 +1,7 @@
 """
 Shared pytest fixtures for the SwissUnihockey backend test suite.
 """
+
 import os
 import pytest
 from unittest.mock import MagicMock, patch
@@ -32,7 +33,7 @@ def _make_mock_client():
     mock.get_teams.return_value = {
         "entries": [
             {"id": 101, "text": "Team Alpha", "set_in_context": {"team_id": 101}},
-            {"id": 102, "text": "Team Beta",  "set_in_context": {"team_id": 102}},
+            {"id": 102, "text": "Team Beta", "set_in_context": {"team_id": 102}},
         ]
     }
     mock.get_games.return_value = {"entries": []}
@@ -65,6 +66,7 @@ def app():
         p.start()
     try:
         from app.main import app as _app
+
         yield _app
     finally:
         for p in patchers:
@@ -91,6 +93,7 @@ def admin_client(app):
 def clear_job_cooldowns():
     """Clear admin-job cooldown state and contact rate limits before each test."""
     from app.main import _job_last_done, _contact_attempts
+
     _job_last_done.clear()
     _contact_attempts.clear()
     yield

@@ -1,6 +1,7 @@
 """
 Teams API endpoints
 """
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
@@ -15,7 +16,7 @@ async def get_teams(
     club: Optional[int] = Query(None, description="Filter by club ID"),
     league: Optional[int] = Query(None, description="Filter by league ID"),
     season: Optional[int] = Query(None, description="Filter by season"),
-    limit: Optional[int] = Query(None, description="Limit number of results", ge=1, le=1000)
+    limit: Optional[int] = Query(None, description="Limit number of results", ge=1, le=1000),
 ):
     """
     Get list of teams with optional filters
@@ -27,6 +28,7 @@ async def get_teams(
     """
     try:
         import asyncio
+
         loop = asyncio.get_running_loop()
         client = get_swissunihockey_client()
         teams_data = await loop.run_in_executor(
@@ -59,6 +61,7 @@ async def get_team(team_id: int):
     """
     try:
         import asyncio
+
         loop = asyncio.get_running_loop()
         client = get_swissunihockey_client()
         teams_data = await loop.run_in_executor(None, client.get_teams)

@@ -1,4 +1,5 @@
 """Game completeness checks for the lifecycle scheduler."""
+
 from __future__ import annotations
 
 from sqlalchemy import select

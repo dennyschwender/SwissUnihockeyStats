@@ -5,6 +5,7 @@ Verifies that the repair job is deferred by 30 minutes when other jobs
 are still running, to prevent VACUUM from acquiring an exclusive lock
 while writers are active.
 """
+
 import asyncio
 import pytest
 from datetime import datetime, timedelta, timezone
@@ -75,8 +76,10 @@ async def test_repair_deferred_when_jobs_running():
     async def mock_launch(job):
         launched.append(job)
 
-    with patch.object(sched, "_launch", side_effect=mock_launch), \
-         patch.object(sched, "_count_running", return_value=1):
+    with (
+        patch.object(sched, "_launch", side_effect=mock_launch),
+        patch.object(sched, "_count_running", return_value=1),
+    ):
         await sched._dispatch_due()
 
     # repair must NOT have been launched
@@ -103,8 +106,10 @@ async def test_repair_launches_when_no_jobs_running():
     async def mock_launch(job):
         launched.append(job)
 
-    with patch.object(sched, "_launch", side_effect=mock_launch), \
-         patch.object(sched, "_count_running", return_value=0):
+    with (
+        patch.object(sched, "_launch", side_effect=mock_launch),
+        patch.object(sched, "_count_running", return_value=0),
+    ):
         await sched._dispatch_due()
 
     assert repair_job in launched, "repair job should launch when no other jobs are running"
@@ -122,8 +127,10 @@ async def test_non_repair_job_not_affected():
     async def mock_launch(job):
         launched.append(job)
 
-    with patch.object(sched, "_launch", side_effect=mock_launch), \
-         patch.object(sched, "_count_running", return_value=1):
+    with (
+        patch.object(sched, "_launch", side_effect=mock_launch),
+        patch.object(sched, "_count_running", return_value=1),
+    ):
         await sched._dispatch_due()
 
     assert games_job in launched, "non-repair job should launch regardless of running jobs"
