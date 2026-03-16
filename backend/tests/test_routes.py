@@ -175,11 +175,15 @@ class TestContactAndPrivacyRoutes:
         assert r.status_code == 200
 
     def test_contact_submit_valid_redirects(self, client):
-        r = client.post(
-            "/en/contact",
-            data={"name": "Test User", "email": "user@example.com", "subject": "Hi", "message": "Hello world"},
-            follow_redirects=False,
-        )
+        from unittest.mock import patch, MagicMock
+        with patch("smtplib.SMTP") as mock_smtp:
+            mock_smtp.return_value.__enter__ = MagicMock(return_value=MagicMock())
+            mock_smtp.return_value.__exit__ = MagicMock(return_value=False)
+            r = client.post(
+                "/en/contact",
+                data={"name": "Test User", "email": "user@example.com", "subject": "Hi", "message": "Hello world"},
+                follow_redirects=False,
+            )
         assert r.status_code == 303
         assert "/en/contact" in r.headers.get("location", "")
 
