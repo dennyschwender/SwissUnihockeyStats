@@ -113,10 +113,19 @@ class DatabaseService:
         Args:
             database_url: Database URL (defaults to settings)
         """
+        import threading
+
         self.database_url = database_url or self._get_database_url()
         self.engine = None
         self.SessionLocal = None
         self._initialized = False
+        # StaticPool (used for :memory: SQLite in tests) shares one underlying
+        # connection across all threads.  Concurrent sessions from background
+        # asyncio tasks would race to issue BEGIN on the same connection and
+        # hit "cannot start a transaction within a transaction".  Serialise
+        # session_scope() with a reentrant lock when using the static pool so
+        # that only one thread holds a session at a time.
+        self._session_lock: threading.RLock | None = None
 
     def _get_database_url(self) -> str:
         """Get database URL from settings"""
@@ -147,6 +156,10 @@ class DatabaseService:
                 poolclass=StaticPool if is_memory else NullPool,
                 echo=False,  # Set to True for SQL debugging
             )
+            if is_memory:
+                import threading
+
+                self._session_lock = threading.RLock()
 
             # Enable foreign keys for SQLite
             @event.listens_for(self.engine, "connect")
@@ -208,6 +221,8 @@ class DatabaseService:
                 ("pen_10min", "INTEGER DEFAULT 0"),
                 ("pen_match", "INTEGER DEFAULT 0"),
                 ("game_class", "INTEGER"),
+                ("computed_from_local", "INTEGER NOT NULL DEFAULT 0"),
+                ("local_computed_at", "DATETIME"),
             ]:
                 if col not in existing_cols:
                     conn.execute(text(f"ALTER TABLE player_statistics ADD COLUMN {col} {typedef}"))
@@ -427,6 +442,9 @@ class DatabaseService:
             with db_service.session_scope() as session:
                 players = session.query(Player).all()
         """
+        lock = self._session_lock
+        if lock is not None:
+            lock.acquire()
         session = self.get_session()
         try:
             yield session
@@ -437,6 +455,8 @@ class DatabaseService:
             raise
         finally:
             session.close()
+            if lock is not None:
+                lock.release()
 
     def drop_all_tables(self):
         """Drop all tables (use with caution!)"""
