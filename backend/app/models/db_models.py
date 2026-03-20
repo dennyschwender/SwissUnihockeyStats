@@ -471,6 +471,10 @@ class PlayerStatistics(Base):
         # Unique per player+season+league (league_abbrev is never NULL; team_id was
         # previously used but is always NULL which lets SQLite store duplicates).
         Index("idx_stats_unique", "player_id", "season_id", "league_abbrev", unique=True),
+        # New: for league-level top-scorer queries (filter by season+league, sort by points)
+        Index("idx_stats_season_league_points", "season_id", "league_abbrev", "points"),
+        # New: for overall top-scorers aggregation (group by player within season)
+        Index("idx_stats_season_player", "season_id", "player_id"),
     )
 
 

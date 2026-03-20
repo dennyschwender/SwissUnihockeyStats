@@ -418,6 +418,16 @@ class DatabaseService:
                 )
             """))
 
+            # ── New composite indexes on player_statistics (idempotent) ─────────
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_stats_season_league_points "
+                "ON player_statistics (season_id, league_abbrev, points)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_stats_season_player "
+                "ON player_statistics (season_id, player_id)"
+            ))
+
             conn.commit()
             logger.debug("SQLite migrations applied")
 
