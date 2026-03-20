@@ -1,6 +1,6 @@
 // backend/static/js/admin/stats.js
 import { fetchJSON } from './utils.js';
-import { renderSeasons, isSeasonFiltered, setFreshnessMap, setSeasonFilter } from './seasons.js';
+import { renderSeasons, isSeasonFiltered, setFreshnessMap, setSeasonFilter, setCompletenessMap } from './seasons.js';
 
 /* =======================================================
    loadStats  — fetches /admin/api/stats + scheduler-diag,
@@ -8,9 +8,10 @@ import { renderSeasons, isSeasonFiltered, setFreshnessMap, setSeasonFilter } fro
 ======================================================= */
 export async function loadStats() {
   try {
-    const [statsR, diagR] = await Promise.all([
+    const [statsR, diagR, complR] = await Promise.all([
       fetch('/admin/api/stats'),
       fetch('/admin/api/scheduler-diag').catch(function() { return null; }),
+      fetch('/admin/api/seasons/completeness').catch(function() { return null; }),
     ]);
     if (!statsR.ok) throw new Error('HTTP ' + statsR.status);
     const d = await statsR.json();
@@ -42,6 +43,16 @@ export async function loadStats() {
     document.getElementById('t-games'  ).textContent = window.fmt(t.games);
     document.getElementById('t-gp'     ).textContent = window.fmt(t.game_players);
     document.getElementById('t-events' ).textContent = window.fmt(t.game_events);
+
+    // Load completeness data (best-effort)
+    if (complR && complR.ok) {
+      try {
+        const complD = await complR.json();
+        const complMap = {};
+        for (const row of (Array.isArray(complD) ? complD : (complD.seasons || []))) complMap[row.season_id] = row;
+        setCompletenessMap(complMap);
+      } catch (_) {}
+    }
 
     const visibleSeasons = (d.by_season || []).filter(function(s) { return !isSeasonFiltered(s.season_id); });
     renderSeasons(visibleSeasons);

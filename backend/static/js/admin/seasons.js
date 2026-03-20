@@ -6,6 +6,7 @@ import { fetchJSON } from './utils.js';
 ======================================================= */
 let _freshnessMap = {};
 let _seasonFilter = { min_season: null, excluded_seasons: [] };
+let _completenessMap = {};  // season_id -> completeness row
 
 /* task name -> entity_type (matches scheduler POLICIES) */
 const TASK_TO_ENTITY = {
@@ -20,6 +21,7 @@ const TASK_TO_ENTITY = {
 ======================================================= */
 export function setFreshnessMap(map) { _freshnessMap = map; }
 export function setSeasonFilter(filter) { _seasonFilter = filter; }
+export function setCompletenessMap(map) { _completenessMap = map; }
 
 /* =======================================================
    Season filter helper
@@ -77,7 +79,7 @@ function buildSeasonCard(s, isOpen) {
     '\n<div class="season-card' + currentCls + '">' +
     '\n  <div class="season-header" onclick="toggleSeason(' + sid + ')">' +
     '\n    <span class="season-year">' + year + currentBadge + '</span>' +
-    '\n    <div class="season-chips">' + summaryChips + buildCompletenessChip(s) + buildSeasonFreshSummary(sid) + '</div>' +
+    '\n    <div class="season-chips">' + summaryChips + buildCompletenessChip(s) + buildGamesCompleteness(sid) + buildFreezeStatusBadge(sid) + buildSeasonFreshSummary(sid) + '</div>' +
     '\n    <span class="chevron' + chevOpen + '" id="chv-' + sid + '">\u25b6</span>' +
     '\n  </div>' +
     '\n  <div class="season-body' + bodyOpen + '" id="sbody-' + sid + '" data-sid="' + sid + '">' +
@@ -101,6 +103,7 @@ function buildSeasonCard(s, isOpen) {
     '\n      <button class="btn btn-blue btn-sm"  onclick="triggerIndex(' + sid + ',\'leagues_path\',forceFor(' + sid + '))">&#9654; Leagues Path</button>' +
     '\n      <button class="btn btn-green btn-sm" onclick="triggerIndex(' + sid + ',\'full\',        forceFor(' + sid + '))">&#9889; Full Season</button>' +
     '\n      <button class="btn btn-sm ' + currentBtnCls + '" onclick="setCurrentSeason(' + sid + ', ' + s.is_current + ')" title="' + currentBtnTitle + '">' + currentBtnTxt + '</button>' +
+    '\n      ' + buildFreezeButton(sid) +
     '\n      <button class="btn btn-red btn-sm"   onclick="deleteLayer(' + sid + ',\'all\')">&#128465; Delete Season</button>' +
     '\n      <label>' +
     '\n        <input type="checkbox" id="force-' + sid + '">' +
@@ -198,6 +201,39 @@ function freshnessBadge(sid, task) {
   const tip = 'Next: ' + row.next_run + ' \u00b7 max age: ' + maxAgeStr;
   return '<span class="fresh-badge ' + cls + '" title="' + tip + '">' + lbl + '</span>'
        + '<span class="next-run-pill" title="' + tip + '">' + row.next_run + '</span>';
+}
+
+function buildGamesCompleteness(sid) {
+  const c = _completenessMap[sid];
+  if (!c) return '';
+  const total = c.games_total || 0;
+  if (total === 0) return '';
+  const finished = c.games_finished || 0;
+  const pct = c.games_pct || 0;
+  const check = pct === 100 ? ' \u2713' : '';
+  const tip = pct === 100 ? 'All games finished' : finished + ' of ' + total + ' games finished (' + pct + '%)';
+  const cls = pct === 100 ? 'ok' : (pct >= 80 ? 'warn' : '');
+  return '<span class="s-chip ' + cls + '" title="' + tip + '">' + finished + '/' + total + ' games' + check + '</span>';
+}
+
+function buildFreezeStatusBadge(sid) {
+  const c = _completenessMap[sid];
+  if (!c) return '';
+  if (c.is_frozen)
+    return '<span class="s-chip" style="background:#30363d;color:#8b949e;border-color:#484f58">\u2744 Frozen</span>';
+  if (c.is_complete)
+    return '<span class="s-chip ok" style="background:#1e3a1e;color:#3fb950;border-color:#238636">\u2705 Complete</span>';
+  return '';
+}
+
+function buildFreezeButton(sid) {
+  const c = _completenessMap[sid];
+  if (!c) return '';
+  if (c.is_frozen)
+    return '<button class="btn btn-sm" style="background:#21262d;border-color:#30363d;color:#8b949e" onclick="unfreezeSeason(' + sid + ')" title="Unfreeze season \u2014 scheduler will resume indexing">\u2744 Unfreeze</button>';
+  if (c.is_complete)
+    return '<button class="btn btn-sm" style="background:#1e3a1e;border-color:#238636;color:#3fb950" onclick="freezeSeason(' + sid + ')" title="Freeze season \u2014 scheduler will skip indexing">\u2744 Freeze</button>';
+  return '';
 }
 
 function buildCompletenessChip(s) {
@@ -372,6 +408,25 @@ async function deleteLayer(season, layer) {
 }
 
 /* =======================================================
+   Freeze / Unfreeze season
+======================================================= */
+async function freezeSeason(sid) {
+  const year = sid + '/' + String(sid + 1).slice(-2);
+  if (!confirm('Freeze season ' + year + '?\n\nThe scheduler will skip this season until it is unfrozen.')) return;
+  const d = await fetchJSON('/admin/api/season/' + sid + '/freeze', { method: 'POST' });
+  if (!d) { window.log('error', 'Failed: freeze request failed'); return; }
+  window.log('ok', '\u2744 Season ' + year + ' frozen');
+  window.loadStats();
+}
+async function unfreezeSeason(sid) {
+  const year = sid + '/' + String(sid + 1).slice(-2);
+  const d = await fetchJSON('/admin/api/season/' + sid + '/unfreeze', { method: 'POST' });
+  if (!d) { window.log('error', 'Failed: unfreeze request failed'); return; }
+  window.log('ok', '\u2b1c Season ' + year + ' unfrozen');
+  window.loadStats();
+}
+
+/* =======================================================
    Purge seasons
 ======================================================= */
 async function runPurge(forcePreview) {
@@ -417,4 +472,5 @@ Object.assign(window, {
   toggleSeason, setCurrentSeason, triggerIndex,
   triggerIndexTiered, triggerIndexEvents, deleteLayer,
   pullSeasons, runPurge, toggleEl,
+  freezeSeason, unfreezeSeason,
 });
