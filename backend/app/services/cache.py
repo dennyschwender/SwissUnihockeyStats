@@ -22,12 +22,12 @@ def get_cached(key: tuple) -> Any | None:
     """Return cached value if present and not expired, else None."""
     with _lock:
         entry = _cache.get(key)
-    if entry is None:
-        return None
-    value, stored_at = entry
-    if time.monotonic() - stored_at > _TTL:
-        return None
-    return value
+        if entry is None:
+            return None
+        value, stored_at = entry
+        if time.monotonic() - stored_at > _TTL:
+            return None
+        return value
 
 
 def set_cached(key: tuple, value: Any) -> None:
