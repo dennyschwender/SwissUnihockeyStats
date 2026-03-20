@@ -1,7 +1,6 @@
 """Tests for the in-memory TTL cache module."""
 import threading
 import time
-import pytest
 from unittest.mock import patch
 
 from app.services.cache import get_cached, set_cached, invalidate_prefix, _cache, _lock

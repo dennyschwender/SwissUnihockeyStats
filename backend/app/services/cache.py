@@ -26,6 +26,7 @@ def get_cached(key: tuple) -> Any | None:
             return None
         value, stored_at = entry
         if time.monotonic() - stored_at > _TTL:
+            del _cache[key]  # evict expired entry
             return None
         return value
 
