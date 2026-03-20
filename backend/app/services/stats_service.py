@@ -1189,28 +1189,35 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
             .all()
         )
 
+        # Batch-fetch primary team for all players in one query (replaces N+1 loop)
+        player_ids = [row[0] for row in stats]
+        all_ps_rows = (
+            session.query(
+                PlayerStatistics.player_id,
+                PlayerStatistics.team_name,
+                PlayerStatistics.team_id,
+                PlayerStatistics.league_abbrev,
+                PlayerStatistics.games_played,
+            )
+            .filter(
+                PlayerStatistics.player_id.in_(player_ids),
+                PlayerStatistics.season_id == season_id,
+            )
+            .all()
+        )
+        # Build lookup: player_id → row with highest games_played
+        ps_by_player: dict[int, Any] = {}
+        for ps_row in all_ps_rows:
+            pid = ps_row[0]
+            if pid not in ps_by_player or ps_row[4] > ps_by_player[pid][4]:
+                ps_by_player[pid] = ps_row
+
         result = []
         for i, (player_id, full_name, gp, g, a, pts, pim) in enumerate(stats, 1):
-            # For each player, find the team/league where they played most games
-            primary_stats = (
-                session.query(
-                    PlayerStatistics.team_name,
-                    PlayerStatistics.team_id,
-                    PlayerStatistics.league_abbrev,
-                    PlayerStatistics.games_played,
-                )
-                .filter(
-                    PlayerStatistics.player_id == player_id, PlayerStatistics.season_id == season_id
-                )
-                .order_by(PlayerStatistics.games_played.desc())
-                .first()
-            )
-
-            if primary_stats:
-                team_name, team_id, league_abbrev, _ = primary_stats
-            else:
-                team_name, team_id, league_abbrev = "Unknown", None, None
-
+            primary = ps_by_player.get(player_id)
+            team_name = primary[1] if primary else "Unknown"
+            team_id = primary[2] if primary else None
+            league_abbrev = primary[3] if primary else None
             result.append(
                 {
                     "rank": i,
