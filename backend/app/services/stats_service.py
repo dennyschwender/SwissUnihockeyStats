@@ -28,6 +28,7 @@ from app.models.db_models import (
     TeamPlayer,
 )
 from app.services.database import get_database_service
+from app.services.cache import get_cached, set_cached
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -433,6 +434,10 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
 
     Returns list of dicts sorted by pts DESC, gd DESC, gf DESC.
     """
+    cache_key = ("standings", db_league_id, tuple(sorted(only_group_ids or [])))
+    cached = get_cached(cache_key)
+    if cached is not None:
+        return cached
     db = get_database_service()
     with db.session_scope() as session:
         # Gather all group_ids for this league
@@ -607,6 +612,7 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
             row["rank"] = i
             row["gd"] = row["gf"] - row["ga"]
 
+        set_cached(cache_key, standings)
         return standings
 
 
@@ -632,6 +638,10 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
     league_abbrev is derived by stripping the gender prefix ("Herren "/"Damen ")
     from the DB league name so it matches what the API returns (e.g. "L-UPL").
     """
+    cache_key = ("league_scorers", db_league_id, limit)
+    cached = get_cached(cache_key)
+    if cached is not None:
+        return cached
     import re as _re
 
     db = get_database_service()
@@ -818,6 +828,7 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
                     "pen_match": getattr(ps, "pen_match", 0) or 0,
                 }
             )
+        set_cached(cache_key, result)
         return result
 
 
@@ -976,6 +987,10 @@ def get_league_top_penalties(db_league_id: int, limit: int = 100) -> list[dict]:
     primary path, 3-tier fallback) but orders by penalty_minutes DESC and
     only returns rows where penalty_minutes > 0.
     """
+    cache_key = ("league_penalties", db_league_id, limit)
+    cached = get_cached(cache_key)
+    if cached is not None:
+        return cached
     import re as _re
 
     db = get_database_service()
@@ -1141,6 +1156,7 @@ def get_league_top_penalties(db_league_id: int, limit: int = 100) -> list[dict]:
                     "pen_match": getattr(ps, "pen_match", 0) or 0,
                 }
             )
+        set_cached(cache_key, result)
         return result
 
 
@@ -1155,6 +1171,11 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
     from app.services.database import get_database_service
     from app.models.db_models import PlayerStatistics, Player, League
     from sqlalchemy import func
+
+    cache_key = ("top_scorers", season_id, limit)
+    cached = get_cached(cache_key)
+    if cached is not None:
+        return cached
 
     if season_id is None:
         from app.main import get_current_season
@@ -1251,6 +1272,7 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
                 }
             )
 
+        set_cached(cache_key, result)
         return result
 
 
