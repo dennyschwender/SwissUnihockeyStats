@@ -36,7 +36,9 @@ A season is **complete** when:
 2. All games are finished (`Game.status != 'finished'`, count == 0)
 3. No syncs are actively in-progress for this season (`SyncStatus.entity_id LIKE '%:{season_id}%' AND sync_status == 'in_progress'`, count == 0)
 
-Note: `SyncStatus` has no `season_id` FK — uses string `entity_id` like `"season:2025"`. The LIKE guard prevents freezing a season while a sync is actively running.
+Note: `SyncStatus` has no `season_id` FK — uses string `entity_id` like `"season:2025"`. The trailing-anchor LIKE pattern (`%:{season_id}`) prevents false matches (e.g. season_id=2 matching "2024"). The LIKE guard prevents freezing a season while a sync is actively running.
+
+**Known limitation:** Games that are permanently stuck at `status='scheduled'` (e.g. cancelled games the API never updates) will block auto-freeze. In that case the admin can use the manual Freeze button in the dashboard.
 
 Helper function `_is_season_complete(session, season_id: int) -> bool` in `scheduler.py`:
 
@@ -49,7 +51,7 @@ def _is_season_complete(session, season_id: int) -> bool:
         Game.season_id == season_id, Game.status != "finished"
     ).scalar()
     in_progress = session.query(SyncStatus).filter(
-        SyncStatus.entity_id.like(f"%:{season_id}%"),
+        SyncStatus.entity_id.like(f"%:{season_id}"),  # trailing anchor — avoids matching "2025" inside "2025123"
         SyncStatus.sync_status == "in_progress",
     ).count()
     return unfinished == 0 and in_progress == 0
@@ -70,21 +72,26 @@ if season is not None:
         return  # season is frozen — skip entirely
 ```
 
-**Change 2 — Auto-freeze in `refresh_queue()`:**
+**Change 2 — Auto-freeze after `refresh_queue()` completes:**
 
-After processing all policies, iterate non-current, non-frozen seasons. If `_is_season_complete()` returns True, set `is_frozen = True` and log:
+After the policy-iteration session_scope closes, open a **separate** `session_scope()` for the auto-freeze writes. This avoids holding a write lock open during the async yields in the policy loop:
 
 ```python
-for season_id in past_season_ids:
-    frozen = session.query(Season.is_frozen).filter(Season.id == season_id).scalar()
-    if frozen:
-        continue
-    if _is_season_complete(session, season_id):
-        session.query(Season).filter(Season.id == season_id).update({"is_frozen": True})
-        logger.info("Season %s auto-frozen (all games finished, no active syncs)", season_id)
+# Separate session_scope — do NOT nest inside the policy-iteration session
+with db_service.session_scope() as session:
+    past_seasons = session.query(Season).filter(
+        Season.highlighted == False, Season.is_frozen == False
+    ).all()
+    for season in past_seasons:
+        if _is_season_complete(session, season.id):
+            season.is_frozen = True
+            logger.info("Season %s auto-frozen (all games finished, no active syncs)", season.id)
+    # session_scope commits on exit — do NOT add session.commit() here
 ```
 
-This runs once per tick per non-frozen past season. Once frozen, the check never runs again for that season. Cost: 3 COUNT queries per past season per tick (every 5 minutes) — negligible.
+**Important:** Never add a manual `session.commit()` inside this block — `session_scope()` commits on exit. Exceptions propagate outside the `with` block per the session_scope contract.
+
+This runs once per tick. Once a season is frozen, it is excluded by the `is_frozen == False` filter and never checked again. Cost: 3 COUNT queries per non-frozen past season per tick — negligible.
 
 ### Part 4: Admin API Endpoints
 
