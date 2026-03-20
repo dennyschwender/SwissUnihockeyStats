@@ -68,6 +68,40 @@ def test_cache_key_with_tuple_arg():
     assert get_cached(key_b) is None
 
 
+class TestStatsCacheFunctions:
+    """get_upcoming_games and get_latest_results use the TTL cache."""
+
+    def test_get_upcoming_games_returns_cached_on_second_call(self, app):
+        """Second call returns the cached result without hitting the DB again."""
+        from app.services.stats_service import get_upcoming_games
+        from app.services import cache as _cache
+
+        # Prime cache with a fake entry for this key
+        key = ("upcoming_games", 2025, None, 12)
+        fake = [{"id": 999}]
+        _cache.set_cached(key, fake)
+
+        result = get_upcoming_games(limit=12, season_id=2025)
+        assert result == fake
+
+        # Cleanup
+        _cache.invalidate_prefix("upcoming_games")
+
+    def test_get_latest_results_returns_cached_on_second_call(self, app):
+        """Second call returns the cached result without hitting the DB again."""
+        from app.services.stats_service import get_latest_results
+        from app.services import cache as _cache
+
+        key = ("latest_results", 2025, None, 12)
+        fake = [{"id": 888, "home_team": "A", "away_team": "B"}]
+        _cache.set_cached(key, fake)
+
+        result = get_latest_results(limit=12, season_id=2025)
+        assert result == fake
+
+        _cache.invalidate_prefix("latest_results")
+
+
 def test_thread_safety_concurrent_set_and_invalidate():
     """Concurrent set from one thread and invalidate from another must not raise."""
     _clear_cache()

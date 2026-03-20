@@ -1688,6 +1688,8 @@ class DataIndexer:
             invalidate_prefix("standings")
             invalidate_prefix("league_scorers")
             invalidate_prefix("league_penalties")
+            invalidate_prefix("upcoming_games")
+            invalidate_prefix("latest_results")
             return count
 
     def index_game_events(
@@ -3053,6 +3055,8 @@ class DataIndexer:
             games_refreshed,
             transitioned,
         )
+        invalidate_prefix("upcoming_games")
+        invalidate_prefix("latest_results")
         return transitioned
 
     def _fetch_and_store_game_data(self, game, session) -> None:

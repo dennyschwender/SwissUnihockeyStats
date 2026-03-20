@@ -2154,10 +2154,16 @@ def get_upcoming_games(
     from datetime import date as _date
 
     db = get_database_service()
-    with db.session_scope() as session:
-        if season_id is None:
+    if season_id is None:
+        with db.session_scope() as session:
             season_id = _get_current_season_id(session)
 
+    key = ("upcoming_games", season_id, league_category, limit)
+    cached = get_cached(key)
+    if cached is not None:
+        return cached
+
+    with db.session_scope() as session:
         today = _date.today()
         q = session.query(Game).filter(
             Game.season_id == season_id,
@@ -2190,6 +2196,7 @@ def get_upcoming_games(
         games_raw = q.order_by(Game.game_date.asc()).limit(limit).all()
 
         if not games_raw:
+            set_cached(key, [])
             return []
 
         team_ids = {g.home_team_id for g in games_raw} | {g.away_team_id for g in games_raw}
@@ -2227,7 +2234,7 @@ def get_upcoming_games(
             label_parts = [p for p in [mw, lg_short] if p]
             grp_label[grp.id] = " - ".join(label_parts)
 
-        return [
+        result = [
             {
                 "game_id": g.id,
                 "date": g.game_date.strftime("%d.%m") if g.game_date else "",
@@ -2244,6 +2251,8 @@ def get_upcoming_games(
             }
             for g in games_raw
         ]
+        set_cached(key, result)
+        return result
 
 
 def get_schedule(
@@ -2387,10 +2396,16 @@ def get_latest_results(
     from datetime import date as _date
 
     db = get_database_service()
-    with db.session_scope() as session:
-        if season_id is None:
+    if season_id is None:
+        with db.session_scope() as session:
             season_id = _get_current_season_id(session)
 
+    key = ("latest_results", season_id, league_category, limit)
+    cached = get_cached(key)
+    if cached is not None:
+        return cached
+
+    with db.session_scope() as session:
         today = _date.today()
         q = session.query(Game).filter(
             Game.season_id == season_id,
@@ -2423,6 +2438,7 @@ def get_latest_results(
         games_raw = q.order_by(Game.game_date.desc()).limit(limit).all()
 
         if not games_raw:
+            set_cached(key, [])
             return []
 
         team_ids = {g.home_team_id for g in games_raw} | {g.away_team_id for g in games_raw}
@@ -2460,7 +2476,7 @@ def get_latest_results(
             label_parts = [p for p in [mw, lg_short] if p]
             grp_label[grp.id] = " - ".join(label_parts)
 
-        return [
+        result = [
             {
                 "game_id": g.id,
                 "date": g.game_date.strftime("%d.%m") if g.game_date else "",
@@ -2479,6 +2495,8 @@ def get_latest_results(
             }
             for g in games_raw
         ]
+        set_cached(key, result)
+        return result
 
 
 # ---------------------------------------------------------------------------
