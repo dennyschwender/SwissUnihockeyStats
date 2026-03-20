@@ -30,6 +30,7 @@ from app.models.db_models import (
     PlayerStatistics,
     SyncStatus,
 )
+from app.services.cache import invalidate_prefix
 from app.services.swissunihockey import get_swissunihockey_client
 from app.services.database import get_database_service
 from app.services.local_stats_aggregator import (
@@ -1235,6 +1236,8 @@ class DataIndexer:
         if on_progress:
             on_progress(100)
         logger.info("✓ Indexed %d player stat rows for season %s%s", count, season_id, tier_lbl)
+        # Invalidate cached top scorers — fresh player stats just written
+        invalidate_prefix("top_scorers")
         return count
 
     def compute_player_stats_for_season(
@@ -1681,6 +1684,10 @@ class DataIndexer:
                 f"✓ Indexed {count} games for league {league_id} "
                 f"group={group_name!r} ({len(visited_rounds)} rounds)"
             )
+            # Invalidate cached standings/scorers — fresh data just written
+            invalidate_prefix("standings")
+            invalidate_prefix("league_scorers")
+            invalidate_prefix("league_penalties")
             return count
 
     def index_game_events(
