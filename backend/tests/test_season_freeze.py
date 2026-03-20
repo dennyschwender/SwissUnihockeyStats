@@ -172,6 +172,10 @@ class TestAdminFreezeEndpoints:
         resp = admin_client.post("/admin/api/season/99999/freeze")
         assert resp.status_code == 404
 
+    def test_unfreeze_404_on_missing_season(self, admin_client, app):
+        resp = admin_client.post("/admin/api/season/99999/unfreeze")
+        assert resp.status_code == 404
+
     def test_completeness_contains_is_frozen_field(self, admin_client, app):
         from app.services.database import get_database_service
         from app.models.db_models import Season
@@ -192,6 +196,9 @@ class TestAdminFreezeEndpoints:
             assert "games_finished" in entry
             assert "games_pct" in entry
             assert "is_complete" in entry
+            assert "season_id" in entry
+            assert "text" in entry
+            assert "is_current" in entry
         finally:
             with db.session_scope() as session:
                 session.query(Season).filter(Season.id == 6003).delete()
