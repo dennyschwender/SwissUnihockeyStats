@@ -1587,6 +1587,74 @@ async def admin_delete_season_layer(
     return {"ok": True, "season_id": season_id, "layer": layer, "deleted": totals}
 
 
+@app.get("/admin/api/seasons/completeness")
+async def admin_seasons_completeness(_: None = Depends(require_admin)):
+    """Return completeness data for all seasons."""
+    from app.services.database import get_database_service
+    from app.models.db_models import Season, Game
+    from app.services.scheduler import _is_season_complete
+    from sqlalchemy import func
+
+    db = get_database_service()
+    result = []
+    with db.session_scope() as session:
+        seasons = session.query(Season).order_by(Season.id.desc()).all()
+        for s in seasons:
+            games_total = (
+                session.query(func.count(Game.id))
+                .filter(Game.season_id == s.id)
+                .scalar()
+            ) or 0
+            games_finished = (
+                session.query(func.count(Game.id))
+                .filter(Game.season_id == s.id, Game.status == "finished")
+                .scalar()
+            ) or 0
+            games_pct = int(games_finished * 100 / games_total) if games_total else 0
+            is_complete = _is_season_complete(session, s.id)
+            result.append({
+                "season_id": s.id,
+                "text": s.text or str(s.id),
+                "is_current": bool(s.highlighted),
+                "is_frozen": bool(s.is_frozen),
+                "games_total": games_total,
+                "games_finished": games_finished,
+                "games_pct": games_pct,
+                "is_complete": is_complete,
+            })
+    return result
+
+
+@app.post("/admin/api/season/{season_id}/freeze")
+async def admin_freeze_season(season_id: int, _: None = Depends(require_admin)):
+    """Mark a season as frozen — scheduler will skip it."""
+    from app.services.database import get_database_service
+    from app.models.db_models import Season
+
+    db = get_database_service()
+    with db.session_scope() as session:
+        s = session.query(Season).filter(Season.id == season_id).first()
+        if not s:
+            raise HTTPException(status_code=404, detail=f"Season {season_id} not found")
+        s.is_frozen = True
+    return {"ok": True, "season_id": season_id, "is_frozen": True}
+
+
+@app.post("/admin/api/season/{season_id}/unfreeze")
+async def admin_unfreeze_season(season_id: int, _: None = Depends(require_admin)):
+    """Unfreeze a season — scheduler will resume processing it."""
+    from app.services.database import get_database_service
+    from app.models.db_models import Season
+
+    db = get_database_service()
+    with db.session_scope() as session:
+        s = session.query(Season).filter(Season.id == season_id).first()
+        if not s:
+            raise HTTPException(status_code=404, detail=f"Season {season_id} not found")
+        s.is_frozen = False
+    return {"ok": True, "season_id": season_id, "is_frozen": False}
+
+
 @app.get("/admin/api/scheduler")
 async def admin_scheduler_status(_: None = Depends(require_admin)):
     """Return the scheduler queue and recent history."""

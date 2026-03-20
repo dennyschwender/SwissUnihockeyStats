@@ -111,3 +111,87 @@ class TestIsSeasonComplete:
         with db.session_scope() as session:
             result = _is_season_complete(session, 4)
         assert result is True
+
+
+class TestAdminFreezeEndpoints:
+    """Admin freeze/unfreeze/completeness endpoints."""
+
+    def test_completeness_returns_list(self, admin_client, app):
+        resp = admin_client.get("/admin/api/seasons/completeness")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+
+    def test_freeze_endpoint(self, admin_client, app):
+        from app.services.database import get_database_service
+        from app.models.db_models import Season
+
+        db = get_database_service()
+        with db.session_scope() as session:
+            s = Season(id=6001, text="6001/xx", highlighted=False, is_frozen=False)
+            session.add(s)
+
+        try:
+            resp = admin_client.post("/admin/api/season/6001/freeze")
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["ok"] is True
+            assert body["is_frozen"] is True
+
+            with db.session_scope() as session:
+                s = session.query(Season).filter(Season.id == 6001).one()
+                assert s.is_frozen is True
+        finally:
+            with db.session_scope() as session:
+                session.query(Season).filter(Season.id == 6001).delete()
+
+    def test_unfreeze_endpoint(self, admin_client, app):
+        from app.services.database import get_database_service
+        from app.models.db_models import Season
+
+        db = get_database_service()
+        with db.session_scope() as session:
+            s = Season(id=6002, text="6002/xx", highlighted=False, is_frozen=True)
+            session.add(s)
+
+        try:
+            resp = admin_client.post("/admin/api/season/6002/unfreeze")
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["ok"] is True
+            assert body["is_frozen"] is False
+
+            with db.session_scope() as session:
+                s = session.query(Season).filter(Season.id == 6002).one()
+                assert s.is_frozen is False
+        finally:
+            with db.session_scope() as session:
+                session.query(Season).filter(Season.id == 6002).delete()
+
+    def test_freeze_404_on_missing_season(self, admin_client, app):
+        resp = admin_client.post("/admin/api/season/99999/freeze")
+        assert resp.status_code == 404
+
+    def test_completeness_contains_is_frozen_field(self, admin_client, app):
+        from app.services.database import get_database_service
+        from app.models.db_models import Season
+
+        db = get_database_service()
+        with db.session_scope() as session:
+            s = Season(id=6003, text="6003/xx", highlighted=False, is_frozen=False)
+            session.add(s)
+
+        try:
+            resp = admin_client.get("/admin/api/seasons/completeness")
+            assert resp.status_code == 200
+            data = resp.json()
+            entry = next((d for d in data if d["season_id"] == 6003), None)
+            assert entry is not None
+            assert "is_frozen" in entry
+            assert "games_total" in entry
+            assert "games_finished" in entry
+            assert "games_pct" in entry
+            assert "is_complete" in entry
+        finally:
+            with db.session_scope() as session:
+                session.query(Season).filter(Season.id == 6003).delete()
