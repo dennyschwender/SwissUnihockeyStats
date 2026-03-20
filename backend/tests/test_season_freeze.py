@@ -14,5 +14,7 @@ class TestSeasonModel:
             session.add(s)
         with db.session_scope() as session:
             s = session.query(Season).filter(Season.id == 9000).one()
-            assert s.is_frozen is False
-            session.delete(s)
+            try:
+                assert s.is_frozen is False
+            finally:
+                session.delete(s)
