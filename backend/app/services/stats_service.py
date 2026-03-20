@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from sqlalchemy import and_, case, func, or_
+from sqlalchemy.orm import joinedload
 
 from app.models.db_models import (
     Game,
@@ -435,7 +436,12 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
     db = get_database_service()
     with db.session_scope() as session:
         # Gather all group_ids for this league
-        league = session.query(League).filter(League.id == db_league_id).first()
+        league = (
+            session.query(League)
+            .options(joinedload(League.groups))
+            .filter(League.id == db_league_id)
+            .first()
+        )
         if league is None:
             return []
 
@@ -630,7 +636,12 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
 
     db = get_database_service()
     with db.session_scope() as session:
-        league = session.query(League).filter(League.id == db_league_id).first()
+        league = (
+            session.query(League)
+            .options(joinedload(League.groups))
+            .filter(League.id == db_league_id)
+            .first()
+        )
         if league is None:
             return []
 
@@ -969,7 +980,12 @@ def get_league_top_penalties(db_league_id: int, limit: int = 100) -> list[dict]:
 
     db = get_database_service()
     with db.session_scope() as session:
-        league = session.query(League).filter(League.id == db_league_id).first()
+        league = (
+            session.query(League)
+            .options(joinedload(League.groups))
+            .filter(League.id == db_league_id)
+            .first()
+        )
         if league is None:
             return []
 
