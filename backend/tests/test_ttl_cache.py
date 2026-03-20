@@ -71,6 +71,9 @@ def test_cache_key_with_tuple_arg():
 class TestStatsCacheFunctions:
     """get_upcoming_games and get_latest_results use the TTL cache."""
 
+    def setup_method(self):
+        _clear_cache()
+
     def test_get_upcoming_games_returns_cached_on_second_call(self, app):
         """Second call returns the cached result without hitting the DB again."""
         from app.services.stats_service import get_upcoming_games
