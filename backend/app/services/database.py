@@ -428,6 +428,11 @@ class DatabaseService:
                 "ON player_statistics (season_id, player_id)"
             ))
 
+            # ── Add is_frozen to seasons ─────────────────────────────────────
+            season_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(seasons)"))}
+            if "is_frozen" not in season_cols:
+                conn.execute(text("ALTER TABLE seasons ADD COLUMN is_frozen INTEGER NOT NULL DEFAULT 0"))
+
             conn.commit()
             logger.debug("SQLite migrations applied")
 

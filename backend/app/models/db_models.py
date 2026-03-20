@@ -42,6 +42,7 @@ class Season(Base):
     highlighted: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
     last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
     last_full_sync: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    is_frozen: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="0")
 
     # Relationships
     clubs = relationship("Club", back_populates="season", cascade="all, delete-orphan")
