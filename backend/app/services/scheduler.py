@@ -383,6 +383,46 @@ class JobRecord:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Season-freeze helper
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _is_season_complete(session, season_id: int) -> bool:
+    """Return True when a past season has all games finished and no active syncs.
+
+    Three conditions must all hold:
+    1. The season has at least one game (data exists).
+    2. Every game has status == 'finished' (no scheduled or live games remain).
+    3. No SyncStatus row for this season is in_progress (no active sync running).
+
+    The LIKE pattern uses a trailing anchor (%:{season_id}) — no trailing %
+    — to avoid season_id=4 matching entity_id "leagues:8004".
+    """
+    from app.models.db_models import Game, SyncStatus
+    from sqlalchemy import func
+
+    total = session.query(func.count(Game.id)).filter(Game.season_id == season_id).scalar()
+    if not total:
+        return False
+    unfinished = (
+        session.query(func.count(Game.id))
+        .filter(Game.season_id == season_id, Game.status != "finished")
+        .scalar()
+    )
+    if unfinished:
+        return False
+    in_progress = (
+        session.query(SyncStatus)
+        .filter(
+            SyncStatus.entity_id.like(f"%:{season_id}"),
+            SyncStatus.sync_status == "in_progress",
+        )
+        .count()
+    )
+    return in_progress == 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Scheduler
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -822,6 +862,28 @@ class Scheduler:
         except Exception as exc:
             logger.error("[scheduler] refresh_queue error: %s", exc, exc_info=True)
 
+        # ── Auto-freeze past seasons whose data is complete ───────────────────
+        try:
+            from app.services.database import get_database_service
+            from app.models.db_models import Season
+
+            db_service = get_database_service()
+            with db_service.session_scope() as session:
+                past_seasons = session.query(Season).filter(
+                    Season.highlighted == False,  # noqa: E712
+                    Season.is_frozen == False,    # noqa: E712
+                ).all()
+                for s in past_seasons:
+                    if _is_season_complete(session, s.id):
+                        s.is_frozen = True
+                        logger.info(
+                            "[scheduler] Season %s auto-frozen (all games finished, no active syncs)",
+                            s.id,
+                        )
+                # session_scope commits on exit — do NOT add session.commit() here
+        except Exception as exc:
+            logger.error("[scheduler] auto-freeze error: %s", exc, exc_info=True)
+
     def _maybe_schedule(
         self,
         session,
@@ -835,6 +897,13 @@ class Scheduler:
         once a completed sync exists their data never changes, so we skip
         rescheduling to avoid thousands of redundant API calls per day.
         """
+        # Skip frozen seasons entirely — no jobs, no DB queries
+        if season is not None:
+            from app.models.db_models import Season as _Season
+            frozen = session.query(_Season.is_frozen).filter(_Season.id == season).scalar()
+            if frozen:
+                return
+
         key = (policy["name"], season)
 
         # Don't double-queue

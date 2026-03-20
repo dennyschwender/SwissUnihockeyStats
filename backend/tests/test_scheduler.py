@@ -487,3 +487,50 @@ async def test_fresh_sync_status_not_requeued_on_restart(scheduler):
     check_now = _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None)
     due_now = [j.policy_name for j in scheduler._queue if j.run_at <= check_now]
     assert len(due_now) == 0, f"Expected no immediately-due jobs, got {len(due_now)}: {due_now}"
+
+
+class TestSeasonFreezeScheduler:
+    """Frozen seasons are skipped by _maybe_schedule."""
+
+    def test_maybe_schedule_skips_frozen_season(self, scheduler, app):
+        """_maybe_schedule returns without enqueuing when season.is_frozen is True."""
+        from app.services.database import get_database_service
+        from app.models.db_models import Season
+
+        db = get_database_service()
+        with db.session_scope() as session:
+            s = Season(id=7001, text="7001/xx", highlighted=False, is_frozen=True)
+            session.add(s)
+
+        policy = next(p for p in POLICIES if p["scope"] == "season")
+        queue_before = len(scheduler._queue)
+
+        with db.session_scope() as session:
+            scheduler._maybe_schedule(session, policy, season=7001, is_current_season=False)
+
+        assert len(scheduler._queue) == queue_before  # nothing enqueued
+
+        with db.session_scope() as session:
+            session.query(Season).filter(Season.id == 7001).delete()
+
+    def test_maybe_schedule_does_not_skip_unfrozen_season(self, scheduler, app):
+        """_maybe_schedule proceeds normally for unfrozen seasons."""
+        from app.services.database import get_database_service
+        from app.models.db_models import Season
+
+        db = get_database_service()
+        with db.session_scope() as session:
+            s = Season(id=7002, text="7002/xx", highlighted=True, is_frozen=False)
+            session.add(s)
+
+        policy = next(p for p in POLICIES if p["scope"] == "season" and not p.get("current_only"))
+        queue_before = len(scheduler._queue)
+
+        with db.session_scope() as session:
+            scheduler._maybe_schedule(session, policy, season=7002, is_current_season=True)
+
+        assert len(scheduler._queue) > queue_before
+
+        scheduler._queue.clear()
+        with db.session_scope() as session:
+            session.query(Season).filter(Season.id == 7002).delete()
