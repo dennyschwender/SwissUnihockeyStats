@@ -14,6 +14,7 @@ services:
       - TZ=Europe/Zurich
       - DATABASE_PATH=/app/data/swissunihockey.db
       - SWISSUNIHOCKEY_CACHE_DIR=/app/data/cache
+      - DATA_DIR=/app/data
 
     volumes:
       - ./data:/app/data

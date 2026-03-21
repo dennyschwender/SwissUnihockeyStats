@@ -5,6 +5,7 @@ SEASONS → CLUBS → TEAMS → PLAYERS
 SEASONS → LEAGUES → GROUPS → GAMES → PLAYERS
 """
 
+import hashlib
 import logging
 import re
 import threading
@@ -57,6 +58,11 @@ class _PlayerStatsFetchResult:
     player_id: int
     raw_data: dict = field(default_factory=dict)
     api_error: bool = False  # True only for HTTP 5xx — increments skip counter
+
+
+def _stable_group_key(s: str) -> int:
+    """Deterministic integer key from a string, stable across processes."""
+    return int(hashlib.md5(s.encode()).hexdigest()[:8], 16)
 
 
 def _phase_from_slider_text(slider_text: str) -> str:
@@ -1403,7 +1409,7 @@ class DataIndexer:
                     group_name = entry.get("text", "") or ctx.get("group", "")
                     # Use a stable integer key: hash the string group name
                     # (the API doesn't give a numeric group ID directly)
-                    group_key = abs(hash(f"{league_db_id}:{group_name}")) % (10**9)
+                    group_key = _stable_group_key(f"{league_db_id}:{group_name}")
 
                     grp = (
                         session.query(LeagueGroup)
@@ -1570,7 +1576,7 @@ class DataIndexer:
                 cache_key = f"{league_db_id}:{group_name or ''}:{phase}"
                 if cache_key in _phase_group_cache:
                     return _phase_group_cache[cache_key]
-                _gk = abs(hash(cache_key)) % (10**9)
+                _gk = _stable_group_key(cache_key)
                 _grp = (
                     session.query(LeagueGroup)
                     .filter(
@@ -2326,12 +2332,12 @@ class DataIndexer:
 
             # 4. Index games – one API call per group so all divisions are fetched
             with self.db_service.session_scope() as _gs:
-                group_rows = [
-                    (grp.id, grp.name)
-                    for grp in _gs.query(LeagueGroup)
-                    .filter(LeagueGroup.league_id == league_db_id)
-                    .all()
-                ]
+                _seen_names: set[str] = set()
+                group_rows = []
+                for grp in _gs.query(LeagueGroup).filter(LeagueGroup.league_id == league_db_id).all():
+                    if grp.name not in _seen_names:
+                        _seen_names.add(grp.name)
+                        group_rows.append((grp.id, grp.name))
             # Fall back to a single ungrouped call if no groups were stored
             if not group_rows:
                 group_rows = [(None, None)]
@@ -3002,12 +3008,12 @@ class DataIndexer:
         games_refreshed = 0
         for league_db_id, league_id, game_class in league_rows:
             with self.db_service.session_scope() as _gs:
-                group_rows = [
-                    (grp.id, grp.name)
-                    for grp in _gs.query(LeagueGroup)
-                    .filter(LeagueGroup.league_id == league_db_id)
-                    .all()
-                ]
+                _seen_names2: set[str] = set()
+                group_rows = []
+                for grp in _gs.query(LeagueGroup).filter(LeagueGroup.league_id == league_db_id).all():
+                    if grp.name not in _seen_names2:
+                        _seen_names2.add(grp.name)
+                        group_rows.append((grp.id, grp.name))
             if not group_rows:
                 group_rows = [(None, None)]
             for grp_db_id, grp_name in group_rows:

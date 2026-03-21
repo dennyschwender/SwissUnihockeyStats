@@ -660,5 +660,60 @@ def repair():
     click.echo("\nDone.")
 
 
+@cli.command("repair-groups")
+def repair_groups():
+    """Deduplicate league_group rows caused by non-deterministic hash() keys.
+
+    For each (league_id, name) pair with duplicates, keeps the row whose
+    group_id matches the new deterministic md5-based key (or the one with the
+    lowest primary key id if none match), remaps game FKs, then deletes the
+    rest. Safe to run multiple times.
+    """
+    import hashlib
+    from collections import defaultdict
+    from app.services.database import get_db_service
+    from app.models.db_models import LeagueGroup, Game
+
+    def _stable_group_key(s: str) -> int:
+        return int(hashlib.md5(s.encode()).hexdigest()[:8], 16)
+
+    db = get_db_service()
+    with db.session_scope() as session:
+        all_groups = session.query(LeagueGroup).order_by(LeagueGroup.id).all()
+
+        # Group by (league_id, name)
+        buckets: dict = defaultdict(list)
+        for grp in all_groups:
+            buckets[(grp.league_id, grp.name or "")].append(grp)
+
+        duplicates = {k: v for k, v in buckets.items() if len(v) > 1}
+        click.echo(f"Found {len(duplicates)} (league_id, name) pairs with duplicates.")
+
+        total_deleted = 0
+        total_remapped = 0
+
+        for (league_id, name), rows in duplicates.items():
+            correct_key = _stable_group_key(f"{league_id}:{name}")
+            # Prefer the row whose group_id matches the new deterministic key
+            keeper = next((r for r in rows if r.group_id == correct_key), rows[0])
+            to_delete = [r for r in rows if r.id != keeper.id]
+
+            # Remap game FKs to keeper
+            for dup in to_delete:
+                remapped = (
+                    session.query(Game)
+                    .filter(Game.group_id == dup.id)
+                    .update({"group_id": keeper.id}, synchronize_session="fetch")
+                )
+                total_remapped += remapped
+                session.delete(dup)
+                total_deleted += 1
+
+        click.echo(f"Remapped {total_remapped} game FK(s).")
+        click.echo(f"Deleted {total_deleted} duplicate LeagueGroup row(s).")
+
+    click.echo("Done.")
+
+
 if __name__ == "__main__":
     cli()
