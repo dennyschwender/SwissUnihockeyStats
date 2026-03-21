@@ -671,13 +671,13 @@ def repair_groups():
     """
     import hashlib
     from collections import defaultdict
-    from app.services.database import get_db_service
+    from app.services.database import get_database_service
     from app.models.db_models import LeagueGroup, Game
 
     def _stable_group_key(s: str) -> int:
         return int(hashlib.md5(s.encode()).hexdigest()[:8], 16)
 
-    db = get_db_service()
+    db = get_database_service()
     with db.session_scope() as session:
         all_groups = session.query(LeagueGroup).order_by(LeagueGroup.id).all()
 
