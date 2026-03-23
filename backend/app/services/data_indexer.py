@@ -3086,11 +3086,50 @@ class DataIndexer:
                 game.completeness_checked_at = now
                 transitioned += 1
 
+        # ── Phase 3: check detail endpoint for cancellations ──────────────────
+        # Cancelled games disappear from the rounds list, so the list-based
+        # refresh above will never see the cancellation. Check the detail endpoint
+        # for any upcoming game whose scheduled date is within the next 3 days
+        # (or already past) and still has no score.
+        cancelled_count = 0
+        check_window = now + timedelta(days=3)
+        with self.db_service.session_scope() as session:
+            to_check = (
+                session.query(Game)
+                .filter(
+                    Game.season_id == season_id,
+                    Game.completeness_status == "upcoming",
+                    Game.home_score.is_(None),
+                    Game.game_date.isnot(None),
+                    Game.game_date <= check_window.replace(tzinfo=None),
+                )
+                .all()
+            )
+            for game in to_check:
+                try:
+                    detail = self.client.get_game_details(game.id)
+                    cells = [
+                        str(c["text"][0]).strip()
+                        for region in detail.get("data", {}).get("regions", [])
+                        for row in region.get("rows", [])
+                        for c in row.get("cells", [])
+                        if isinstance(c.get("text"), list) and c["text"]
+                    ]
+                    if any(v.strip().lower() in ("abgesagt", "cancelled", "annulé", "annullato")
+                           for v in cells):
+                        game.status = "cancelled"
+                        game.completeness_status = "cancelled"
+                        cancelled_count += 1
+                        logger.info("[upcoming_games] game %s marked cancelled via detail", game.id)
+                except Exception:
+                    pass
+
         logger.info(
-            "[upcoming_games] season=%s refreshed=%d games, transitioned=%d to post_game",
+            "[upcoming_games] season=%s refreshed=%d games, transitioned=%d to post_game, %d cancelled",
             season_id,
             games_refreshed,
             transitioned,
+            cancelled_count,
         )
         invalidate_prefix("upcoming_games")
         invalidate_prefix("latest_results")
