@@ -90,7 +90,8 @@
     "no_games": "Nessuna partita trovata",
     "no_games_filtered": "Nessuna partita trovata per questo filtro",
     "count_suffix": "partite",
-    "upcoming_short": "in arrivo"
+    "upcoming_short": "in arrivo",
+    "cancelled_short": "annullato"
   },
   "rankings": {
     "title": "Classifiche",

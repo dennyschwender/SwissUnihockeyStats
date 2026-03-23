@@ -90,7 +90,8 @@
     "no_games": "Keine Spiele gefunden",
     "no_games_filtered": "Keine Spiele für diesen Filter gefunden",
     "count_suffix": "Spiele",
-    "upcoming_short": "bevorstehend"
+    "upcoming_short": "bevorstehend",
+    "cancelled_short": "abgesagt"
   },
   "rankings": {
     "title": "Ranglisten",

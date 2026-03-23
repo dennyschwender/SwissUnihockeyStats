@@ -90,7 +90,8 @@
     "no_games": "Aucun match trouvé",
     "no_games_filtered": "Aucun match trouvé pour ce filtre",
     "count_suffix": "matchs",
-    "upcoming_short": "à venir"
+    "upcoming_short": "à venir",
+    "cancelled_short": "annulé"
   },
   "rankings": {
     "title": "Classements",

@@ -3516,6 +3516,7 @@ def get_playoff_series_for_game(game_id: int) -> dict | None:
                 _ta_wins = _tb_wins = 0
                 _games_list: list[dict] = []
                 for _g in _sorted:
+                    _cancelled = _g.status == "cancelled"
                     _played = _g.home_score is not None
                     if _played:
                         _home_wins = _g.home_score > _g.away_score
@@ -3541,6 +3542,7 @@ def get_playoff_series_for_game(game_id: int) -> dict | None:
                             "home_score": _g.home_score,
                             "away_score": _g.away_score,
                             "played": _played,
+                            "cancelled": _cancelled,
                             "is_current": _g.id == game_id,
                         }
                     )

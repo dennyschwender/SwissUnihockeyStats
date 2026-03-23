@@ -1041,13 +1041,16 @@ function gameTimeline(events, totalSeconds) {
                      :style="'display:flex;align-items:center;justify-content:space-between;padding:.4rem 1rem;cursor:' + (g.game_id ? 'pointer' : 'default') + ';' + (g.is_current ? 'background:var(--primary-50,#fef2f2);border-left:3px solid var(--swiss-red);font-weight:600;' : (hov ? 'background:var(--gray-50);' : ''))">
                   <div style="display:flex;align-items:center;gap:.6rem;min-width:0;flex:1;">
                     <span style="font-size:.72rem;color:var(--gray-400);white-space:nowrap;" x-text="g.weekday + ' ' + g.date"></span>
-                    <span style="font-size:.82rem;font-weight:500;color:var(--gray-700);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="g.home_team + ' – ' + g.away_team"></span>
+                    <span :style="'font-size:.82rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' + (g.cancelled ? 'color:var(--gray-400);text-decoration:line-through;' : 'color:var(--gray-700);')" x-text="g.home_team + ' – ' + g.away_team"></span>
                   </div>
                   <div style="white-space:nowrap;margin-left:.75rem;">
                     <template x-if="g.played">
                       <span style="font-size:.9rem;font-weight:700;color:var(--gray-900);" x-text="g.home_score + ':' + g.away_score"></span>
                     </template>
-                    <template x-if="!g.played">
+                    <template x-if="!g.played && g.cancelled">
+                      <span style="font-size:.72rem;color:var(--gray-400);font-style:italic;text-decoration:line-through;">{{ t.games.cancelled_short }}</span>
+                    </template>
+                    <template x-if="!g.played && !g.cancelled">
                       <span style="font-size:.72rem;color:var(--gray-400);font-style:italic;">{{ t.games.upcoming_short }}</span>
                     </template>
                   </div>
