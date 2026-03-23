@@ -155,7 +155,7 @@ Production runs on `pi4desk` at `/home/denny/dockerimages/SwissUnihockeyStats/`.
 
 ```bash
 # Correct deploy (rebuilds image, force-recreates container)
-docker build --no-cache -t swissunihockey:latest . && docker compose up -d --force-recreate
+docker compose build --no-cache && docker compose up -d --force-recreate
 
 # Do NOT use docker restart — it reuses old container layers
 ```
