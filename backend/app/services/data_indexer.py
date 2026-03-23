@@ -129,18 +129,28 @@ def _parse_game_rows(regions: list) -> list[dict]:
                 dt_lower = date_text.strip().lower()
                 if dt_lower in ("abgesagt", "cancelled", "annulé", "annullato"):
                     game_cancelled = True
-                elif dt_lower in _RELATIVE_DAYS:
-                    delta = _RELATIVE_DAYS[dt_lower]
-                    game_date = datetime.now() + timedelta(days=delta)
-                    game_date = game_date.replace(hour=0, minute=0, second=0, microsecond=0)
                 else:
-                    for fmt in ("%d.%m.%Y %H:%M", "%d.%m.%y %H:%M"):
+                    # Check if date starts with a relative word (e.g. "gestern 18:00")
+                    _rel_word = dt_lower.split()[0] if dt_lower else ""
+                    if _rel_word in _RELATIVE_DAYS:
+                        delta = _RELATIVE_DAYS[_rel_word]
+                        game_date = datetime.now() + timedelta(days=delta)
+                        # Try to extract time from remainder (e.g. "gestern 18:00")
+                        _time_part = dt_lower[len(_rel_word):].strip()
                         try:
-                            game_date = datetime.strptime(date_text.strip(), fmt)
-                            game_time_str = game_date.strftime("%H:%M")
-                            break
+                            _t = datetime.strptime(_time_part, "%H:%M")
+                            game_date = game_date.replace(hour=_t.hour, minute=_t.minute, second=0, microsecond=0)
+                            game_time_str = _time_part
                         except ValueError:
-                            pass
+                            game_date = game_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                    else:
+                        for fmt in ("%d.%m.%Y %H:%M", "%d.%m.%y %H:%M"):
+                            try:
+                                game_date = datetime.strptime(date_text.strip(), fmt)
+                                game_time_str = game_date.strftime("%H:%M")
+                                break
+                            except ValueError:
+                                pass
 
             # --- venue ---
             venue = None
