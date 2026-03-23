@@ -121,8 +121,18 @@ def _parse_game_rows(regions: list) -> list[dict]:
             if isinstance(date_text, list):
                 date_text = date_text[0] if date_text else ""
             if date_text:
-                if date_text.strip().lower() in ("abgesagt", "cancelled", "annulé", "annullato"):
+                _RELATIVE_DAYS = {
+                    "gestern": -1, "yesterday": -1, "hier": -1, "ieri": -1,
+                    "heute": 0, "today": 0, "aujourd'hui": 0, "oggi": 0,
+                    "morgen": 1, "tomorrow": 1, "demain": 1, "domani": 1,
+                }
+                dt_lower = date_text.strip().lower()
+                if dt_lower in ("abgesagt", "cancelled", "annulé", "annullato"):
                     game_cancelled = True
+                elif dt_lower in _RELATIVE_DAYS:
+                    delta = _RELATIVE_DAYS[dt_lower]
+                    game_date = datetime.now() + timedelta(days=delta)
+                    game_date = game_date.replace(hour=0, minute=0, second=0, microsecond=0)
                 else:
                     for fmt in ("%d.%m.%Y %H:%M", "%d.%m.%y %H:%M"):
                         try:
@@ -1672,13 +1682,16 @@ class DataIndexer:
                             if not game:
                                 continue
 
-                    game.game_date = g["game_date"]
-                    game.game_time = g["game_time_str"]
+                    # Only update date when the API returned a parseable date (not cancelled/null)
+                    if g["game_date"] is not None:
+                        game.game_date = g["game_date"]
+                        game.game_time = g["game_time_str"]
                     game.venue = g["venue"]
                     game.group_id = effective_group_id
                     # Only overwrite score/status when the API returned a real result;
                     # never clobber an existing stored score with None.
-                    if g["status"] == "cancelled":
+                    # Never mark a scored game as cancelled (API data glitch protection).
+                    if g["status"] == "cancelled" and game.home_score is None:
                         game.status = "cancelled"
                         game.completeness_status = "cancelled"
                     elif g["home_score"] is not None:
