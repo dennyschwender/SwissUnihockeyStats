@@ -3048,15 +3048,18 @@ class DataIndexer:
             if not group_rows:
                 group_rows = [(None, None)]
             for grp_db_id, grp_name in group_rows:
-                games_refreshed += self.index_games_for_league(
-                    league_db_id,
-                    season_id,
-                    league_id,
-                    game_class,
-                    group_name=grp_name,
-                    group_db_id=grp_db_id,
-                    force=True,
-                )
+                try:
+                    games_refreshed += self.index_games_for_league(
+                        league_db_id,
+                        season_id,
+                        league_id,
+                        game_class,
+                        group_name=grp_name,
+                        group_db_id=grp_db_id,
+                        force=True,
+                    )
+                except Exception as exc:
+                    logger.warning("[upcoming_games] skipping group %s/%s: %s", league_id, grp_name, exc)
 
         # ── Phase 2: pure-DB scan — flip finished games from upcoming → post_game ──
         transitioned = 0
