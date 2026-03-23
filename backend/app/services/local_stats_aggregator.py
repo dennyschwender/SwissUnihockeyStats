@@ -228,13 +228,47 @@ def aggregate_player_stats_for_season(
             pen_breakdown[(pid, tid)][bucket] += 1
 
         # ── Step 3: Upsert PlayerStatistics ──
-        now = _now()
+        # A player may have appeared on multiple teams in the same league (transfer),
+        # producing multiple (player_id, team_id) rows from the aggregation above.
+        # Merge them into one entry per (player_id, abbrev) to avoid UNIQUE constraint
+        # violations on (player_id, season_id, league_abbrev).
+        merged: dict[tuple[int, str], dict] = {}
         for row in rows:
             pid, tid = row.player_id, row.team_id
             first_gid = first_game.get((pid, tid), -1)
             abbrev = abbrev_by_game.get(first_gid, "unknown")
+            key = (pid, abbrev)
             breakdown = pen_breakdown.get((pid, tid), {})
+            if key not in merged:
+                merged[key] = {
+                    "pid": pid,
+                    "tid": tid,
+                    "abbrev": abbrev,
+                    "games_played": row.games_played,
+                    "goals": row.goals,
+                    "assists": row.assists,
+                    "penalty_minutes": row.penalty_minutes,
+                    "pen_2min": breakdown.get("2min", 0),
+                    "pen_5min": breakdown.get("5min", 0),
+                    "pen_10min": breakdown.get("10min", 0),
+                    "pen_match": breakdown.get("match", 0),
+                }
+            else:
+                # Player on multiple teams — sum stats, keep most recent team_id
+                m = merged[key]
+                m["tid"] = tid
+                m["games_played"] += row.games_played
+                m["goals"] += row.goals
+                m["assists"] += row.assists
+                m["penalty_minutes"] += row.penalty_minutes
+                m["pen_2min"] += breakdown.get("2min", 0)
+                m["pen_5min"] += breakdown.get("5min", 0)
+                m["pen_10min"] += breakdown.get("10min", 0)
+                m["pen_match"] += breakdown.get("match", 0)
 
+        now = _now()
+        for m in merged.values():
+            pid, tid, abbrev = m["pid"], m["tid"], m["abbrev"]
             existing = (
                 session.query(PlayerStatistics)
                 .filter_by(player_id=pid, season_id=season_id, league_abbrev=abbrev)
@@ -246,31 +280,30 @@ def aggregate_player_stats_for_season(
                     season_id=season_id,
                     team_id=tid,
                     league_abbrev=abbrev,
-                    games_played=row.games_played,
-                    goals=row.goals,
-                    assists=row.assists,
-                    points=(row.goals or 0) + (row.assists or 0),
-                    penalty_minutes=row.penalty_minutes,
-                    pen_2min=breakdown.get("2min", 0),
-                    pen_5min=breakdown.get("5min", 0),
-                    pen_10min=breakdown.get("10min", 0),
-                    pen_match=breakdown.get("match", 0),
+                    games_played=m["games_played"],
+                    goals=m["goals"],
+                    assists=m["assists"],
+                    points=m["goals"] + m["assists"],
+                    penalty_minutes=m["penalty_minutes"],
+                    pen_2min=m["pen_2min"],
+                    pen_5min=m["pen_5min"],
+                    pen_10min=m["pen_10min"],
+                    pen_match=m["pen_match"],
                     computed_from_local=True,
                     local_computed_at=now,
                     last_updated=now,
                 )
                 session.add(obj)
             else:
-                existing.games_played = row.games_played
-                existing.goals = row.goals
-                existing.assists = row.assists
-                existing.points = (row.goals or 0) + (row.assists or 0)
-                existing.penalty_minutes = row.penalty_minutes
-                if breakdown:
-                    existing.pen_2min = breakdown.get("2min", 0)
-                    existing.pen_5min = breakdown.get("5min", 0)
-                    existing.pen_10min = breakdown.get("10min", 0)
-                    existing.pen_match = breakdown.get("match", 0)
+                existing.games_played = m["games_played"]
+                existing.goals = m["goals"]
+                existing.assists = m["assists"]
+                existing.points = m["goals"] + m["assists"]
+                existing.penalty_minutes = m["penalty_minutes"]
+                existing.pen_2min = m["pen_2min"]
+                existing.pen_5min = m["pen_5min"]
+                existing.pen_10min = m["pen_10min"]
+                existing.pen_match = m["pen_match"]
                 existing.computed_from_local = True
                 existing.local_computed_at = now
                 existing.last_updated = now
