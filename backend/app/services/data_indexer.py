@@ -232,6 +232,7 @@ LEAGUE_TIERS: dict[int, int] = {
     6: 6,  # 4. Liga
     7: 6,  # 5. Liga
     12: 6,  # Regional (Junioren A–E, Juniorinnen A–D, Senioren)
+    11: 6,  # Unknown cup/regional competition (no league entry in API)
     23: 6,  # Supercup
     25: 6,  # Test / Cup
 }
