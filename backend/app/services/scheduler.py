@@ -958,8 +958,14 @@ class Scheduler:
                     return  # back off until max_age expires
 
         if last_sync is None:
-            # Never synced – run soon, staggered by priority to avoid thundering herd.
-            run_at = now + timedelta(seconds=policy["priority"])
+            if "run_at_hour" in policy:
+                # Fixed-time policies: even on first run, snap to the next scheduled
+                # window instead of running immediately. Running at startup would fire
+                # all instances of e.g. upcoming_games (noon/evening/night) in parallel.
+                run_at = _snap_to_hour(now, policy["run_at_hour"])
+            else:
+                # Other policies: run soon, staggered by priority to avoid thundering herd.
+                run_at = now + timedelta(seconds=policy["priority"])
         else:
             if "run_at_hour" in policy:
                 # Snap to the next nightly window that satisfies max_age.
