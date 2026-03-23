@@ -1844,6 +1844,7 @@ def _get_team_upcoming(session, team_id: int, season_id: int) -> list[dict]:
             or_(Game.home_team_id == team_id, Game.away_team_id == team_id),
             Game.season_id == season_id,
             Game.home_score.is_(None),
+            Game.status != "cancelled",
             Game.game_date.isnot(None),
             Game.game_date >= _date.today(),
         )
@@ -2184,6 +2185,7 @@ def get_upcoming_games(
         q = session.query(Game).filter(
             Game.season_id == season_id,
             Game.home_score.is_(None),
+            Game.status != "cancelled",
             Game.game_date.isnot(None),
             Game.game_date >= today,
         )
@@ -2318,6 +2320,7 @@ def get_schedule(
         base_q = session.query(Game).filter(
             Game.season_id == season_id,
             Game.home_score.is_(None),
+            Game.status != "cancelled",
             Game.game_date.isnot(None),
             Game.game_date >= today,
         )
@@ -3631,7 +3634,7 @@ def get_recent_games(
         base_q = session.query(Game).filter(Game.season_id == season_id)
 
         if mode == "schedule":
-            base_q = base_q.filter(Game.home_score.is_(None), Game.game_date >= today)
+            base_q = base_q.filter(Game.home_score.is_(None), Game.status != "cancelled", Game.game_date >= today)
         else:
             # "results" mode (default)
             base_q = base_q.filter(Game.home_score.isnot(None))

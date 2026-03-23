@@ -116,17 +116,21 @@ def _parse_game_rows(regions: list) -> list[dict]:
             # --- date / time ---
             game_date = None
             game_time_str = None
+            game_cancelled = False
             date_text = date_cell.get("text", "")
             if isinstance(date_text, list):
                 date_text = date_text[0] if date_text else ""
             if date_text:
-                for fmt in ("%d.%m.%Y %H:%M", "%d.%m.%y %H:%M"):
-                    try:
-                        game_date = datetime.strptime(date_text.strip(), fmt)
-                        game_time_str = game_date.strftime("%H:%M")
-                        break
-                    except ValueError:
-                        pass
+                if date_text.strip().lower() in ("abgesagt", "cancelled", "annulé", "annullato"):
+                    game_cancelled = True
+                else:
+                    for fmt in ("%d.%m.%Y %H:%M", "%d.%m.%y %H:%M"):
+                        try:
+                            game_date = datetime.strptime(date_text.strip(), fmt)
+                            game_time_str = game_date.strftime("%H:%M")
+                            break
+                        except ValueError:
+                            pass
 
             # --- venue ---
             venue = None
@@ -172,9 +176,9 @@ def _parse_game_rows(regions: list) -> list[dict]:
             # --- score / status (cell[7]) ---
             home_score = None
             away_score = None
-            status = "scheduled"
+            status = "cancelled" if game_cancelled else "scheduled"
             period = None
-            if len(cells) > 7:
+            if not game_cancelled and len(cells) > 7:
                 score_text = cells[7].get("text", ["-"])
                 score_text = score_text[0] if isinstance(score_text, list) else score_text
                 if score_text and score_text not in ("-", ""):
@@ -1674,7 +1678,10 @@ class DataIndexer:
                     game.group_id = effective_group_id
                     # Only overwrite score/status when the API returned a real result;
                     # never clobber an existing stored score with None.
-                    if g["home_score"] is not None:
+                    if g["status"] == "cancelled":
+                        game.status = "cancelled"
+                        game.completeness_status = "cancelled"
+                    elif g["home_score"] is not None:
                         game.home_score = g["home_score"]
                         game.away_score = g["away_score"]
                         game.status = g["status"]
