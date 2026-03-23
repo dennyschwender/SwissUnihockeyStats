@@ -1568,6 +1568,14 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                     PlayerStatistics.player_id.in_(pids),
                     PlayerStatistics.season_id == season_id,
                     PlayerStatistics.team_name == team.name,
+                    # Exclude rows that belong to a different team with the same name
+                    # (e.g. women's NLB "Visper Lions" vs men's 3. Liga "Visper Lions").
+                    # When team_id is NULL (per-player API path) we can't discriminate,
+                    # so we allow those through.
+                    or_(
+                        PlayerStatistics.team_id == team_id,
+                        PlayerStatistics.team_id.is_(None),
+                    ),
                 )
                 .all()
             ):
@@ -1581,6 +1589,10 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                 PlayerStatistics.player_id.in_(pids),
                 PlayerStatistics.season_id == season_id,
                 PlayerStatistics.team_name == team.name,
+                or_(
+                    PlayerStatistics.team_id == team_id,
+                    PlayerStatistics.team_id.is_(None),
+                ),
             ]
             if team_league_abbrev:
                 ps_filter.append(PlayerStatistics.league_abbrev == team_league_abbrev)
@@ -1644,6 +1656,10 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                     PlayerStatistics.player_id.in_(extras_pids),
                     PlayerStatistics.season_id == season_id,
                     PlayerStatistics.team_name == team.name,
+                    or_(
+                        PlayerStatistics.team_id == team_id,
+                        PlayerStatistics.team_id.is_(None),
+                    ),
                 ]
                 if team_league_abbrev:
                     ps_filter_extras.append(PlayerStatistics.league_abbrev == team_league_abbrev)
