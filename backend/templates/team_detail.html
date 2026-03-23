@@ -43,12 +43,14 @@
   {% if team.standings %}
   <script>window._teamStandings = {{ team.standings | tojson }};</script>
   {% endif %}
-  <div x-data="{ tab: '{% if team.standings %}standings{% else %}roster{% endif %}' }">
+  <div x-data="{ tab: '{% if team.standings %}standings{% elif team.roster %}roster{% else %}results{% endif %}' }">
     <div class="tab-bar">
       {% if team.standings %}
       <button @click="tab='standings'" :class="['tab-btn', tab==='standings' && 'active']">📊 {{ t.team_tabs.tab_standings }}</button>
       {% endif %}
+      {% if team.roster %}
       <button @click="tab='roster'" :class="['tab-btn', tab==='roster' && 'active']">{{ t.team_tabs.tab_roster }}</button>
+      {% endif %}
       <button @click="tab='results'" :class="['tab-btn', tab==='results' && 'active']">{{ t.team_tabs.tab_results }}</button>
       <button @click="tab='upcoming'" :class="['tab-btn', tab==='upcoming' && 'active']">
         {{ t.team_tabs.tab_upcoming }}{% if team.upcoming_games %} <span class="tab-count-badge">{{ team.upcoming_games|length }}</span>{% endif %}
