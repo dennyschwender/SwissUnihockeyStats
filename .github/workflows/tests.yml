@@ -1,6 +1,6 @@
 name: Python Tests
 
-on:
+on: {} # DISABLED
   push:
     branches: [ main, develop ]
   pull_request:

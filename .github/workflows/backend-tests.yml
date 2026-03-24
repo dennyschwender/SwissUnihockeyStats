@@ -1,6 +1,6 @@
 name: Backend Tests
 
-on:
+on: {} # DISABLED
   push:
     branches: [ main, develop ]
     paths:

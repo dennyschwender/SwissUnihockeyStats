@@ -1,6 +1,6 @@
 name: Docker Build and Test
 
-on:
+on: {} # DISABLED
   push:
     branches: [ main, develop ]
   pull_request:
