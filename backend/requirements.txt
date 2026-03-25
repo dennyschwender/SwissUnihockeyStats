@@ -15,7 +15,7 @@ itsdangerous>=2.1.2       # required by starlette SessionMiddleware
 sqlalchemy>=2.0.25
 
 # HTTP Client (requests used in api_client.py)
-requests>=2.31.0
+requests>=2.32.3
 
 # System metrics (admin System tab)
 psutil>=5.9.0
