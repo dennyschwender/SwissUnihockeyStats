@@ -868,7 +868,7 @@ class Scheduler:
         # ── Auto-freeze past seasons whose data is complete ───────────────────
         try:
             from app.services.database import get_database_service
-            from app.models.db_models import Season
+            from app.models.db_models import Season, Game
 
             db_service = get_database_service()
             with db_service.session_scope() as session:
@@ -877,6 +877,27 @@ class Scheduler:
                     Season.is_frozen == False,    # noqa: E712
                 ).all()
                 for s in past_seasons:
+                    # Pre-freeze cleanup: mark scheduled games with no date as cancelled.
+                    # These are games that were never played and never got a date assigned
+                    # (e.g. cancelled rounds that the list-based refresh never saw).
+                    orphan_count = (
+                        session.query(Game)
+                        .filter(
+                            Game.season_id == s.id,
+                            Game.status == "scheduled",
+                            Game.game_date.is_(None),
+                        )
+                        .update(
+                            {"status": "cancelled", "completeness_status": "cancelled"},
+                            synchronize_session="fetch",
+                        )
+                    )
+                    if orphan_count:
+                        logger.info(
+                            "[scheduler] Season %s: marked %d orphan scheduled games as cancelled",
+                            s.id,
+                            orphan_count,
+                        )
                     if _is_season_complete(session, s.id):
                         s.is_frozen = True
                         logger.info(
