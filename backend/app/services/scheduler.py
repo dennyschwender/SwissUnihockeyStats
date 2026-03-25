@@ -392,7 +392,7 @@ def _is_season_complete(session, season_id: int) -> bool:
 
     Three conditions must all hold:
     1. The season has at least one game (data exists).
-    2. Every game has status == 'finished' (no scheduled or live games remain).
+    2. Every game has status in ('finished', 'cancelled') — no scheduled or live games remain.
     3. No SyncStatus row for this season is in_progress (no active sync running).
 
     The LIKE pattern uses a trailing anchor (%:{season_id}) — no trailing %
@@ -406,7 +406,10 @@ def _is_season_complete(session, season_id: int) -> bool:
         return False
     unfinished = (
         session.query(func.count(Game.id))
-        .filter(Game.season_id == season_id, Game.status != "finished")
+        .filter(
+            Game.season_id == season_id,
+            ~Game.status.in_(("finished", "cancelled")),
+        )
         .scalar()
     )
     if unfinished:

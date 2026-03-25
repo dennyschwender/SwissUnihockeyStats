@@ -1607,7 +1607,7 @@ async def admin_seasons_completeness(_: None = Depends(require_admin)):
             ) or 0
             games_finished = (
                 session.query(func.count(Game.id))
-                .filter(Game.season_id == s.id, Game.status == "finished")
+                .filter(Game.season_id == s.id, Game.status.in_(("finished", "cancelled")))
                 .scalar()
             ) or 0
             games_pct = int(games_finished * 100 / games_total) if games_total else 0
