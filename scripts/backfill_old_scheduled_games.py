@@ -13,8 +13,10 @@ import logging
 import sys
 import time
 
-# Ensure backend is on path when run from /app
-sys.path.insert(0, "/app/backend")
+# Ensure backend is on path
+# In Docker: /app is the workdir, app/ is the package
+# Locally: backend/ contains app/
+sys.path.insert(0, "/app")
 sys.path.insert(0, "backend")
 
 from app.services.database import get_database_service
