@@ -55,3 +55,36 @@ def test_translate_license_unknown_falls_back():
 def test_translate_license_none_returns_none():
     from app.lib.player_translations import translate_license
     assert translate_license(None, "en") is None
+
+
+def test_player_details_stale_when_none():
+    from app.services.stats_service import _player_details_stale
+    assert _player_details_stale(None) is True
+
+
+def test_player_details_stale_before_aug31_this_year():
+    """Fetched before the most recent Aug 31 → stale."""
+    from app.services.stats_service import _player_details_stale
+    fetched = datetime(2025, 7, 1, tzinfo=timezone.utc)
+    assert _player_details_stale(fetched, _today=datetime(2026, 3, 29, tzinfo=timezone.utc)) is True
+
+
+def test_player_details_fresh_after_aug31():
+    """Fetched after the most recent Aug 31 → not stale."""
+    from app.services.stats_service import _player_details_stale
+    fetched = datetime(2025, 9, 5, tzinfo=timezone.utc)
+    assert _player_details_stale(fetched, _today=datetime(2026, 3, 29, tzinfo=timezone.utc)) is False
+
+
+def test_player_details_stale_before_aug31_same_year():
+    """Today is Sept 15; fetched Aug 1 of same year → stale."""
+    from app.services.stats_service import _player_details_stale
+    fetched = datetime(2025, 8, 1, tzinfo=timezone.utc)
+    assert _player_details_stale(fetched, _today=datetime(2025, 9, 15, tzinfo=timezone.utc)) is True
+
+
+def test_player_details_fresh_when_fetched_same_day_as_aug31():
+    """Fetched exactly on Aug 31 → not stale."""
+    from app.services.stats_service import _player_details_stale
+    fetched = datetime(2025, 8, 31, 12, 0, tzinfo=timezone.utc)
+    assert _player_details_stale(fetched, _today=datetime(2026, 3, 1, tzinfo=timezone.utc)) is False

@@ -3936,7 +3936,7 @@ async def player_detail(request: Request, locale: str, player_id: int):
     """Player detail page — career stats from DB"""
     from app.services.stats_service import get_player_detail
 
-    player = get_player_detail(player_id)
+    player = get_player_detail(player_id, locale=locale)
     error_message = None
     if not player:
         error_message = f"Player {player_id} not found in database."

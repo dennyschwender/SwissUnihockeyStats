@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import and_, case, func, or_
@@ -1884,7 +1884,32 @@ def _get_team_upcoming(session, team_id: int, season_id: int) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def get_player_detail(person_id: int) -> dict:
+def _player_details_stale(
+    fetched_at: Optional[datetime],
+    _today: Optional[datetime] = None,
+) -> bool:
+    """Return True if player biographical details need refreshing.
+
+    Data is considered fresh if it was fetched after the most recent August 31st.
+    This aligns with the new season registration cycle (September).
+
+    Args:
+        fetched_at: The datetime when details were last fetched. None → always stale.
+        _today: Override today's date (for testing). Defaults to UTC now.
+    """
+    if fetched_at is None:
+        return True
+    today = _today or datetime.now(timezone.utc)
+    # Find the most recent Aug 31 (this year if we're past it, else last year)
+    aug31_this_year = today.replace(month=8, day=31, hour=0, minute=0, second=0, microsecond=0)
+    cutoff = aug31_this_year if today >= aug31_this_year else aug31_this_year.replace(year=today.year - 1)
+    # Normalise fetched_at to UTC-aware for comparison
+    if fetched_at.tzinfo is None:
+        fetched_at = fetched_at.replace(tzinfo=timezone.utc)
+    return fetched_at < cutoff
+
+
+def get_player_detail(person_id: int, locale: str = "de") -> dict:
     """
     Return player profile + per-season stats across all seasons.
     Uses team_name / league_abbrev text columns (populated since schema migration).
@@ -2127,38 +2152,98 @@ def get_player_detail(person_id: int) -> dict:
             "career": career,
             "totals": totals,
             "recent_games": recent_games,
-            "photo_url": None,
+            # Biographical cache fields (populated from DB if already fetched)
+            "photo_url": player.photo_url,
+            "height_cm": player.height_cm,
+            "weight_kg": player.weight_kg,
+            "position_raw": player.position_raw,
+            "license_raw": player.license_raw,
+            "player_details_fetched_at": player.player_details_fetched_at,
+            # Translated fields — populated after API check below
+            "position": None,
+            "license": None,
         }
 
-    # Fetch photo URL and birth year from API outside the DB session (HTTP call)
+    # Fetch/refresh biographical data if stale (TTL: end of August each year).
+    # First page load for a player will be slightly slower (one API call);
+    # all subsequent loads are fast from DB until next end-of-August refresh.
     try:
         from app.services.swissunihockey import get_swissunihockey_client
+        from app.lib.player_translations import translate_position, translate_license
 
-        client = get_swissunihockey_client()
-        api_data = client.get_player_details(person_id)
-        regions = api_data.get("data", {}).get("regions", [])
-        if regions:
-            cells = regions[0].get("rows", [{}])[0].get("cells", [])
-            if cells:
-                img = cells[0].get("image", {})
-                result["photo_url"] = img.get("url") or None
-                # cells[4] is "Jahrgang" (year of birth) per API response structure
-                if not result["year_of_birth"] and len(cells) > 4:
-                    yob_texts = cells[4].get("text", [])
-                    if yob_texts:
+        if _player_details_stale(result.get("player_details_fetched_at")):
+            client = get_swissunihockey_client()
+            api_data = client.get_player_details(person_id)
+            regions = api_data.get("data", {}).get("regions", [])
+            if regions:
+                cells = regions[0].get("rows", [{}])[0].get("cells", [])
+                if cells:
+                    def _cell_text(idx):
+                        if idx >= len(cells):
+                            return None
+                        cell = cells[idx]
+                        texts = cell.get("text", []) if isinstance(cell, dict) else []
+                        if isinstance(texts, list):
+                            return str(texts[0]).strip() if texts else None
+                        return str(texts).strip() or None
+
+                    photo_url = None
+                    img = cells[0].get("image", {}) if isinstance(cells[0], dict) else {}
+                    photo_url = img.get("url") or None
+
+                    position_raw = _cell_text(3)
+                    year_of_birth_str = _cell_text(4)
+                    height_str = _cell_text(5)   # e.g. "179 cm"
+                    weight_str = _cell_text(6)   # e.g. "70 kg"
+                    license_raw = _cell_text(7)
+
+                    def _parse_int_prefix(s):
+                        """Parse leading integer from strings like '179 cm' → 179."""
+                        if not s:
+                            return None
                         try:
-                            yob = int(str(yob_texts[0]).strip())
+                            return int(s.split()[0])
+                        except (ValueError, IndexError):
+                            return None
+
+                    height_cm = _parse_int_prefix(height_str)
+                    weight_kg = _parse_int_prefix(weight_str)
+
+                    # Backfill year_of_birth if missing
+                    if not result["year_of_birth"] and year_of_birth_str:
+                        try:
+                            yob = int(year_of_birth_str)
                             if 1950 <= yob <= 2025:
                                 result["year_of_birth"] = yob
-                                db = get_database_service()
-                                with db.session_scope() as session:
-                                    player_row = session.query(Player).filter(
-                                        Player.person_id == person_id
-                                    ).first()
-                                    if player_row and not player_row.year_of_birth:
-                                        player_row.year_of_birth = yob
                         except (ValueError, TypeError):
                             pass
+
+                    result["photo_url"] = photo_url
+                    result["height_cm"] = height_cm
+                    result["weight_kg"] = weight_kg
+                    result["position_raw"] = position_raw
+                    result["license_raw"] = license_raw
+
+                    # Persist to DB
+                    db = get_database_service()
+                    with db.session_scope() as session:
+                        player_row = session.query(Player).filter(
+                            Player.person_id == person_id
+                        ).first()
+                        if player_row:
+                            player_row.photo_url = photo_url
+                            player_row.height_cm = height_cm
+                            player_row.weight_kg = weight_kg
+                            player_row.position_raw = position_raw
+                            player_row.license_raw = license_raw
+                            player_row.player_details_fetched_at = datetime.now(timezone.utc)
+                            if not player_row.year_of_birth and result["year_of_birth"]:
+                                player_row.year_of_birth = result["year_of_birth"]
+
+        # Apply translations using the request locale
+        result["position"] = translate_position(result.get("position_raw"), locale)
+        result["license"] = translate_license(result.get("license_raw"), locale)
+
     except Exception:
         pass
 
