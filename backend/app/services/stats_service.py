@@ -1905,24 +1905,31 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                 }
             )
 
-        # ── Group standings: find the DB league id and the group the team plays in
+        # ── Group standings: find the DB league id and the regular-season group the team plays in
         _league_db_id: int | None = league_row.id if league_row else None
         _team_group_id: int | None = None
         _group_name: str = ""
         if _league_db_id:
-            _group_row = (
-                session.query(Game.group_id, LeagueGroup.name, LeagueGroup.text)
+            _all_group_rows = (
+                session.query(Game.group_id, LeagueGroup.name, LeagueGroup.text, LeagueGroup.phase)
                 .join(LeagueGroup, Game.group_id == LeagueGroup.id)
                 .filter(
                     or_(Game.home_team_id == team_id, Game.away_team_id == team_id),
                     Game.season_id == season_id,
                     Game.group_id.isnot(None),
                 )
-                .first()
+                .distinct()
+                .all()
             )
-            if _group_row:
-                _team_group_id = _group_row[0]
-                _group_name = _group_row[1] or _group_row[2] or ""
+            # Prefer the regular-season group (phase == "Regelsaison" or None/empty),
+            # falling back to the first group if no regular-season group is found.
+            _regular_row = next(
+                (r for r in _all_group_rows if not r[3] or r[3] == "Regelsaison"),
+                _all_group_rows[0] if _all_group_rows else None,
+            )
+            if _regular_row:
+                _team_group_id = _regular_row[0]
+                _group_name = _regular_row[1] or _regular_row[2] or ""
 
         # Head coach lookup
         from app.models.db_models import Staff as _Staff
