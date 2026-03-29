@@ -123,3 +123,17 @@ def mock_api_client():
     yield mock_client
     for p in patchers:
         p.stop()
+
+
+@pytest.fixture
+def db_session(app):  # noqa: F811
+    """Yield a live SQLAlchemy session backed by the in-memory test DB.
+
+    Unlike session_scope(), this fixture commits immediately so that other
+    session_scope() calls (e.g. inside service functions) can see the seeded data.
+    """
+    from app.services.database import get_database_service
+
+    db = get_database_service()
+    with db.session_scope() as session:
+        yield session

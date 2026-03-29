@@ -2282,6 +2282,35 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
         for r in career:
             r.pop("_tier", None)
 
+        # Build career_by_season: group career rows by season_id
+        _season_groups: dict[int, list[dict]] = {}
+        for r in career:
+            _season_groups.setdefault(r["season_id"], []).append(r)
+
+        career_by_season: list[dict] = []
+        for _sid in sorted(_season_groups.keys(), reverse=True):
+            _rows = _season_groups[_sid]
+            _sgp  = sum((r.get("gp")  or 0) for r in _rows)
+            _sg   = sum((r.get("g")   or 0) for r in _rows)
+            _sa   = sum((r.get("a")   or 0) for r in _rows)
+            _spts = sum((r.get("pts") or 0) for r in _rows)
+            _spim = sum((r.get("pim") or 0) for r in _rows)
+            career_by_season.append(
+                {
+                    "season_id": _sid,
+                    "season_text": _rows[0]["season_text"],
+                    "totals": {
+                        "gp":  _sgp,
+                        "g":   _sg,
+                        "a":   _sa,
+                        "pts": _spts,
+                        "pim": _spim,
+                        "ppg": _compute_ppg(_spts, _sgp),
+                    },
+                    "rows": _rows,
+                }
+            )
+
         # Career totals
         total_gp  = sum((r.get("gp")  or 0) for r in career)
         total_g   = sum((r.get("g")   or 0) for r in career)
@@ -2309,6 +2338,7 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
             "last_name": player.last_name or "",
             "year_of_birth": player.year_of_birth,
             "career": career,
+            "career_by_season": career_by_season,
             "totals": totals,
             "recent_games": recent_games,
             "recent_has_more": recent_has_more,

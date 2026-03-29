@@ -401,3 +401,66 @@ class TestBuildSeriesRounds:
         for key in ("team_a_id", "team_b_id", "team_a_name", "team_b_name",
                     "team_a_wins", "team_b_wins", "games"):
             assert key in s, f"Missing key {key} in series dict"
+
+
+class TestCareerBySeason:
+    """Test career_by_season grouping in get_player_detail."""
+
+    def _seed_player_with_two_seasons(self, session):
+        from app.models.db_models import Player, Season, PlayerStatistics
+        s1 = Season(id=2024, text="2023/24", highlighted=False)
+        s2 = Season(id=2025, text="2024/25", highlighted=True)
+        session.merge(s1)
+        session.merge(s2)
+        p = Player(person_id=9001, full_name="Test Player")
+        session.merge(p)
+        session.flush()
+        session.merge(PlayerStatistics(
+            id=90011, player_id=9001, season_id=2025,
+            league_abbrev="NLA", team_name="Team A",
+            games_played=10, goals=5, assists=3, points=8, penalty_minutes=4,
+        ))
+        session.merge(PlayerStatistics(
+            id=90012, player_id=9001, season_id=2025,
+            league_abbrev="NLB", team_name="Team B",
+            games_played=5, goals=1, assists=2, points=3, penalty_minutes=2,
+        ))
+        session.merge(PlayerStatistics(
+            id=90013, player_id=9001, season_id=2024,
+            league_abbrev="NLA", team_name="Team A",
+            games_played=20, goals=10, assists=8, points=18, penalty_minutes=6,
+        ))
+        session.commit()
+
+    def test_career_by_season_present(self, db_session):
+        self._seed_player_with_two_seasons(db_session)
+        from app.services.stats_service import get_player_detail
+        result = get_player_detail(person_id=9001)
+        assert "career_by_season" in result
+
+    def test_career_by_season_ordered_desc(self, db_session):
+        self._seed_player_with_two_seasons(db_session)
+        from app.services.stats_service import get_player_detail
+        result = get_player_detail(person_id=9001)
+        seasons = result["career_by_season"]
+        assert len(seasons) == 2
+        assert seasons[0]["season_id"] == 2025
+        assert seasons[1]["season_id"] == 2024
+
+    def test_career_by_season_totals_aggregated(self, db_session):
+        self._seed_player_with_two_seasons(db_session)
+        from app.services.stats_service import get_player_detail
+        result = get_player_detail(person_id=9001)
+        season_2025 = result["career_by_season"][0]
+        assert season_2025["totals"]["gp"] == 15   # 10 + 5
+        assert season_2025["totals"]["g"] == 6     # 5 + 1
+        assert season_2025["totals"]["a"] == 5     # 3 + 2
+        assert season_2025["totals"]["pts"] == 11  # 8 + 3
+        assert len(season_2025["rows"]) == 2
+
+    def test_career_by_season_single_row_season(self, db_session):
+        self._seed_player_with_two_seasons(db_session)
+        from app.services.stats_service import get_player_detail
+        result = get_player_detail(person_id=9001)
+        season_2024 = result["career_by_season"][1]
+        assert len(season_2024["rows"]) == 1
