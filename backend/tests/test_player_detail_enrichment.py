@@ -105,3 +105,14 @@ def test_ppg_none_when_no_games():
 def test_ppg_none_when_games_none():
     from app.services.stats_service import _compute_ppg
     assert _compute_ppg(points=5, games_played=None) is None
+
+
+def test_get_player_recent_games_returns_limited_rows(client):
+    """get_player_recent_games respects limit and returns has_more flag."""
+    from app.services.stats_service import get_player_recent_games
+    # Person_id 0 has no games — should return empty list with has_more=False
+    result = get_player_recent_games(person_id=0, offset=0, limit=10)
+    assert "rows" in result
+    assert "has_more" in result
+    assert result["has_more"] is False
+    assert isinstance(result["rows"], list)

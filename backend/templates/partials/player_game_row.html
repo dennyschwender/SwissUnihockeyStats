@@ -1,0 +1,22 @@
+<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;"
+  onclick="window.location='/{{ locale }}/game/{{ g.game_id }}'"
+  onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+  <td style="padding:.6rem .75rem;color:var(--gray-500);">{{ g.date }}</td>
+  <td style="padding:.6rem .5rem;text-align:center;font-size:.75rem;color:var(--gray-500);">{{ g.league or '–' }}</td>
+  <td style="padding:.6rem .35rem;text-align:center;font-size:.75rem;color:var(--gray-400);">{{ g.home_away }}</td>
+  <td style="padding:.6rem .75rem;">
+    <a href="/{{ locale }}/team/{{ g.opponent_id }}" onclick="event.stopPropagation()" style="color:inherit;text-decoration:none;">{{ g.opponent }}</a>
+  </td>
+  <td style="padding:.6rem .75rem;text-align:center;">
+    {% if g.result == 'W' %}<span style="font-weight:700;color:#16a34a;">W {{ g.score }}</span>
+    {% elif g.result == 'OTW' %}<span style="font-weight:700;color:#059669;">OTW {{ g.score }}</span>
+    {% elif g.result == 'OTL' %}<span style="font-weight:700;color:#b45309;">OTL {{ g.score }}</span>
+    {% elif g.result == 'L' %}<span style="font-weight:700;color:#dc2626;">L {{ g.score }}</span>
+    {% elif g.result == 'D' %}<span style="font-weight:700;color:var(--gray-500);">D {{ g.score }}</span>
+    {% else %}<span style="color:var(--gray-400);">–</span>{% endif %}
+  </td>
+  <td style="padding:.6rem .5rem;text-align:center;">{{ g.g if g.g is not none else '–' }}</td>
+  <td style="padding:.6rem .5rem;text-align:center;">{{ g.a if g.a is not none else '–' }}</td>
+  <td style="padding:.6rem .5rem;text-align:center;font-weight:{% if g.g or g.a %}600{% else %}400{% endif %};">{{ (g.g + g.a) if (g.g is not none and g.a is not none) else '–' }}</td>
+  <td style="padding:.6rem .5rem;text-align:center;color:{% if g.pim %}#dc2626{% else %}inherit{% endif %};">{{ g.pim if g.pim is not none else '–' }}</td>
+</tr>

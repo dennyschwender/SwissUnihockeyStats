@@ -3,12 +3,19 @@ Players API endpoints
 """
 
 import logging
+import os
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from app.services.swissunihockey import get_swissunihockey_client
+from app.services.stats_service import get_player_recent_games as _get_recent_games
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+_templates_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "templates")
+_templates = Jinja2Templates(directory=os.path.abspath(_templates_dir))
 
 
 @router.get("/")
@@ -53,6 +60,38 @@ async def search_players(
         raise
     except Exception as e:
         logger.error("Error searching players: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/{player_id}/games", response_class=HTMLResponse)
+async def get_player_games(
+    request: Request,
+    player_id: int,
+    offset: int = Query(0, ge=0, description="Number of rows to skip"),
+    limit: int = Query(10, ge=1, le=50, description="Rows per page"),
+    locale: str = Query("de", description="Locale for translated content"),
+):
+    """Return an HTML fragment of recent game rows for HTMX pagination."""
+    import asyncio
+
+    loop = asyncio.get_running_loop()
+    try:
+        result = await loop.run_in_executor(
+            None, lambda: _get_recent_games(player_id, offset=offset, limit=limit)
+        )
+        return _templates.TemplateResponse(
+            "partials/player_games_fragment.html",
+            {
+                "request": request,
+                "rows": result["rows"],
+                "has_more": result["has_more"],
+                "player_id": player_id,
+                "locale": locale,
+                "next_offset": offset + limit,
+            },
+        )
+    except Exception as e:
+        logger.error("Error fetching games for player %s: %s", player_id, e, exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

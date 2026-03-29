@@ -1916,6 +1916,108 @@ def _compute_ppg(points: Optional[int], games_played: Optional[int]) -> Optional
     return round((points or 0) / games_played, 2)
 
 
+_STRIP_PREFIXES = (
+    "herren ",
+    "damen ",
+    "junioren ",
+    "juniorinnen ",
+    "junioren/-innen ",
+    "senioren ",
+)
+
+
+def _fetch_recent_game_rows(session, person_id: int, offset: int = 0, limit: int = 11) -> list[dict]:
+    """Fetch recent game appearance rows for a player. Returns list of game dicts."""
+    from app.models.db_models import Game as _Game, Team as _Team
+
+    recent_game_rows = (
+        session.query(GamePlayer, _Game)
+        .join(_Game, GamePlayer.game_id == _Game.id)
+        .filter(GamePlayer.player_id == person_id)
+        .order_by(_Game.game_date.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    # Preload team names needed
+    team_ids_needed = set()
+    for _, g in recent_game_rows:
+        team_ids_needed.add(g.home_team_id)
+        team_ids_needed.add(g.away_team_id)
+    team_names = {
+        t.id: t.name for t in session.query(_Team).filter(_Team.id.in_(team_ids_needed)).all()
+    }
+
+    # Preload group_id → league short name
+    group_ids_needed = {g.group_id for _, g in recent_game_rows if g.group_id}
+    group_league_abbrev: dict[int, str] = {}
+    if group_ids_needed:
+        from app.models.db_models import LeagueGroup as _LG, League as _League2
+
+        for grp, lg in (
+            session.query(_LG, _League2)
+            .join(_League2, _LG.league_id == _League2.id)
+            .filter(_LG.id.in_(group_ids_needed))
+            .all()
+        ):
+            lname = lg.name or lg.text or ""
+            for pfx in _STRIP_PREFIXES:
+                if lname.lower().startswith(pfx):
+                    lname = lname[len(pfx):]
+                    break
+            group_league_abbrev[grp.id] = lname
+
+    rows: list[dict] = []
+    for gp, g in recent_game_rows:
+        is_home = gp.team_id == g.home_team_id
+        opp_id = g.away_team_id if is_home else g.home_team_id
+        opp_name = team_names.get(opp_id, f"Team {opp_id}")
+        if g.home_score is not None and g.away_score is not None:
+            my_score = g.home_score if is_home else g.away_score
+            opp_score = g.away_score if is_home else g.home_score
+            _is_extra = g.period in ("OT", "SO")
+            if my_score > opp_score:
+                result_label = "OTW" if _is_extra else "W"
+            elif my_score < opp_score:
+                result_label = "OTL" if _is_extra else "L"
+            else:
+                result_label = "D"
+            score_str = f"{my_score}–{opp_score}"
+        else:
+            result_label = ""
+            score_str = ""
+        rows.append(
+            {
+                "game_id": g.id,
+                "date": g.game_date.strftime("%Y-%m-%d") if g.game_date else "",
+                "home_away": "H" if is_home else "A",
+                "opponent": opp_name,
+                "opponent_id": opp_id,
+                "score": score_str,
+                "result": result_label,
+                "season_id": g.season_id,
+                "league": group_league_abbrev.get(g.group_id, "") if g.group_id else "",
+                "g": gp.goals,
+                "a": gp.assists,
+                "pim": gp.penalty_minutes,
+            }
+        )
+    return rows
+
+
+def get_player_recent_games(person_id: int, offset: int = 0, limit: int = 10) -> dict:
+    """Return a page of recent game appearances for a player.
+
+    Returns:
+        {"rows": [...], "has_more": bool}
+    """
+    db = get_database_service()
+    with db.session_scope() as session:
+        rows = _fetch_recent_game_rows(session, person_id, offset=offset, limit=limit + 1)
+    has_more = len(rows) > limit
+    return {"rows": rows[:limit], "has_more": has_more}
+
+
 def get_player_detail(person_id: int, locale: str = "de") -> dict:
     """
     Return player profile + per-season stats across all seasons.
@@ -1924,14 +2026,6 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
     from app.services.data_indexer import LEAGUE_TIERS
 
     _DEFAULT_TIER = 99
-    _STRIP_PREFIXES = (
-        "herren ",
-        "damen ",
-        "junioren ",
-        "juniorinnen ",
-        "junioren/-innen ",
-        "senioren ",
-    )
 
     db = get_database_service()
     with db.session_scope() as session:
@@ -2080,79 +2174,9 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
         }
 
         # Recent game appearances (last 10 across all seasons, most recent first)
-        from app.models.db_models import Game as _Game, Team as _Team
-
-        recent_game_rows = (
-            session.query(GamePlayer, _Game)
-            .join(_Game, GamePlayer.game_id == _Game.id)
-            .filter(GamePlayer.player_id == person_id)
-            .order_by(_Game.game_date.desc())
-            .limit(10)
-            .all()
-        )
-        # Preload team names needed
-        team_ids_needed = set()
-        for _, g in recent_game_rows:
-            team_ids_needed.add(g.home_team_id)
-            team_ids_needed.add(g.away_team_id)
-        team_names = {
-            t.id: t.name for t in session.query(_Team).filter(_Team.id.in_(team_ids_needed)).all()
-        }
-
-        # Preload group_id → league short name
-        group_ids_needed = {g.group_id for _, g in recent_game_rows if g.group_id}
-        group_league_abbrev: dict[int, str] = {}
-        if group_ids_needed:
-            from app.models.db_models import LeagueGroup as _LG, League as _League2
-
-            for grp, lg in (
-                session.query(_LG, _League2)
-                .join(_League2, _LG.league_id == _League2.id)
-                .filter(_LG.id.in_(group_ids_needed))
-                .all()
-            ):
-                lname = lg.name or lg.text or ""
-                for pfx in _STRIP_PREFIXES:
-                    if lname.lower().startswith(pfx):
-                        lname = lname[len(pfx) :]
-                        break
-                group_league_abbrev[grp.id] = lname
-
-        recent_games: list[dict] = []
-        for gp, g in recent_game_rows:
-            is_home = gp.team_id == g.home_team_id
-            opp_id = g.away_team_id if is_home else g.home_team_id
-            opp_name = team_names.get(opp_id, f"Team {opp_id}")
-            if g.home_score is not None and g.away_score is not None:
-                my_score = g.home_score if is_home else g.away_score
-                opp_score = g.away_score if is_home else g.home_score
-                _is_extra = g.period in ("OT", "SO")
-                if my_score > opp_score:
-                    result_label = "OTW" if _is_extra else "W"
-                elif my_score < opp_score:
-                    result_label = "OTL" if _is_extra else "L"
-                else:
-                    result_label = "D"
-                score_str = f"{my_score}–{opp_score}"
-            else:
-                result_label = ""
-                score_str = ""
-            recent_games.append(
-                {
-                    "game_id": g.id,
-                    "date": g.game_date.strftime("%Y-%m-%d") if g.game_date else "",
-                    "home_away": "H" if is_home else "A",
-                    "opponent": opp_name,
-                    "opponent_id": opp_id,
-                    "score": score_str,
-                    "result": result_label,
-                    "season_id": g.season_id,
-                    "league": group_league_abbrev.get(g.group_id, "") if g.group_id else "",
-                    "g": gp.goals,  # None = not yet indexed (distinct from 0 goals)
-                    "a": gp.assists,
-                    "pim": gp.penalty_minutes,
-                }
-            )
+        _recent_rows = _fetch_recent_game_rows(session, person_id, offset=0, limit=11)
+        recent_games = _recent_rows[:10]
+        recent_has_more = len(_recent_rows) > 10
 
         result = {
             "person_id": player.person_id,
@@ -2163,6 +2187,7 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
             "career": career,
             "totals": totals,
             "recent_games": recent_games,
+            "recent_has_more": recent_has_more,
             # Biographical cache fields (populated from DB if already fetched)
             "photo_url": player.photo_url,
             "height_cm": player.height_cm,
