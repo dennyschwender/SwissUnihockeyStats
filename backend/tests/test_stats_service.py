@@ -313,5 +313,40 @@ def test_search_league_penalties_returns_matching_player(populated_league_db):
     assert any("bob" in r["player_name"].lower() for r in rows)
 
 
+class TestTeamRosterPPG:
+    """Test that roster player dicts include ppg field."""
+
+    def test_ppg_present_in_roster_dicts(self):
+        from app.services.database import get_database_service
+        from app.models.db_models import Team, Season
+        db = get_database_service()
+        with db.session_scope() as session:
+            season = session.query(Season).first()
+            if not season:
+                pytest.skip("No season in DB")
+            team = session.query(Team).filter(Team.season_id == season.id).first()
+            if not team:
+                pytest.skip("No team in DB")
+            team_id = team.id
+            season_id = season.id
+
+        result = get_team_detail(team_id=team_id, season_id=season_id)
+        roster = result.get("roster", [])
+        if not roster:
+            pytest.skip("No roster players")
+        for p in roster:
+            assert "ppg" in p, f"ppg key missing from player dict: {p}"
+
+    def test_ppg_is_none_when_gp_is_zero(self):
+        from app.services.stats_service import _compute_ppg
+        assert _compute_ppg(10, 0) is None
+        assert _compute_ppg(0, 0) is None
+
+    def test_ppg_rounded_to_two_decimals(self):
+        from app.services.stats_service import _compute_ppg
+        result = _compute_ppg(10, 3)
+        assert result == 3.33
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
