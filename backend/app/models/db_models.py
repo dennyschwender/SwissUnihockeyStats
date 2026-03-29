@@ -188,6 +188,12 @@ class Player(Base):
         Integer, default=0, nullable=False, server_default="0"
     )
     api_skip_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    photo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    height_cm: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    weight_kg: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    position_raw: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    license_raw: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    player_details_fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Relationships
     team_memberships = relationship(
