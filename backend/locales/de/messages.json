@@ -232,7 +232,9 @@
     "tab_topscorers": "Topscorer",
     "tab_penalties": "Strafen",
     "tab_results": "Ergebnisse",
-    "tab_upcoming": "Bevorstehend"
+    "tab_upcoming": "Bevorstehend",
+    "search_player_placeholder": "Spieler suchen...",
+    "no_results_search": "Keine Ergebnisse gefunden."
   },
   "pwa": {
     "install_title": "📱 Unihockey Stats installieren",

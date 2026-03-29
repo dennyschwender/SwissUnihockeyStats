@@ -1160,6 +1160,124 @@ def get_league_top_penalties(db_league_id: int, limit: int = 100) -> list[dict]:
         return result
 
 
+def search_league_scorers(db_league_id: int, query: str, limit: int = 50) -> list[dict]:
+    """Search scorers in a league by player name substring.
+    Empty query returns top scorers ordered by points desc.
+    """
+    db = get_database_service()
+    with db.session_scope() as session:
+        league = session.query(League).filter(League.id == db_league_id).first()
+        if league is None:
+            return []
+
+        league_abbrev = re.sub(
+            r"^(Junioren/-innen|Junioren|Juniorinnen|Herren|Damen|Senioren)\s+",
+            "",
+            str(league.name or ""),
+        ).strip()
+
+        base_q = (
+            session.query(PlayerStatistics, Player)
+            .join(Player, PlayerStatistics.player_id == Player.person_id)
+            .filter(
+                PlayerStatistics.season_id == league.season_id,
+                PlayerStatistics.league_abbrev == league_abbrev,
+            )
+        )
+        if league.game_class:
+            base_q = base_q.filter(
+                (PlayerStatistics.game_class == league.game_class)
+                | (PlayerStatistics.game_class == None)  # noqa: E711
+            )
+
+        q = query.strip().lower()
+        if q:
+            base_q = base_q.filter(
+                func.lower(Player.first_name + " " + Player.last_name).contains(q)
+            )
+
+        rows = (
+            base_q
+            .order_by(PlayerStatistics.points.desc(), PlayerStatistics.goals.desc())
+            .limit(limit)
+            .all()
+        )
+
+        return [
+            {
+                "player_id": ps.player_id,
+                "player_name": f"{pl.first_name or ''} {pl.last_name or ''}".strip(),
+                "team_name": ps.team_name or "",
+                "gp": ps.games_played or 0,
+                "g": ps.goals or 0,
+                "a": ps.assists or 0,
+                "pts": ps.points or 0,
+                "pim": ps.penalty_minutes or 0,
+            }
+            for ps, pl in rows
+        ]
+
+
+def search_league_penalties(db_league_id: int, query: str, limit: int = 50) -> list[dict]:
+    """Search penalty leaders in a league by player name substring.
+    Empty query returns top penalty players ordered by pim desc.
+    """
+    db = get_database_service()
+    with db.session_scope() as session:
+        league = session.query(League).filter(League.id == db_league_id).first()
+        if league is None:
+            return []
+
+        league_abbrev = re.sub(
+            r"^(Junioren/-innen|Junioren|Juniorinnen|Herren|Damen|Senioren)\s+",
+            "",
+            str(league.name or ""),
+        ).strip()
+
+        base_q = (
+            session.query(PlayerStatistics, Player)
+            .join(Player, PlayerStatistics.player_id == Player.person_id)
+            .filter(
+                PlayerStatistics.season_id == league.season_id,
+                PlayerStatistics.league_abbrev == league_abbrev,
+                PlayerStatistics.penalty_minutes > 0,
+            )
+        )
+        if league.game_class:
+            base_q = base_q.filter(
+                (PlayerStatistics.game_class == league.game_class)
+                | (PlayerStatistics.game_class == None)  # noqa: E711
+            )
+
+        q = query.strip().lower()
+        if q:
+            base_q = base_q.filter(
+                func.lower(Player.first_name + " " + Player.last_name).contains(q)
+            )
+
+        rows = (
+            base_q
+            .order_by(PlayerStatistics.penalty_minutes.desc())
+            .limit(limit)
+            .all()
+        )
+
+        return [
+            {
+                "player_id": ps.player_id,
+                "player_name": f"{pl.first_name or ''} {pl.last_name or ''}".strip(),
+                "team_name": ps.team_name or "",
+                "gp": ps.games_played or 0,
+                "pim": ps.penalty_minutes or 0,
+                "pen_2": getattr(ps, "pen_2min", None) or 0,
+                "pen_5": getattr(ps, "pen_5min", None) or 0,
+                "pen_10": getattr(ps, "pen_10min", None) or 0,
+                "pen_match": getattr(ps, "pen_match", None) or 0,
+            }
+            for ps, pl in rows
+        ]
+
+
 def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) -> list[dict]:
     """
     Overall top scorers across all leagues in a season.

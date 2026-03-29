@@ -1,0 +1,17 @@
+{% for r in rows %}
+<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;"
+    onclick="window.location='/{{ locale }}/player/{{ r.player_id }}'">
+  <td style="padding:.5rem .75rem;">
+    <a href="/{{ locale }}/player/{{ r.player_id }}" onclick="event.stopPropagation()" style="color:inherit;text-decoration:none;">{{ r.player_name }}</a>
+  </td>
+  <td style="padding:.5rem .75rem;color:var(--gray-500);">{{ r.team_name }}</td>
+  <td style="padding:.5rem .5rem;text-align:center;">{{ r.gp }}</td>
+  <td style="padding:.5rem .5rem;text-align:center;font-weight:600;color:#dc2626;">{{ r.pim }}</td>
+  <td style="padding:.5rem .5rem;text-align:center;">{{ r.pen_2 }}</td>
+  <td style="padding:.5rem .5rem;text-align:center;">{{ r.pen_5 }}</td>
+  <td style="padding:.5rem .5rem;text-align:center;">{{ r.pen_10 }}</td>
+  <td style="padding:.5rem .5rem;text-align:center;color:#dc2626;">{{ r.pen_match }}</td>
+</tr>
+{% else %}
+<tr><td colspan="8" style="padding:2rem;text-align:center;color:var(--gray-400);">{{ t.league_detail.no_results_search }}</td></tr>
+{% endfor %}

@@ -241,5 +241,77 @@ def test_fetch_recent_game_rows_with_null_nullable_fields(db_session):
     assert rows[0]["date"] == ""
 
 
+@pytest.fixture(scope="module")
+def populated_league_db(app):
+    """Insert a minimal league+player stats dataset for search tests."""
+    from app.services.database import get_database_service
+    from app.models.db_models import League, Season, Player, PlayerStatistics, LeagueGroup
+
+    db = get_database_service()
+    with db.session_scope() as session:
+        if not session.query(Season).filter_by(id=99).first():
+            session.add(Season(id=99, text="2099/00"))
+        if not session.query(League).filter_by(id=99).first():
+            session.add(League(id=99, league_id=99, season_id=99, name="Herren NLA", game_class=1))
+        if not session.query(LeagueGroup).filter_by(id=99).first():
+            session.add(LeagueGroup(id=99, league_id=99, group_id=99, name="NLA"))
+        if not session.query(Player).filter_by(person_id=9901).first():
+            session.add(Player(person_id=9901, first_name="Anna", last_name="Mueller"))
+        if not session.query(Player).filter_by(person_id=9902).first():
+            session.add(Player(person_id=9902, first_name="Bob", last_name="Smith"))
+        if not session.query(PlayerStatistics).filter_by(player_id=9901, season_id=99).first():
+            session.add(PlayerStatistics(
+                player_id=9901,
+                season_id=99,
+                league_abbrev="NLA",
+                game_class=1,
+                goals=10,
+                assists=5,
+                points=15,
+                games_played=20,
+                penalty_minutes=4,
+            ))
+        if not session.query(PlayerStatistics).filter_by(player_id=9902, season_id=99).first():
+            session.add(PlayerStatistics(
+                player_id=9902,
+                season_id=99,
+                league_abbrev="NLA",
+                game_class=1,
+                goals=2,
+                assists=1,
+                points=3,
+                games_played=20,
+                penalty_minutes=22,
+            ))
+
+
+def test_search_league_scorers_returns_matching_player(populated_league_db):
+    """search_league_scorers returns rows matching name substring."""
+    from app.services.stats_service import search_league_scorers
+
+    rows = search_league_scorers(db_league_id=99, query="anna", limit=10)
+    assert len(rows) >= 1
+    assert any("anna" in r["player_name"].lower() for r in rows)
+
+
+def test_search_league_scorers_empty_query_returns_top_rows(populated_league_db):
+    """Empty query returns top scorers ordered by points desc."""
+    from app.services.stats_service import search_league_scorers
+
+    rows = search_league_scorers(db_league_id=99, query="", limit=5)
+    assert len(rows) <= 5
+    if len(rows) > 1:
+        assert rows[0]["pts"] >= rows[1]["pts"]
+
+
+def test_search_league_penalties_returns_matching_player(populated_league_db):
+    """search_league_penalties returns rows matching name substring."""
+    from app.services.stats_service import search_league_penalties
+
+    rows = search_league_penalties(db_league_id=99, query="bob", limit=10)
+    assert len(rows) >= 1
+    assert any("bob" in r["player_name"].lower() for r in rows)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

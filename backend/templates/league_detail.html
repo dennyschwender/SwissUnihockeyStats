@@ -328,9 +328,16 @@
         <div style="margin-bottom:.75rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;">
           <!-- name text filter -->
           <div style="position:relative;flex:1;min-width:140px;">
-            <input x-model="nameFilter" type="text" placeholder="Search player…"
+            <input
+              type="text"
+              name="q"
+              x-model="searchQuery"
+              placeholder="{{ t.league_detail.search_player_placeholder }}"
+              hx-get="/{{ locale }}/league/{{ league.id }}/scorers/search"
+              hx-trigger="input delay:300ms"
+              hx-target="#scorers-search-results"
+              hx-swap="innerHTML"
               style="width:100%;box-sizing:border-box;padding:.45rem 1.6rem .45rem .75rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;font-size:.875rem;background:var(--card-bg,white);color:inherit;">
-            <span x-show="nameFilter" @click="nameFilter=''" style="position:absolute;right:.4rem;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--gray-400);font-size:1rem;" title="Clear">✕</span>
           </div>
           <!-- team multi-select dropdown -->
           <div style="position:relative;flex:1;min-width:160px;" x-data="{ open: false }" @click.outside="open=false">
@@ -364,7 +371,25 @@
           <span style="font-size:.8rem;color:var(--gray-400);white-space:nowrap;"
             x-text="isFiltered ? (filteredRows().length + ' / ' + allRows.length) : (Math.min(visibleCount, filteredRows().length) + ' / ' + allRows.length)"></span>
         </div>
-        <div style="overflow-x:auto;">
+        <!-- HTMX search results — shown when a search query is active -->
+        <div x-show="searchQuery.trim().length > 0" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+          <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+            <thead>
+              <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
+                <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.player }}</th>
+                <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.team }}</th>
+                <th style="padding:.6rem .5rem;text-align:center;">GP</th>
+                <th style="padding:.6rem .5rem;text-align:center;">G</th>
+                <th style="padding:.6rem .5rem;text-align:center;">A</th>
+                <th style="padding:.6rem .75rem;text-align:center;font-weight:700;">PTS</th>
+                <th style="padding:.6rem .5rem;text-align:center;">PIM</th>
+              </tr>
+            </thead>
+            <tbody id="scorers-search-results"></tbody>
+          </table>
+        </div>
+        <!-- Alpine table — hidden when search query is active -->
+        <div x-show="searchQuery.trim().length === 0" style="overflow-x:auto;">
           <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
             <thead>
               <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
@@ -423,6 +448,7 @@
           Alpine.data('scorersTable', () => ({
             allRows: JSON.parse(document.getElementById('scorers-data').textContent),
             nameFilter: '',
+            searchQuery: '',
             teamFilter: [],
             sortCol: 'pts',
             sortDir: -1,
@@ -512,14 +538,40 @@
       <div x-data="penaltiesTable()">
         <div style="margin-bottom:.75rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;">
           <div style="position:relative;flex:1;min-width:140px;">
-            <input x-model="nameFilter" type="text" placeholder="Search player…"
+            <input
+              type="text"
+              name="q"
+              x-model="searchQuery"
+              placeholder="{{ t.league_detail.search_player_placeholder }}"
+              hx-get="/{{ locale }}/league/{{ league.id }}/penalties/search"
+              hx-trigger="input delay:300ms"
+              hx-target="#penalties-search-results"
+              hx-swap="innerHTML"
               style="width:100%;box-sizing:border-box;padding:.45rem 1.6rem .45rem .75rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;font-size:.875rem;background:var(--card-bg,white);color:inherit;">
-            <span x-show="nameFilter" @click="nameFilter=''" style="position:absolute;right:.4rem;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--gray-400);font-size:1rem;" title="Clear">✕</span>
           </div>
           <span style="font-size:.8rem;color:var(--gray-400);white-space:nowrap;"
             x-text="(nameFilter ? filteredRows().length : Math.min(visibleCount, filteredRows().length)) + ' / ' + allRows.length"></span>
         </div>
-        <div style="overflow-x:auto;">
+        <!-- HTMX search results — shown when a search query is active -->
+        <div x-show="searchQuery.trim().length > 0" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+          <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+            <thead>
+              <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
+                <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.player }}</th>
+                <th style="padding:.6rem .75rem;text-align:left;">{{ t.table.team }}</th>
+                <th style="padding:.6rem .5rem;text-align:center;">GP</th>
+                <th style="padding:.6rem .75rem;text-align:center;font-weight:700;">PIM</th>
+                <th style="padding:.6rem .5rem;text-align:center;" title="2-minute penalties">2'</th>
+                <th style="padding:.6rem .5rem;text-align:center;" title="5-minute penalties">5'</th>
+                <th style="padding:.6rem .5rem;text-align:center;" title="10-minute penalties">10'</th>
+                <th style="padding:.6rem .5rem;text-align:center;color:#dc2626;" title="Match penalties">MP</th>
+              </tr>
+            </thead>
+            <tbody id="penalties-search-results"></tbody>
+          </table>
+        </div>
+        <!-- Alpine table — hidden when search query is active -->
+        <div x-show="searchQuery.trim().length === 0" style="overflow-x:auto;">
           <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
             <thead>
               <tr style="background:var(--gray-50,#f9fafb);border-bottom:2px solid var(--gray-200);">
@@ -576,6 +628,7 @@
               .map(x => ({ ...x, pim_pg: x.gp > 0 ? +(x.pim / x.gp).toFixed(2) : 0 }))
               .sort((a, b) => b.pim - a.pim || b.pen_match - a.pen_match),
             nameFilter: '',
+            searchQuery: '',
             sortCol: 'pim',
             sortDir: -1,
             visibleCount: 25,

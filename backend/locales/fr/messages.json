@@ -232,7 +232,9 @@
     "tab_topscorers": "Meilleurs buteurs",
     "tab_penalties": "Pénalités",
     "tab_results": "Résultats",
-    "tab_upcoming": "À venir"
+    "tab_upcoming": "À venir",
+    "search_player_placeholder": "Rechercher un joueur...",
+    "no_results_search": "Aucun résultat trouvé."
   },
   "pwa": {
     "install_title": "📱 Installer Unihockey Stats",

@@ -3578,6 +3578,28 @@ async def league_detail(request: Request, locale: str, league_id: int):
     )
 
 
+@app.get("/{locale}/league/{league_id}/scorers/search", response_class=HTMLResponse)
+async def league_scorers_search(request: Request, locale: str, league_id: int, q: str = ""):
+    from app.services.stats_service import search_league_scorers
+    rows = search_league_scorers(db_league_id=league_id, query=q, limit=50)
+    return templates.TemplateResponse(
+        request,
+        "partials/league_scorers_rows.html",
+        {"rows": rows, "locale": locale, "t": get_translations(locale)},
+    )
+
+
+@app.get("/{locale}/league/{league_id}/penalties/search", response_class=HTMLResponse)
+async def league_penalties_search(request: Request, locale: str, league_id: int, q: str = ""):
+    from app.services.stats_service import search_league_penalties
+    rows = search_league_penalties(db_league_id=league_id, query=q, limit=50)
+    return templates.TemplateResponse(
+        request,
+        "partials/league_penalties_rows.html",
+        {"rows": rows, "locale": locale, "t": get_translations(locale)},
+    )
+
+
 @app.get("/{locale}/teams", response_class=HTMLResponse)
 async def teams_page(request: Request, locale: str, season: Optional[int] = None, club: str = ""):
     """Teams listing page. Optional ?club=name pre-filters by club name."""
