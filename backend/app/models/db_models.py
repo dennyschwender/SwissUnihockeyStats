@@ -485,6 +485,24 @@ class PlayerStatistics(Base):
     )
 
 
+class Staff(Base):
+    """Coaching staff per team per season, indexed from the Swiss Unihockey API."""
+
+    __tablename__ = "staff"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)         # person_id from API
+    season_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("seasons.id"), primary_key=True
+    )
+    team_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    team_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    league_db_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    first_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    last_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    role: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow)
+
+
 class SyncStatus(Base):
     """Track sync status for different data types"""
 
