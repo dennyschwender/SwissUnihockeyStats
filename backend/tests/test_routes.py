@@ -213,3 +213,36 @@ class TestContactAndPrivacyRoutes:
         assert last_response is not None
         assert last_response.status_code == 429
         assert b"html" in last_response.content.lower()
+
+
+def test_root_redirect_uses_locale_cookie(client):
+    """Root redirect should use the preferred_locale cookie when set."""
+    client.cookies.set("preferred_locale", "en")
+    response = client.get("/", follow_redirects=False)
+    client.cookies.delete("preferred_locale")
+    assert response.status_code == 302
+    assert response.headers["location"] == "/en"
+
+
+def test_root_redirect_falls_back_to_default_when_no_cookie(client):
+    """Root redirect without cookie should redirect to DEFAULT_LOCALE (de)."""
+    client.cookies.delete("preferred_locale")
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["location"] == "/de"
+
+
+def test_root_redirect_ignores_invalid_locale_cookie(client):
+    """Root redirect with invalid locale cookie should fall back to default."""
+    client.cookies.set("preferred_locale", "zz")
+    response = client.get("/", follow_redirects=False)
+    client.cookies.delete("preferred_locale")
+    assert response.status_code == 302
+    assert response.headers["location"] == "/de"
+
+
+def test_locale_cookie_set_on_page_visit(client):
+    """Visiting a locale page should set the preferred_locale cookie."""
+    response = client.get("/en", follow_redirects=False)
+    assert "preferred_locale" in response.cookies
+    assert response.cookies["preferred_locale"] == "en"

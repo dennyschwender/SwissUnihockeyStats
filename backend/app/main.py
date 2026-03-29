@@ -27,6 +27,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response as StarletteResponse
 from app.config import settings
 from app.api.v1.router import api_router
 from app.lib.i18n import get_translations, get_locale_from_path, DEFAULT_LOCALE
@@ -195,6 +197,28 @@ app.add_middleware(
     same_site="lax",
     https_only=not settings.DEBUG,
 )
+
+
+class LocaleCookieMiddleware(BaseHTTPMiddleware):
+    """Sets preferred_locale cookie on every /{locale}/... response."""
+
+    async def dispatch(self, request, call_next):
+        from app.lib.i18n import SUPPORTED_LOCALES
+        response = await call_next(request)
+        path_parts = request.url.path.lstrip("/").split("/")
+        if path_parts and path_parts[0] in SUPPORTED_LOCALES:
+            response.set_cookie(
+                "preferred_locale",
+                path_parts[0],
+                max_age=365 * 24 * 3600,
+                httponly=False,
+                samesite="lax",
+            )
+        return response
+
+
+# Registered after SessionMiddleware so it wraps it — sets cookie on every locale response.
+app.add_middleware(LocaleCookieMiddleware)
 # Configure CORS — restrict to specific methods and headers
 app.add_middleware(
     CORSMiddleware,
@@ -440,8 +464,11 @@ if settings.DEBUG:
 
 @app.get("/", response_class=HTMLResponse)
 async def root_redirect(request: Request):
-    """Redirect root to default locale"""
-    return RedirectResponse(f"/{DEFAULT_LOCALE}", status_code=302)
+    """Redirect root to preferred locale from cookie, fallback to DEFAULT_LOCALE."""
+    from app.lib.i18n import SUPPORTED_LOCALES
+    preferred = request.cookies.get("preferred_locale", "")
+    locale = preferred if preferred in SUPPORTED_LOCALES else DEFAULT_LOCALE
+    return RedirectResponse(f"/{locale}", status_code=302)
 
 
 # ============================================================================
