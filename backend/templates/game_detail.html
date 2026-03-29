@@ -461,6 +461,11 @@ function gameTimeline(events, totalSeconds) {
       {% if game.referee_1 %}<a href="/{{ locale }}/referee/{{ game.referee_1 | urlencode }}" style="color:inherit;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ game.referee_1 }}</a>{% endif %}{% if game.referee_1 and game.referee_2 %} · {% endif %}{% if game.referee_2 %}<a href="/{{ locale }}/referee/{{ game.referee_2 | urlencode }}" style="color:inherit;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ game.referee_2 }}</a>{% endif %}
     </div>
     {% endif %}
+    {% if game.home_coach or game.away_coach %}
+    <div class="gd-meta-venue" style="font-size:.75rem;color:var(--gray-500);">🎯
+      {% if game.home_coach %}<a href="/{{ locale }}/coach/{{ game.home_coach.person_id }}" style="color:inherit;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ game.home_coach.name }}</a>{% endif %}{% if game.home_coach and game.away_coach %} · {% endif %}{% if game.away_coach %}<a href="/{{ locale }}/coach/{{ game.away_coach.person_id }}" style="color:inherit;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ game.away_coach.name }}</a>{% endif %}
+    </div>
+    {% endif %}
     {% if game.spectators is not none and game.spectators != '' %}
     <div class="gd-meta-venue" style="font-size:.75rem;color:var(--gray-500);">👥 {{ game.spectators }} spectators</div>
     {% endif %}

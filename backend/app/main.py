@@ -4175,6 +4175,44 @@ async def universal_search(request: Request, locale: str, q: str = ""):
                 )
             html_parts.append("</div></div>")
 
+        # --- Coaches ---
+        from app.models.db_models import Staff as _StaffModel
+        from sqlalchemy import func as _sfunc
+
+        coach_matches = (
+            session.query(_StaffModel)
+            .filter(
+                or_(
+                    (_sfunc.lower(_StaffModel.first_name) + " " + _sfunc.lower(_StaffModel.last_name)).ilike(f"%{q.lower()}%"),
+                    _StaffModel.last_name.ilike(f"%{q}%"),
+                    _StaffModel.first_name.ilike(f"%{q}%"),
+                ),
+                _StaffModel.role.isnot(None),
+            )
+            .order_by(_StaffModel.season_id.desc())
+            .limit(5)
+            .all()
+        )
+        seen_coach_ids: set[int] = set()
+        unique_coaches = []
+        for cm in coach_matches:
+            if cm.id not in seen_coach_ids:
+                seen_coach_ids.add(cm.id)
+                unique_coaches.append(cm)
+        if unique_coaches:
+            html_parts.append(
+                '<div class="search-category"><h3>🎯 Coaches</h3><div class="search-items">'
+            )
+            for cm in unique_coaches:
+                cname = " ".join(p for p in [cm.first_name, cm.last_name] if p).strip()
+                crole = cm.role or ""
+                html_parts.append(
+                    f'<div class="search-item" onclick="window.location.href=\'/{locale}/coach/{cm.id}\'">'
+                    f'<span class="search-item-main"><strong>{cname}</strong>'
+                    f'<span class="search-item-subtitle">{crole}</span></span></div>'
+                )
+            html_parts.append("</div></div>")
+
     if not html_parts:
         return HTMLResponse(
             '<div class="search-results"><p style="text-align:center;padding:2rem;color:var(--gray-500)">No results found for <em>'

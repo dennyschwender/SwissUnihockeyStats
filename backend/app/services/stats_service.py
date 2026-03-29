@@ -3634,6 +3634,30 @@ def get_game_box_score(game_id: int) -> dict:
             goals, penalties, home_name, away_name
         )
 
+        # Coach lookup for home and away teams
+        from app.models.db_models import Staff as _StaffModel
+        from sqlalchemy import func as _func
+
+        def _get_head_coach(tid, sid):
+            if not tid:
+                return None
+            row = (
+                session.query(_StaffModel)
+                .filter(
+                    _StaffModel.team_id == tid,
+                    _StaffModel.season_id == sid,
+                    _func.lower(_StaffModel.role) == "headcoach",
+                )
+                .first()
+            )
+            if not row:
+                return None
+            name = " ".join(p for p in [row.first_name, row.last_name] if p).strip()
+            return {"person_id": row.id, "name": name or f"Coach {row.id}"}
+
+        home_coach = _get_head_coach(game.home_team_id, game.season_id)
+        away_coach = _get_head_coach(game.away_team_id, game.season_id)
+
         def _get_regular_season_standings(db_session, league_id, group_id, phase):
             """For playoff/playout games, show the regular-season standings instead."""
             if not league_id:
@@ -3671,6 +3695,8 @@ def get_game_box_score(game_id: int) -> dict:
             "status": game.status or "",
             "referee_1": game.referee_1 or "",
             "referee_2": game.referee_2 or "",
+            "home_coach": home_coach,
+            "away_coach": away_coach,
             "spectators": game.spectators,
             "goals": goals,
             "penalties": penalties,

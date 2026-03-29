@@ -28,6 +28,12 @@
       {% if team.season_name %}<span>{{ team.season_name }}</span>{% endif %}
     </div>
     {% endif %}
+    {% if team and team.head_coach %}
+    <div style="font-size:.8rem;color:var(--gray-500);margin-top:.25rem;">
+      🎯 {{ t.coach.head_coach }}:
+      <a href="/{{ locale }}/coach/{{ team.head_coach.person_id }}" class="link-text">{{ team.head_coach.name }}</a>
+    </div>
+    {% endif %}
     {% if team and team.available_seasons | length > 1 %}
     <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.75rem;">
       {% for s in team.available_seasons %}
