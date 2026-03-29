@@ -2315,21 +2315,23 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
                     break
             return s.strip().lower()
 
+        # First pass: find all (season_id, norm_league) keys that have a named team.
+        _keys_with_team: set[tuple] = set()
+        for r in career:
+            if (r.get("team_name") or "").strip() not in ("", "—"):
+                _keys_with_team.add((r["season_id"], _norm_league(r["league"])))
+
         _career_seen: set[tuple] = set()
-        _career_seen_with_team: set[tuple] = set()  # (season_id, norm_league) keys that have a team
         _career_deduped: list[dict] = []
         for r in career:
             _nl = _norm_league(r["league"])
-            _tn = (r.get("team_name") or "").lower()
-            _sk = (r["season_id"], _nl)  # season+league key
-            _dk = (_sk[0], _nl, _tn)
-            # Skip empty-team row if we already have a named-team row for the same season+league
-            if not _tn and _sk in _career_seen_with_team:
+            _tn = (r.get("team_name") or "").strip()
+            # Drop empty-team rows when a named-team row exists for the same season+league
+            if _tn in ("", "—") and (r["season_id"], _nl) in _keys_with_team:
                 continue
+            _dk = (r["season_id"], _nl, _tn.lower())
             if _dk not in _career_seen:
                 _career_seen.add(_dk)
-                if _tn:
-                    _career_seen_with_team.add(_sk)
                 _career_deduped.append(r)
         career = _career_deduped
 
