@@ -3669,6 +3669,145 @@ def _canonical_phase(phase_str: str | None) -> str:
     return "regular"
 
 
+def _build_series_rounds(
+    phase_group_ids: list[int],
+    season_id: int,
+    session,
+    reg_rank: Optional[dict] = None,
+) -> list[dict]:
+    """Return [{phase_name, series_list}] grouped by LeagueGroup (one per round).
+
+    Args:
+        phase_group_ids: LeagueGroup.id values for one canonical phase (playoff or playout).
+        season_id: season to filter games by.
+        session: active SQLAlchemy session.
+        reg_rank: optional dict[team_id -> int rank] from regular season standings.
+
+    Returns list of phase dicts ordered by earliest game date ascending.
+    """
+    if not phase_group_ids:
+        return []
+
+    phase_groups = (
+        session.query(LeagueGroup)
+        .filter(LeagueGroup.id.in_(phase_group_ids))
+        .all()
+    )
+
+    phase_games = (
+        session.query(Game)
+        .filter(
+            Game.group_id.in_(phase_group_ids),
+            Game.season_id == season_id,
+        )
+        .order_by(Game.game_date.asc())
+        .all()
+    )
+    if not phase_games:
+        return []
+
+    all_team_ids = {g.home_team_id for g in phase_games} | {g.away_team_id for g in phase_games}
+    _snm: dict[int, str] = {}
+    _slogo: dict[int, Optional[str]] = {}
+    for _t in (
+        session.query(Team)
+        .filter(Team.id.in_(all_team_ids), Team.season_id == season_id)
+        .all()
+    ):
+        _snm[_t.id] = _t.name or _t.text or f"Team {_t.id}"
+        if _t.logo_url:
+            _slogo[_t.id] = _t.logo_url
+    _missing = all_team_ids - _snm.keys()
+    if _missing:
+        for _t in (
+            session.query(Team)
+            .filter(Team.id.in_(_missing), Team.name.isnot(None))
+            .all()
+        ):
+            _snm.setdefault(_t.id, _t.name)
+            if _t.logo_url:
+                _slogo.setdefault(_t.id, _t.logo_url)
+
+    # Bucket games by group_id -> sorted team-pair key
+    _pairs_by_group: dict[int, dict[tuple, list]] = {g.id: {} for g in phase_groups}
+    for _g in phase_games:
+        _key = tuple(sorted([_g.home_team_id, _g.away_team_id]))
+        _pairs_by_group[_g.group_id].setdefault(_key, []).append(_g)
+
+    def _earliest(gid: int) -> datetime:
+        dates = [g.game_date for g in phase_games if g.group_id == gid and g.game_date]
+        return min(dates) if dates else datetime.max
+
+    ordered_groups = sorted(
+        [g for g in phase_groups if _pairs_by_group.get(g.id)],
+        key=lambda g: _earliest(g.id),
+    )
+
+    phases: list[dict] = []
+    for _grp in ordered_groups:
+        group_series: list[dict] = []
+        for _key, _pgames in sorted(
+            _pairs_by_group[_grp.id].items(),
+            key=lambda x: _snm.get(x[0][0] if isinstance(x[0], tuple) else x[0], ""),
+        ):
+            _sorted = sorted(_pgames, key=lambda x: x.game_date or datetime.min)
+            _first_g = _sorted[0]
+            _ta = _first_g.home_team_id
+            _tb = _first_g.away_team_id
+            _ta_wins = _tb_wins = 0
+            _games_list: list[dict] = []
+            for _g in _sorted:
+                _played = _g.home_score is not None
+                if _played:
+                    _home_wins = _g.home_score > _g.away_score
+                    if _g.home_team_id == _ta:
+                        if _home_wins:
+                            _ta_wins += 1
+                        else:
+                            _tb_wins += 1
+                    else:
+                        if _home_wins:
+                            _tb_wins += 1
+                        else:
+                            _ta_wins += 1
+                _games_list.append(
+                    {
+                        "game_id": _g.id,
+                        "date": _g.game_date.strftime("%d.%m.%Y") if _g.game_date else "",
+                        "weekday": _g.game_date.strftime("%a") if _g.game_date else "",
+                        "home_team": _snm.get(_g.home_team_id, f"Team {_g.home_team_id}"),
+                        "away_team": _snm.get(_g.away_team_id, f"Team {_g.away_team_id}"),
+                        "home_team_id": _g.home_team_id,
+                        "away_team_id": _g.away_team_id,
+                        "home_score": _g.home_score,
+                        "away_score": _g.away_score,
+                        "played": _played,
+                    }
+                )
+            group_series.append(
+                {
+                    "team_a_id": _ta,
+                    "team_b_id": _tb,
+                    "team_a_name": _snm.get(_ta, f"Team {_ta}"),
+                    "team_b_name": _snm.get(_tb, f"Team {_tb}"),
+                    "team_a_logo": _slogo.get(_ta),
+                    "team_b_logo": _slogo.get(_tb),
+                    "team_a_rank": (reg_rank or {}).get(_ta),
+                    "team_b_rank": (reg_rank or {}).get(_tb),
+                    "team_a_wins": _ta_wins,
+                    "team_b_wins": _tb_wins,
+                    "games": _games_list,
+                }
+            )
+        phases.append(
+            {
+                "phase_name": _grp.phase or "",
+                "series_list": group_series,
+            }
+        )
+    return phases
+
+
 def get_playoff_series_for_game(game_id: int) -> dict | None:
     """Return all series in the same playoff/playout phase as *game_id*, grouped by round.
 

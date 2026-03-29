@@ -350,3 +350,54 @@ class TestTeamRosterPPG:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
+
+
+class TestBuildSeriesRounds:
+    """Test _build_series_rounds returns grouped phase structure."""
+
+    def test_returns_list_of_phase_dicts(self):
+        from app.services.stats_service import _build_series_rounds
+        from app.services.database import get_database_service
+        from app.models.db_models import LeagueGroup
+        db = get_database_service()
+        with db.session_scope() as session:
+            groups = session.query(LeagueGroup).limit(2).all()
+            if not groups:
+                pytest.skip("No LeagueGroup rows in DB")
+            group_ids = [g.id for g in groups]
+            season_id = groups[0].league.season_id if groups[0].league else 2025
+            result = _build_series_rounds(group_ids, season_id, session)
+        assert isinstance(result, list)
+        for phase in result:
+            assert "phase_name" in phase
+            assert "series_list" in phase
+            assert isinstance(phase["series_list"], list)
+
+    def test_empty_group_ids_returns_empty_list(self):
+        from app.services.stats_service import _build_series_rounds
+        from app.services.database import get_database_service
+        db = get_database_service()
+        with db.session_scope() as session:
+            result = _build_series_rounds([], 2025, session)
+        assert result == []
+
+    def test_series_have_required_keys(self):
+        from app.services.stats_service import _build_series_rounds
+        from app.services.database import get_database_service
+        from app.models.db_models import LeagueGroup, Game
+        db = get_database_service()
+        with db.session_scope() as session:
+            grp = (
+                session.query(LeagueGroup)
+                .join(Game, Game.group_id == LeagueGroup.id)
+                .first()
+            )
+            if not grp:
+                pytest.skip("No LeagueGroup with games")
+            result = _build_series_rounds([grp.id], grp.league.season_id if grp.league else 2025, session)
+        if not result or not result[0]["series_list"]:
+            pytest.skip("No series in result")
+        s = result[0]["series_list"][0]
+        for key in ("team_a_id", "team_b_id", "team_a_name", "team_b_name",
+                    "team_a_wins", "team_b_wins", "games"):
+            assert key in s, f"Missing key {key} in series dict"
