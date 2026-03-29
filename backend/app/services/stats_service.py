@@ -1908,11 +1908,40 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
         # ── Group standings: find the DB league id and the regular-season group the team plays in
         _league_db_id: int | None = league_row.id if league_row else None
         _team_group_id: int | None = None
+        _standings_group_ids: list[int] | None = None
         _group_name: str = ""
         if _league_db_id:
-            _all_group_rows = (
-                session.query(Game.group_id, LeagueGroup.name, LeagueGroup.text, LeagueGroup.phase)
-                .join(LeagueGroup, Game.group_id == LeagueGroup.id)
+            def _cp(phase_str: str | None) -> str:
+                """Canonical phase — mirrors league page logic."""
+                if not phase_str:
+                    return "implicit"  # undifferentiated; old-style indexing
+                if phase_str == "Regelsaison":
+                    return "regular"
+                p = phase_str.lower()
+                if "playoff" in p or "superfinal" in p:
+                    return "playoff"
+                if "playout" in p:
+                    return "playout"
+                if "aufstieg" in p or "abstieg" in p or "qualifikation" in p:
+                    return "promotion"
+                return "regular"
+
+            # All groups in this league, with their canonical phase
+            all_league_groups = (
+                session.query(LeagueGroup)
+                .filter(LeagueGroup.league_id == _league_db_id)
+                .all()
+            )
+            # Explicit regular-season groups (phase='Regelsaison')
+            explicit_regular = [g for g in all_league_groups if _cp(g.phase) == "regular"]
+            # Implicit (phase=None) groups — only used when no explicit ones exist
+            implicit_regular = [g for g in all_league_groups if _cp(g.phase) == "implicit"]
+            candidate_regular = explicit_regular if explicit_regular else implicit_regular
+
+            # Groups this specific team has games in
+            _team_gids: set[int] = {
+                row[0]
+                for row in session.query(Game.group_id)
                 .filter(
                     or_(Game.home_team_id == team_id, Game.away_team_id == team_id),
                     Game.season_id == season_id,
@@ -1920,16 +1949,24 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                 )
                 .distinct()
                 .all()
-            )
-            # Prefer the regular-season group (phase == "Regelsaison" or None/empty),
-            # falling back to the first group if no regular-season group is found.
-            _regular_row = next(
-                (r for r in _all_group_rows if not r[3] or r[3] == "Regelsaison"),
-                _all_group_rows[0] if _all_group_rows else None,
-            )
-            if _regular_row:
-                _team_group_id = _regular_row[0]
-                _group_name = _regular_row[1] or _regular_row[2] or ""
+            }
+
+            # Regular groups the team actually played in (for group-name display)
+            team_regular = [g for g in candidate_regular if g.id in _team_gids]
+
+            if team_regular:
+                # Use the team's own regular group for the display name
+                _team_group_id = team_regular[0].id
+                _group_name = team_regular[0].name or team_regular[0].text or ""
+                # Multi-group league: show only this team's group in standings
+                if len(candidate_regular) > 1:
+                    _standings_group_ids = [g.id for g in team_regular]
+                else:
+                    _standings_group_ids = [g.id for g in candidate_regular]
+            elif candidate_regular:
+                # Team only played non-regular rounds (playout/playoff only);
+                # still show the league's regular standings so the position is visible
+                _standings_group_ids = [g.id for g in candidate_regular]
 
         # Head coach lookup
         from app.models.db_models import Staff as _Staff
@@ -1973,7 +2010,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
         try:
             _result_data["standings"] = get_league_standings(
                 _league_db_id,
-                only_group_ids=[_team_group_id] if _team_group_id else None,
+                only_group_ids=_standings_group_ids,
             )
         except Exception:
             pass
