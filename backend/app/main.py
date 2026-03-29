@@ -4144,23 +4144,18 @@ async def universal_search(request: Request, locale: str, q: str = ""):
             html_parts.append("</div></div>")
 
         # --- Referees ---
-        from sqlalchemy import union, column as _col
+        from sqlalchemy import select, union
         from app.models.db_models import Game
 
-        ref1_q = (
-            session.query(Game.referee_1.label("name"))
-            .filter(Game.referee_1.ilike(f"%{q}%"), Game.referee_1.isnot(None))
-        )
-        ref2_q = (
-            session.query(Game.referee_2.label("name"))
-            .filter(Game.referee_2.ilike(f"%{q}%"), Game.referee_2.isnot(None))
-        )
-        referee_names = (
-            session.query(_col("name"))
-            .select_entity_from(union(ref1_q, ref2_q).alias("refs"))
-            .limit(5)
-            .all()
-        )
+        _ref_stmt = union(
+            select(Game.referee_1.label("name")).where(
+                Game.referee_1.ilike(f"%{q}%"), Game.referee_1.isnot(None)
+            ),
+            select(Game.referee_2.label("name")).where(
+                Game.referee_2.ilike(f"%{q}%"), Game.referee_2.isnot(None)
+            ),
+        ).limit(5)
+        referee_names = session.execute(_ref_stmt).fetchall()
         if referee_names:
             html_parts.append(
                 '<div class="search-category"><h3>🧑‍⚖️ Referees</h3><div class="search-items">'
