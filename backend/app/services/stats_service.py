@@ -1758,7 +1758,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                         "a": a_val,
                         "pts": pts_val,
                         "pim": pim_val,
-                        "ppg": round(pts_val / gp_val, 2) if gp_val else None,
+                        "ppg": _compute_ppg(pts_val, gp_val),
                     }
                 )
 
@@ -1812,7 +1812,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                         "pts": pts_val,
                         "pim": pim_val,
                         "from_games": True,
-                        "ppg": round(pts_val / (ps.get("gp") or info["gp"]), 2) if (ps.get("gp") or info["gp"]) else None,
+                        "ppg": _compute_ppg(pts_val, ps.get("gp") or info["gp"]),
                     }
                 )
         else:
@@ -1835,7 +1835,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                         "a": info["a"],
                         "pts": info["pts"],
                         "pim": info["pim"],
-                        "ppg": round(info["pts"] / info["gp"], 2) if info["gp"] else None,
+                        "ppg": _compute_ppg(info["pts"], info["gp"]),
                     }
                 )
             roster.sort(key=lambda r: (r["number"] if r["number"] is not None else 99, r["name"]))
