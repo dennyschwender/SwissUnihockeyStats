@@ -716,5 +716,85 @@ def repair_groups():
     click.echo("Done.")
 
 
+@cli.command()
+def populate_year_of_birth():
+    """Populate year_of_birth for players without it via API."""
+    import time
+    from app.services.api_client import SwissUnihockeyClient
+    from app.services.database import get_database_service
+    from app.models.db_models import Player
+
+    client = SwissUnihockeyClient()
+    db = get_database_service()
+    batch_size = 1000
+    delay = 0.1
+
+    with db.session_scope() as session:
+        total_missing = session.query(Player).filter(Player.year_of_birth.is_(None)).count()
+    click.echo(f'Found {total_missing} players without year_of_birth')
+
+    offset = 0
+    updated_total = 0
+    batch_num = 0
+
+    while True:
+        batch_num += 1
+        with db.session_scope() as session:
+            players = session.query(Player).filter(Player.year_of_birth.is_(None)).offset(offset).limit(batch_size).all()
+            person_ids = [p.person_id for p in players]
+
+        if not person_ids:
+            break
+
+        updates = {}
+        for person_id in person_ids:
+            try:
+                data = client.get_player_details(person_id)
+                rows = data.get('data', {}).get('regions', [])[0].get('rows', [])
+                yob = None
+                if rows:
+                    cells = rows[0].get('cells', [])
+                    for cell in cells:
+                        if isinstance(cell, dict) and cell.get('key') == 'year_of_birth':
+                            txt = cell.get('text', [''])[0]
+                            try:
+                                yob = int(txt.strip()) if txt else None
+                            except (ValueError, TypeError):
+                                yob = None
+                            break
+                    if not yob and len(cells) > 4:
+                        cell = cells[4]
+                        txt = cell.get('text', [''])[0] if isinstance(cell, dict) else ''
+                        try:
+                            yob = int(txt.strip()) if txt else None
+                            if yob and not (1950 <= yob <= 2025):
+                                yob = None
+                        except (ValueError, TypeError):
+                            yob = None
+                if yob:
+                    updates[person_id] = yob
+            except Exception as e:
+                click.echo(f'  Error {person_id}: {e}')
+            time.sleep(delay)
+
+        if updates:
+            with db.session_scope() as session:
+                rows_updated = (
+                    session.query(Player)
+                    .filter(Player.person_id.in_(updates.keys()), Player.year_of_birth.is_(None))
+                    .all()
+                )
+                for p in rows_updated:
+                    p.year_of_birth = updates[p.person_id]
+
+        batch_updated = len(updates)
+        updated_total += batch_updated
+        offset += batch_size
+        click.echo(f'Batch {batch_num}: processed {len(person_ids)} players, updated {batch_updated}. Total updated: {updated_total}. Progress: {offset}/{total_missing}')
+        time.sleep(1)
+
+    click.echo(f'\nDone. Total updated: {updated_total} players')
+
+
 if __name__ == "__main__":
     cli()

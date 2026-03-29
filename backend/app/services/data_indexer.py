@@ -831,6 +831,18 @@ class DataIndexer:
                         team_player.position = pos_txt or None
                     else:
                         team_player.position = row.get("position")
+                    # cells[3] = year of birth ("Jahrgang")
+                    if not player.year_of_birth and len(cells) >= 4:
+                        yob_cell = cells[3]
+                        yob_txt = yob_cell.get("text", "") if isinstance(yob_cell, dict) else ""
+                        if isinstance(yob_txt, list):
+                            yob_txt = yob_txt[0] if yob_txt else ""
+                        try:
+                            yob = int(str(yob_txt).strip()) if yob_txt else None
+                            if yob and 1950 <= yob <= 2025:
+                                player.year_of_birth = yob
+                        except (ValueError, TypeError):
+                            pass
                     team_player.last_updated = datetime.now(timezone.utc)
 
                     count += 1

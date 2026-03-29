@@ -2130,7 +2130,7 @@ def get_player_detail(person_id: int) -> dict:
             "photo_url": None,
         }
 
-    # Fetch photo URL from API outside the DB session (HTTP call)
+    # Fetch photo URL and birth year from API outside the DB session (HTTP call)
     try:
         from app.services.swissunihockey import get_swissunihockey_client
 
@@ -2142,6 +2142,23 @@ def get_player_detail(person_id: int) -> dict:
             if cells:
                 img = cells[0].get("image", {})
                 result["photo_url"] = img.get("url") or None
+                # cells[4] is "Jahrgang" (year of birth) per API response structure
+                if not result["year_of_birth"] and len(cells) > 4:
+                    yob_texts = cells[4].get("text", [])
+                    if yob_texts:
+                        try:
+                            yob = int(str(yob_texts[0]).strip())
+                            if 1950 <= yob <= 2025:
+                                result["year_of_birth"] = yob
+                                db = get_database_service()
+                                with db.session_scope() as session:
+                                    player_row = session.query(Player).filter(
+                                        Player.person_id == person_id
+                                    ).first()
+                                    if player_row and not player_row.year_of_birth:
+                                        player_row.year_of_birth = yob
+                        except (ValueError, TypeError):
+                            pass
     except Exception:
         pass
 
