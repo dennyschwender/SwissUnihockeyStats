@@ -85,3 +85,4 @@ backend/data/
 
 # Git worktrees
 .worktrees/
+.worktrees/
