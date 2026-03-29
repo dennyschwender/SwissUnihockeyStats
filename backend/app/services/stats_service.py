@@ -1924,6 +1924,24 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
                 _team_group_id = _group_row[0]
                 _group_name = _group_row[1] or _group_row[2] or ""
 
+        # Head coach lookup
+        from app.models.db_models import Staff as _Staff
+        _head_coach_row = (
+            session.query(_Staff)
+            .filter(
+                _Staff.team_id == team_id,
+                _Staff.season_id == season_id,
+                func.lower(_Staff.role) == "headcoach",
+            )
+            .first()
+        )
+        head_coach = None
+        if _head_coach_row:
+            _cn = " ".join(
+                p for p in [_head_coach_row.first_name, _head_coach_row.last_name] if p
+            ).strip()
+            head_coach = {"person_id": _head_coach_row.id, "name": _cn or f"Coach {_head_coach_row.id}"}
+
         _result_data = {
             "id": team.id,
             "name": team.name or team.text or f"Team {team_id}",
@@ -1940,6 +1958,7 @@ def get_team_detail(team_id: int, season_id: Optional[int] = None) -> dict:
             "upcoming_games": _get_team_upcoming(session, team_id, season_id or 0),
             "standings": [],
             "group_name": _group_name,
+            "head_coach": head_coach,
         }
 
     # Fetch standings outside the session scope (get_league_standings opens its own session)
@@ -4220,4 +4239,49 @@ def get_referee_games(name: str, session) -> dict:
             for g in games
         ],
         "total": len(games),
+    }
+
+
+def get_coach_detail(person_id: int, session) -> dict | None:
+    """Return coaching history for a staff person.
+
+    Returns dict or None if person not found.
+    """
+    from app.models.db_models import Staff
+
+    rows = (
+        session.query(Staff)
+        .filter(Staff.id == person_id)
+        .order_by(Staff.season_id.desc())
+        .all()
+    )
+    if not rows:
+        return None
+    latest = rows[0]
+    name = " ".join(
+        part for part in [latest.first_name, latest.last_name] if part
+    ).strip() or f"Coach {person_id}"
+
+    season_texts = {
+        r[0]: r[1]
+        for r in session.query(Season.id, Season.text)
+        .filter(Season.id.in_([r.season_id for r in rows]))
+        .all()
+    }
+
+    return {
+        "person_id": person_id,
+        "name": name,
+        "role": latest.role,
+        "seasons": [
+            {
+                "season_id": r.season_id,
+                "season_text": season_texts.get(r.season_id) or str(r.season_id),
+                "team_name": r.team_name or "",
+                "team_db_id": r.team_id,
+                "league_db_id": r.league_db_id,
+                "role": r.role,
+            }
+            for r in rows
+        ],
     }

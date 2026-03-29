@@ -558,3 +558,43 @@ class TestGetRefereeGames:
         result = get_referee_games("Nobody Here", db_session)
         assert result["total"] == 0
         assert result["games"] == []
+
+
+class TestGetCoachDetail:
+    """Test get_coach_detail returns correct structure."""
+
+    def _seed_coach(self, session):
+        from app.models.db_models import Staff, Season, Team
+        session.merge(Season(id=2025, text="2024/25", highlighted=True))
+        session.merge(Season(id=2024, text="2023/24", highlighted=False))
+        session.merge(Team(id=201, season_id=2025, name="Team X"))
+        session.flush()
+        session.merge(Staff(
+            id=401, season_id=2025, team_id=201, team_name="Team X",
+            first_name="Anna", last_name="Coach", role="Headcoach",
+        ))
+        session.merge(Staff(
+            id=401, season_id=2024, team_id=201, team_name="Team X",
+            first_name="Anna", last_name="Coach", role="Headcoach",
+        ))
+        session.flush()
+
+    def test_returns_coach_dict(self, db_session):
+        self._seed_coach(db_session)
+        from app.services.stats_service import get_coach_detail
+        result = get_coach_detail(401, db_session)
+        assert result is not None
+        assert result["name"] == "Anna Coach"
+        assert result["person_id"] == 401
+
+    def test_seasons_ordered_desc(self, db_session):
+        self._seed_coach(db_session)
+        from app.services.stats_service import get_coach_detail
+        result = get_coach_detail(401, db_session)
+        season_ids = [s["season_id"] for s in result["seasons"]]
+        assert season_ids == sorted(season_ids, reverse=True)
+
+    def test_unknown_coach_returns_none(self, db_session):
+        from app.services.stats_service import get_coach_detail
+        result = get_coach_detail(999999, db_session)
+        assert result is None
