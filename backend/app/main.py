@@ -3918,6 +3918,23 @@ async def player_detail(request: Request, locale: str, player_id: int):
     )
 
 
+@app.get("/{locale}/referee/{name:path}", response_class=HTMLResponse)
+async def referee_detail(locale: str, name: str, request: Request):
+    """Referee detail page — shows all games refereed by this person."""
+    from urllib.parse import unquote
+    from app.services.stats_service import get_referee_games
+    from app.services.database import get_database_service
+    t = get_translations(locale)
+    db = get_database_service()
+    decoded_name = unquote(name)
+    with db.session_scope() as session:
+        referee = get_referee_games(decoded_name, session)
+    return templates.TemplateResponse(
+        "referee_detail.html",
+        {"request": request, "locale": locale, "t": t, "referee": referee},
+    )
+
+
 # ==================== Other Pages ====================
 
 

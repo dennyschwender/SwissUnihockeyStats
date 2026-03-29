@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ t.referee.page_title }} — {{ referee.name }}{% endblock %}
+
+{% block content %}
+<div class="container page-content">
+  <div style="margin-bottom:1.5rem;">
+    <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:.25rem;">🧑‍⚖️ {{ referee.name }}</h1>
+    <p style="color:var(--gray-500);font-size:.9rem;">{{ t.referee.games_count }}: {{ referee.total }}</p>
+  </div>
+
+  {% if referee.games %}
+  <div class="section-block">
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>{{ t.table.date }}</th>
+            <th>{{ t.table.league }}</th>
+            <th>{{ t.table.home_team }}</th>
+            <th style="text-align:center;">Score</th>
+            <th>{{ t.table.away_team }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for g in referee.games %}
+          <tr class="clickable" onclick="window.location='/{{ locale }}/game/{{ g.game_id }}'">
+            <td style="white-space:nowrap;color:var(--gray-500);">{{ g.game_date }}</td>
+            <td style="font-size:.8rem;color:var(--gray-500);">
+              {% if g.league_db_id %}<a href="/{{ locale }}/league/{{ g.league_db_id }}" class="link-inherit" onclick="event.stopPropagation()">{{ g.league_name }}</a>{% else %}{{ g.league_name }}{% endif %}
+            </td>
+            <td style="font-weight:500;">{{ g.home_team }}</td>
+            <td style="text-align:center;font-weight:700;">
+              {% if g.score %}{{ g.score }}{% else %}<span style="color:var(--gray-400);">vs</span>{% endif %}
+            </td>
+            <td style="font-weight:500;">{{ g.away_team }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state-center">
+    <p class="empty-state-icon">🧑‍⚖️</p>
+    <p>{{ t.referee.no_games }}</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
