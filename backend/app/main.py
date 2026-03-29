@@ -4126,6 +4126,38 @@ async def universal_search(request: Request, locale: str, q: str = ""):
                 )
             html_parts.append("</div></div>")
 
+        # --- Referees ---
+        from sqlalchemy import union
+        from app.models.db_models import Game
+
+        ref1_q = (
+            session.query(Game.referee_1.label("name"))
+            .filter(Game.referee_1.ilike(f"%{q}%"), Game.referee_1.isnot(None))
+        )
+        ref2_q = (
+            session.query(Game.referee_2.label("name"))
+            .filter(Game.referee_2.ilike(f"%{q}%"), Game.referee_2.isnot(None))
+        )
+        referee_names = (
+            session.query("name")
+            .select_entity_from(union(ref1_q, ref2_q).alias("refs"))
+            .limit(5)
+            .all()
+        )
+        if referee_names:
+            html_parts.append(
+                '<div class="search-category"><h3>🧑‍⚖️ Referees</h3><div class="search-items">'
+            )
+            for (ref_name,) in referee_names:
+                from urllib.parse import quote
+
+                url = f"/{locale}/referee/{quote(ref_name)}"
+                html_parts.append(
+                    f'<div class="search-item" onclick="window.location.href=\'{url}\'">'
+                    f"<strong>{ref_name}</strong></div>"
+                )
+            html_parts.append("</div></div>")
+
     if not html_parts:
         return HTMLResponse(
             '<div class="search-results"><p style="text-align:center;padding:2rem;color:var(--gray-500)">No results found for <em>'

@@ -457,7 +457,9 @@ function gameTimeline(events, totalSeconds) {
     <div class="gd-meta-venue"><a href="https://www.google.com/maps/search/?api=1&query={{ game.venue | urlencode }}" target="_blank" rel="noopener">📍 {{ game.venue }}</a></div>
     {% endif %}
     {% if game.referee_1 or game.referee_2 %}
-    <div class="gd-meta-venue" style="font-size:.75rem;color:var(--gray-500);">🧑‍⚖️ {{ game.referee_1 }}{% if game.referee_1 and game.referee_2 %} · {% endif %}{{ game.referee_2 }}</div>
+    <div class="gd-meta-venue" style="font-size:.75rem;color:var(--gray-500);">🧑‍⚖️
+      {% if game.referee_1 %}<a href="/{{ locale }}/referee/{{ game.referee_1 | urlencode }}" style="color:inherit;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ game.referee_1 }}</a>{% endif %}{% if game.referee_1 and game.referee_2 %} · {% endif %}{% if game.referee_2 %}<a href="/{{ locale }}/referee/{{ game.referee_2 | urlencode }}" style="color:inherit;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ game.referee_2 }}</a>{% endif %}
+    </div>
     {% endif %}
     {% if game.spectators is not none and game.spectators != '' %}
     <div class="gd-meta-venue" style="font-size:.75rem;color:var(--gray-500);">👥 {{ game.spectators }} spectators</div>
