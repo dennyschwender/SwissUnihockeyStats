@@ -260,5 +260,17 @@
     "description": "Umfassende Statistiken für Schweizer Unihockey-Ligen, Teams, Spiele und Ranglisten",
     "og_description": "Umfassende Statistiken für Schweizer Unihockey-Ligen, Teams, Spiele und Ranglisten",
     "keywords": "unihockey, floorball, schweiz, statistiken, ligen, teams, ranglisten"
+  },
+  "referee": {
+    "page_title": "Schiedsrichter",
+    "games_count": "Spiele als Schiedsrichter",
+    "no_games": "Keine Spiele gefunden."
+  },
+  "coach": {
+    "page_title": "Trainer",
+    "head_coach": "Headcoach",
+    "assistant_coach": "Assistenzcoach",
+    "no_seasons": "Keine Saisons gefunden.",
+    "season_history": "Stationsübersicht"
   }
 }

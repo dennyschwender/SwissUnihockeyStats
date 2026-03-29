@@ -260,5 +260,17 @@
     "description": "Statistiche complete per leghe, squadre, partite e classifiche dell'unihockey svizzero",
     "og_description": "Statistiche complete per leghe, squadre, partite e classifiche dell'unihockey svizzero",
     "keywords": "unihockey, floorball, svizzera, statistiche, leghe, squadre, classifiche"
+  },
+  "referee": {
+    "page_title": "Arbitro",
+    "games_count": "Partite come arbitro",
+    "no_games": "Nessuna partita trovata."
+  },
+  "coach": {
+    "page_title": "Allenatore",
+    "head_coach": "Capo allenatore",
+    "assistant_coach": "Assistente allenatore",
+    "no_seasons": "Nessuna stagione trovata.",
+    "season_history": "Storico stagioni"
   }
 }

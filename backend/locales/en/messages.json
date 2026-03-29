@@ -260,5 +260,17 @@
     "description": "Comprehensive statistics for Swiss floorball leagues, teams, games, and rankings",
     "og_description": "Comprehensive statistics for Swiss floorball leagues, teams, games, and rankings",
     "keywords": "unihockey, floorball, swiss, statistics, leagues, teams, rankings"
+  },
+  "referee": {
+    "page_title": "Referee",
+    "games_count": "Games as referee",
+    "no_games": "No games found."
+  },
+  "coach": {
+    "page_title": "Coach",
+    "head_coach": "Head Coach",
+    "assistant_coach": "Assistant Coach",
+    "no_seasons": "No seasons found.",
+    "season_history": "Season History"
   }
 }
