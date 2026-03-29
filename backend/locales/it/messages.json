@@ -196,7 +196,11 @@
     "season_history": "Storico stagioni",
     "career_totals": "Totale carriera",
     "show_less": "Mostra meno ▲",
-    "show_all": "Mostra tutto"
+    "show_all": "Mostra tutto",
+    "height": "Altezza",
+    "weight": "Peso",
+    "ppg": "Pts/P",
+    "show_more_games": "Carica altro"
   },
   "team_tabs": {
     "tab_standings": "Classifica",

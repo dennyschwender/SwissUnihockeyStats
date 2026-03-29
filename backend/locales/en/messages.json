@@ -196,7 +196,11 @@
     "season_history": "Season History",
     "career_totals": "Career Totals",
     "show_less": "Show less ▲",
-    "show_all": "Show all"
+    "show_all": "Show all",
+    "height": "Height",
+    "weight": "Weight",
+    "ppg": "PPG",
+    "show_more_games": "Load more"
   },
   "team_tabs": {
     "tab_standings": "Standings",

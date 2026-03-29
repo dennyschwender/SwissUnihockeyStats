@@ -196,7 +196,11 @@
     "season_history": "Historique des saisons",
     "career_totals": "Total carrière",
     "show_less": "Voir moins ▲",
-    "show_all": "Voir tout"
+    "show_all": "Voir tout",
+    "height": "Taille",
+    "weight": "Poids",
+    "ppg": "Pts/J",
+    "show_more_games": "Charger plus"
   },
   "team_tabs": {
     "tab_standings": "Classement",

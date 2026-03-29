@@ -196,7 +196,11 @@
     "season_history": "Saisonverlauf",
     "career_totals": "Karriere gesamt",
     "show_less": "Weniger anzeigen ▲",
-    "show_all": "Alle anzeigen"
+    "show_all": "Alle anzeigen",
+    "height": "Grösse",
+    "weight": "Gewicht",
+    "ppg": "P/Sp",
+    "show_more_games": "Mehr laden"
   },
   "team_tabs": {
     "tab_standings": "Tabelle",
