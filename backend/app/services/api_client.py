@@ -340,6 +340,10 @@ class SwissUnihockeyClient:
     def get_team_stats(self, team_id: int) -> Dict[str, Any]:
         return self._make_request(f"/api/teams/{team_id}/statistics", {})
 
+    def get_team_staff(self, team_id: int) -> Dict[str, Any]:
+        """Fetch coaching staff for a team. Returns list of staff members."""
+        return self._make_request(f"/api/teams/{team_id}/staff", {})
+
     # --- Players ---
     def get_players(self, **params) -> Dict[str, Any]:
         return self._make_request("/api/players", params)
