@@ -711,7 +711,7 @@ class Scheduler:
         job_id = await self._launch_and_return_id(job)
         return job_id
 
-    async def _launch_and_return_id(self, job: ScheduledJob) -> str:
+    async def _launch_and_return_id(self, job: ScheduledJob, force: bool = False) -> str:
         """Like _launch() but returns the job_id."""
         job_id = str(uuid.uuid4())[:8]
         record = JobRecord(
@@ -750,7 +750,7 @@ class Scheduler:
         record.started_at = _utcnow()
 
         try:
-            await self._submit(job_id, job.season, job.task, False, job.max_tier)
+            await self._submit(job_id, job.season, job.task, force, job.max_tier)
             asyncio.create_task(
                 self._watch(job_id, record),
                 name=f"sched-watch-{job_id}",

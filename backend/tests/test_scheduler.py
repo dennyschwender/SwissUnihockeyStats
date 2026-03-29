@@ -377,6 +377,32 @@ class TestClearDone:
         assert remaining[0]["status"] == "running"
 
 
+class TestLaunchAndReturnIdForce:
+    """_launch_and_return_id passes force flag to _submit"""
+
+    @pytest.mark.asyncio
+    async def test_force_flag_forwarded(self, mock_admin_jobs):
+        captured = {}
+
+        async def submit(job_id, season, task, force=False, max_tier=7):
+            captured["force"] = force
+
+        sched = Scheduler(mock_admin_jobs, submit)
+        from app.services.scheduler import ScheduledJob, _utcnow, POLICIES
+        policy = next(p for p in POLICIES if p["name"] == "seasons")
+        job = ScheduledJob(
+            run_at=_utcnow(),
+            priority=policy["priority"],
+            policy_name=policy["name"],
+            task=policy["task"],
+            season=None,
+            label="test",
+            max_tier=policy.get("max_tier", 7),
+        )
+        await sched._launch_and_return_id(job, force=True)
+        assert captured["force"] is True
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
 
