@@ -876,8 +876,14 @@ class Scheduler:
                 expected = set(range(self._min_season, current_season_id + 1))
                 missing = expected - set(indexed_seasons)
                 if missing:
+                    # Only block if a seasons job is due very soon or actively
+                    # running — a job scheduled weeks away must not suppress the
+                    # immediate gap-fill (the normal 30-day policy always queues
+                    # a future job, which would otherwise permanently block this).
+                    _soon = _utcnow() + timedelta(hours=1)
                     already_queued = any(
-                        j.policy_name == "seasons" for j in self._queue
+                        j.policy_name == "seasons" and j.run_at <= _soon
+                        for j in self._queue
                     ) or any(
                         r.policy_name == "seasons" and r.status in ("pending", "running")
                         for r in self._history
