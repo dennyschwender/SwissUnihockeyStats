@@ -17,3 +17,41 @@ def test_migration_adds_player_columns(client):
     assert "position_raw" in cols
     assert "license_raw" in cols
     assert "player_details_fetched_at" in cols
+
+
+def test_translate_position_known_locale():
+    from app.lib.player_translations import translate_position
+    assert translate_position("Stürmer", "en") == "Forward"
+    assert translate_position("Verteidiger", "en") == "Defender"
+    assert translate_position("Torhüter", "en") == "Goalkeeper"
+
+
+def test_translate_position_de_returns_german():
+    from app.lib.player_translations import translate_position
+    assert translate_position("Stürmer", "de") == "Stürmer"
+
+
+def test_translate_position_unknown_falls_back_to_raw():
+    from app.lib.player_translations import translate_position
+    assert translate_position("Libero", "en") == "Libero"
+
+
+def test_translate_position_none_returns_none():
+    from app.lib.player_translations import translate_position
+    assert translate_position(None, "en") is None
+
+
+def test_translate_license_known():
+    from app.lib.player_translations import translate_license
+    assert translate_license("Herren Aktive GF L-UPL", "en") == "Men Active GF L-UPL"
+    assert translate_license("Damen Aktive GF L-UPL", "en") == "Women Active GF L-UPL"
+
+
+def test_translate_license_unknown_falls_back():
+    from app.lib.player_translations import translate_license
+    assert translate_license("Junioren U21 A", "en") == "Junioren U21 A"
+
+
+def test_translate_license_none_returns_none():
+    from app.lib.player_translations import translate_license
+    assert translate_license(None, "en") is None
