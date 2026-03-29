@@ -195,6 +195,7 @@
               <th style="{{ th_ctr }}"><button @click="sort('g')" style="{{ btn }}">G<span style="font-size:.7rem;opacity:.55;" x-text="icon('g')"></span></button></th>
               <th style="{{ th_ctr }}"><button @click="sort('a')" style="{{ btn }}">A<span style="font-size:.7rem;opacity:.55;" x-text="icon('a')"></span></button></th>
               <th style="{{ th_ctr }}font-weight:700;"><button @click="sort('pts')" style="{{ btn }}font-weight:700;">PTS<span style="font-size:.7rem;opacity:.55;" x-text="icon('pts')"></span></button></th>
+              <th style="{{ th_ctr }}"><button @click="sort('ppg')" style="{{ btn }}">PPG<span style="font-size:.7rem;opacity:.55;" x-text="icon('ppg')"></span></button></th>
               <th style="{{ th_ctr }}"><button @click="sort('pim')" style="{{ btn }}">PIM<span style="font-size:.7rem;opacity:.55;" x-text="icon('pim')"></span></button></th>
 
             </tr>
@@ -211,6 +212,7 @@
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="p.g"></td>
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="p.a"></td>
                 <td style="padding:.6rem .75rem;text-align:center;font-weight:700;" x-text="p.pts"></td>
+                <td style="padding:.6rem .5rem;text-align:center;color:var(--gray-500);" x-text="p.ppg != null ? p.ppg : '—'"></td>
                 <td style="padding:.6rem .5rem;text-align:center;" x-text="p.pim"></td>
 
               </tr>
