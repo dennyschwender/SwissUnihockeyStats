@@ -3344,107 +3344,23 @@ async def league_detail(request: Request, locale: str, league_id: int):
         )
 
     # --- Series data per phase (playoff / playout) ---
-    from datetime import date as _date
-    from app.models.db_models import Team as _TmModel
+    from app.services.stats_service import _build_series_rounds
 
-    # Build regular-season rank map: team_id → rank (1-based position in standings)
+    # Build regular-season rank map: team_id -> rank (1-based position in standings)
     _reg_rank: dict[int, int] = {}
     for _ri, _rs in enumerate(standings, 1):
         _tid = _rs.get("team_id")
         if _tid:
             _reg_rank[_tid] = _ri
+
     series_by_phase: dict[str, list[dict]] = {}
     for _sph, _sgids in _phase_to_group_ids.items():
         if _sph not in ("playoff", "playout"):
             continue
         with db.session_scope() as _ssess:
-            _sgames = (
-                _ssess.query(Game)
-                .filter(Game.group_id.in_(_sgids))
-                .order_by(Game.game_date.asc())
-                .all()
+            series_by_phase[_sph] = _build_series_rounds(
+                _sgids, league_data["season_id"], _ssess, _reg_rank
             )
-            _sti = {g.home_team_id for g in _sgames} | {g.away_team_id for g in _sgames}
-            _snm: dict[int, str] = {}
-            _slogo: dict[int, str] = {}
-            for _t in (
-                _ssess.query(_TmModel)
-                .filter(_TmModel.id.in_(_sti), _TmModel.season_id == league_data["season_id"])
-                .all()
-            ):
-                _snm[_t.id] = _t.name or _t.text or f"Team {_t.id}"
-                if _t.logo_url:
-                    _slogo[_t.id] = _t.logo_url
-            # Fallback: find names from any season
-            _missing = _sti - _snm.keys()
-            if _missing:
-                for _t in (
-                    _ssess.query(_TmModel)
-                    .filter(_TmModel.id.in_(_missing), _TmModel.name.isnot(None))
-                    .all()
-                ):
-                    _snm.setdefault(_t.id, _t.name)
-                    if _t.logo_url:
-                        _slogo.setdefault(_t.id, _t.logo_url)
-            # Group games by sorted team-pair key (stable), but determine
-            # team_a / team_b from the home/away of the FIRST game in the series.
-            _pairs: dict[tuple, list] = {}
-            for _g in _sgames:
-                _key = tuple(sorted([_g.home_team_id, _g.away_team_id]))
-                _pairs.setdefault(_key, []).append(_g)
-            _series_list = []
-            for _key, _pgames in sorted(_pairs.items(), key=lambda x: _snm.get(x[0], "")):
-                _sorted_pgames = sorted(_pgames, key=lambda x: x.game_date or datetime.min)
-                _first_g = _sorted_pgames[0]
-                _ta = _first_g.home_team_id  # home of game 1 = team A
-                _tb = _first_g.away_team_id  # away of game 1 = team B
-                _ta_wins = 0
-                _tb_wins = 0
-                _games_list = []
-                for _g in _sorted_pgames:
-                    _played = _g.home_score is not None
-                    if _played:
-                        _home_wins = _g.home_score > _g.away_score
-                        if _g.home_team_id == _ta:
-                            if _home_wins:
-                                _ta_wins += 1
-                            else:
-                                _tb_wins += 1
-                        else:
-                            if _home_wins:
-                                _tb_wins += 1
-                            else:
-                                _ta_wins += 1
-                    _games_list.append(
-                        {
-                            "game_id": _g.id,
-                            "date": _g.game_date.strftime("%d.%m.%Y") if _g.game_date else "",
-                            "weekday": _g.game_date.strftime("%a") if _g.game_date else "",
-                            "home_team": _snm.get(_g.home_team_id, f"Team {_g.home_team_id}"),
-                            "away_team": _snm.get(_g.away_team_id, f"Team {_g.away_team_id}"),
-                            "home_team_id": _g.home_team_id,
-                            "away_team_id": _g.away_team_id,
-                            "home_score": _g.home_score,
-                            "away_score": _g.away_score,
-                            "played": _played,
-                        }
-                    )
-                _series_list.append(
-                    {
-                        "team_a_id": _ta,
-                        "team_b_id": _tb,
-                        "team_a_name": _snm.get(_ta, f"Team {_ta}"),
-                        "team_b_name": _snm.get(_tb, f"Team {_tb}"),
-                        "team_a_logo": _slogo.get(_ta),
-                        "team_b_logo": _slogo.get(_tb),
-                        "team_a_rank": _reg_rank.get(_ta),
-                        "team_b_rank": _reg_rank.get(_tb),
-                        "team_a_wins": _ta_wins,
-                        "team_b_wins": _tb_wins,
-                        "games": _games_list,
-                    }
-                )
-            series_by_phase[_sph] = _series_list
 
     # Standings per non-regular phase (for potential fallback table)
     for _ph, _gids in _phase_to_group_ids.items():
