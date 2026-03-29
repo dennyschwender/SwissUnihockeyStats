@@ -56,15 +56,11 @@
   </div>
   {% endif %}
 
-  <!-- Season History (collapsible) -->
-  {% if player.career %}
-  <div x-data="{ expanded: false }" class="section-block">
+  <!-- Season History (collapsible per season) -->
+  {% if player.career_by_season %}
+  <div class="section-block">
     <div class="section-block-header">
       <h2 class="section-block-title">{{ t.player.season_history }}</h2>
-      {% if player.career | length > 5 %}
-      <button @click="expanded = !expanded" class="section-block-toggle"
-        x-text="expanded ? '{{ t.player.show_less }}' : '{{ t.player.show_all }} ({{ player.career | length }}) \u25bc'"></button>
-      {% endif %}
     </div>
     <div class="table-scroll">
       <table class="data-table">
@@ -79,19 +75,49 @@
             <th class="col-narrow" style="font-weight:700;">PTS</th>
             <th class="col-narrow">PIM</th>
             <th class="col-narrow">{{ t.player.ppg }}</th>
+            <th class="col-narrow" style="width:1.5rem;"></th>
           </tr>
         </thead>
-        <tbody>
-          {% for row in player.career %}
-          <tr class="clickable"
-            {% if loop.index > 5 %}x-show="expanded"{% endif %}>
-            <td style="font-weight:500;">
+        {% for season in player.career_by_season %}
+        {% set multi = season.rows | length > 1 %}
+        <tbody x-data="{ open: {{ 'true' if loop.first else 'false' }} }">
+          <!-- Season summary row -->
+          <tr {% if multi %}@click="open = !open"{% endif %}
+              style="background:var(--gray-50);border-top:2px solid var(--gray-200);{% if multi %}cursor:pointer;{% endif %}">
+            <td style="font-weight:600;">
+              <a href="/{{ locale }}/leagues?season={{ season.season_id }}" class="link-inherit" @click.stop>{{ season.season_text }}</a>
+            </td>
+            <td style="font-size:.8rem;color:var(--gray-500);">
+              {% if not multi and season.rows[0].league_db_id %}
+                <a href="/{{ locale }}/league/{{ season.rows[0].league_db_id }}" class="link-inherit" @click.stop>{{ season.rows[0].league }}</a>
+              {% elif not multi %}{{ season.rows[0].league }}{% else %}–{% endif %}
+            </td>
+            <td style="color:var(--gray-600);">
+              {% if not multi and season.rows[0].team_db_id %}
+                <a href="/{{ locale }}/team/{{ season.rows[0].team_db_id }}?season={{ season.season_id }}" class="link-inherit" @click.stop>{{ season.rows[0].team_name }}</a>
+              {% elif not multi %}{{ season.rows[0].team_name }}{% else %}–{% endif %}
+            </td>
+            <td class="col-narrow">{{ season.totals.gp }}</td>
+            <td class="col-narrow">{{ season.totals.g }}</td>
+            <td class="col-narrow">{{ season.totals.a }}</td>
+            <td class="col-narrow" style="font-weight:700;">{{ season.totals.pts }}</td>
+            <td class="col-narrow">{{ season.totals.pim }}</td>
+            <td class="col-narrow" style="color:var(--gray-500);">{{ season.totals.ppg if season.totals.ppg is not none else '–' }}</td>
+            <td class="col-narrow" style="text-align:center;font-size:.7rem;color:var(--gray-400);">
+              {% if multi %}<span x-text="open ? '▼' : '▶'"></span>{% endif %}
+            </td>
+          </tr>
+          <!-- Sub-rows (only shown when expanded) -->
+          {% if multi %}
+          {% for row in season.rows %}
+          <tr x-show="open" x-cloak style="background:var(--white);">
+            <td style="font-size:.8rem;color:var(--gray-500);padding-left:1.5rem;">
               <a href="/{{ locale }}/leagues?season={{ row.season_id }}" class="link-inherit">{{ row.season_text }}</a>
             </td>
             <td style="font-size:.8rem;color:var(--gray-500);">
               {% if row.league_db_id %}<a href="/{{ locale }}/league/{{ row.league_db_id }}" class="link-inherit">{{ row.league }}</a>{% else %}{{ row.league }}{% endif %}
             </td>
-            <td style="color:var(--gray-600);">
+            <td style="color:var(--gray-600);font-size:.85rem;">
               {% if row.team_db_id %}<a href="/{{ locale }}/team/{{ row.team_db_id }}?season={{ row.season_id }}" class="link-inherit">{{ row.team_name }}</a>{% else %}{{ row.team_name }}{% endif %}
             </td>
             <td class="col-narrow">{{ row.gp }}</td>
@@ -100,9 +126,14 @@
             <td class="col-narrow" style="font-weight:700;">{{ row.pts }}</td>
             <td class="col-narrow">{{ row.pim }}</td>
             <td class="col-narrow" style="color:var(--gray-500);">{{ row.ppg if row.ppg is not none else '–' }}</td>
+            <td></td>
           </tr>
           {% endfor %}
-          <!-- Totals row (always visible) -->
+          {% endif %}
+        </tbody>
+        {% endfor %}
+        <!-- Totals row -->
+        <tfoot>
           <tr style="background:var(--gray-50);border-top:2px solid var(--gray-200);font-weight:700;">
             <td colspan="3">{{ t.player.career_totals }}</td>
             <td class="col-narrow">{{ player.totals.gp }}</td>
@@ -111,8 +142,9 @@
             <td class="col-narrow">{{ player.totals.pts }}</td>
             <td class="col-narrow">{{ player.totals.pim }}</td>
             <td class="col-narrow" style="color:var(--gray-500);">{{ player.totals.ppg if player.totals.ppg is not none else '–' }}</td>
+            <td></td>
           </tr>
-        </tbody>
+        </tfoot>
       </table>
     </div>
   </div>
