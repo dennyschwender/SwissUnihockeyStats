@@ -500,3 +500,61 @@ class TestBuildTimelineEvents:
         events, _ = build_timeline_events(goals, [], "Home", "Away")
         goal_ev = events[0]
         assert goal_ev["score"] == ""
+
+
+class TestGetRefereeGames:
+    """Test get_referee_games returns correct structure."""
+
+    def _seed_referee_games(self, session):
+        from app.models.db_models import Game, Season, Team
+        from datetime import datetime
+        session.merge(Season(id=2025, text="2024/25", highlighted=True))
+        session.flush()
+        for tid, tname in [(901, "Team A"), (902, "Team B"), (903, "Team C"),
+                           (904, "Team D"), (905, "Team E"), (906, "Team F")]:
+            session.merge(Team(id=tid, season_id=2025, name=tname))
+        session.flush()
+        session.merge(Game(
+            id=5001, season_id=2025,
+            home_team_id=901, away_team_id=902,
+            home_score=3, away_score=2,
+            referee_1="John Referee",
+            game_date=datetime(2025, 1, 15),
+        ))
+        session.merge(Game(
+            id=5002, season_id=2025,
+            home_team_id=903, away_team_id=904,
+            home_score=1, away_score=1,
+            referee_2="John Referee",
+            game_date=datetime(2025, 2, 10),
+        ))
+        session.merge(Game(
+            id=5003, season_id=2025,
+            home_team_id=905, away_team_id=906,
+            home_score=None, away_score=None,
+            referee_1="Other Referee",
+            game_date=datetime(2025, 3, 1),
+        ))
+        session.flush()
+
+    def test_returns_games_for_referee(self, db_session):
+        self._seed_referee_games(db_session)
+        from app.services.stats_service import get_referee_games
+        result = get_referee_games("John Referee", db_session)
+        assert result["name"] == "John Referee"
+        assert result["total"] == 2
+
+    def test_matches_referee_1_and_referee_2(self, db_session):
+        self._seed_referee_games(db_session)
+        from app.services.stats_service import get_referee_games
+        result = get_referee_games("John Referee", db_session)
+        game_ids = [g["game_id"] for g in result["games"]]
+        assert 5001 in game_ids
+        assert 5002 in game_ids
+        assert 5003 not in game_ids
+
+    def test_no_games_for_unknown_referee(self, db_session):
+        from app.services.stats_service import get_referee_games
+        result = get_referee_games("Nobody Here", db_session)
+        assert result["total"] == 0
+        assert result["games"] == []

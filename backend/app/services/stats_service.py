@@ -4161,3 +4161,63 @@ def get_recent_games(
                 }
             )
         return {"games": result, "total": total, "offset": offset, "limit": limit}
+
+
+def get_referee_games(name: str, session) -> dict:
+    """Return all games refereed by *name* (matches referee_1 or referee_2).
+
+    Args:
+        name: exact referee name string as stored in Game.referee_1 / referee_2.
+        session: active SQLAlchemy session.
+    """
+    games = (
+        session.query(Game)
+        .filter(or_(Game.referee_1 == name, Game.referee_2 == name))
+        .order_by(Game.game_date.desc())
+        .all()
+    )
+    # Build team name lookup
+    team_ids = set()
+    for g in games:
+        team_ids.add(g.home_team_id)
+        team_ids.add(g.away_team_id)
+    t_names: dict[int, str] = {}
+    if team_ids:
+        rows = (
+            session.query(Team.id, Team.season_id, Team.name)
+            .filter(Team.id.in_(team_ids))
+            .all()
+        )
+        for row in rows:
+            key = row.id
+            if key not in t_names and row.name:
+                t_names[key] = row.name
+    # Build league name lookup via group_id
+    group_ids = {g.group_id for g in games if g.group_id}
+    grp_league: dict[int, tuple[str, Optional[int]]] = {}
+    if group_ids:
+        lg_rows = (
+            session.query(LeagueGroup.id, League.id.label("league_db_id"), League.name, League.text)
+            .join(League, LeagueGroup.league_id == League.id)
+            .filter(LeagueGroup.id.in_(group_ids))
+            .all()
+        )
+        for row in lg_rows:
+            grp_league[row.id] = (row.name or row.text or "", row.league_db_id)
+    return {
+        "name": name,
+        "games": [
+            {
+                "game_id": g.id,
+                "game_date": g.game_date.strftime("%d.%m.%Y") if g.game_date else "",
+                "home_team": t_names.get(g.home_team_id, f"Team {g.home_team_id}"),
+                "away_team": t_names.get(g.away_team_id, f"Team {g.away_team_id}"),
+                "score": f"{g.home_score}:{g.away_score}" if g.home_score is not None else "",
+                "league_name": grp_league.get(g.group_id, ("", None))[0] if g.group_id else "",
+                "league_db_id": grp_league.get(g.group_id, ("", None))[1] if g.group_id else None,
+                "season_id": g.season_id,
+            }
+            for g in games
+        ],
+        "total": len(games),
+    }
