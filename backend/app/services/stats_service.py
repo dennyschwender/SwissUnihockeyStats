@@ -2952,6 +2952,7 @@ def build_timeline_events(
                 "team_side": _team_side(team),
                 "pct": round(pct, 4),
                 "label": label,
+                "score": g.get("score", "") or "",
             }
         )
 
@@ -2976,6 +2977,8 @@ def build_timeline_events(
                 "team_side": _team_side(team),
                 "pct": round(pct, 4),
                 "label": label,
+                "minutes": minutes,
+                "infraction": infraction,
             }
         )
 

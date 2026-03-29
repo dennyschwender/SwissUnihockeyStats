@@ -464,3 +464,39 @@ class TestCareerBySeason:
         result = get_player_detail(person_id=9001)
         season_2024 = result["career_by_season"][1]
         assert len(season_2024["rows"]) == 1
+
+
+class TestBuildTimelineEvents:
+    """Test build_timeline_events includes score, minutes, infraction fields."""
+
+    def test_goal_event_includes_score(self):
+        from app.services.stats_service import build_timeline_events
+        goals = [{"period": 1, "time": "05:00", "score": "1:0", "team": "Home", "player": "Player A"}]
+        events, _ = build_timeline_events(goals, [], "Home", "Away")
+        goal_ev = next(e for e in events if e["kind"] == "goal")
+        assert "score" in goal_ev
+        assert goal_ev["score"] == "1:0"
+
+    def test_penalty_event_includes_minutes_and_infraction(self):
+        from app.services.stats_service import build_timeline_events
+        pens = [{"period": 1, "time": "03:00", "minutes": 2, "infraction": "Hooking", "team": "Home", "player": "Player B"}]
+        events, _ = build_timeline_events([], pens, "Home", "Away")
+        pen_ev = next(e for e in events if e["kind"] == "penalty")
+        assert "minutes" in pen_ev
+        assert pen_ev["minutes"] == 2
+        assert "infraction" in pen_ev
+        assert pen_ev["infraction"] == "Hooking"
+
+    def test_penalty_missing_infraction_defaults_to_empty_string(self):
+        from app.services.stats_service import build_timeline_events
+        pens = [{"period": 1, "time": "03:00", "minutes": 5, "team": "Away", "player": "X"}]
+        events, _ = build_timeline_events([], pens, "Home", "Away")
+        pen_ev = events[0]
+        assert pen_ev["infraction"] == ""
+
+    def test_goal_missing_score_defaults_to_empty_string(self):
+        from app.services.stats_service import build_timeline_events
+        goals = [{"period": 1, "time": "05:00", "team": "Home", "player": "X"}]
+        events, _ = build_timeline_events(goals, [], "Home", "Away")
+        goal_ev = events[0]
+        assert goal_ev["score"] == ""
