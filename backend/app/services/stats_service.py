@@ -2197,8 +2197,21 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
             session.query(PlayerStatistics, Season)
             .join(Season, PlayerStatistics.season_id == Season.id)
             .filter(PlayerStatistics.player_id == person_id)
+            .order_by(PlayerStatistics.id.desc())
             .all()
         )
+
+        # Deduplicate: PlayerStatistics has no unique constraint, so re-indexing
+        # can create duplicate rows. Keep only the most recent (highest id) row
+        # per (season_id, league_abbrev, team_name) combination.
+        _seen: set[tuple] = set()
+        _deduped: list = []
+        for _ps, _season in stats_rows:
+            _key = (_ps.season_id, _ps.league_abbrev or "", _ps.team_name or "")
+            if _key not in _seen:
+                _seen.add(_key)
+                _deduped.append((_ps, _season))
+        stats_rows = _deduped
 
         # Build (season_id, league_abbrev) → league DB id lookup
         # Strip gender/age prefix from League.name to match ps.league_abbrev.
