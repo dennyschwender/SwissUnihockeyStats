@@ -2201,17 +2201,6 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
             .all()
         )
 
-        # Deduplicate: PlayerStatistics has no unique constraint, so re-indexing
-        # can create duplicate rows. Keep only the most recent (highest id) row
-        # per (season_id, league_abbrev, team_name) combination.
-        _seen: set[tuple] = set()
-        _deduped: list = []
-        for _ps, _season in stats_rows:
-            _key = (_ps.season_id, _ps.league_abbrev or "", _ps.team_name or "")
-            if _key not in _seen:
-                _seen.add(_key)
-                _deduped.append((_ps, _season))
-        stats_rows = _deduped
 
         # Build (season_id, league_abbrev) → league DB id lookup
         # Strip gender/age prefix from League.name to match ps.league_abbrev.
@@ -2309,10 +2298,40 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
                 }
             )
 
-        # Sort: most recent season first, then by tier (best league first) within season
-        career.sort(key=lambda r: (-r["season_id"], r["_tier"]))
+        # Sort: most recent season first, then by tier (best league first) within season.
+        # Rows with league_db_id resolved come first within the same key (higher quality).
+        career.sort(key=lambda r: (-r["season_id"], r["_tier"], 0 if r.get("league_db_id") else 1))
         for r in career:
             r.pop("_tier", None)
+
+        # Deduplicate career rows: the same league may be stored under different abbreviations
+        # (e.g. "Junioren U21 A" vs "U21 A") across re-index runs. Normalize by stripping
+        # gender/age prefixes before comparing, keeping the first (best-quality) occurrence.
+        def _norm_league(abbrev: str) -> str:
+            s = (abbrev or "").strip()
+            for pfx in _STRIP_PREFIXES:
+                if s.lower().startswith(pfx):
+                    s = s[len(pfx):]
+                    break
+            return s.strip().lower()
+
+        _career_seen: set[tuple] = set()
+        _career_seen_with_team: set[tuple] = set()  # (season_id, norm_league) keys that have a team
+        _career_deduped: list[dict] = []
+        for r in career:
+            _nl = _norm_league(r["league"])
+            _tn = (r.get("team_name") or "").lower()
+            _sk = (r["season_id"], _nl)  # season+league key
+            _dk = (_sk[0], _nl, _tn)
+            # Skip empty-team row if we already have a named-team row for the same season+league
+            if not _tn and _sk in _career_seen_with_team:
+                continue
+            if _dk not in _career_seen:
+                _career_seen.add(_dk)
+                if _tn:
+                    _career_seen_with_team.add(_sk)
+                _career_deduped.append(r)
+        career = _career_deduped
 
         # Build career_by_season: group career rows by season_id
         _season_groups: dict[int, list[dict]] = {}
