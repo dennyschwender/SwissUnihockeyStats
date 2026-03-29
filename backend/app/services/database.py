@@ -433,6 +433,21 @@ class DatabaseService:
             if "is_frozen" not in season_cols:
                 conn.execute(text("ALTER TABLE seasons ADD COLUMN is_frozen INTEGER NOT NULL DEFAULT 0"))
 
+            # ── Add biographical cache columns to players ────────────────────
+            existing_player_cols = {
+                row[1] for row in conn.execute(text("PRAGMA table_info(players)"))
+            }
+            for col, typedef in [
+                ("photo_url", "VARCHAR(500)"),
+                ("height_cm", "INTEGER"),
+                ("weight_kg", "INTEGER"),
+                ("position_raw", "VARCHAR(50)"),
+                ("license_raw", "VARCHAR(100)"),
+                ("player_details_fetched_at", "DATETIME"),
+            ]:
+                if col not in existing_player_cols:
+                    conn.execute(text(f"ALTER TABLE players ADD COLUMN {col} {typedef}"))
+
             conn.commit()
             logger.debug("SQLite migrations applied")
 
