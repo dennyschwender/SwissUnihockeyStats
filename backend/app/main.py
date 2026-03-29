@@ -3723,12 +3723,79 @@ async def teams_search(
 @app.get("/{locale}/team/{team_id}", response_class=HTMLResponse)
 async def team_detail(request: Request, locale: str, team_id: int, season: Optional[int] = None):
     """Team detail page — roster + stats + recent results from DB"""
-    from app.services.stats_service import get_team_detail
+    from app.services.stats_service import (
+        get_team_detail,
+        get_league_by_id,
+        get_league_standings,
+        _canonical_phase,
+        _build_series_rounds,
+    )
+    from app.services.database import get_database_service as _get_db
+    from app.models.db_models import Game as _Game, LeagueGroup as _LeagueGroup
 
     team = get_team_detail(team_id, season_id=season)
     error_message = None
     if not team:
         error_message = f"Team {team_id} not found in database."
+
+    # Build standings data using the same pipeline as the league detail page
+    standings: list[dict] = []
+    standings_by_group: dict[str, list[dict]] = {}
+    standings_by_phase: dict[str, list[dict]] = {}
+    series_by_phase: dict[str, list[dict]] = {}
+    t_groups: list[dict] = []
+
+    _league_db_id = (team or {}).get("league_db_id")
+    if _league_db_id:
+        league_data = get_league_by_id(_league_db_id)
+        if league_data:
+            t_groups = league_data.get("groups", [])
+            _all_gids = [gid for grp in t_groups for gid in grp["ids"]]
+
+            # group_id → canonical phase
+            _gid_to_phase: dict[int, str] = {}
+            if _all_gids:
+                _db = _get_db()
+                with _db.session_scope() as _ps:
+                    for _pr in _ps.query(_LeagueGroup.id, _LeagueGroup.phase).filter(
+                        _LeagueGroup.id.in_(_all_gids)
+                    ).all():
+                        _gid_to_phase[_pr.id] = _canonical_phase(_pr.phase)
+
+            _phase_to_gids: dict[str, list[int]] = {}
+            for _gid, _ph in _gid_to_phase.items():
+                _phase_to_gids.setdefault(_ph, []).append(_gid)
+
+            _regular_gids = _phase_to_gids.get("regular", [])
+            standings = get_league_standings(
+                _league_db_id,
+                only_group_ids=_regular_gids if _regular_gids else None,
+            )
+
+            _regular_gid_set = set(_regular_gids)
+            for grp in t_groups:
+                _base = [g for g in grp["ids"] if g in _regular_gid_set]
+                if _base:
+                    standings_by_group[grp["name"]] = get_league_standings(
+                        _league_db_id, only_group_ids=_base
+                    )
+
+            _reg_rank = {r["team_id"]: r["rank"] for r in standings}
+            for _sph, _sgids in _phase_to_gids.items():
+                if _sph not in ("playoff", "playout"):
+                    continue
+                _db2 = _get_db()
+                with _db2.session_scope() as _ss:
+                    series_by_phase[_sph] = _build_series_rounds(
+                        _sgids, league_data["season_id"], _ss, _reg_rank
+                    )
+            for _ph, _gids in _phase_to_gids.items():
+                if _ph != "regular":
+                    standings_by_phase[_ph] = get_league_standings(
+                        _league_db_id, only_group_ids=_gids
+                    )
+
+    _playoff_spots, _playout_spots = _zone_cutoffs((team or {}).get("league_name") or "")
 
     return templates.TemplateResponse(
         request,
@@ -3738,8 +3805,13 @@ async def team_detail(request: Request, locale: str, team_id: int, season: Optio
             "t": get_translations(locale),
             "team": team,
             "error_message": error_message,
-            "playoff_spots": _zone_cutoffs((team or {}).get("league_name") or "")[0],
-            "playout_spots": _zone_cutoffs((team or {}).get("league_name") or "")[1],
+            "standings": standings,
+            "standings_by_group": standings_by_group,
+            "standings_by_phase": standings_by_phase,
+            "series_by_phase": series_by_phase,
+            "groups": t_groups,
+            "playoff_spots": _playoff_spots,
+            "playout_spots": _playout_spots,
         },
     )
 
