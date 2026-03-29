@@ -374,10 +374,26 @@ def backfill_game_player_stats_from_events(
 
         target_game_ids = [g.id for g in target_games]
 
-        # Only process games where NO GamePlayer row has goals already set (> 0).
-        # GamePlayer.goals defaults to 0 on insert, so goals > 0 means already filled.
+        # Games with unresolved player events — always re-eligible for another pass
+        unresolved_game_ids: set[int] = {
+            r[0]
+            for r in session.query(UnresolvedPlayerEvent.game_id)
+            .filter(
+                UnresolvedPlayerEvent.season_id == season_id,
+                UnresolvedPlayerEvent.resolved_at.is_(None),
+                UnresolvedPlayerEvent.game_id.in_(target_game_ids),
+            )
+            .distinct()
+            .all()
+        }
+
+        # Only process games where NO GamePlayer row has goals already set (> 0),
+        # OR the game has unresolved player events (needs a second pass).
         eligible_game_ids: list[int] = []
         for gid in target_game_ids:
+            if gid in unresolved_game_ids:
+                eligible_game_ids.append(gid)
+                continue
             gp_rows = (
                 session.query(GamePlayer)
                 .filter(GamePlayer.game_id == gid, GamePlayer.season_id == season_id)
@@ -514,6 +530,22 @@ def backfill_game_player_stats_from_events(
             gp.assists = assists_acc.get(key, 0)
             gp.penalty_minutes = pim_acc.get(key, 0)
             updated += 1
+
+        # Mark previously-unresolved events as resolved where we now have a match
+        if unresolved_game_ids:
+            for gid in unresolved_game_ids:
+                resolved_pids = {
+                    pid for (g, pid) in list(goals_acc.keys()) + list(assists_acc.keys())
+                    if g == gid
+                }
+                for pid in resolved_pids:
+                    pname = player_names.get(pid, "")
+                    if pname:
+                        session.query(UnresolvedPlayerEvent).filter(
+                            UnresolvedPlayerEvent.game_id == gid,
+                            func.lower(UnresolvedPlayerEvent.raw_name) == pname,
+                            UnresolvedPlayerEvent.resolved_at.is_(None),
+                        ).update({"resolved_at": _now()}, synchronize_session="fetch")
 
         logger.info(
             "Backfill game player stats: %d GamePlayer rows updated for season %s (tiers %s)",

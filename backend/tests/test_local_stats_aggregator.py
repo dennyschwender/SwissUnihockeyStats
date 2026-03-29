@@ -414,3 +414,78 @@ def test_backfill_creates_unresolved_for_unknown_player(engine, mock_db):
 def test_backfill_no_complete_games_returns_zero(engine, mock_db):
     count = backfill_game_player_stats_from_events(mock_db, season_id=999, tiers=[1, 2, 3])
     assert count == 0
+
+
+def test_backfill_reprocesses_game_with_unresolved_events(engine, mock_db):
+    """Games with UnresolvedPlayerEvent rows should be re-eligible even if some
+    other players in the game already have goals > 0."""
+    import datetime
+    from sqlalchemy.orm import Session as _Session
+
+    with _Session(engine) as s:
+        season = Season(id=500, text="2025/26")
+        s.add(season)
+        s.flush()
+        league = League(id=500, season_id=500, league_id=1, game_class=1, name="Herren NLA")
+        s.add(league)
+        s.flush()
+        group = LeagueGroup(id=500, league_id=500, group_id=500, name="NLA")
+        s.add(group)
+        s.flush()
+        t1 = Team(id=500, season_id=500, name="Home", club_id=None)
+        t2 = Team(id=501, season_id=500, name="Away", club_id=None)
+        s.add_all([t1, t2])
+        s.flush()
+        p1 = Player(person_id=5001, first_name="Anna", last_name="Mueller")
+        p2 = Player(person_id=5002, first_name="Bob", last_name="Smith")
+        s.add_all([p1, p2])
+        s.flush()
+        game = Game(
+            id=500, season_id=500, group_id=500,
+            home_team_id=500, away_team_id=501,
+            home_score=2, away_score=0,
+            completeness_status="complete",
+            game_date=datetime.datetime(2025, 1, 1),
+        )
+        s.add(game)
+        s.flush()
+        # p1 already has goals (was resolved in a previous backfill)
+        gp1 = GamePlayer(
+            player_id=5001, game_id=500, team_id=500, season_id=500,
+            is_home_team=True, goals=1, assists=0, penalty_minutes=0,
+        )
+        # p2 has goals=0 but actually scored (unresolved event)
+        gp2 = GamePlayer(
+            player_id=5002, game_id=500, team_id=500, season_id=500,
+            is_home_team=True, goals=0, assists=0, penalty_minutes=0,
+        )
+        s.add_all([gp1, gp2])
+        s.flush()
+        # GameEvent for p2's goal — raw_data "player" field with scorer name
+        evt = GameEvent(
+            game_id=500, season_id=500, team_id=500,
+            event_type="Torschütze",
+            raw_data={"player": "Bob Smith", "event_type": "Torschütze"},
+        )
+        s.add(evt)
+        s.flush()
+        # UnresolvedPlayerEvent flags game 500 as needing re-processing
+        unresolved = UnresolvedPlayerEvent(
+            game_id=500, team_id=500, season_id=500,
+            raw_name="bob smith", event_type="Torschütze",
+            created_at=datetime.datetime.utcnow(), resolved_at=None,
+        )
+        s.add(unresolved)
+        s.commit()
+
+    count = backfill_game_player_stats_from_events(mock_db, season_id=500, tiers=(1,))
+    assert count > 0
+
+    with _Session(engine) as s:
+        gp2_updated = s.query(GamePlayer).filter_by(player_id=5002, game_id=500).first()
+        assert gp2_updated.goals == 1, f"Expected 1 goal, got {gp2_updated.goals}"
+        unresolved_evt = s.query(UnresolvedPlayerEvent).filter_by(
+            game_id=500, raw_name="bob smith"
+        ).first()
+        assert unresolved_evt is not None
+        assert unresolved_evt.resolved_at is not None, "Expected unresolved event to be marked resolved"
