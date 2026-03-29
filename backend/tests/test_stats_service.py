@@ -192,5 +192,54 @@ class TestStatsPerformance:
         assert duration < 0.5
 
 
+@pytest.fixture
+def db_session():
+    from app.services.database import get_database_service
+
+    db = get_database_service()
+    with db.session_scope() as session:
+        yield session
+
+
+def test_fetch_recent_game_rows_with_null_nullable_fields(db_session):
+    """_fetch_recent_game_rows must not crash when nullable fields (game_date, period) are None."""
+    from app.services.stats_service import _fetch_recent_game_rows
+    from app.models.db_models import Player, Team, Season, Game, GamePlayer
+
+    season = Season(id=1, text="2025/26")
+    db_session.add(season)
+    team = Team(id=1, season_id=1, name="Test Team", club_id=None)
+    db_session.add(team)
+    player = Player(person_id=9999, first_name="Test", last_name="Player")
+    db_session.add(player)
+    game = Game(
+        id=1,
+        season_id=1,
+        home_team_id=1,
+        away_team_id=1,
+        game_date=None,  # <- the problematic field
+        home_score=3,
+        away_score=1,
+        completeness_status="complete",
+    )
+    db_session.add(game)
+    gp = GamePlayer(
+        player_id=9999,
+        game_id=1,
+        team_id=1,
+        season_id=1,
+        is_home_team=True,
+        goals=None,
+        assists=None,
+        penalty_minutes=None,
+    )
+    db_session.add(gp)
+    db_session.flush()
+
+    rows = _fetch_recent_game_rows(db_session, 9999, offset=0, limit=10)
+    assert len(rows) == 1
+    assert rows[0]["date"] == ""
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

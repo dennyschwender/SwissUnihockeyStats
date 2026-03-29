@@ -1975,7 +1975,7 @@ def _fetch_recent_game_rows(session, person_id: int, offset: int = 0, limit: int
         if g.home_score is not None and g.away_score is not None:
             my_score = g.home_score if is_home else g.away_score
             opp_score = g.away_score if is_home else g.home_score
-            _is_extra = g.period in ("OT", "SO")
+            _is_extra = (g.period or "") in ("OT", "SO")
             if my_score > opp_score:
                 result_label = "OTW" if _is_extra else "W"
             elif my_score < opp_score:
