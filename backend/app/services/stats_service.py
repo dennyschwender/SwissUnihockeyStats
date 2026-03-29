@@ -1909,6 +1909,13 @@ def _player_details_stale(
     return fetched_at < cutoff
 
 
+def _compute_ppg(points: Optional[int], games_played: Optional[int]) -> Optional[float]:
+    """Compute points-per-game rounded to 2 decimal places. Returns None if no games."""
+    if not games_played:
+        return None
+    return round((points or 0) / games_played, 2)
+
+
 def get_player_detail(person_id: int, locale: str = "de") -> dict:
     """
     Return player profile + per-season stats across all seasons.
@@ -2050,6 +2057,7 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
                     "a": ps.assists,
                     "pts": ps.points,
                     "pim": ps.penalty_minutes,
+                    "ppg": _compute_ppg(ps.points, ps.games_played),
                     "_tier": abbrev_tier.get(_abbrev, _DEFAULT_TIER),
                 }
             )
@@ -2060,12 +2068,15 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
             r.pop("_tier", None)
 
         # Career totals
+        total_gp = sum(r["gp"] for r in career)
+        total_pts = sum(r["pts"] for r in career)
         totals = {
-            "gp": sum(r["gp"] for r in career),
+            "gp": total_gp,
             "g": sum(r["g"] for r in career),
             "a": sum(r["a"] for r in career),
-            "pts": sum(r["pts"] for r in career),
+            "pts": total_pts,
             "pim": sum(r["pim"] for r in career),
+            "ppg": _compute_ppg(total_pts, total_gp),
         }
 
         # Recent game appearances (last 10 across all seasons, most recent first)

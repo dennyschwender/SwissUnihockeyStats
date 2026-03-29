@@ -88,3 +88,20 @@ def test_player_details_fresh_when_fetched_same_day_as_aug31():
     from app.services.stats_service import _player_details_stale
     fetched = datetime(2025, 8, 31, 12, 0, tzinfo=timezone.utc)
     assert _player_details_stale(fetched, _today=datetime(2026, 3, 1, tzinfo=timezone.utc)) is False
+
+
+def test_ppg_calculated_per_career_row():
+    from app.services.stats_service import _compute_ppg
+    assert _compute_ppg(points=30, games_played=20) == 1.50
+    assert _compute_ppg(points=7, games_played=3) == 2.33
+
+
+def test_ppg_none_when_no_games():
+    from app.services.stats_service import _compute_ppg
+    assert _compute_ppg(points=0, games_played=0) is None
+    assert _compute_ppg(points=5, games_played=0) is None
+
+
+def test_ppg_none_when_games_none():
+    from app.services.stats_service import _compute_ppg
+    assert _compute_ppg(points=5, games_played=None) is None
