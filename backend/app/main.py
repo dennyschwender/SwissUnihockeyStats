@@ -186,6 +186,13 @@ app = FastAPI(
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+
+@app.get("/sw.js", include_in_schema=False)
+async def service_worker():
+    """Serve sw.js from root so its default scope is '/' (covers all pages)."""
+    from fastapi.responses import FileResponse
+    return FileResponse(str(STATIC_DIR / "sw.js"), media_type="application/javascript")
+
 # Setup Jinja2 templates
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
