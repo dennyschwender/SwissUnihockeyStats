@@ -13,8 +13,18 @@
     <div class="detail-header-body">
       <a href="javascript:history.back()" class="back-link">← {{ t.common.back }}</a>
       <h1 class="detail-title" style="margin:.5rem 0 0;">{{ player.name if player else "Player" }}</h1>
-      {% if player and player.year_of_birth %}
-      <p class="detail-meta" style="margin:.25rem 0 0;">{{ t.player.born }} {{ player.year_of_birth }}</p>
+      {% if player %}
+      {% set bio_parts = [] %}
+      {% if player.position %}{% set _ = bio_parts.append(player.position) %}{% endif %}
+      {% if player.height_cm %}{% set _ = bio_parts.append(player.height_cm ~ " cm") %}{% endif %}
+      {% if player.weight_kg %}{% set _ = bio_parts.append(player.weight_kg ~ " kg") %}{% endif %}
+      {% if player.license %}{% set _ = bio_parts.append(player.license) %}{% endif %}
+      {% if player.year_of_birth %}{% set _ = bio_parts.append(t.player.born ~ " " ~ player.year_of_birth) %}{% endif %}
+      {% if bio_parts %}
+      <p class="detail-meta" style="margin:.25rem 0 0;font-size:.85rem;color:var(--gray-500);">
+        {{ bio_parts | join(' · ') }}
+      </p>
+      {% endif %}
       {% endif %}
     </div>
     {% if player and player.photo_url %}
@@ -35,10 +45,11 @@
       ('A',   player.totals.a),
       ('PTS', player.totals.pts),
       ('PIM', player.totals.pim),
+      (t.player.ppg, player.totals.ppg),
     ] %}
     {% for label, val in stats %}
     <div class="stat-badge">
-      <span class="stat-badge-value">{{ val }}</span>
+      <span class="stat-badge-value">{{ val if val is not none else '–' }}</span>
       <span class="stat-badge-label">{{ label }}</span>
     </div>
     {% endfor %}
@@ -67,6 +78,7 @@
             <th class="col-narrow">A</th>
             <th class="col-narrow" style="font-weight:700;">PTS</th>
             <th class="col-narrow">PIM</th>
+            <th class="col-narrow">{{ t.player.ppg }}</th>
           </tr>
         </thead>
         <tbody>
@@ -87,6 +99,7 @@
             <td class="col-narrow">{{ row.a }}</td>
             <td class="col-narrow" style="font-weight:700;">{{ row.pts }}</td>
             <td class="col-narrow">{{ row.pim }}</td>
+            <td class="col-narrow" style="color:var(--gray-500);">{{ row.ppg if row.ppg is not none else '–' }}</td>
           </tr>
           {% endfor %}
           <!-- Totals row (always visible) -->
@@ -97,6 +110,7 @@
             <td class="col-narrow">{{ player.totals.a }}</td>
             <td class="col-narrow">{{ player.totals.pts }}</td>
             <td class="col-narrow">{{ player.totals.pim }}</td>
+            <td class="col-narrow" style="color:var(--gray-500);">{{ player.totals.ppg if player.totals.ppg is not none else '–' }}</td>
           </tr>
         </tbody>
       </table>
@@ -111,11 +125,10 @@
 
   <!-- Recent Game Appearances -->
   {% if player.recent_games %}
-  <div x-data="{ page: 0, perPage: 10 }" class="section-block">
+  <div class="section-block">
     <h2 class="section-block-title" style="margin-bottom:.75rem;">Recent Games</h2>
     <div class="table-scroll">
-      <table class="data-table">
-      <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+      <table class="data-table" style="width:100%;border-collapse:collapse;font-size:.875rem;">
         <thead>
           <tr>
             <th>Date</th>
@@ -129,38 +142,24 @@
             <th class="col-narrow">PIM</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="recent-games-body">
           {% for g in player.recent_games %}
-          <tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;"
-            onclick="window.location='/{{ locale }}/game/{{ g.game_id }}'"
-            onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
-            <td style="padding:.6rem .75rem;color:var(--gray-500);">{{ g.date }}</td>
-            <td style="padding:.6rem .5rem;text-align:center;font-size:.75rem;color:var(--gray-500);">{{ g.league or '–' }}</td>
-            <td style="padding:.6rem .35rem;text-align:center;font-size:.75rem;color:var(--gray-400);">{{ g.home_away }}</td>
-            <td style="padding:.6rem .75rem;">
-              <a href="/{{ locale }}/team/{{ g.opponent_id }}" onclick="event.stopPropagation()" style="color:inherit;text-decoration:none;">{{ g.opponent }}</a>
-            </td>
-            <td style="padding:.6rem .75rem;text-align:center;">
-              {% if g.result == 'W' %}
-              <span style="font-weight:700;color:#16a34a;">W {{ g.score }}</span>
-              {% elif g.result == 'OTW' %}
-              <span style="font-weight:700;color:#059669;">OTW {{ g.score }}</span>
-              {% elif g.result == 'OTL' %}
-              <span style="font-weight:700;color:#b45309;">OTL {{ g.score }}</span>
-              {% elif g.result == 'L' %}
-              <span style="font-weight:700;color:#dc2626;">L {{ g.score }}</span>
-              {% elif g.result == 'D' %}
-              <span style="font-weight:700;color:var(--gray-500);">D {{ g.score }}</span>
-              {% else %}
-              <span style="color:var(--gray-400);">–</span>
-              {% endif %}
-            </td>
-            <td style="padding:.6rem .5rem;text-align:center;">{{ g.g if g.g is not none else '–' }}</td>
-            <td style="padding:.6rem .5rem;text-align:center;">{{ g.a if g.a is not none else '–' }}</td>
-            <td style="padding:.6rem .5rem;text-align:center;font-weight:{% if g.g or g.a %}600{% else %}400{% endif %};">{{ (g.g + g.a) if (g.g is not none and g.a is not none) else '–' }}</td>
-            <td style="padding:.6rem .5rem;text-align:center;color:{% if g.pim %}#dc2626{% else %}inherit{% endif %};">{{ g.pim if g.pim is not none else '–' }}</td>
-          </tr>
+          {% include "partials/player_game_row.html" %}
           {% endfor %}
+          {% if player.recent_has_more %}
+          <tr id="show-more-row-10">
+            <td colspan="9" style="text-align:center;padding:.75rem;">
+              <button
+                hx-get="/api/v1/players/{{ player.person_id }}/games?offset=10&limit=10&locale={{ locale }}"
+                hx-target="closest tr"
+                hx-swap="outerHTML"
+                class="btn-secondary"
+                style="padding:.5rem 1.5rem;font-size:.875rem;">
+                {{ t.player.show_more_games }}
+              </button>
+            </td>
+          </tr>
+          {% endif %}
         </tbody>
       </table>
     </div>
