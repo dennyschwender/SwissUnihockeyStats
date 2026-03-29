@@ -2,12 +2,13 @@
 {% include "partials/player_game_row.html" %}
 {% endfor %}
 {% if has_more %}
-<tr id="show-more-row-{{ next_offset }}">
+<tr>
   <td colspan="9" style="text-align:center;padding:.75rem;">
     <button
       hx-get="/api/v1/players/{{ player_id }}/games?offset={{ next_offset }}&limit=10&locale={{ locale }}"
-      hx-target="closest tr"
-      hx-swap="outerHTML"
+      hx-target="#recent-games-body"
+      hx-swap="beforeend"
+      hx-on::after-request="this.closest('tr').remove()"
       class="btn-secondary"
       style="padding:.5rem 1.5rem;font-size:.875rem;">
       Load more

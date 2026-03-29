@@ -2162,14 +2162,17 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
             r.pop("_tier", None)
 
         # Career totals
-        total_gp = sum(r["gp"] for r in career)
-        total_pts = sum(r["pts"] for r in career)
+        total_gp  = sum((r.get("gp")  or 0) for r in career)
+        total_g   = sum((r.get("g")   or 0) for r in career)
+        total_a   = sum((r.get("a")   or 0) for r in career)
+        total_pts = sum((r.get("pts") or 0) for r in career)
+        total_pim = sum((r.get("pim") or 0) for r in career)
         totals = {
             "gp": total_gp,
-            "g": sum(r["g"] for r in career),
-            "a": sum(r["a"] for r in career),
+            "g": total_g,
+            "a": total_a,
             "pts": total_pts,
-            "pim": sum(r["pim"] for r in career),
+            "pim": total_pim,
             "ppg": _compute_ppg(total_pts, total_gp),
         }
 
@@ -2249,7 +2252,7 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
                     if not result["year_of_birth"] and year_of_birth_str:
                         try:
                             yob = int(year_of_birth_str)
-                            if 1950 <= yob <= 2025:
+                            if 1950 <= yob <= datetime.now().year + 1:
                                 result["year_of_birth"] = yob
                         except (ValueError, TypeError):
                             pass
@@ -2280,8 +2283,8 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
         result["position"] = translate_position(result.get("position_raw"), locale)
         result["license"] = translate_license(result.get("license_raw"), locale)
 
-    except Exception:
-        pass
+    except Exception as _bio_exc:
+        logger.debug("Could not refresh player biographical data for %s: %s", person_id, _bio_exc)
 
     return result
 

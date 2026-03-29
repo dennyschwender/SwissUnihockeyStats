@@ -147,12 +147,13 @@
           {% include "partials/player_game_row.html" %}
           {% endfor %}
           {% if player.recent_has_more %}
-          <tr id="show-more-row-10">
+          <tr>
             <td colspan="9" style="text-align:center;padding:.75rem;">
               <button
                 hx-get="/api/v1/players/{{ player.person_id }}/games?offset=10&limit=10&locale={{ locale }}"
-                hx-target="closest tr"
-                hx-swap="outerHTML"
+                hx-target="#recent-games-body"
+                hx-swap="beforeend"
+                hx-on::after-request="this.closest('tr').remove()"
                 class="btn-secondary"
                 style="padding:.5rem 1.5rem;font-size:.875rem;">
                 {{ t.player.show_more_games }}
