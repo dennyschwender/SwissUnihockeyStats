@@ -310,19 +310,33 @@
   .tl-marker {
     position: absolute;
     width: 10px;
-    height: 10px;
-    border-radius: 50%;
+    height: 20px;
+    border-radius: 3px;
     border: 2px solid var(--card-bg, white);
     cursor: pointer;
     transform: translateX(-50%);
     transition: transform .1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
   }
   .tl-marker:hover { transform: translateX(-50%) scale(1.4); }
-  .tl-marker.goal { top: calc(50% - 14px); }
+  .tl-marker.goal { top: calc(50% - 18px); border-radius: 50% 50% 3px 3px; }
   .tl-marker.penalty {
-    top: calc(50% + 6px);
+    top: calc(50% + 4px);
     border-radius: 2px;
-    width: 8px; height: 8px;
+    width: 8px; height: 16px;
+  }
+  .tl-marker-label {
+    writing-mode: vertical-rl;
+    font-size: .5rem;
+    font-weight: 700;
+    color: white;
+    pointer-events: none;
+    line-height: 1;
+    overflow: hidden;
+    max-height: 100%;
   }
   .tl-marker.home { background: var(--tl-home); }
   .tl-marker.away { background: var(--tl-away); }
@@ -342,19 +356,9 @@
   }
   html.dark-mode .tl-tooltip { background: #374151; color: var(--swiss-white); }
   @media (max-width: 640px) {
-    .tl-bar { display: none; }
-    .tl-mobile { display: flex; flex-direction: column; gap: .35rem; }
-    .tl-mobile-row {
-      display: flex; align-items: center; gap: .5rem; font-size: .75rem;
-    }
-    .tl-mobile-dot {
-      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-    }
-    .tl-mobile-dot.penalty { border-radius: 2px; }
-    .tl-mobile-dot.home { background: var(--tl-home); }
-    .tl-mobile-dot.away { background: var(--tl-away); }
-    .tl-mobile-dot.unknown { background: var(--gray-400); }
-    .tl-mobile-label { color: var(--gray-700); line-height: 1.3; }
+    .tl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tl-bar { min-width: 560px; }
+    .tl-mobile { display: none; }
   }
   @media (min-width: 641px) { .tl-mobile { display: none; } }
 </style>
@@ -558,6 +562,8 @@ function gameTimeline(events, totalSeconds) {
              @mouseenter="tooltip = e"
              @mouseleave="tooltip = null"
              @click.stop="tooltip = (tooltip && tooltip.id === e.id) ? null : e">
+          <span class="tl-marker-label"
+                x-text="e.kind === 'goal' ? (e.score || '') : (e.minutes != null ? e.minutes + &quot;'&quot; : '')"></span>
         </div>
       </template>
 
@@ -566,7 +572,20 @@ function gameTimeline(events, totalSeconds) {
            x-transition.opacity
            class="tl-tooltip"
            :style="`left: clamp(80px, calc(${tooltip ? tooltip.pct : 0}%), calc(100% - 80px))`"
-           x-text="tooltip ? tooltip.label : ''">
+           style="white-space:normal;max-width:220px;line-height:1.4;padding:.4rem .65rem;">
+        <template x-if="tooltip">
+          <div>
+            <div style="font-weight:700;font-size:.8rem;" x-text="tooltip.label.split('—')[0].trim()"></div>
+            <div style="font-size:.75rem;opacity:.85;" x-text="tooltip.label.split('—').slice(1).join('—').trim()"></div>
+            <template x-if="tooltip.kind === 'goal' && tooltip.score">
+              <div style="font-size:1.1rem;font-weight:700;margin-top:.2rem;" x-text="tooltip.score"></div>
+            </template>
+            <template x-if="tooltip.kind === 'penalty' && tooltip.minutes != null">
+              <div style="font-size:.75rem;opacity:.85;margin-top:.2rem;"
+                   x-text="tooltip.minutes + &quot;' &quot; + (tooltip.infraction || '')"></div>
+            </template>
+          </div>
+        </template>
       </div>
     </div>
 
