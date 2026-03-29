@@ -403,6 +403,103 @@ class TestLaunchAndReturnIdForce:
         assert captured["force"] is True
 
 
+class TestSeasonGapDetection:
+    """_refresh_queue forces index_seasons when seasons are missing from DB"""
+
+    @pytest.mark.asyncio
+    async def test_gap_triggers_forced_seasons_job(self, mock_admin_jobs):
+        launched = []
+
+        async def submit(job_id, season, task, force=False, max_tier=7):
+            launched.append({"task": task, "force": force})
+
+        sched = Scheduler(mock_admin_jobs, submit)
+        sched._min_season = 2020
+
+        # Simulate DB returning only season 2025 (highlighted), missing 2020-2024
+        from unittest.mock import patch, MagicMock
+        mock_season_rows = [(2025, True)]  # (id, highlighted)
+
+        mock_session = MagicMock()
+        mock_session.query.return_value.order_by.return_value.all.return_value = mock_season_rows
+        # Season.is_frozen query returns None (not frozen)
+        mock_session.query.return_value.filter.return_value.scalar.return_value = None
+
+        mock_db = MagicMock()
+        mock_db.session_scope.return_value.__enter__ = MagicMock(return_value=mock_session)
+        mock_db.session_scope.return_value.__exit__ = MagicMock(return_value=False)
+
+        with patch("app.services.scheduler.get_database_service", return_value=mock_db):
+            await sched._refresh_queue()
+
+        seasons_jobs = [j for j in launched if j["task"] == "seasons"]
+        assert len(seasons_jobs) == 1
+        assert seasons_jobs[0]["force"] is True
+
+    @pytest.mark.asyncio
+    async def test_no_gap_no_forced_job(self, mock_admin_jobs):
+        launched = []
+
+        async def submit(job_id, season, task, force=False, max_tier=7):
+            launched.append({"task": task, "force": force})
+
+        sched = Scheduler(mock_admin_jobs, submit)
+        sched._min_season = 2025
+
+        from unittest.mock import patch, MagicMock
+        mock_season_rows = [(2025, True)]
+        mock_session = MagicMock()
+        mock_session.query.return_value.order_by.return_value.all.return_value = mock_season_rows
+        mock_session.query.return_value.filter.return_value.scalar.return_value = None
+
+        mock_db = MagicMock()
+        mock_db.session_scope.return_value.__enter__ = MagicMock(return_value=mock_session)
+        mock_db.session_scope.return_value.__exit__ = MagicMock(return_value=False)
+
+        with patch("app.services.scheduler.get_database_service", return_value=mock_db):
+            await sched._refresh_queue()
+
+        forced_seasons = [j for j in launched if j["task"] == "seasons" and j["force"]]
+        assert len(forced_seasons) == 0
+
+    @pytest.mark.asyncio
+    async def test_gap_skipped_when_seasons_job_already_queued(self, mock_admin_jobs):
+        launched = []
+
+        async def submit(job_id, season, task, force=False, max_tier=7):
+            launched.append({"task": task, "force": force})
+
+        sched = Scheduler(mock_admin_jobs, submit)
+        sched._min_season = 2020
+
+        # Pre-queue a seasons job
+        from app.services.scheduler import ScheduledJob, _utcnow
+        sched._queue.append(ScheduledJob(
+            run_at=_utcnow(),
+            priority=10,
+            policy_name="seasons",
+            task="seasons",
+            season=None,
+            label="already queued",
+        ))
+
+        from unittest.mock import patch, MagicMock
+        mock_season_rows = [(2025, True)]
+        mock_session = MagicMock()
+        mock_session.query.return_value.order_by.return_value.all.return_value = mock_season_rows
+        mock_session.query.return_value.filter.return_value.scalar.return_value = None
+
+        mock_db = MagicMock()
+        mock_db.session_scope.return_value.__enter__ = MagicMock(return_value=mock_session)
+        mock_db.session_scope.return_value.__exit__ = MagicMock(return_value=False)
+
+        with patch("app.services.scheduler.get_database_service", return_value=mock_db):
+            await sched._refresh_queue()
+
+        forced_seasons = [j for j in launched if j["task"] == "seasons" and j["force"]]
+        assert len(forced_seasons) == 0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
 

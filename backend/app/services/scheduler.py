@@ -39,6 +39,9 @@ _SNAPSHOT_INTERVAL_S = 6 * 3600
 
 logger = logging.getLogger(__name__)
 
+# Imported at module level so tests can patch app.services.scheduler.get_database_service
+from app.services.database import get_database_service  # noqa: E402
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Policy definitions
 # ─────────────────────────────────────────────────────────────────────────────
@@ -821,8 +824,10 @@ class Scheduler:
         queued/running. If not, look up the last sync time and schedule the
         next run if the data is stale (or has never been synced).
         """
+        current_season_id: int | None = None
+        indexed_seasons: list[int] = []
+
         try:
-            from app.services.database import get_database_service
             from app.models.db_models import Season, SyncStatus
 
             db_service = get_database_service()
@@ -833,8 +838,8 @@ class Scheduler:
                     session.query(Season.id, Season.highlighted).order_by(Season.id.desc()).all()
                 )
                 # Identify the current (highlighted) season — only it gets recurring updates
-                current_season_id: int | None = next((r[0] for r in season_rows if r[1]), None)
-                indexed_seasons: list[int] = [r[0] for r in season_rows]
+                current_season_id = next((r[0] for r in season_rows if r[1]), None)
+                indexed_seasons = [r[0] for r in season_rows]
 
                 # Yield to the event loop every N iterations so that HTTP
                 # request handlers (health checks, page loads) are not starved
@@ -865,9 +870,41 @@ class Scheduler:
         except Exception as exc:
             logger.error("[scheduler] refresh_queue error: %s", exc, exc_info=True)
 
+        # ── Gap detection: force index_seasons if expected seasons missing ──
+        try:
+            if self._min_season is not None and current_season_id is not None:
+                expected = set(range(self._min_season, current_season_id + 1))
+                missing = expected - set(indexed_seasons)
+                if missing:
+                    already_queued = any(
+                        j.policy_name == "seasons" for j in self._queue
+                    ) or any(
+                        r.policy_name == "seasons" and r.status in ("pending", "running")
+                        for r in self._history
+                    )
+                    if not already_queued:
+                        seasons_policy = next(
+                            p for p in POLICIES if p["name"] == "seasons"
+                        )
+                        job = ScheduledJob(
+                            run_at=_utcnow(),
+                            priority=seasons_policy["priority"],
+                            policy_name=seasons_policy["name"],
+                            task=seasons_policy["task"],
+                            season=None,
+                            label=seasons_policy["label"] + " (gap fill)",
+                            max_tier=seasons_policy.get("max_tier", 7),
+                        )
+                        logger.info(
+                            "[scheduler] season gap detected (missing %s), forcing index_seasons",
+                            sorted(missing),
+                        )
+                        await self._launch_and_return_id(job, force=True)
+        except Exception as exc:
+            logger.error("[scheduler] gap_detection error: %s", exc, exc_info=True)
+
         # ── Auto-freeze past seasons whose data is complete ───────────────────
         try:
-            from app.services.database import get_database_service
             from app.models.db_models import Season, Game
 
             db_service = get_database_service()
