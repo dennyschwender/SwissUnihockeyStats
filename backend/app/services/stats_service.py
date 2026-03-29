@@ -2327,10 +2327,21 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
             _sa   = sum((r.get("a")   or 0) for r in _rows)
             _spts = sum((r.get("pts") or 0) for r in _rows)
             _spim = sum((r.get("pim") or 0) for r in _rows)
+            # If all rows share the same team/league, surface it on the summary row
+            _team_names = {r.get("team_name") for r in _rows}
+            _league_names = {r.get("league") for r in _rows}
+            _common_team = _rows[0]["team_name"] if len(_team_names) == 1 else None
+            _common_team_db_id = _rows[0]["team_db_id"] if len(_team_names) == 1 else None
+            _common_league = _rows[0]["league"] if len(_league_names) == 1 else None
+            _common_league_db_id = _rows[0]["league_db_id"] if len(_league_names) == 1 else None
             career_by_season.append(
                 {
                     "season_id": _sid,
                     "season_text": _rows[0]["season_text"],
+                    "common_team": _common_team,
+                    "common_team_db_id": _common_team_db_id,
+                    "common_league": _common_league,
+                    "common_league_db_id": _common_league_db_id,
                     "totals": {
                         "gp":  _sgp,
                         "g":   _sg,

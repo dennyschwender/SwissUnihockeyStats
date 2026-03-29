@@ -88,14 +88,16 @@
               <a href="/{{ locale }}/leagues?season={{ season.season_id }}" class="link-inherit" @click.stop>{{ season.season_text }}</a>
             </td>
             <td style="font-size:.8rem;color:var(--gray-500);">
-              {% if not multi and season.rows[0].league_db_id %}
-                <a href="/{{ locale }}/league/{{ season.rows[0].league_db_id }}" class="link-inherit" @click.stop>{{ season.rows[0].league }}</a>
-              {% elif not multi %}{{ season.rows[0].league }}{% else %}–{% endif %}
+              {% set _show_league = season.rows[0].league if (not multi) else season.common_league %}
+              {% set _show_league_id = season.rows[0].league_db_id if (not multi) else season.common_league_db_id %}
+              {% if _show_league_id %}<a href="/{{ locale }}/league/{{ _show_league_id }}" class="link-inherit" @click.stop>{{ _show_league }}</a>
+              {% elif _show_league %}{{ _show_league }}{% else %}–{% endif %}
             </td>
             <td style="color:var(--gray-600);">
-              {% if not multi and season.rows[0].team_db_id %}
-                <a href="/{{ locale }}/team/{{ season.rows[0].team_db_id }}?season={{ season.season_id }}" class="link-inherit" @click.stop>{{ season.rows[0].team_name }}</a>
-              {% elif not multi %}{{ season.rows[0].team_name }}{% else %}–{% endif %}
+              {% set _show_team = season.rows[0].team_name if (not multi) else season.common_team %}
+              {% set _show_team_id = season.rows[0].team_db_id if (not multi) else season.common_team_db_id %}
+              {% if _show_team_id %}<a href="/{{ locale }}/team/{{ _show_team_id }}?season={{ season.season_id }}" class="link-inherit" @click.stop>{{ _show_team }}</a>
+              {% elif _show_team %}{{ _show_team }}{% else %}–{% endif %}
             </td>
             <td class="col-narrow">{{ season.totals.gp }}</td>
             <td class="col-narrow">{{ season.totals.g }}</td>
