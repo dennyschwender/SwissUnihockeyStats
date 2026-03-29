@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ t.coach.page_title }} — {{ coach.name }}{% endblock %}
+
+{% block content %}
+<div class="container page-content">
+  <div style="margin-bottom:1.5rem;">
+    <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:.25rem;">🎯 {{ coach.name }}</h1>
+    <p style="color:var(--gray-500);font-size:.9rem;">
+      {% if coach.role and coach.role | lower == 'headcoach' %}{{ t.coach.head_coach }}
+      {% elif coach.role and coach.role | lower == 'assistantcoach' %}{{ t.coach.assistant_coach }}
+      {% elif coach.role %}{{ coach.role }}{% endif %}
+    </p>
+  </div>
+
+  {% if coach.seasons %}
+  <div class="section-block">
+    <div class="section-block-header">
+      <h2 class="section-block-title">{{ t.coach.season_history }}</h2>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>{{ t.table.season }}</th>
+            <th>{{ t.table.team }}</th>
+            <th>{{ t.table.league }}</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in coach.seasons %}
+          <tr>
+            <td style="font-weight:500;">{{ s.season_text }}</td>
+            <td>
+              {% if s.team_db_id %}<a href="/{{ locale }}/team/{{ s.team_db_id }}?season={{ s.season_id }}" class="link-text">{{ s.team_name }}</a>{% else %}{{ s.team_name }}{% endif %}
+            </td>
+            <td style="font-size:.8rem;color:var(--gray-500);">
+              {% if s.league_db_id %}<a href="/{{ locale }}/league/{{ s.league_db_id }}" class="link-text">—</a>{% else %}—{% endif %}
+            </td>
+            <td style="font-size:.85rem;color:var(--gray-500);">{{ s.role }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state-center">
+    <p class="empty-state-icon">🎯</p>
+    <p>{{ t.coach.no_seasons }}</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

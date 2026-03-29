@@ -3935,6 +3935,23 @@ async def referee_detail(locale: str, name: str, request: Request):
     )
 
 
+@app.get("/{locale}/coach/{person_id:int}", response_class=HTMLResponse)
+async def coach_detail(locale: str, person_id: int, request: Request):
+    """Coach detail page — shows all teams coached across seasons."""
+    from app.services.stats_service import get_coach_detail
+    from app.services.database import get_database_service
+    t = get_translations(locale)
+    db = get_database_service()
+    with db.session_scope() as session:
+        coach = get_coach_detail(person_id, session)
+    if coach is None:
+        raise HTTPException(status_code=404, detail="Coach not found")
+    return templates.TemplateResponse(
+        "coach_detail.html",
+        {"request": request, "locale": locale, "t": t, "coach": coach},
+    )
+
+
 # ==================== Other Pages ====================
 
 
