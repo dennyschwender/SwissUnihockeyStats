@@ -220,11 +220,11 @@
     "tab_roster": "Kader",
     "tab_h2h": "H2H & Form",
     "tab_table": "Tabelle",
-    "tab_playoff": "Playoff",
+    "tab_playoff": "Playoff/Playouts",
     "period_breakdown": "Perioden-Übersicht",
     "h2h_title": "Direktvergleich",
     "no_h2h": "Keine früheren Begegnungen gefunden.",
-    "form_title": "Aktuelle Form",
+    "form_title": "Aktuelle Form (vor diesem Spiel)",
     "pos_legend": "G = Torhüter · D = Verteidiger · C = Mitte · A = Stürmer"
   },
   "league_detail": {

@@ -220,11 +220,11 @@
     "tab_roster": "Roster",
     "tab_h2h": "H2H & Form",
     "tab_table": "Table",
-    "tab_playoff": "Playoff",
+    "tab_playoff": "Playoff/Playouts",
     "period_breakdown": "Period Breakdown",
     "h2h_title": "Head to Head",
     "no_h2h": "No previous meetings found.",
-    "form_title": "Recent Form",
+    "form_title": "Recent Form (before this game)",
     "pos_legend": "G = Goalie · D = Defender · C = Centre · A = Winger"
   },
   "league_detail": {

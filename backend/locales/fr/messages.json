@@ -220,11 +220,11 @@
     "tab_roster": "Effectif",
     "tab_h2h": "H2H & Forme",
     "tab_table": "Classement",
-    "tab_playoff": "Playoff",
+    "tab_playoff": "Playoff/Playouts",
     "period_breakdown": "Résumé par période",
     "h2h_title": "Face à face",
     "no_h2h": "Aucune rencontre précédente trouvée.",
-    "form_title": "Forme récente",
+    "form_title": "Forme récente (avant ce match)",
     "pos_legend": "G = Gardien · D = Défenseur · C = Centre · A = Ailier"
   },
   "league_detail": {
