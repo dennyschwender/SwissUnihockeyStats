@@ -235,5 +235,68 @@ class TestPlayerIndexing:
         assert hasattr(indexer, "index_players_for_team")
 
 
+class TestIndexTeamStaff:
+    """Test index_team_staff upserts Staff rows correctly."""
+
+    def test_indexes_headcoach_and_assistantcoach(self, db_session):
+        from unittest.mock import MagicMock
+        from app.services.data_indexer import DataIndexer
+        from app.models.db_models import Staff, Season, Team
+
+        db_session.merge(Season(id=2025, text="2024/25", highlighted=True))
+        db_session.merge(Team(id=101, season_id=2025, name="Test Team"))
+        db_session.flush()
+
+        mock_staff_response = {
+            "data": [
+                {"person_id": 201, "first_name": "Hans", "last_name": "Meier", "role": "Headcoach"},
+                {"person_id": 202, "first_name": "Kurt", "last_name": "Müller", "role": "Assistantcoach"},
+                {"person_id": 203, "first_name": "Beat", "last_name": "Keller", "role": "Physiotherapist"},
+            ]
+        }
+
+        indexer = DataIndexer.__new__(DataIndexer)
+        indexer.client = MagicMock()
+        indexer.client.get_team_staff.return_value = mock_staff_response
+
+        indexer.index_team_staff(101, 2025, db_session)
+        db_session.flush()
+
+        staff_rows = db_session.query(Staff).filter(Staff.team_id == 101).all()
+        roles = {s.role for s in staff_rows}
+        assert "Headcoach" in roles
+        assert "Assistantcoach" in roles
+        assert "Physiotherapist" not in roles
+        assert len(staff_rows) == 2
+
+    def test_upserts_existing_staff(self, db_session):
+        from unittest.mock import MagicMock
+        from app.services.data_indexer import DataIndexer
+        from app.models.db_models import Staff, Season, Team
+
+        db_session.merge(Season(id=2025, text="2024/25", highlighted=True))
+        db_session.merge(Team(id=102, season_id=2025, name="Team 2"))
+        db_session.flush()
+
+        db_session.merge(Staff(id=301, season_id=2025, team_id=102,
+                               first_name="Old", last_name="Name", role="Headcoach"))
+        db_session.flush()
+
+        mock_staff_response = {
+            "data": [
+                {"person_id": 301, "first_name": "New", "last_name": "Name", "role": "Headcoach"},
+            ]
+        }
+        indexer = DataIndexer.__new__(DataIndexer)
+        indexer.client = MagicMock()
+        indexer.client.get_team_staff.return_value = mock_staff_response
+
+        indexer.index_team_staff(102, 2025, db_session)
+        db_session.flush()
+
+        s = db_session.query(Staff).filter(Staff.id == 301, Staff.season_id == 2025).one()
+        assert s.first_name == "New"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

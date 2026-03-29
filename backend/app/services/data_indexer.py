@@ -1060,6 +1060,41 @@ class DataIndexer:
             False,
         )
 
+    def index_team_staff(
+        self, team_id: int, season_id: int, session
+    ) -> None:
+        """Fetch and upsert coaching staff for *team_id* in *season_id*.
+
+        Only indexes Headcoach and Assistantcoach roles.
+        """
+        from app.models.db_models import Staff
+
+        _INDEXED_ROLES = {"headcoach", "assistantcoach"}
+
+        try:
+            data = self.client.get_team_staff(team_id)
+        except Exception as exc:
+            logger.warning("get_team_staff(%s) failed: %s", team_id, exc)
+            return
+
+        staff_list = data.get("data") or []
+        for member in staff_list:
+            role = (member.get("role") or "").strip()
+            if role.lower() not in _INDEXED_ROLES:
+                continue
+            person_id = member.get("person_id")
+            if not person_id:
+                continue
+            staff_row = Staff(
+                id=int(person_id),
+                season_id=season_id,
+                team_id=team_id,
+                first_name=member.get("first_name") or None,
+                last_name=member.get("last_name") or None,
+                role=role,
+            )
+            session.merge(staff_row)
+
     def index_player_stats_one(self, player_id: int, season_id: int, force: bool = False) -> int:
         """Index statistics for a single player in one season.
 
