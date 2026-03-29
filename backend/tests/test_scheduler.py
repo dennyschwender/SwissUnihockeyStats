@@ -499,6 +499,43 @@ class TestSeasonGapDetection:
         forced_seasons = [j for j in launched if j["task"] == "seasons" and j["force"]]
         assert len(forced_seasons) == 0
 
+    @pytest.mark.asyncio
+    async def test_gap_skipped_when_seasons_job_running_in_history(self, mock_admin_jobs):
+        launched = []
+
+        async def submit(job_id, season, task, force=False, max_tier=7):
+            launched.append({"task": task, "force": force})
+
+        sched = Scheduler(mock_admin_jobs, submit)
+        sched._min_season = 2020
+
+        # Simulate a seasons job already running (in history, not queue)
+        from app.services.scheduler import JobRecord, _utcnow
+        sched._history.append(JobRecord(
+            job_id="abc123",
+            policy_name="seasons",
+            task="seasons",
+            season=None,
+            status="running",
+            scheduled_at=_utcnow(),
+        ))
+
+        from unittest.mock import patch, MagicMock
+        mock_season_rows = [(2025, True)]
+        mock_session = MagicMock()
+        mock_session.query.return_value.order_by.return_value.all.return_value = mock_season_rows
+        mock_session.query.return_value.filter.return_value.scalar.return_value = None
+
+        mock_db = MagicMock()
+        mock_db.session_scope.return_value.__enter__ = MagicMock(return_value=mock_session)
+        mock_db.session_scope.return_value.__exit__ = MagicMock(return_value=False)
+
+        with patch("app.services.scheduler.get_database_service", return_value=mock_db):
+            await sched._refresh_queue()
+
+        forced_seasons = [j for j in launched if j["task"] == "seasons" and j["force"]]
+        assert len(forced_seasons) == 0
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
