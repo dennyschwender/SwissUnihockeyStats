@@ -4144,7 +4144,7 @@ async def universal_search(request: Request, locale: str, q: str = ""):
             html_parts.append("</div></div>")
 
         # --- Referees ---
-        from sqlalchemy import union
+        from sqlalchemy import union, column as _col
         from app.models.db_models import Game
 
         ref1_q = (
@@ -4156,7 +4156,7 @@ async def universal_search(request: Request, locale: str, q: str = ""):
             .filter(Game.referee_2.ilike(f"%{q}%"), Game.referee_2.isnot(None))
         )
         referee_names = (
-            session.query("name")
+            session.query(_col("name"))
             .select_entity_from(union(ref1_q, ref2_q).alias("refs"))
             .limit(5)
             .all()
