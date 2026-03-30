@@ -280,7 +280,7 @@
   }
   .tl-bar {
     position: relative;
-    height: 48px;
+    height: 40px;
     margin: 0 4px;
   }
   .tl-track {
@@ -310,8 +310,7 @@
   .tl-marker {
     position: absolute;
     width: 10px;
-    height: 20px;
-    border-radius: 3px;
+    height: 40px;
     border: 2px solid var(--card-bg, white);
     cursor: pointer;
     transform: translateX(-50%);
@@ -322,15 +321,14 @@
     overflow: hidden;
   }
   .tl-marker:hover { transform: translateX(-50%) scale(1.4); }
-  .tl-marker.goal { top: calc(50% - 18px); border-radius: 50% 50% 3px 3px; }
+  .tl-marker.goal { top: calc(50% - 40px); }
   .tl-marker.penalty {
-    top: calc(50% + 4px);
-    border-radius: 2px;
-    width: 8px; height: 16px;
+    top: calc(50% - 40px);
+    width: 8px; height: 40px;
   }
   .tl-marker-label {
     writing-mode: vertical-rl;
-    font-size: .5rem;
+    font-size: .7rem;
     font-weight: 700;
     color: white;
     pointer-events: none;
