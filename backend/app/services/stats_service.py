@@ -3126,7 +3126,7 @@ def get_game_box_score(game_id: int) -> dict:
                 is_own_goal = ev_type.lower().startswith("eigentor")
                 goals.append(
                     {
-                        "period": period,
+                        "period": derived_period,
                         "time": time_str,
                         "score": score_str,
                         "team": team_label,
@@ -3142,7 +3142,7 @@ def get_game_box_score(game_id: int) -> dict:
                 infraction = m.group(2).strip() if m else ev_type
                 penalties.append(
                     {
-                        "period": period,
+                        "period": derived_period,
                         "time": time_str,
                         "team": team_label,
                         "player": player_name,
