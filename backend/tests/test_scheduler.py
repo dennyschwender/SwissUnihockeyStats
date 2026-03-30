@@ -344,6 +344,11 @@ class TestPoliciesStructure:
         for p in POLICIES:
             assert p["priority"] > 0, f"Policy {p['name']} has non-positive priority"
 
+
+
+class TestPoliciesDefinition:
+    """Validate specific policy definitions and their properties."""
+
     def test_games_policy_exists_and_is_past_only(self):
         """games policy must exist, be past_only, and require leagues."""
         from app.services.scheduler import POLICIES
