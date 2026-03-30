@@ -1323,6 +1323,20 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
             if _tname:
                 team_gender[_tname] = _GC_GENDER[_gc]
 
+        # Players with locally-computed rows (from GamePlayer aggregation).
+        # These coexist with API-fetched rows using different league_abbrev values
+        # (e.g. "Herren NLB" vs "NLB"), causing double-counting. Prefer local rows
+        # when they exist; fall back to API rows for players without any local rows.
+        local_players_subq = (
+            session.query(PlayerStatistics.player_id)
+            .filter(
+                PlayerStatistics.season_id == season_id,
+                PlayerStatistics.computed_from_local == True,  # noqa: E712
+            )
+            .distinct()
+            .subquery()
+        )
+
         # Aggregate stats per player across all teams
         stats = (
             session.query(
@@ -1335,7 +1349,13 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
                 func.sum(PlayerStatistics.penalty_minutes).label("pim"),
             )
             .join(Player, PlayerStatistics.player_id == Player.person_id)
-            .filter(PlayerStatistics.season_id == season_id)
+            .filter(
+                PlayerStatistics.season_id == season_id,
+                or_(
+                    PlayerStatistics.computed_from_local == True,  # noqa: E712
+                    PlayerStatistics.player_id.not_in(local_players_subq),
+                ),
+            )
             .group_by(PlayerStatistics.player_id, Player.full_name)
             .order_by(
                 func.sum(PlayerStatistics.points).desc(), func.sum(PlayerStatistics.goals).desc()
@@ -1431,7 +1451,23 @@ def get_player_leaderboard(
             "pim": pim_sum.desc(),
         }.get(order_by, pts_sum.desc())
 
-        base_filter = [PlayerStatistics.season_id == season_id]
+        # Prefer locally-computed rows over API rows to avoid double-counting
+        # (same league stored with different abbrev from each source).
+        local_players_subq = (
+            session.query(PlayerStatistics.player_id)
+            .filter(
+                PlayerStatistics.season_id == season_id,
+                PlayerStatistics.computed_from_local == True,  # noqa: E712
+            )
+            .distinct()
+            .subquery()
+        )
+        dedup_filter = or_(
+            PlayerStatistics.computed_from_local == True,  # noqa: E712
+            PlayerStatistics.player_id.not_in(local_players_subq),
+        )
+
+        base_filter = [PlayerStatistics.season_id == season_id, dedup_filter]
         if team_id is not None:
             base_filter.append(
                 PlayerStatistics.team_name.in_(session.query(Team.name).filter(Team.id == team_id))
