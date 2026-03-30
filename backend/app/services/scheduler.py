@@ -994,6 +994,11 @@ class Scheduler:
         if policy.get("current_only") and not is_current_season:
             return
 
+        # past_only policies exist specifically for past seasons (e.g. games, game_events)
+        # — the current season's game indexing is owned by upcoming_games/post_game_completion.
+        if policy.get("past_only") and is_current_season:
+            return
+
         # Cascade prerequisite: ensure ordering on the very first run
         # (T1 must have completed at least once before T2 is eligible, etc.).
         # We do NOT block on staleness here — each tier's own max_age already

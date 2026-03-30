@@ -732,3 +732,84 @@ class TestSeasonFreezeScheduler:
         scheduler._queue.clear()
         with db.session_scope() as session:
             session.query(Season).filter(Season.id == 7002).delete()
+
+
+class TestPastOnlyFlag:
+    """past_only policies must not run for the current season."""
+
+    def test_past_only_policy_skipped_for_current_season(self):
+        """A past_only policy must return early when is_current_season=True."""
+        from unittest.mock import MagicMock
+        from app.services.scheduler import Scheduler
+
+        sched = Scheduler.__new__(Scheduler)
+        sched._min_season = None
+        sched._excluded_seasons = []
+        sched._max_concurrent = 2
+        sched._policy_tiers = {}
+        sched._enabled = True
+        sched._queue = []
+        sched._history = []
+        sched._running = False
+
+        past_only_policy = {
+            "name": "games",
+            "entity_type": "games",
+            "task": "games",
+            "scope": "season",
+            "past_only": True,
+            "label": "Games (past seasons)",
+            "max_age": __import__("datetime").timedelta(days=7),
+            "priority": 55,
+            "run_at_hour": 3,
+        }
+
+        mock_session = MagicMock()
+        sched._maybe_schedule(mock_session, past_only_policy, season=2025, is_current_season=True)
+
+        assert sched._queue == [], "past_only policy must not be queued for current season"
+
+    def test_past_only_policy_runs_for_past_season(self):
+        """A past_only policy must NOT be skipped when is_current_season=False."""
+        from unittest.mock import MagicMock, patch
+        from datetime import timedelta
+        from app.services.scheduler import Scheduler
+
+        sched = Scheduler.__new__(Scheduler)
+        sched._min_season = None
+        sched._excluded_seasons = []
+        sched._max_concurrent = 2
+        sched._policy_tiers = {}
+        sched._enabled = True
+        sched._queue = []
+        sched._history = []
+        sched._running = False
+
+        past_only_policy = {
+            "name": "games",
+            "entity_type": "games",
+            "task": "games",
+            "scope": "season",
+            "past_only": True,
+            "requires": "leagues",
+            "label": "Games (past seasons)",
+            "max_age": timedelta(days=7),
+            "priority": 55,
+            "run_at_hour": 3,
+        }
+
+        mock_session = MagicMock()
+        # is_frozen → False
+        mock_session.query.return_value.filter.return_value.scalar.return_value = False
+        from datetime import datetime
+        leagues_done = datetime(2026, 3, 30, 3, 0, 0)
+
+        with patch("app.services.scheduler._last_sync_for") as mock_lsf, \
+             patch("app.services.scheduler._last_attempt_for", return_value=None):
+            mock_lsf.side_effect = lambda s, entity_type, season: (
+                leagues_done if entity_type == "leagues" else None
+            )
+            sched._maybe_schedule(mock_session, past_only_policy, season=2019, is_current_season=False)
+
+        assert len(sched._queue) == 1, "past_only policy should be queued for past season"
+        assert sched._queue[0].policy_name == "games"
