@@ -426,7 +426,7 @@ function eventsTable(goals, penalties) {
     icon(k) { if (this.key !== k) return '\u2195'; return this.dir === 'asc' ? '\u2191' : '\u2193'; },
     fmtMin(e) { return e.type === 'penalty' && e.minutes != null ? e.minutes + "'" : '\u2014'; },
     fmtPenalty(e) { if (e.type !== 'penalty') return ''; const m = e.minutes != null ? e.minutes + "'" : ''; const i = e.infraction || ''; return m && i ? m + '\u00a0(' + i + ')' : m || i || '\u2014'; },
-    isPeriodStart(i) { return i === 0 || this.sorted[i].period !== this.sorted[i-1].period; }
+    isPeriodStart(i) { const p = e => e.display_period || e.period; return i === 0 || p(this.sorted[i]) !== p(this.sorted[i-1]); }
   };
 }
 
@@ -655,7 +655,7 @@ function gameTimeline(events, totalSeconds) {
           <tbody>
             <template x-for="(e, i) in sorted" :key="e.type + '|' + e.time + '|' + e.team + '|' + (e.player || '') + '|' + (e.minutes || '') + '|' + (e.score || '')">
               <tr :class="(e.type === 'penalty' ? 'gd-row-penalty' : '') + (isPeriodStart(i) && i > 0 ? ' gd-row-period-start' : '')">
-                <td x-text="e.period || '—'"></td>
+                <td x-text="e.display_period || e.period || '—'"></td>
                 <td x-text="e.time || '—'"></td>
                 <td x-text="e.type === 'goal' ? '🥅' : '🟨'"></td>
                 <td x-text="e.team || '—'"></td>
