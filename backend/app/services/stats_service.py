@@ -1380,12 +1380,20 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
             )
             .all()
         )
-        # Build lookup: player_id → row with highest games_played
+        # Build lookup: player_id → best row (prefer non-NULL team_name, then most games)
         ps_by_player: dict[int, Any] = {}
         for ps_row in all_ps_rows:
             pid = ps_row[0]
-            if pid not in ps_by_player or ps_row[4] > ps_by_player[pid][4]:
+            if pid not in ps_by_player:
                 ps_by_player[pid] = ps_row
+            else:
+                cur = ps_by_player[pid]
+                cur_has_name = bool(cur[1])
+                new_has_name = bool(ps_row[1])
+                if new_has_name and (not cur_has_name or ps_row[4] > cur[4]):
+                    ps_by_player[pid] = ps_row
+                elif not cur_has_name and not new_has_name and ps_row[4] > cur[4]:
+                    ps_by_player[pid] = ps_row
 
         result = []
         for i, (player_id, full_name, gp, g, a, pts, pim) in enumerate(stats, 1):

@@ -266,9 +266,24 @@ def aggregate_player_stats_for_season(
                 m["pen_10min"] += breakdown.get("10min", 0)
                 m["pen_match"] += breakdown.get("match", 0)
 
+        # Pre-load team names for all team_ids referenced in merged rows
+        from app.models.db_models import Team as TeamModel
+
+        all_tids = {m["tid"] for m in merged.values() if m["tid"] is not None}
+        team_name_by_id: dict[int, str] = {}
+        if all_tids:
+            for t in (
+                session.query(TeamModel.id, TeamModel.name)
+                .filter(TeamModel.id.in_(all_tids), TeamModel.season_id == season_id)
+                .all()
+            ):
+                if t.name:
+                    team_name_by_id[t.id] = t.name
+
         now = _now()
         for m in merged.values():
             pid, tid, abbrev = m["pid"], m["tid"], m["abbrev"]
+            team_name = team_name_by_id.get(tid) if tid is not None else None
             existing = (
                 session.query(PlayerStatistics)
                 .filter_by(player_id=pid, season_id=season_id, league_abbrev=abbrev)
@@ -279,6 +294,7 @@ def aggregate_player_stats_for_season(
                     player_id=pid,
                     season_id=season_id,
                     team_id=tid,
+                    team_name=team_name,
                     league_abbrev=abbrev,
                     games_played=m["games_played"],
                     goals=m["goals"],
@@ -304,6 +320,8 @@ def aggregate_player_stats_for_season(
                 existing.pen_5min = m["pen_5min"]
                 existing.pen_10min = m["pen_10min"]
                 existing.pen_match = m["pen_match"]
+                if team_name:
+                    existing.team_name = team_name
                 existing.computed_from_local = True
                 existing.local_computed_at = now
                 existing.last_updated = now
