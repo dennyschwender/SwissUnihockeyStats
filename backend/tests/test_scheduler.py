@@ -344,6 +344,41 @@ class TestPoliciesStructure:
         for p in POLICIES:
             assert p["priority"] > 0, f"Policy {p['name']} has non-positive priority"
 
+    def test_games_policy_exists_and_is_past_only(self):
+        """games policy must exist, be past_only, and require leagues."""
+        from app.services.scheduler import POLICIES
+
+        p = next((p for p in POLICIES if p["name"] == "games"), None)
+        assert p is not None, "games policy not found in POLICIES"
+        assert p["past_only"] is True
+        assert p["requires"] == "leagues"
+        assert p["task"] == "games"
+        assert p["scope"] == "season"
+        assert p["run_at_hour"] == 3
+
+    def test_game_events_policy_exists_and_is_past_only(self):
+        """game_events policy must exist, be past_only, and require games."""
+        from app.services.scheduler import POLICIES
+
+        p = next((p for p in POLICIES if p["name"] == "game_events"), None)
+        assert p is not None, "game_events policy not found in POLICIES"
+        assert p["past_only"] is True
+        assert p["requires"] == "games"
+        assert p["task"] == "events"
+        assert p["scope"] == "season"
+        assert p["run_at_hour"] == 3
+
+    def test_games_policy_priority_between_leagues_and_upcoming(self):
+        """games must have priority between leagues(50) and upcoming_games_noon(70)."""
+        from app.services.scheduler import POLICIES
+
+        leagues_p = next(p["priority"] for p in POLICIES if p["name"] == "leagues")
+        games_p = next(p["priority"] for p in POLICIES if p["name"] == "games")
+        game_events_p = next(p["priority"] for p in POLICIES if p["name"] == "game_events")
+        upcoming_p = next(p["priority"] for p in POLICIES if p["name"] == "upcoming_games_noon")
+
+        assert leagues_p < games_p < game_events_p < upcoming_p
+
 
 class TestClearDone:
     """Unit tests for clear_done helper."""

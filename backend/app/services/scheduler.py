@@ -120,6 +120,34 @@ POLICIES: list[dict] = [
         "priority": 50,
         "run_at_hour": 3,
     },
+    # ── Past-season game indexing — run once, then frozen ────────────────────
+    # These policies fill in games/events/lineups for seasons that were added
+    # to the DB after the season ended (e.g. via gap detection).  current_only
+    # upcoming_games already owns this data for the active season.
+    {
+        "name": "games",
+        "entity_type": "games",
+        "task": "games",          # runs leagues → league_groups → games → team_names
+        "scope": "season",
+        "past_only": True,        # never runs for the current season
+        "requires": "leagues",    # wait until leagues are indexed for this season
+        "label": "Games (past seasons)",
+        "max_age": timedelta(days=7),
+        "priority": 55,
+        "run_at_hour": 3,
+    },
+    {
+        "name": "game_events",
+        "entity_type": "game_events",
+        "task": "events",         # runs game_events + game_lineups together in one pass
+        "scope": "season",
+        "past_only": True,        # never runs for the current season
+        "requires": "games",      # wait until games are indexed for this season
+        "label": "Game events + lineups (past seasons)",
+        "max_age": timedelta(days=7),
+        "priority": 60,
+        "run_at_hour": 3,
+    },
     # ── Upcoming games polling — schedule changes (noon / evening / night) ───
     # Runs 3× daily so any postponements or venue changes are caught promptly.
     {
