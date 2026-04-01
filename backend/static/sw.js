@@ -3,9 +3,9 @@
  * Handles caching and offline functionality
  */
 
-const CACHE_NAME = 'swissunihockey-v4';
-const STATIC_CACHE = 'static-v4';
-const DYNAMIC_CACHE = 'dynamic-v4';
+const CACHE_NAME = 'swissunihockey-v5';
+const STATIC_CACHE = 'static-v5';
+const DYNAMIC_CACHE = 'dynamic-v5';
 
 // Assets to cache immediately
 const STATIC_ASSETS = [
@@ -55,9 +55,13 @@ self.addEventListener('fetch', (event) => {
     
     // Skip non-GET requests
     if (request.method !== 'GET') return;
-    
+
     // Skip chrome extensions
     if (request.url.includes('chrome-extension')) return;
+
+    // Never cache admin pages or admin static JS — always fetch fresh
+    const url = new URL(request.url);
+    if (url.pathname.startsWith('/admin') || url.pathname.startsWith('/static/js/admin')) return;
     
     event.respondWith(
         caches.match(request)
