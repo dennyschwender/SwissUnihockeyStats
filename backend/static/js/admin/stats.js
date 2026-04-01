@@ -1,6 +1,6 @@
 // backend/static/js/admin/stats.js
 import { fetchJSON } from './utils.js';
-import { renderSeasons, isSeasonFiltered, setFreshnessMap, setSeasonFilter, setCompletenessMap } from './seasons.js?v=2';
+import { renderSeasons, isSeasonFiltered, setFreshnessMap, setSeasonFilter, setCompletenessMap } from './seasons.js';
 
 /* =======================================================
    loadStats  — fetches /admin/api/stats + scheduler-diag,

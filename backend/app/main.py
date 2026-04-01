@@ -187,6 +187,15 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
+@app.middleware("http")
+async def no_cache_admin_js(request: Request, call_next):
+    """Prevent Cloudflare (and browsers) from caching admin JS files."""
+    response = await call_next(request)
+    if request.url.path.startswith("/static/js/admin/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.get("/sw.js", include_in_schema=False)
 async def service_worker():
     """Serve sw.js from root so its default scope is '/' (covers all pages)."""
