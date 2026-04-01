@@ -24,8 +24,6 @@
               <button class="btn btn-sm" id="vacuum-btn" onclick="runVacuum()" title="VACUUM + WAL checkpoint: reclaims space from deleted rows and merges WAL back into .db">🧹 VACUUM + Checkpoint</button>
               <button class="btn btn-sm" id="cleanup-btn" onclick="runCleanup()" title="Remove duplicate league_groups, game_events, and old sync_status rows">🗑️ Cleanup Duplicates</button>
               <button class="btn btn-sm" onclick="loadDbInfo()">↺ Refresh</button>
-              <a href="/admin/sync-failures" class="btn btn-sm" style="text-decoration:none">⚠️ Sync Failures</a>
-              <a href="/admin/unresolved-events" class="btn btn-sm" style="text-decoration:none">🔗 Unresolved Events</a>
             </div>
             <div style="margin-top:.5rem;font-size:.7rem;color:#6e7681;line-height:1.5">
               VACUUM rewrites the DB to reclaim free pages and merge the WAL file back. Can take a few seconds on large DBs.
@@ -42,6 +40,32 @@
         <button class="btn btn-sm" onclick="clearDbLog()">Clear</button>
       </div>
       <div class="log-box" id="db-log-box">Ready.</div>
+    </div>
+
+    <!-- ── Sync Failures collapsible ── -->
+    <div class="season-card" style="margin-top:1rem">
+      <div class="season-header" onclick="toggleEl('sf-body','sf-chv')">
+        <span class="season-year">⚠️ Sync Failures</span>
+        <span id="sf-count-badge" style="margin-left:.5rem"></span>
+        <button class="btn btn-sm" onclick="event.stopPropagation();loadSyncFailures()" style="margin-left:auto;margin-right:.5rem">↺</button>
+        <span class="chevron" id="sf-chv">▶</span>
+      </div>
+      <div class="season-body" id="sf-body" style="padding:.75rem 1rem">
+        <div id="sf-content" style="font-size:.82rem;color:#8b949e">Click ↺ to load.</div>
+      </div>
+    </div>
+
+    <!-- ── Unresolved Events collapsible ── -->
+    <div class="season-card" style="margin-top:.5rem">
+      <div class="season-header" onclick="toggleEl('ue-body','ue-chv')">
+        <span class="season-year">🔗 Unresolved Events</span>
+        <span id="ue-count-badge" style="margin-left:.5rem"></span>
+        <button class="btn btn-sm" onclick="event.stopPropagation();loadUnresolvedEvents()" style="margin-left:auto;margin-right:.5rem">↺</button>
+        <span class="chevron" id="ue-chv">▶</span>
+      </div>
+      <div class="season-body" id="ue-body" style="padding:.75rem 1rem">
+        <div id="ue-content" style="font-size:.82rem;color:#8b949e">Click ↺ to load.</div>
+      </div>
     </div>
 
   </div>

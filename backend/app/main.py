@@ -4437,46 +4437,37 @@ async def privacy_page(request: Request, locale: str):
 # ============================================================================
 
 
-@app.get("/admin/sync-failures", response_class=HTMLResponse)
-async def admin_sync_failures(request: Request, _: None = Depends(require_admin)):
-    """Admin page showing all GameSyncFailure rows with retry controls."""
+@app.get("/admin/api/sync-failures")
+async def admin_api_sync_failures(_: None = Depends(require_admin)):
+    """Return all GameSyncFailure rows as JSON."""
     from sqlalchemy import select
     from app.models.db_models import GameSyncFailure, Game
     from app.services.database import get_database_service
 
-    locale = get_locale_from_path(request.url.path)
-    t = get_translations(locale)
     with get_database_service().session_scope() as session:
         rows = session.execute(
             select(GameSyncFailure, Game)
             .join(Game, GameSyncFailure.game_id == Game.id)
             .order_by(GameSyncFailure.abandoned_at.desc())
         ).all()
-        failures_data = [
+        data = [
             {
                 "failure_id": f.id,
-                "game_id": g.id,
                 "game_api_id": g.id,
                 "season_id": f.season_id,
-                "game_date": g.game_date,
-                "abandoned_at": f.abandoned_at,
+                "game_date": g.game_date.isoformat() if g.game_date else None,
+                "abandoned_at": f.abandoned_at.strftime("%Y-%m-%d %H:%M") if f.abandoned_at else None,
                 "missing_fields": f.missing_fields or [],
                 "can_retry": f.can_retry,
-                "retried_at": f.retried_at,
+                "retried_at": f.retried_at.strftime("%Y-%m-%d %H:%M") if f.retried_at else None,
             }
             for f, g in rows
         ]
-    return templates.TemplateResponse(
-        request,
-        "admin_sync_failures.html",
-        {"failures": failures_data, "t": t, "locale": locale},
-    )
+    return {"ok": True, "failures": data}
 
 
-@app.post("/admin/sync-failures/{failure_id}/retry")
-async def admin_retry_sync_failure(
-    failure_id: int, request: Request, _: None = Depends(require_admin)
-):
+@app.post("/admin/api/sync-failures/{failure_id}/retry")
+async def admin_api_retry_sync_failure(failure_id: int, _: None = Depends(require_admin)):
     """Queue a GameSyncFailure for retry by setting can_retry=True."""
     from app.models.db_models import GameSyncFailure
     from app.services.database import get_database_service
@@ -4486,11 +4477,12 @@ async def admin_retry_sync_failure(
         if failure is None:
             raise HTTPException(status_code=404, detail="Failure not found")
         failure.can_retry = True
-    return RedirectResponse(url="/admin/sync-failures", status_code=303)
+    return {"ok": True}
 
 
-@app.get("/admin/unresolved-events", response_class=HTMLResponse)
-async def admin_unresolved_events(request: Request, _: None = Depends(require_admin)):
+@app.get("/admin/api/unresolved-events")
+async def admin_api_unresolved_events(_: None = Depends(require_admin)):
+    """Return unresolved player events as JSON."""
     from app.models.db_models import UnresolvedPlayerEvent
     from app.services.database import get_database_service
 
@@ -4510,36 +4502,28 @@ async def admin_unresolved_events(request: Request, _: None = Depends(require_ad
                 "team_id": r.team_id,
                 "raw_name": r.raw_name,
                 "event_type": r.event_type,
-                "created_at": r.created_at,
+                "created_at": r.created_at.strftime("%Y-%m-%d") if r.created_at else None,
             }
             for r in rows
         ]
-    locale = "de"
-    t = get_translations(locale)
-    return templates.TemplateResponse(
-        "admin_unresolved_events.html",
-        {"request": request, "locale": locale, "t": t, "rows": data},
-    )
+    return {"ok": True, "events": data}
 
 
-@app.post("/admin/unresolved-events/{event_id}/dismiss")
-async def admin_dismiss_unresolved_event(
-    event_id: int, request: Request, _: None = Depends(require_admin)
-):
+@app.post("/admin/api/unresolved-events/{event_id}/dismiss")
+async def admin_api_dismiss_unresolved_event(event_id: int, _: None = Depends(require_admin)):
+    """Dismiss an unresolved player event."""
     from app.models.db_models import UnresolvedPlayerEvent
     from datetime import datetime, timezone
     from app.services.database import get_database_service
 
     db = get_database_service()
-    try:
-        with db.session_scope() as session:
-            row = session.get(UnresolvedPlayerEvent, event_id)
-            if row:
-                row.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
-                row.resolved_by = "dismissed"
-        return RedirectResponse("/admin/unresolved-events", status_code=303)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+    with db.session_scope() as session:
+        row = session.get(UnresolvedPlayerEvent, event_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Event not found")
+        row.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        row.resolved_by = "dismissed"
+    return {"ok": True}
 
 
 # ============================================================================

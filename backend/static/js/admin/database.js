@@ -117,5 +117,110 @@ async function runCleanup() {
   }
 }
 
-Object.assign(window, { runVacuum, runCleanup, clearDbLog, loadDbInfo });
+/* ── HTML escape helper ──────────────────────────────────────────────────── */
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Sync Failures ───────────────────────────────────────────────────────── */
+async function loadSyncFailures() {
+  const el = document.getElementById('sf-content');
+  const badge = document.getElementById('sf-count-badge');
+  if (el) el.innerHTML = '<span style="color:#8b949e">Loading…</span>';
+  const d = await fetchJSON('/admin/api/sync-failures');
+  if (!d) { if (el) el.innerHTML = '<span style="color:#f85149">Failed to load.</span>'; return; }
+  const failures = d.failures || [];
+  if (badge) badge.innerHTML = failures.length
+    ? `<span class="s-chip warn">${failures.length}</span>`
+    : '';
+  if (!failures.length) {
+    if (el) el.innerHTML = '<span style="color:#3fb950">✓ No sync failures.</span>';
+    return;
+  }
+  const rows = failures.map(f => {
+    const retryBtn = (!f.can_retry && !f.retried_at)
+      ? `<button class="btn btn-sm" onclick="retrySyncFailure(${esc(f.failure_id)})">Queue Retry</button>`
+      : '—';
+    return `<tr>
+      <td style="padding:3px 8px 3px 0">${esc(f.game_api_id)}</td>
+      <td style="padding:3px 8px 3px 0">${esc(f.season_id)}</td>
+      <td style="padding:3px 8px 3px 0">${esc(f.game_date || '—')}</td>
+      <td style="padding:3px 8px 3px 0">${esc(f.abandoned_at || '—')}</td>
+      <td style="padding:3px 8px 3px 0">${esc((f.missing_fields || []).join(', ') || '—')}</td>
+      <td style="padding:3px 8px 3px 0">${f.can_retry ? 'Yes' : 'No'}</td>
+      <td style="padding:3px 8px 3px 0">${esc(f.retried_at || '—')}</td>
+      <td style="padding:3px 0">${retryBtn}</td>
+    </tr>`;
+  }).join('');
+  if (el) el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.8rem">
+    <thead><tr style="color:#8b949e;border-bottom:1px solid #30363d">
+      <th style="padding:3px 8px 3px 0;text-align:left">Game</th>
+      <th style="padding:3px 8px 3px 0;text-align:left">Season</th>
+      <th style="padding:3px 8px 3px 0;text-align:left">Date</th>
+      <th style="padding:3px 8px 3px 0;text-align:left">Abandoned</th>
+      <th style="padding:3px 8px 3px 0;text-align:left">Missing Fields</th>
+      <th style="padding:3px 8px 3px 0;text-align:left">Can Retry</th>
+      <th style="padding:3px 8px 3px 0;text-align:left">Retried At</th>
+      <th style="padding:3px 0;text-align:left">Action</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+async function retrySyncFailure(failureId) {
+  const d = await fetchJSON(`/admin/api/sync-failures/${failureId}/retry`, { method: 'POST' });
+  if (d && d.ok) { dbLog('ok', `✓ Failure #${failureId} queued for retry`); loadSyncFailures(); }
+  else dbLog('error', `Failed to queue retry for #${failureId}`);
+}
+
+/* ── Unresolved Events ───────────────────────────────────────────────────── */
+async function loadUnresolvedEvents() {
+  const el = document.getElementById('ue-content');
+  const badge = document.getElementById('ue-count-badge');
+  if (el) el.innerHTML = '<span style="color:#8b949e">Loading…</span>';
+  const d = await fetchJSON('/admin/api/unresolved-events');
+  if (!d) { if (el) el.innerHTML = '<span style="color:#f85149">Failed to load.</span>'; return; }
+  const events = d.events || [];
+  if (badge) badge.innerHTML = events.length
+    ? `<span class="s-chip warn">${events.length}</span>`
+    : '';
+  if (!events.length) {
+    if (el) el.innerHTML = '<span style="color:#3fb950">✓ No unresolved events.</span>';
+    return;
+  }
+  const rows = events.map(e => `<tr>
+    <td style="padding:3px 8px 3px 0">${esc(e.raw_name)}</td>
+    <td style="padding:3px 8px 3px 0">${esc(e.event_type)}</td>
+    <td style="padding:3px 8px 3px 0">${esc(e.game_id)}</td>
+    <td style="padding:3px 8px 3px 0">${esc(e.team_id)}</td>
+    <td style="padding:3px 8px 3px 0">${esc(e.created_at || '—')}</td>
+    <td style="padding:3px 0"><button class="btn btn-sm" onclick="dismissUnresolvedEvent(${esc(e.id)})">Dismiss</button></td>
+  </tr>`).join('');
+  if (el) el.innerHTML = `<p style="font-size:.78rem;color:#8b949e;margin:0 0 .5rem">
+    These penalty events could not be matched to a player in the lineup and are excluded from PlayerStatistics.
+  </p>
+  <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+    <thead><tr style="color:#8b949e;border-bottom:1px solid #30363d">
+      <th style="padding:3px 8px 3px 0;text-align:left">Name in event</th>
+      <th style="padding:3px 8px 3px 0;text-align:left">Event type</th>
+      <th style="padding:3px 8px 3px 0;text-align:left">Game ID</th>
+      <th style="padding:3px 8px 3px 0;text-align:left">Team ID</th>
+      <th style="padding:3px 8px 3px 0;text-align:left">Created</th>
+      <th style="padding:3px 0;text-align:left">Action</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+async function dismissUnresolvedEvent(eventId) {
+  const d = await fetchJSON(`/admin/api/unresolved-events/${eventId}/dismiss`, { method: 'POST' });
+  if (d && d.ok) { dbLog('ok', `✓ Event #${eventId} dismissed`); loadUnresolvedEvents(); }
+  else dbLog('error', `Failed to dismiss event #${eventId}`);
+}
+
+Object.assign(window, {
+  runVacuum, runCleanup, clearDbLog, loadDbInfo,
+  loadSyncFailures, retrySyncFailure,
+  loadUnresolvedEvents, dismissUnresolvedEvent,
+});
 export { loadDbInfo };
