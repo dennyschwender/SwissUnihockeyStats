@@ -800,7 +800,8 @@ async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
             _CHUNK = 200
             for _i in range(0, len(dup_game_ids), _CHUNK):
                 chunk = dup_game_ids[_i : _i + _CHUNK]
-                placeholders = ",".join("?" * len(chunk))
+                params = {f"gid{j}": v for j, v in enumerate(chunk)}
+                placeholders = ",".join(f":gid{j}" for j in range(len(chunk)))
                 r = conn.execute(
                     _text(
                         f"DELETE FROM game_events "
@@ -811,7 +812,7 @@ async def admin_cleanup_duplicates(_: None = Depends(require_admin)):
                         f"  GROUP BY game_id, event_type, period, time, player_id"
                         f")"
                     ),
-                    chunk + chunk,
+                    params,
                 )
                 event_deleted += r.rowcount
                 conn.commit()
