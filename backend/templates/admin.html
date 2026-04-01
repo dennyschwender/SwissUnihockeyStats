@@ -7,6 +7,46 @@
   <link rel="stylesheet" href="/static/css/main.css?v=25">
   <link rel="stylesheet" href="/static/css/admin.css?v=1">
   <script src="/static/js/vendor/chart.umd.min.js"></script>
+  <script>
+  /* healthPanel must be global before Alpine (defer) initialises x-data */
+  function healthPanel() {
+    return {
+      lastRun: null, lastFixed: 0,
+      gamesNoLineup: [], rosterGaps: [], unresolvedStats: [],
+      running: false, error: null,
+      open: { lineup: false, roster: false, stats: false },
+      async load() {
+        try {
+          const r = await fetch('/admin/api/repair-report');
+          const d = await r.json();
+          if (d.ok) {
+            this.lastRun = d.last_run ? new Date(d.last_run).toLocaleString() : null;
+            this.lastFixed = d.last_fixed;
+            this.gamesNoLineup = d.games_no_lineup;
+            this.rosterGaps = d.roster_gaps;
+            this.unresolvedStats = d.unresolved_stats;
+          }
+        } catch (e) { this.error = 'Failed to load health report'; }
+      },
+      async runRepair() {
+        this.running = true; this.error = null;
+        try {
+          const r = await fetch('/admin/api/repair', { method: 'POST' });
+          const d = await r.json();
+          if (d.ok) {
+            this.lastFixed = d.total_fixed;
+            this.lastRun = new Date().toLocaleString();
+            this.gamesNoLineup = d.games_no_lineup;
+            this.rosterGaps = d.roster_gaps;
+            this.unresolvedStats = d.unresolved_stats;
+          } else { this.error = d.detail || 'Repair failed'; }
+        } catch (e) { this.error = 'Repair request failed'; }
+        finally { this.running = false; }
+      },
+      toggle(key) { this.open[key] = !this.open[key]; },
+    };
+  }
+  </script>
   <script defer src="/static/js/vendor/alpine.min.js"></script>
 </head>
 <body>
@@ -96,68 +136,11 @@ function switchTab(name) {
   if (name === 'trends') window.loadTrends();
 }
 
-/* ── DB Health panel (Alpine.js) ── */
-function healthPanel() {
-  return {
-    lastRun: null,
-    lastFixed: 0,
-    gamesNoLineup: [],
-    rosterGaps: [],
-    unresolvedStats: [],
-    running: false,
-    error: null,
-    open: { lineup: false, roster: false, stats: false },
-
-    async load() {
-      try {
-        const r = await fetch('/admin/api/repair-report');
-        const d = await r.json();
-        if (d.ok) {
-          this.lastRun = d.last_run ? new Date(d.last_run).toLocaleString() : null;
-          this.lastFixed = d.last_fixed;
-          this.gamesNoLineup = d.games_no_lineup;
-          this.rosterGaps = d.roster_gaps;
-          this.unresolvedStats = d.unresolved_stats;
-        }
-      } catch (e) {
-        this.error = 'Failed to load health report';
-      }
-    },
-
-    async runRepair() {
-      this.running = true;
-      this.error = null;
-      try {
-        const r = await fetch('/admin/api/repair', { method: 'POST' });
-        const d = await r.json();
-        if (d.ok) {
-          this.lastFixed = d.total_fixed;
-          this.lastRun = new Date().toLocaleString();
-          this.gamesNoLineup = d.games_no_lineup;
-          this.rosterGaps = d.roster_gaps;
-          this.unresolvedStats = d.unresolved_stats;
-        } else {
-          this.error = d.detail || 'Repair failed';
-        }
-      } catch (e) {
-        this.error = 'Repair request failed';
-      } finally {
-        this.running = false;
-      }
-    },
-
-    toggle(key) {
-      this.open[key] = !this.open[key];
-    },
-  };
-}
-
 /* ── Window exports ── */
 window.fmt = fmt;
 window.log = log;
 window.loadStats = loadStats;
 window._defaultTiers = _defaultTiers;
-window.healthPanel = healthPanel;
 Object.assign(window, {
   switchTab, clearLog,
   loadScheduler,
