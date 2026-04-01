@@ -1381,23 +1381,6 @@ async def admin_start_indexing(payload: dict, _: None = Depends(require_admin)):
             status_code=400, detail=f"Unknown task '{task}'. Valid: {list(_TASK_META)}"
         )
 
-    # Cooldown guard — skip if data was indexed recently and force is not set.
-    if not force:
-        cooldown = _TASK_COOLDOWN_MINS.get(task, 0)
-        last_done = _job_last_done.get((task, season))
-        if cooldown and last_done:
-            age_mins = (datetime.now(timezone.utc) - last_done).total_seconds() / 60
-            remaining = cooldown - age_mins
-            if remaining > 0:
-                raise HTTPException(
-                    status_code=429,
-                    detail=(
-                        f"Data is fresh — last run {age_mins:.0f} min ago "
-                        f"(cooldown {cooldown} min, {remaining:.0f} min left). "
-                        f'Enable "Force" to override.'
-                    ),
-                )
-
     # Prune old finished jobs before adding a new one
     _purge_expired_jobs()
 
@@ -2122,8 +2105,10 @@ async def _run(job_id: str, season: int | None, task: str, force: bool, max_tier
         if season is None:
             season = get_current_season()
 
-        # ── GUARD: skip future seasons ─────────────────────────────────────
-        if task != "seasons" and season is not None:
+        # ── GUARD: skip future seasons (scheduled jobs only) ──────────────
+        # Manual admin jobs are never blocked — if an operator triggers one
+        # they have their own reasons.  Only the scheduler needs this guard.
+        if job.get("scheduled") and task != "seasons" and season is not None:
             current = get_current_season()
             if season > current:
                 push(
