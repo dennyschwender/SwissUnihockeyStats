@@ -472,5 +472,5 @@ Object.assign(window, {
   toggleSeason, setCurrentSeason, triggerIndex,
   triggerIndexTiered, triggerIndexEvents, deleteLayer,
   pullSeasons, runPurge, toggleEl,
-  freezeSeason, unfreezeSeason,
+  freezeSeason, unfreezeSeason, forceFor,
 });
