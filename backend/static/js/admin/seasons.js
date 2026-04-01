@@ -99,9 +99,9 @@ function buildSeasonCard(s, isOpen) {
     '\n    ' + trowEvents(sid, s) +
     '\n' +
     '\n    <div class="quick-row">' +
-    '\n      <button class="btn btn-blue btn-sm"  onclick="triggerIndex(' + sid + ',\'clubs_path\',  forceFor(' + sid + '))">&#9654; Clubs Path</button>' +
-    '\n      <button class="btn btn-blue btn-sm"  onclick="triggerIndex(' + sid + ',\'leagues_path\',forceFor(' + sid + '))">&#9654; Leagues Path</button>' +
-    '\n      <button class="btn btn-green btn-sm" onclick="triggerIndex(' + sid + ',\'full\',        forceFor(' + sid + '))">&#9889; Full Season</button>' +
+    '\n      <button class="btn btn-blue btn-sm"  onclick="triggerIndex(' + sid + ',\'clubs_path\')">&#9654; Clubs Path</button>' +
+    '\n      <button class="btn btn-blue btn-sm"  onclick="triggerIndex(' + sid + ',\'leagues_path\')">&#9654; Leagues Path</button>' +
+    '\n      <button class="btn btn-green btn-sm" onclick="triggerIndex(' + sid + ',\'full\')">&#9889; Full Season</button>' +
     '\n      <button class="btn btn-sm ' + currentBtnCls + '" onclick="setCurrentSeason(' + sid + ', ' + s.is_current + ')" title="' + currentBtnTitle + '">' + currentBtnTxt + '</button>' +
     '\n      ' + buildFreezeButton(sid) +
     '\n      <button class="btn btn-red btn-sm"   onclick="deleteLayer(' + sid + ',\'all\')">&#128465; Delete Season</button>' +
@@ -146,7 +146,7 @@ function trowTier(sid, task, name, counts) {
     '\n    <select id="tier-' + task + '-' + sid + '" class="tier-select" title="Max league tier">' + _tierOpts(task) + '</select>' +
     '\n  </div>' +
     '\n  <div class="task-btns">' +
-    '\n    <button class="btn btn-sm" onclick="triggerIndexTiered(' + sid + ',\'' + task + '\',forceFor(' + sid + '))">&#9654; Index</button>' +
+    '\n    <button class="btn btn-sm" onclick="triggerIndexTiered(' + sid + ',\'' + task + '\')">&#9654; Index</button>' +
     '\n    <button class="btn btn-sm btn-red" onclick="deleteLayer(' + sid + ',\'' + task + '\')" title="Delete ' + name + ' data for this season">&#128465;</button>' +
     '\n  </div>' +
     '\n</div>'
@@ -166,7 +166,7 @@ function trowEvents(sid, s) {
     '\n    </select>' +
     '\n  </div>' +
     '\n  <div class="task-btns">' +
-    '\n    <button class="btn btn-sm" onclick="triggerIndexEvents(' + sid + ',forceFor(' + sid + '))">&#9654; Index</button>' +
+    '\n    <button class="btn btn-sm" onclick="triggerIndexEvents(' + sid + ')">&#9654; Index</button>' +
     '\n    <button class="btn btn-sm btn-red" onclick="deleteLayer(' + sid + ',\'events\')" title="Delete Game Events data for this season">&#128465;</button>' +
     '\n  </div>' +
     '\n</div>'
@@ -351,7 +351,8 @@ async function pullSeasons() {
     if (btn) btn.disabled = false;
   }
 }
-async function triggerIndex(season, task, force) {
+async function triggerIndex(season, task) {
+  const force = forceFor(season);
   window.log('info', '\u25b6 season=' + season + '  task=' + task + '  force=' + force);
   const d = await fetchJSON('/admin/api/index', {
     method:  'POST',
@@ -362,7 +363,8 @@ async function triggerIndex(season, task, force) {
   window.log('info', 'Job ' + d.job_id + ' queued \u2014 ' + d.label);
   window.registerJob(d);
 }
-async function triggerIndexTiered(season, task, force) {
+async function triggerIndexTiered(season, task) {
+  const force = forceFor(season);
   const sel = document.getElementById('tier-' + task + '-' + season);
   const max_tier = sel ? parseInt(sel.value, 10) : (window._defaultTiers[task] != null ? window._defaultTiers[task] : 7);
   const tierLabel = sel ? sel.options[sel.selectedIndex].text : 'auto';
@@ -376,7 +378,8 @@ async function triggerIndexTiered(season, task, force) {
   window.log('info', 'Job ' + d.job_id + ' queued \u2014 ' + d.label);
   window.registerJob(d);
 }
-async function triggerIndexEvents(season, force) {
+async function triggerIndexEvents(season) {
+  const force = forceFor(season);
   const sel = document.getElementById('tier-events-' + season);
   const max_tier = sel ? parseInt(sel.value, 10) : 7;
   const tierLabel = sel ? sel.options[sel.selectedIndex].text : 'all';
@@ -472,5 +475,5 @@ Object.assign(window, {
   toggleSeason, setCurrentSeason, triggerIndex,
   triggerIndexTiered, triggerIndexEvents, deleteLayer,
   pullSeasons, runPurge, toggleEl,
-  freezeSeason, unfreezeSeason, forceFor,
+  freezeSeason, unfreezeSeason,
 });
