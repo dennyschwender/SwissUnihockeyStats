@@ -3,9 +3,9 @@
  * Handles caching and offline functionality
  */
 
-const CACHE_NAME = 'swissunihockey-v3';
-const STATIC_CACHE = 'static-v3';
-const DYNAMIC_CACHE = 'dynamic-v3';
+const CACHE_NAME = 'swissunihockey-v4';
+const STATIC_CACHE = 'static-v4';
+const DYNAMIC_CACHE = 'dynamic-v4';
 
 // Assets to cache immediately
 const STATIC_ASSETS = [
