@@ -1,14 +1,16 @@
+User gave text directly — no file path, so applying compression inline per the rules.
+
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working in this repo.
 
 ## Project Overview
 
-FastAPI PWA displaying Swiss floorball (unihockey) statistics. Fetches data from the official Swiss Unihockey API, stores it in SQLite, and serves it via Jinja2 templates with HTMX/Alpine.js. Multi-language (de, en, fr, it), mobile-first.
+FastAPI PWA displaying Swiss floorball (unihockey) stats. Fetches from official Swiss Unihockey API, stores in SQLite, serves via Jinja2 templates with HTMX/Alpine.js. Multi-language (de, en, fr, it), mobile-first.
 
 ## Commands
 
-All commands run from `backend/` unless noted. Use `.venv/bin/` binaries (system Python has no uvicorn/pytest).
+All commands run from `backend/` unless noted. Use `.venv/bin/` binaries (system Python lacks uvicorn/pytest).
 
 ```bash
 # Setup
@@ -48,11 +50,11 @@ Browser → FastAPI (main.py) → /api/v1/* → api/v1/ routers
 
 ### Data Flow
 
-The app separates live API proxying (for JSON endpoints) from indexed DB data (for page routes):
+App separates live API proxying (JSON endpoints) from indexed DB data (page routes):
 
 - **Page routes** (`main.py`) query SQLite via `stats_service.py` — fast, no API calls.
 - **JSON API** (`api/v1/`) proxy to SwissUnihockey API via `services/api_client.py` with file-based caching.
-- **Background indexer** (`services/data_indexer.py`) populates SQLite on a schedule.
+- **Background indexer** (`services/data_indexer.py`) populates SQLite on schedule.
 
 ### Key Services
 
@@ -67,15 +69,15 @@ The app separates live API proxying (for JSON endpoints) from indexed DB data (f
 
 ### Database
 
-SQLite with WAL mode. `busy_timeout=30000` is set **before** `journal_mode=WAL` (order matters). `NullPool` for file-based SQLite (each `session_scope()` gets its own connection); `StaticPool` for `:memory:` tests.
+SQLite with WAL mode. `busy_timeout=30000` set **before** `journal_mode=WAL` (order matters). `NullPool` for file-based SQLite (each `session_scope()` gets own connection); `StaticPool` for `:memory:` tests.
 
 **Season-scoped composite keys**: `Club(id, season_id)`, `Team(id, season_id)`, and their FKs. Many entities exist multiple times across seasons.
 
-**SyncStatus**: tracks sync state for every indexed entity (`pending` / `in_progress` / `completed` / `failed`). The scheduler reads this to decide what to re-fetch.
+**SyncStatus**: tracks sync state for every indexed entity (`pending` / `in_progress` / `completed` / `failed`). Scheduler reads this to decide what to re-fetch.
 
 ### session_scope Anti-Pattern
 
-Never manually commit inside `session_scope()` — the context manager commits on exit. Never swallow exceptions inside the `with` block (leaves session in `PendingRollbackError`):
+Never manually commit inside `session_scope()` — context manager commits on exit. Never swallow exceptions inside `with` block (leaves session in `PendingRollbackError`):
 
 ```python
 # WRONG
@@ -93,17 +95,17 @@ except Exception as exc:
     logger.error(...)
 ```
 
-`_mark_sync_complete(session, ...)` calls `session.commit()` internally — don't wrap it in another commit.
+`_mark_sync_complete(session, ...)` calls `session.commit()` internally — don't wrap in another commit.
 
 ### Data Indexer: Two-Phase Player Stats
 
-Player game stats use a two-phase approach to avoid holding SQLite write locks during slow API calls:
+Player game stats use two-phase approach to avoid holding SQLite write locks during slow API calls:
 
 - **Phase 1**: Concurrent API fetches (`ThreadPoolExecutor`, up to `max_concurrent` workers). No DB writes.
-- **Phase 2**: Batched DB writes at `_PHASE2_BATCH_SIZE=300` players per `session_scope()`. Each batch holds the write lock for seconds, not minutes.
+- **Phase 2**: Batched DB writes at `_PHASE2_BATCH_SIZE=300` players per `session_scope()`. Each batch holds write lock for seconds, not minutes.
 - **Checkpoint resume**: Per-player `SyncStatus` (`player_game_stats:{pid}:{season}`) allows restarts to skip completed players.
 
-**Do not increase `max_concurrent` above 2 for SQLite** — concurrent writes cause lock timeouts.
+**Don't increase `max_concurrent` above 2 for SQLite** — concurrent writes cause lock timeouts.
 
 ### Scheduler
 
@@ -111,7 +113,7 @@ Policy-based in-memory scheduler (`services/scheduler.py`). Defines `POLICIES` l
 
 ### League Tiers
 
-`LEAGUE_TIERS` in `data_indexer.py` maps API `league_id` → tier (1=NLA, 2=NLB, 3=1.Liga, ..., 6=Regional). Only tiers 1–2 support the `/api/teams/{id}/players` endpoint. Use `--max-tier` flag on CLI commands to limit scope.
+`LEAGUE_TIERS` in `data_indexer.py` maps API `league_id` → tier (1=NLA, 2=NLB, 3=1.Liga, ..., 6=Regional). Only tiers 1–2 support `/api/teams/{id}/players` endpoint. Use `--max-tier` flag on CLI commands to limit scope.
 
 ## Adding a New Page
 
@@ -122,7 +124,7 @@ Policy-based in-memory scheduler (`services/scheduler.py`). Defines `POLICIES` l
 
 ## i18n
 
-All user-facing strings live in `backend/locales/{locale}/messages.json`. Access in templates via `{{ t.section.key }}`. Load in routes: `get_translations(locale)` from `app.lib.i18n`. Supported locales: `de`, `en`, `fr`, `it`.
+All user-facing strings in `backend/locales/{locale}/messages.json`. Access in templates via `{{ t.section.key }}`. Load in routes: `get_translations(locale)` from `app.lib.i18n`. Supported locales: `de`, `en`, `fr`, `it`.
 
 ## Code Conventions
 
@@ -155,7 +157,7 @@ Production runs on `pi4desk` at `/home/denny/dockerimages/SwissUnihockeyStats/`.
 
 ```bash
 # Correct deploy (rebuilds image, force-recreates container)
-docker compose build --no-cache && docker compose up -d --force-recreate
+docker compose build --no-cache --no-pull && docker compose up -d --force-recreate
 
 # Do NOT use docker restart — it reuses old container layers
 ```
