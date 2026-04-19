@@ -4152,6 +4152,7 @@ async def universal_search(request: Request, locale: str, q: str = "", offset: i
             .filter(
                 or_(Team.name.ilike(f"%{q}%"), Team.text.ilike(f"%{q}%")),
                 Team.name.isnot(None),
+                Team.league_id != 25,
             )
             .group_by(Team.id)
             .limit(200)
@@ -4217,7 +4218,10 @@ async def universal_search(request: Request, locale: str, q: str = "", offset: i
         # --- Leagues ---
         leagues = (
             session.query(League)
-            .filter(or_(League.name.ilike(f"%{q}%"), League.text.ilike(f"%{q}%")))
+            .filter(
+                or_(League.name.ilike(f"%{q}%"), League.text.ilike(f"%{q}%")),
+                League.league_id != 25,
+            )
             .order_by(League.season_id.desc())
             .limit(5)
             .all()

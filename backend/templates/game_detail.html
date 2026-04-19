@@ -445,6 +445,12 @@ function gameTimeline(events, totalSeconds) {
   <div class="alert-error">⚠ {{ error_message }}</div>
   {% endif %}
 
+  {% if game and game.is_test_game %}
+  <div class="alert-warning" style="background:var(--yellow-50,#fffbeb);border:1px solid var(--yellow-300,#fcd34d);border-radius:.5rem;padding:.75rem 1rem;margin-bottom:1rem;color:#92400e;font-size:.9rem;">
+    ⚠ This is a <strong>test game</strong> (referee evaluation / SR-Einteilung) — not an official match.
+  </div>
+  {% endif %}
+
   <div style="margin-bottom:1.5rem;">
     <a href="javascript:history.back()" class="gd-back">← {{ t.common.back }}</a>
   </div>

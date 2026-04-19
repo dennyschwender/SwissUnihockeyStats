@@ -249,6 +249,11 @@ def get_teams_list(
                 .filter(Team.season_id == season_id)
             )
 
+        # Exclude test leagues (referee evaluation games — not official matches)
+        query = query.filter(
+            or_(League.league_id.is_(None), League.league_id != 25)
+        )
+
         # Multi-select league name filter — each value used as ilike prefix
         if league_names:
             query = query.filter(or_(*[League.name.ilike(f"{n}%") for n in league_names]))
@@ -3719,6 +3724,10 @@ def get_game_box_score(game_id: int) -> dict:
             if (game.group and game.group.league)
             else ""
         )
+        _api_league_id = (
+            game.group.league.league_id if (game.group and game.group.league) else None
+        )
+        _is_test_game = _api_league_id == 25 or "test" in _league_name.lower()
 
         _timeline_events, _total_seconds = build_timeline_events(
             goals, penalties, home_name, away_name
@@ -3813,6 +3822,7 @@ def get_game_box_score(game_id: int) -> dict:
             "group_name": _group_name,
             "phase": _phase,
             "league_name": _league_name,
+            "is_test_game": _is_test_game,
             "timeline_events": _timeline_events,
             "total_seconds": _total_seconds,
         }
