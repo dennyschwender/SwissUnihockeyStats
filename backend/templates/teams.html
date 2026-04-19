@@ -69,7 +69,7 @@ document.addEventListener('alpine:init', () => {
             : t.gender === this.activeAge));
           const fOk = this.activeField === 'all' || t.field === this.activeField;
           const lOk = this.activeLevel === 'all' || t.level === this.activeLevel;
-          const hay = (t.text + ' ' + t.league_name).toLowerCase();
+          const hay = (t.text + ' ' + t.league_name + ' ' + (t.gender || '')).toLowerCase();
           const qOk = words.length === 0 || words.every(w => hay.includes(w));
           return sOk && aOk && fOk && lOk && qOk;
         });
@@ -88,7 +88,7 @@ document.addEventListener('alpine:init', () => {
             : (this.activeAge === 'senioren' ? t.gender === 'Senioren'
             : t.gender === this.activeAge));
           const fOk = this.activeField === 'all' || t.field === this.activeField;
-          const hay = (t.text + ' ' + t.league_name).toLowerCase();
+          const hay = (t.text + ' ' + t.league_name + ' ' + (t.gender || '')).toLowerCase();
           const qOk = words.length === 0 || words.every(w => hay.includes(w));
           if (sOk && aOk && fOk && qOk) levels.add(t.level);
         }
