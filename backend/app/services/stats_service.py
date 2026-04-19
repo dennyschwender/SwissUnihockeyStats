@@ -296,9 +296,13 @@ def get_league_by_id(db_league_id: int) -> Optional[dict]:
             return None
         # Deduplicate groups by display name so identically-named groups
         # (e.g. multiple "Gruppe 1" rows from re-indexing) merge into one.
+        # Skip groups with no name — they are phantom rows from indexing runs
+        # that fetched phase metadata without a group name.
         seen: dict[str, list[int]] = {}
         for g in lg.groups:
-            name = g.name or g.text or f"Group {g.id}"
+            name = g.name or g.text or ""
+            if not name:
+                continue
             seen.setdefault(name, []).append(g.id)
         groups = [{"name": name, "ids": ids} for name, ids in seen.items()]
         return {
