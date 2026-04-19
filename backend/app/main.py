@@ -187,6 +187,16 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
+@app.get("/static/manifest.json", include_in_schema=False)
+async def serve_manifest():
+    from fastapi.responses import FileResponse
+    return FileResponse(
+        str(STATIC_DIR / "manifest.json"),
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
 @app.middleware("http")
 async def no_cache_admin_js(request: Request, call_next):
     """Prevent Cloudflare (and browsers) from caching admin JS files."""
