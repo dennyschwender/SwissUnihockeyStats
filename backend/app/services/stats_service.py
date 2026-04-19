@@ -2606,6 +2606,7 @@ def get_upcoming_games(
                         q.join(LeagueGroup, Game.group_id == LeagueGroup.id)
                         .join(League, LeagueGroup.league_id == League.id)
                         .filter(League.league_id == league_id, League.game_class == game_class)
+                        .filter(League.league_id != 25)
                     )
                 except ValueError:
                     pass  # Invalid format, ignore filter
@@ -2613,6 +2614,13 @@ def get_upcoming_games(
             # Legacy filtering by league IDs
             q = q.join(LeagueGroup, Game.group_id == LeagueGroup.id).filter(
                 LeagueGroup.league_id.in_(league_ids)
+            )
+        else:
+            # No category filter — still exclude test leagues
+            q = (
+                q.join(LeagueGroup, Game.group_id == LeagueGroup.id)
+                .join(League, LeagueGroup.league_id == League.id)
+                .filter(League.league_id != 25)
             )
 
         games_raw = q.order_by(Game.game_date.asc()).limit(limit).all()
@@ -2849,6 +2857,7 @@ def get_latest_results(
                         q.join(LeagueGroup, Game.group_id == LeagueGroup.id)
                         .join(League, LeagueGroup.league_id == League.id)
                         .filter(League.league_id == league_id, League.game_class == game_class)
+                        .filter(League.league_id != 25)
                     )
                 except ValueError:
                     pass  # Invalid format, ignore filter
@@ -2856,6 +2865,13 @@ def get_latest_results(
             # Legacy filtering by league IDs
             q = q.join(LeagueGroup, Game.group_id == LeagueGroup.id).filter(
                 LeagueGroup.league_id.in_(league_ids)
+            )
+        else:
+            # No category filter — still exclude test leagues
+            q = (
+                q.join(LeagueGroup, Game.group_id == LeagueGroup.id)
+                .join(League, LeagueGroup.league_id == League.id)
+                .filter(League.league_id != 25)
             )
 
         games_raw = q.order_by(Game.game_date.desc()).limit(limit).all()
