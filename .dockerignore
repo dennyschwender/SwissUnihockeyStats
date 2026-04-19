@@ -47,10 +47,8 @@ Thumbs.db
 # GitHub
 .github/
 
-# Cache (use mounted volume instead)
-data/cache/*
-data/raw/*
-data/processed/*
+# Data (use mounted volume instead)
+data/
 
 # Test files
 tests/
