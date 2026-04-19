@@ -4111,7 +4111,7 @@ async def game_detail(request: Request, locale: str, game_id: int):
 
 
 @app.get("/{locale}/search", response_class=HTMLResponse)
-async def universal_search(request: Request, locale: str, q: str = ""):
+async def universal_search(request: Request, locale: str, q: str = "", offset: int = 0):
     """Universal search across players, teams, and leagues — DB-backed."""
     if not q or len(q) < 2:
         return HTMLResponse(
@@ -4170,6 +4170,8 @@ async def universal_search(request: Request, locale: str, q: str = ""):
             )
             .all()
         )
+        import urllib.parse as _up
+        _PAGE = 8
         current_season = _get_current_season_id(session)
         unique_teams_rows.sort(
             key=lambda r: (
@@ -4179,19 +4181,37 @@ async def universal_search(request: Request, locale: str, q: str = ""):
                 r[0].name or "",
             )
         )
-        unique_teams_rows = unique_teams_rows[:8]
-        if unique_teams_rows:
-            html_parts.append(
-                '<div class="search-category"><h3>👥 Teams</h3><div class="search-items">'
-            )
-            for t, lg in unique_teams_rows:
+        page_rows = unique_teams_rows[offset: offset + _PAGE]
+        has_more = len(unique_teams_rows) > offset + _PAGE
+
+        def _team_items_html(rows, more, next_off):
+            parts = []
+            for t, lg in rows:
                 tname = t.name or t.text or f"Team {t.id}"
                 lgname = (lg.name or lg.text or "") if lg else ""
                 subtitle = f'<span class="search-item-subtitle">{lgname}</span>' if lgname else ""
-                html_parts.append(
+                parts.append(
                     f'<div class="search-item" onclick="window.location.href=\'/{locale}/team/{t.id}\'">'
                     f'<span class="search-item-main"><strong>{tname}</strong>{subtitle}</span></div>'
                 )
+            if more:
+                parts.append(
+                    f'<button class="search-load-more" '
+                    f'hx-get="/{locale}/search?q={_up.quote(q)}&offset={next_off}" '
+                    f'hx-target="this" hx-swap="outerHTML">'
+                    f'Load more…</button>'
+                )
+            return "".join(parts)
+
+        if offset > 0:
+            # Subsequent page: return only items (+ optional next button), no wrappers
+            return HTMLResponse(_team_items_html(page_rows, has_more, offset + _PAGE))
+
+        if page_rows:
+            html_parts.append(
+                '<div class="search-category"><h3>👥 Teams</h3><div class="search-items">'
+            )
+            html_parts.append(_team_items_html(page_rows, has_more, offset + _PAGE))
             html_parts.append("</div></div>")
 
         # --- Leagues ---

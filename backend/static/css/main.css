@@ -1063,6 +1063,19 @@ html.dark-mode .universal-search-results {
   font-weight: 400;
 }
 
+.search-load-more {
+  display: block;
+  width: 100%;
+  padding: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--primary-600);
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: center;
+}
+.search-load-more:hover { text-decoration: underline; }
+
 .search-item .text-gray-600 {
   color: var(--gray-600);
   font-size: 0.875rem;
