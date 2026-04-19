@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      pull_policy: never
     container_name: swissunihockeystats
 
     environment:
