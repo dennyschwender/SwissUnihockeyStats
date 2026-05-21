@@ -201,7 +201,10 @@
     "away": "Away",
     "home_away": "H/A",
     "opponent": "Opponent",
-    "result": "Result"
+    "result": "Result",
+    "home_team": "Home Team",
+    "away_team": "Away Team",
+    "role": "Role"
   },
   "player": {
     "born": "Born:",
@@ -257,7 +260,14 @@
     "phase_playout": "⬇️ Playouts",
     "phase_promotion": "🔄 Promotion/Relegation",
     "season_label": "Season",
-    "groups_suffix": "groups"
+    "groups_suffix": "groups",
+    "legend_playoff": "Playoff",
+    "legend_playout": "Playout / Relegation",
+    "no_standings": "No standings data available.",
+    "no_series": "No series data available yet.",
+    "clear_all": "Clear all",
+    "select_all": "Select all",
+    "search_player_roster": "Search name or position…"
   },
   "pwa": {
     "install_title": "📱 Install Unihockey Stats",
@@ -295,5 +305,21 @@
     "assistant_coach": "Assistant Coach",
     "no_seasons": "No seasons found.",
     "season_history": "Season History"
+  },
+  "favorites": {
+    "title": "Favorites",
+    "subtitle": "Quick access to your saved items",
+    "no_favorites": "No favorites yet",
+    "no_favorites_desc": "Click the star icon on clubs, leagues, or teams to save them here",
+    "browse": "Browse Content",
+    "remove": "Remove from favorites",
+    "clear_all": "Clear All Favorites",
+    "confirm_clear": "Are you sure you want to remove all favorites?",
+    "fav_clubs": "Favorite Clubs",
+    "fav_leagues": "Favorite Leagues",
+    "fav_teams": "Favorite Teams",
+    "view_clubs": "View All Clubs",
+    "view_leagues": "View All Leagues",
+    "view_teams": "View All Teams"
   }
 }

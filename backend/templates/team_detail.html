@@ -170,17 +170,17 @@
       <template x-if="shownStandings.length > 0 && standingsPhase === 'regular'">
         <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:.75rem;font-size:.78rem;color:var(--gray-500);">
           <span style="display:flex;align-items:center;gap:.35rem;">
-            <span style="display:inline-block;width:.7rem;height:.7rem;border-radius:2px;background:#16a34a;"></span>Playoff
+            <span style="display:inline-block;width:.7rem;height:.7rem;border-radius:2px;background:#16a34a;"></span>{{ t.league_detail.legend_playoff }}
           </span>
           <span style="display:flex;align-items:center;gap:.35rem;">
-            <span style="display:inline-block;width:.7rem;height:.7rem;border-radius:2px;background:#dc2626;"></span>Playout / Relegation
+            <span style="display:inline-block;width:.7rem;height:.7rem;border-radius:2px;background:#dc2626;"></span>{{ t.league_detail.legend_playout }}
           </span>
           <span>Points: W=3, OT/SO&nbsp;W=2, OT/SO&nbsp;L=1, L=0</span>
         </div>
       </template>
       <template x-if="shownStandings.length === 0 && !isSeriesPhase">
         <div style="text-align:center;padding:3rem;color:var(--gray-500);">
-          <p style="font-size:2rem">📊</p><p>No standings data available.</p>
+          <p style="font-size:2rem">📊</p><p>{{ t.league_detail.no_standings }}</p>
         </div>
       </template>
       <!-- Playoff / Playout bracket -->
@@ -188,7 +188,7 @@
         <div>
           <template x-if="!hasAnySeries">
             <div style="text-align:center;padding:3rem;color:var(--gray-500);">
-              <p style="font-size:2rem">🏆</p><p>No series data available yet.</p>
+              <p style="font-size:2rem">🏆</p><p>{{ t.league_detail.no_series }}</p>
             </div>
           </template>
           <template x-for="round in shownSeries" :key="round.phase_name">
@@ -276,7 +276,7 @@
     }">
       {% if team.roster %}
       <div style="margin-bottom:.75rem;">
-        <input x-model="q" type="search" placeholder="Search name or position…"
+        <input x-model="q" type="search" placeholder="{{ t.league_detail.search_player_roster }}"
           class="search-input" style="max-width:22rem;">
       </div>
       <div class="table-scroll">

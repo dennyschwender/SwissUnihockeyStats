@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Favorites - {{ t.common.app_name }}{% endblock %}
+{% block title %}{{ t.favorites.title }} - {{ t.common.app_name }}{% endblock %}
 {% block description %}Your saved clubs, leagues, and teams - quick access to your favorite Unihockey Stats content{% endblock %}
 
 {% block content %}
 <div class="hero fade-in">
-    <h1>⭐ Your Favorites</h1>
-    <p>Quick access to your saved items</p>
+    <h1>⭐ {{ t.favorites.title }}</h1>
+    <p>{{ t.favorites.subtitle }}</p>
 </div>
 
 <!-- Favorites Manager using Alpine.js + localStorage -->
@@ -15,11 +15,9 @@
     <!-- Empty State -->
     <div x-show="isEmpty()" class="fav-empty">
         <div class="fav-empty-icon">⭐</div>
-        <h2 class="fav-empty-title">No favorites yet</h2>
-        <p class="fav-empty-desc">
-            Click the star icon on clubs, leagues, or teams to save them here
-        </p>
-        <a href="/{{ locale }}" class="fav-browse-btn">Browse Content</a>
+        <h2 class="fav-empty-title">{{ t.favorites.no_favorites }}</h2>
+        <p class="fav-empty-desc">{{ t.favorites.no_favorites_desc }}</p>
+        <a href="/{{ locale }}" class="fav-browse-btn">{{ t.favorites.browse }}</a>
     </div>
     
     <!-- Favorites Lists -->
@@ -28,7 +26,7 @@
         <!-- Clubs Favorites -->
         <div x-show="favorites.clubs.length > 0" class="fav-section">
             <h2 class="fav-section-heading">
-                <span>🏒</span> Favorite Clubs
+                <span>🏒</span> {{ t.favorites.fav_clubs }}
                 <span x-text="'(' + favorites.clubs.length + ')'" class="fav-section-count"></span>
             </h2>
             <div class="cards-grid">
@@ -37,11 +35,10 @@
                         <button 
                             @click="removeFavorite('clubs', club.id)" 
                             class="favorite-btn active favorite-indicator"
-                            title="Remove from favorites"
+                            title="{{ t.favorites.remove }}"
                         >⭐</button>
                         <h3 x-text="club.name"></h3>
-                        <p style="color: var(--gray-600); font-size: 0.875rem;" x-text="'ID: ' + club.id"></p>
-                        <a :href="'/{{ locale }}/clubs'" class="fav-action-link">View All Clubs</a>
+                        <a :href="'/{{ locale }}/clubs'" class="fav-action-link">{{ t.favorites.view_clubs }}</a>
                     </div>
                 </template>
             </div>
@@ -50,7 +47,7 @@
         <!-- Leagues Favorites -->
         <div x-show="favorites.leagues.length > 0" class="fav-section">
             <h2 class="fav-section-heading">
-                <span>🏆</span> Favorite Leagues
+                <span>🏆</span> {{ t.favorites.fav_leagues }}
                 <span x-text="'(' + favorites.leagues.length + ')'" class="fav-section-count"></span>
             </h2>
             <div class="cards-grid">
@@ -59,11 +56,11 @@
                         <button 
                             @click="removeFavorite('leagues', league.id)" 
                             class="favorite-btn active favorite-indicator"
-                            title="Remove from favorites"
+                            title="{{ t.favorites.remove }}"
                         >⭐</button>
                         <div class="card-icon">🏆</div>
                         <h3 x-text="league.name"></h3>
-                        <a :href="'/{{ locale }}/leagues'" class="fav-action-link">View All Leagues</a>
+                        <a :href="'/{{ locale }}/leagues'" class="fav-action-link">{{ t.favorites.view_leagues }}</a>
                     </div>
                 </template>
             </div>
@@ -72,7 +69,7 @@
         <!-- Teams Favorites -->
         <div x-show="favorites.teams.length > 0" class="fav-section">
             <h2 class="fav-section-heading">
-                <span>👥</span> Favorite Teams
+                <span>👥</span> {{ t.favorites.fav_teams }}
                 <span x-text="'(' + favorites.teams.length + ')'" class="fav-section-count"></span>
             </h2>
             <div class="cards-grid">
@@ -81,11 +78,11 @@
                         <button 
                             @click="removeFavorite('teams', team.id)" 
                             class="favorite-btn active favorite-indicator"
-                            title="Remove from favorites"
+                            title="{{ t.favorites.remove }}"
                         >⭐</button>
                         <div class="card-icon">👥</div>
                         <h3 x-text="team.name"></h3>
-                        <a :href="'/{{ locale }}/teams'" class="fav-action-link">View All Teams</a>
+                        <a :href="'/{{ locale }}/teams'" class="fav-action-link">{{ t.favorites.view_teams }}</a>
                     </div>
                 </template>
             </div>
@@ -93,7 +90,7 @@
         
         <!-- Clear All -->
         <div class="fav-footer">
-            <button @click="clearAll()" class="btn-outline">Clear All Favorites</button>
+            <button @click="clearAll()" class="btn-outline">{{ t.favorites.clear_all }}</button>
         </div>
     </div>
     
@@ -121,7 +118,7 @@ function favoritesManager() {
         },
         
         clearAll() {
-            if (confirm('Are you sure you want to remove all favorites?')) {
+            if (confirm({{ t.favorites.confirm_clear | tojson }})) {
                 this.favorites = { clubs: [], leagues: [], teams: [] };
                 this.saveFavorites();
             }

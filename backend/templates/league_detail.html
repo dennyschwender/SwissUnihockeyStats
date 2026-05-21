@@ -226,18 +226,18 @@
         <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:.75rem;font-size:.78rem;color:var(--gray-500);">
           <span style="display:flex;align-items:center;gap:.35rem;">
             <span style="display:inline-block;width:.7rem;height:.7rem;border-radius:2px;background:#16a34a;"></span>
-            Playoff
+            {{ t.league_detail.legend_playoff }}
           </span>
           <span style="display:flex;align-items:center;gap:.35rem;">
             <span style="display:inline-block;width:.7rem;height:.7rem;border-radius:2px;background:#dc2626;"></span>
-            Playout / Relegation
+            {{ t.league_detail.legend_playout }}
           </span>
         </div>
       </template>
       <template x-if="shownStandings.length === 0 && !isSeriesPhase">
         <div style="text-align:center;padding:3rem;color:var(--gray-500);">
           <p style="font-size:2rem">📊</p>
-          <p>No standings data available. Standings require finished games.</p>
+          <p>{{ t.league_detail.no_standings }}</p>
         </div>
       </template>
 
@@ -247,7 +247,7 @@
           <template x-if="!hasAnySeries">
             <div style="text-align:center;padding:3rem;color:var(--gray-500);">
               <p style="font-size:2rem">🏆</p>
-              <p>No series data available yet.</p>
+              <p>{{ t.league_detail.no_series }}</p>
             </div>
           </template>
           <template x-for="round in shownSeries" :key="round.phase_name">
@@ -362,8 +362,8 @@
               style="position:absolute;z-index:50;top:calc(100% + 2px);left:0;right:0;background:var(--card-bg,white);border:1px solid var(--gray-200,#e5e7eb);border-radius:.375rem;box-shadow:0 4px 12px rgba(0,0,0,.1);max-height:220px;overflow-y:auto;">
               <!-- clear all -->
               <div style="display:flex;justify-content:space-between;padding:.35rem .65rem;border-bottom:1px solid var(--gray-100);font-size:.8rem;">
-                <span @click="teamFilter=[]" style="cursor:pointer;color:var(--gray-500);">Clear all</span>
-                <span @click="teamFilter=teams.slice()" style="cursor:pointer;color:var(--gray-500);">Select all</span>
+                <span @click="teamFilter=[]" style="cursor:pointer;color:var(--gray-500);">{{ t.league_detail.clear_all }}</span>
+                <span @click="teamFilter=teams.slice()" style="cursor:pointer;color:var(--gray-500);">{{ t.league_detail.select_all }}</span>
               </div>
               <template x-for="team in teams" :key="team">
                 <label style="display:flex;align-items:center;gap:.5rem;padding:.35rem .65rem;font-size:.875rem;cursor:pointer;"
@@ -706,8 +706,8 @@
             <div x-show="open" x-transition
               style="position:absolute;z-index:50;top:calc(100% + 2px);left:0;right:0;background:var(--card-bg,white);border:1px solid var(--gray-200,#e5e7eb);border-radius:.375rem;box-shadow:0 4px 12px rgba(0,0,0,.1);max-height:220px;overflow-y:auto;">
               <div style="display:flex;justify-content:space-between;padding:.35rem .65rem;border-bottom:1px solid var(--gray-100);font-size:.8rem;">
-                <span @click="teamFilter=[]" style="cursor:pointer;color:var(--gray-500);">Clear all</span>
-                <span @click="teamFilter=teams.slice()" style="cursor:pointer;color:var(--gray-500);">Select all</span>
+                <span @click="teamFilter=[]" style="cursor:pointer;color:var(--gray-500);">{{ t.league_detail.clear_all }}</span>
+                <span @click="teamFilter=teams.slice()" style="cursor:pointer;color:var(--gray-500);">{{ t.league_detail.select_all }}</span>
               </div>
               <template x-for="team in teams" :key="team">
                 <label style="display:flex;align-items:center;gap:.5rem;padding:.35rem .65rem;font-size:.875rem;cursor:pointer;"
