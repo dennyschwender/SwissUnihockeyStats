@@ -54,10 +54,10 @@
     const _teamGroups         = {{ groups | tojson }};
     const _HIGHLIGHT_TEAM_ID  = {{ team.id if team else 0 }};
     const _PHASE_LABELS = {
-      regular: '🏒 Regular Season',
-      playoff: '🏆 Playoffs',
-      playout: '⬇️ Playouts',
-      promotion: '🔄 Promotion/Relegation',
+      regular: {{ t.league_detail.phase_regular | tojson }},
+      playoff: {{ t.league_detail.phase_playoff | tojson }},
+      playout: {{ t.league_detail.phase_playout | tojson }},
+      promotion: {{ t.league_detail.phase_promotion | tojson }},
     };
     document.addEventListener('alpine:init', () => {
       const teamGroupName = {{ team.group_name | tojson if team else '""' }};
@@ -131,12 +131,12 @@
                 <th>{{ t.table.team }}</th>
                 <th class="col-narrow" title="Games Played">GP</th>
                 <th class="col-narrow" title="Wins (regulation)">W</th>
-                <th class="col-narrow" title="Overtime/Shootout Wins">OTW</th>
-                <th class="col-narrow" title="Overtime/Shootout Losses">OTL</th>
+                <th class="col-narrow standings-col-hide-mobile" title="Overtime/Shootout Wins">OTW</th>
+                <th class="col-narrow standings-col-hide-mobile" title="Overtime/Shootout Losses">OTL</th>
                 <th class="col-narrow" title="Losses (regulation)">L</th>
-                <th class="col-narrow" title="Goals For">GF</th>
-                <th class="col-narrow" title="Goals Against">GA</th>
-                <th style="padding:.6rem .5rem;text-align:center;" title="Goal Difference">GD</th>
+                <th class="col-narrow standings-col-hide-mobile" title="Goals For">GF</th>
+                <th class="col-narrow standings-col-hide-mobile" title="Goals Against">GA</th>
+                <th class="standings-col-hide-mobile" style="padding:.6rem .5rem;text-align:center;" title="Goal Difference">GD</th>
                 <th style="padding:.6rem .75rem;text-align:center;font-weight:700;" title="Points">PTS</th>
               </tr>
             </thead>
@@ -154,12 +154,12 @@
                   <td style="padding:.6rem .75rem;font-weight:500;" x-text="row.team_name"></td>
                   <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gp"></td>
                   <td style="padding:.6rem .5rem;text-align:center;" x-text="row.w"></td>
-                  <td style="padding:.6rem .5rem;text-align:center;color:var(--gray-400);" x-text="row.otw"></td>
-                  <td style="padding:.6rem .5rem;text-align:center;color:var(--gray-400);" x-text="row.otl"></td>
+                  <td class="standings-col-hide-mobile" style="padding:.6rem .5rem;text-align:center;color:var(--gray-400);" x-text="row.otw"></td>
+                  <td class="standings-col-hide-mobile" style="padding:.6rem .5rem;text-align:center;color:var(--gray-400);" x-text="row.otl"></td>
                   <td style="padding:.6rem .5rem;text-align:center;" x-text="row.l"></td>
-                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gf"></td>
-                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.ga"></td>
-                  <td style="padding:.6rem .5rem;text-align:center;" x-text="(row.gd > 0 ? '+' : '') + row.gd"></td>
+                  <td class="standings-col-hide-mobile" style="padding:.6rem .5rem;text-align:center;" x-text="row.gf"></td>
+                  <td class="standings-col-hide-mobile" style="padding:.6rem .5rem;text-align:center;" x-text="row.ga"></td>
+                  <td class="standings-col-hide-mobile" style="padding:.6rem .5rem;text-align:center;" x-text="(row.gd > 0 ? '+' : '') + row.gd"></td>
                   <td style="padding:.6rem .75rem;text-align:center;font-weight:700;font-size:1rem;" x-text="row.pts"></td>
                 </tr>
               </template>

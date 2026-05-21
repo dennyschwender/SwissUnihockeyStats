@@ -10,13 +10,13 @@
   {% endif %}
 
   <div style="margin-bottom:2rem;">
-    <a href="/{{ locale }}/leagues" class="back-link">← Leagues</a>
+    <a href="/{{ locale }}/leagues" class="back-link">← {{ t.nav.leagues }}</a>
     <div class="page-header" style="margin-top:.5rem;">
       <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
         <h1 class="page-title">🏆 {{ league.name if league else "League" }}</h1>
         {% if league.game_class %}
         <span class="detail-meta">
-          {% if league.game_class in [11,12] %}Men{% elif league.game_class in [21,22] %}Women{% elif league.game_class == 31 %}Mixed{% endif %}
+          {% if league.game_class in [11,12] %}{{ t.leagues.gender_men }}{% elif league.game_class in [21,22] %}{{ t.leagues.gender_women }}{% elif league.game_class == 31 %}{{ t.leagues.gender_mixed }}{% endif %}
         </span>
         {% endif %}
         {% if selected_season_name and available_seasons|length <= 1 %}
@@ -25,7 +25,7 @@
       </div>
       {% if available_seasons|length > 1 %}
       <div class="filter-form">
-        <label class="filter-label">Season</label>
+        <label class="filter-label">{{ t.league_detail.season_label }}</label>
         <select onchange="window.location='/{{ locale }}/league/'+this.value" class="filter-select">
           {% for s in available_seasons %}
           <option value="{{ s.league_db_id }}"{% if s.id == league.season_id %} selected{% endif %}>{{ s.name }}</option>
@@ -54,10 +54,10 @@
     const _allGames        = {{ games | tojson }};
     const _allUpcoming     = {{ upcoming_games | tojson }};
     const _PHASE_LABELS = {
-      regular: '🏒 Regular Season',
-      playoff: '🏆 Playoffs',
-      playout: '⬇️ Playouts',
-      promotion: '🔄 Promotion/Relegation',
+      regular: {{ t.league_detail.phase_regular | tojson }},
+      playoff: {{ t.league_detail.phase_playoff | tojson }},
+      playout: {{ t.league_detail.phase_playout | tojson }},
+      promotion: {{ t.league_detail.phase_promotion | tojson }},
     };
     document.addEventListener('alpine:init', () => {
       // When the league has multiple groups, default to the first one.
@@ -156,7 +156,7 @@
           x-show="tab !== 'standings'"
           @click="Alpine.store('leagueFilter').group = 'all'"
           :class="['filter-chip', Alpine.store('leagueFilter').group === 'all' && 'active']">
-          All
+          {{ t.leagues.filter_all }}
         </button>
         <template x-for="grp in _leagueGroups" :key="grp.name">
           <button
@@ -189,12 +189,12 @@
                 <th>{{ t.table.team }}</th>
                 <th class="col-narrow" title="Games Played">GP</th>
                 <th class="col-narrow" title="Wins (regulation)">W</th>
-                <th class="col-narrow" title="Overtime/Shootout Wins">OTW</th>
-                <th class="col-narrow" title="Overtime/Shootout Losses">OTL</th>
+                <th class="col-narrow standings-col-hide-mobile" title="Overtime/Shootout Wins">OTW</th>
+                <th class="col-narrow standings-col-hide-mobile" title="Overtime/Shootout Losses">OTL</th>
                 <th class="col-narrow" title="Losses (regulation)">L</th>
-                <th class="col-narrow" title="Goals For">GF</th>
-                <th class="col-narrow" title="Goals Against">GA</th>
-                <th style="padding:.6rem .5rem;text-align:center;" title="Goal Difference">GD</th>
+                <th class="col-narrow standings-col-hide-mobile" title="Goals For">GF</th>
+                <th class="col-narrow standings-col-hide-mobile" title="Goals Against">GA</th>
+                <th class="standings-col-hide-mobile" style="padding:.6rem .5rem;text-align:center;" title="Goal Difference">GD</th>
                 <th style="padding:.6rem .75rem;text-align:center;font-weight:700;" title="Points">PTS</th>
               </tr>
             </thead>
@@ -207,12 +207,12 @@
                   <td style="padding:.6rem .75rem;font-weight:500;" x-text="row.team_name"></td>
                   <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gp"></td>
                   <td style="padding:.6rem .5rem;text-align:center;" x-text="row.w"></td>
-                  <td style="padding:.6rem .5rem;text-align:center;color:var(--gray-400);" x-text="row.otw"></td>
-                  <td style="padding:.6rem .5rem;text-align:center;color:var(--gray-400);" x-text="row.otl"></td>
+                  <td class="standings-col-hide-mobile" style="padding:.6rem .5rem;text-align:center;color:var(--gray-400);" x-text="row.otw"></td>
+                  <td class="standings-col-hide-mobile" style="padding:.6rem .5rem;text-align:center;color:var(--gray-400);" x-text="row.otl"></td>
                   <td style="padding:.6rem .5rem;text-align:center;" x-text="row.l"></td>
-                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.gf"></td>
-                  <td style="padding:.6rem .5rem;text-align:center;" x-text="row.ga"></td>
-                  <td style="padding:.6rem .5rem;text-align:center;"
+                  <td class="standings-col-hide-mobile" style="padding:.6rem .5rem;text-align:center;" x-text="row.gf"></td>
+                  <td class="standings-col-hide-mobile" style="padding:.6rem .5rem;text-align:center;" x-text="row.ga"></td>
+                  <td class="standings-col-hide-mobile" style="padding:.6rem .5rem;text-align:center;"
                     x-text="(row.gd > 0 ? '+' : '') + row.gd"></td>
                   <td style="padding:.6rem .75rem;text-align:center;font-weight:700;font-size:1rem;" x-text="row.pts"></td>
                 </tr>

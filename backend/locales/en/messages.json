@@ -46,11 +46,13 @@
     "top_scorers": "Overall Top Scorers",
     "view_all_players": "View all players →",
     "all_leagues": "All Leagues",
-    "search_placeholder": "Search clubs, leagues, teams..."
+    "search_placeholder": "Search clubs, leagues, teams...",
+    "no_recent_games": "No recent games found."
   },
   "clubs": {
     "title": "Clubs",
-    "subtitle": "All Swiss Unihockey Clubs"
+    "subtitle": "All Swiss Unihockey Clubs",
+    "no_clubs": "No clubs found."
   },
   "leagues": {
     "title": "Leagues",
@@ -77,7 +79,14 @@
   },
   "teams": {
     "title": "Teams",
-    "subtitle": "All Teams of Swiss Unihockey Leagues"
+    "subtitle": "All Teams of Swiss Unihockey Leagues",
+    "search_placeholder": "Search team or league name…",
+    "count_suffix_many": "teams",
+    "count_suffix_one": "team",
+    "all_clubs_link": "← All Clubs",
+    "no_match": "No teams match the current filters.",
+    "clear_filters": "Clear filters",
+    "filter_level": "Level"
   },
   "games": {
     "title": "Games",
@@ -189,7 +198,10 @@
     "score_penalty": "Score / Penalty",
     "date": "Date",
     "home": "Home",
-    "away": "Away"
+    "away": "Away",
+    "home_away": "H/A",
+    "opponent": "Opponent",
+    "result": "Result"
   },
   "player": {
     "born": "Born:",
@@ -200,7 +212,8 @@
     "height": "Height",
     "weight": "Weight",
     "ppg": "PPG",
-    "show_more_games": "Load more"
+    "show_more_games": "Load more",
+    "recent_games_title": "Recent Games"
   },
   "team_tabs": {
     "tab_standings": "Standings",
@@ -225,7 +238,11 @@
     "h2h_title": "Head to Head",
     "no_h2h": "No previous meetings found.",
     "form_title": "Recent Form (before this game)",
-    "pos_legend": "G = Goalie · D = Defender · C = Centre · A = Winger"
+    "pos_legend": "G = Goalie · D = Defender · C = Centre · A = Winger",
+    "timeline": "Timeline",
+    "spectators_label": "Spectators",
+    "status_finished": "Finished",
+    "status_live": "Live"
   },
   "league_detail": {
     "tab_standings": "Standings",
@@ -234,7 +251,13 @@
     "tab_results": "Results",
     "tab_upcoming": "Upcoming",
     "search_player_placeholder": "Search player...",
-    "no_results_search": "No results found."
+    "no_results_search": "No results found.",
+    "phase_regular": "🏒 Regular Season",
+    "phase_playoff": "🏆 Playoffs",
+    "phase_playout": "⬇️ Playouts",
+    "phase_promotion": "🔄 Promotion/Relegation",
+    "season_label": "Season",
+    "groups_suffix": "groups"
   },
   "pwa": {
     "install_title": "📱 Install Unihockey Stats",

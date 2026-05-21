@@ -52,15 +52,12 @@
             {% elif club.set_in_context and club.set_in_context.region %}
             <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">📍 {{ club.set_in_context.region }}</p>
             {% endif %}
-            {% if club.set_in_context and club.set_in_context.club_id %}
-            <p style="color: var(--gray-500); margin: 0.25rem 0 0 0; font-size: 0.75rem;">ID: {{ club.set_in_context.club_id }}</p>
-            {% endif %}
         </div>
         {% endfor %}
         
         {% if not clubs %}
         <div style="text-align: center; padding: 3rem; color: var(--text-muted); grid-column: 1/-1;">
-            No clubs found.
+            {{ t.clubs.no_clubs }}
         </div>
         {% endif %}
     </div>

@@ -14,6 +14,15 @@ document.addEventListener('alpine:init', () => {
     const locale = {{ locale | tojson }};
     const club   = {{ club | tojson }};
 
+    const T = {
+      gender_men:   {{ t.leagues.gender_men   | tojson }},
+      gender_women: {{ t.leagues.gender_women | tojson }},
+      gender_mixed: {{ t.leagues.gender_mixed | tojson }},
+      big_field:    {{ t.leagues.big_field    | tojson }},
+      small_field:  {{ t.leagues.small_field  | tojson }},
+      count_one:    {{ t.teams.count_suffix_one  | tojson }},
+      count_many:   {{ t.teams.count_suffix_many | tojson }},
+    };
     const AGE_SORT   = { U21:7, U18:8, U16:9, U14:10, U12:11, U10:12, Senioren:13 };
     const SEX_SORT   = { men:0, women:1, mixed:2 };
     const LEVEL_SORT = { A:0, B:1, C:2, D:3, E:4 };
@@ -109,8 +118,9 @@ document.addEventListener('alpine:init', () => {
       get sections() { return buildSections(this.filtered); },
       get count()    { return this.filtered.length; },
 
-      sexLabel(s)   { return s === 'men' ? 'Men' : s === 'women' ? 'Women' : 'Mixed'; },
-      fieldLabel(f) { return f === 'big' ? 'Big field' : 'Small field'; },
+      sexLabel(s)   { return s === 'men' ? T.gender_men : s === 'women' ? T.gender_women : T.gender_mixed; },
+      fieldLabel(f) { return f === 'big' ? T.big_field : T.small_field; },
+      get countLabel() { return this.count + ' ' + (this.count === 1 ? T.count_one : T.count_many); },
     };
   });
 });
@@ -120,7 +130,7 @@ document.addEventListener('alpine:init', () => {
 
   {% if club %}
   <div style="margin-bottom:1rem;">
-    <a href="/{{ locale }}/clubs" class="back-link back-link--red">← All Clubs</a>
+    <a href="/{{ locale }}/clubs" class="back-link back-link--red">{{ t.teams.all_clubs_link }}</a>
   </div>
   {% endif %}
 
@@ -130,7 +140,7 @@ document.addEventListener('alpine:init', () => {
     {% if seasons %}
     <form method="get" class="filter-form">
       {% if club %}<input type="hidden" name="club" value="{{ club }}">{% endif %}
-      <label for="season-select" class="filter-label">Season</label>
+      <label for="season-select" class="filter-label">{{ t.table.season }}</label>
       <select id="season-select" name="season" onchange="this.form.submit()" class="filter-select">
         {% for s in seasons %}
         <option value="{{ s.id }}" {% if s.id == current_season_id %}selected{% endif %}>{{ s.name }}</option>
@@ -147,45 +157,45 @@ document.addEventListener('alpine:init', () => {
     <div class="filter-search-wrap">
       <span class="filter-search-icon">🔍</span>
       <input type="text" x-model="q"
-             placeholder="Search team or league name…"
+             placeholder="{{ t.teams.search_placeholder }}"
              class="filter-search-input">
     </div>
 
     <!-- Sex -->
     <div class="filter-bar-row">
-      <span class="filter-bar-label">Sex</span>
-      <button :class="['filter-chip', activeSex==='all' && 'active']"   @click="activeSex='all'">All</button>
-      <button :class="['filter-chip', activeSex==='men' && 'active']"   @click="activeSex='men'">Men</button>
-      <button :class="['filter-chip', activeSex==='women' && 'active']" @click="activeSex='women'">Women</button>
-      <button :class="['filter-chip', activeSex==='mixed' && 'active']" @click="activeSex='mixed'">Mixed</button>
+      <span class="filter-bar-label">{{ t.leagues.filter_sex }}</span>
+      <button :class="['filter-chip', activeSex==='all' && 'active']"   @click="activeSex='all'">{{ t.leagues.filter_all }}</button>
+      <button :class="['filter-chip', activeSex==='men' && 'active']"   @click="activeSex='men'">{{ t.leagues.filter_men }}</button>
+      <button :class="['filter-chip', activeSex==='women' && 'active']" @click="activeSex='women'">{{ t.leagues.filter_women }}</button>
+      <button :class="['filter-chip', activeSex==='mixed' && 'active']" @click="activeSex='mixed'">{{ t.leagues.filter_mixed }}</button>
     </div>
 
     <!-- Age -->
     <div class="filter-bar-row">
-      <span class="filter-bar-label">Age</span>
-      <button :class="['filter-chip', activeAge==='all' && 'active']"      @click="setAge('all')">All</button>
-      <button :class="['filter-chip', activeAge==='senior' && 'active']"   @click="setAge('senior')">Senior</button>
+      <span class="filter-bar-label">{{ t.leagues.filter_age }}</span>
+      <button :class="['filter-chip', activeAge==='all' && 'active']"      @click="setAge('all')">{{ t.leagues.filter_all }}</button>
+      <button :class="['filter-chip', activeAge==='senior' && 'active']"   @click="setAge('senior')">{{ t.leagues.filter_senior }}</button>
       <button :class="['filter-chip', activeAge==='U21' && 'active']"      @click="setAge('U21')">U21</button>
       <button :class="['filter-chip', activeAge==='U18' && 'active']"      @click="setAge('U18')">U18</button>
       <button :class="['filter-chip', activeAge==='U16' && 'active']"      @click="setAge('U16')">U16</button>
       <button :class="['filter-chip', activeAge==='U14' && 'active']"      @click="setAge('U14')">U14</button>
       <button :class="['filter-chip', activeAge==='U12' && 'active']"      @click="setAge('U12')">U12</button>
       <button :class="['filter-chip', activeAge==='U10' && 'active']"      @click="setAge('U10')">U10</button>
-      <button :class="['filter-chip', activeAge==='senioren' && 'active']" @click="setAge('senioren')">Senioren</button>
+      <button :class="['filter-chip', activeAge==='senioren' && 'active']" @click="setAge('senioren')">{{ t.leagues.filter_senioren }}</button>
     </div>
 
     <!-- Field -->
     <div class="filter-bar-row">
-      <span class="filter-bar-label">Field</span>
-      <button :class="['filter-chip', activeField==='all' && 'active']"   @click="activeField='all'">All</button>
-      <button :class="['filter-chip', activeField==='big' && 'active']"   @click="activeField='big'">Big field</button>
-      <button :class="['filter-chip', activeField==='small' && 'active']" @click="activeField='small'">Small field</button>
+      <span class="filter-bar-label">{{ t.leagues.filter_field }}</span>
+      <button :class="['filter-chip', activeField==='all' && 'active']"   @click="activeField='all'">{{ t.leagues.filter_all }}</button>
+      <button :class="['filter-chip', activeField==='big' && 'active']"   @click="activeField='big'">{{ t.leagues.big_field }}</button>
+      <button :class="['filter-chip', activeField==='small' && 'active']" @click="activeField='small'">{{ t.leagues.small_field }}</button>
     </div>
 
     <!-- Level: only visible when a U* age group is selected; shows only available levels -->
     <div class="filter-bar-row" x-show="showLevelFilter">
-      <span class="filter-bar-label">Level</span>
-      <button :class="['filter-chip', activeLevel==='all' && 'active']" @click="activeLevel='all'">All</button>
+      <span class="filter-bar-label">{{ t.teams.filter_level }}</span>
+      <button :class="['filter-chip', activeLevel==='all' && 'active']" @click="activeLevel='all'">{{ t.leagues.filter_all }}</button>
       <template x-for="lvl in availableLevels" :key="lvl">
         <button :class="['filter-chip', activeLevel===lvl && 'active']" @click="activeLevel=lvl" x-text="lvl"></button>
       </template>
@@ -193,11 +203,11 @@ document.addEventListener('alpine:init', () => {
 
     <!-- Count + clear -->
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
-      <span class="filter-bar-count" x-text="count + ' team' + (count !== 1 ? 's' : '')"></span>
+      <span class="filter-bar-count" x-text="countLabel"></span>
       <button x-show="q || activeSex !== 'all' || activeAge !== 'all' || activeField !== 'all' || activeLevel !== 'all'"
               @click="q=''; activeSex='all'; activeAge='all'; activeField='all'; activeLevel='all';"
               class="filter-clear-btn">
-        ✕ Clear filters
+        ✕ {{ t.teams.clear_filters }}
       </button>
     </div>
   </div>
@@ -262,10 +272,10 @@ document.addEventListener('alpine:init', () => {
   <template x-if="sections.length === 0">
     <div class="empty-state-center">
       <p class="empty-state-icon">👥</p>
-      <p>No teams match the selected filters.</p>
+      <p>{{ t.teams.no_match }}</p>
       <button @click="q=''; activeSex='all'; activeAge='all'; activeField='all';"
               class="filter-clear-btn">
-        Clear filters
+        {{ t.teams.clear_filters }}
       </button>
     </div>
   </template>

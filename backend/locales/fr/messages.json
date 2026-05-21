@@ -46,11 +46,13 @@
     "top_scorers": "Meilleurs buteurs globaux",
     "view_all_players": "Voir tous les joueurs →",
     "all_leagues": "Toutes les ligues",
-    "search_placeholder": "Rechercher clubs, ligues, équipes..."
+    "search_placeholder": "Rechercher clubs, ligues, équipes...",
+    "no_recent_games": "Aucun match récent trouvé."
   },
   "clubs": {
     "title": "Clubs",
-    "subtitle": "Tous les clubs de unihockey suisses"
+    "subtitle": "Tous les clubs de unihockey suisses",
+    "no_clubs": "Aucun club trouvé."
   },
   "leagues": {
     "title": "Ligues",
@@ -77,7 +79,14 @@
   },
   "teams": {
     "title": "Équipes",
-    "subtitle": "Toutes les équipes des ligues de unihockey suisses"
+    "subtitle": "Toutes les équipes des ligues de unihockey suisses",
+    "search_placeholder": "Rechercher équipe ou ligue…",
+    "count_suffix_many": "équipes",
+    "count_suffix_one": "équipe",
+    "all_clubs_link": "← Tous les clubs",
+    "no_match": "Aucune équipe ne correspond aux filtres.",
+    "clear_filters": "Réinitialiser les filtres",
+    "filter_level": "Niveau"
   },
   "games": {
     "title": "Matchs",
@@ -189,7 +198,10 @@
     "score_penalty": "Score / Pénalité",
     "date": "Date",
     "home": "Domicile",
-    "away": "Extérieur"
+    "away": "Extérieur",
+    "home_away": "D/E",
+    "opponent": "Adversaire",
+    "result": "Résultat"
   },
   "player": {
     "born": "Né(e) :",
@@ -200,7 +212,8 @@
     "height": "Taille",
     "weight": "Poids",
     "ppg": "Pts/J",
-    "show_more_games": "Charger plus"
+    "show_more_games": "Charger plus",
+    "recent_games_title": "Derniers matchs"
   },
   "team_tabs": {
     "tab_standings": "Classement",
@@ -225,7 +238,11 @@
     "h2h_title": "Face à face",
     "no_h2h": "Aucune rencontre précédente trouvée.",
     "form_title": "Forme récente (avant ce match)",
-    "pos_legend": "G = Gardien · D = Défenseur · C = Centre · A = Ailier"
+    "pos_legend": "G = Gardien · D = Défenseur · C = Centre · A = Ailier",
+    "timeline": "Chronologie",
+    "spectators_label": "Spectateurs",
+    "status_finished": "Terminé",
+    "status_live": "En direct"
   },
   "league_detail": {
     "tab_standings": "Classement",
@@ -234,7 +251,13 @@
     "tab_results": "Résultats",
     "tab_upcoming": "À venir",
     "search_player_placeholder": "Rechercher un joueur...",
-    "no_results_search": "Aucun résultat trouvé."
+    "no_results_search": "Aucun résultat trouvé.",
+    "phase_regular": "🏒 Saison régulière",
+    "phase_playoff": "🏆 Playoffs",
+    "phase_playout": "⬇️ Playouts",
+    "phase_promotion": "🔄 Promotion/Relégation",
+    "season_label": "Saison",
+    "groups_suffix": "groupes"
   },
   "pwa": {
     "install_title": "📱 Installer Unihockey Stats",
