@@ -217,7 +217,7 @@ main {
 /* Cards Grid */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 2rem;
   margin-top: 3rem;
 }
@@ -695,7 +695,7 @@ html.dark-mode .universal-search-results {
 }
 
 /* Responsive */
-@media (max-width: 960px) {
+@media (max-width: 640px) {
   .hamburger-btn {
     display: flex;
   }
@@ -1266,10 +1266,6 @@ html.dark-mode .image-skeleton {
     gap: 1.25rem;
   }
 
-  .cards-grid {
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  }
-
   .universal-search-container {
     max-width: 100%;
   }
@@ -1460,6 +1456,21 @@ html.dark-mode .search-input {
 .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+
+/* Right-edge fade cue so users know there are more columns to scroll */
+.table-scroll-wrap {
+  position: relative;
+}
+.table-scroll-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 2.5rem;
+  background: linear-gradient(to right, transparent, var(--card-bg, #fff));
+  pointer-events: none;
+  transition: opacity .15s;
 }
 
 .data-table {
@@ -2514,5 +2525,111 @@ html.dark-mode .filter-bar {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem 1rem 3rem;
+}
+
+/* ============================================
+   RESPONSIVE FIXES — MOBILE (≤640px)
+   ============================================ */
+
+@media (max-width: 640px) {
+
+  /* --- NAV: show full nav at tablet (≤640px only collapse) --- */
+  /* (hamburger breakpoint already handled at 960px; fine-tuned here) */
+
+  /* --- GAME ROWS: 2-row grid so team names are always visible --- */
+  .game-row {
+    display: grid;
+    grid-template-areas:
+      "home score away"
+      "date date  league";
+    grid-template-columns: 1fr 68px 1fr;
+    gap: .2rem .35rem;
+    padding: .65rem .75rem;
+    align-items: center;
+  }
+  .game-col-date {
+    grid-area: date;
+    width: auto;
+    font-size: .7rem;
+  }
+  .game-col-team--right {
+    grid-area: home;
+    white-space: normal;
+    text-align: right;
+    font-size: .82rem;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    text-overflow: unset;
+  }
+  .game-col-team:not(.game-col-team--right) {
+    grid-area: away;
+    white-space: normal;
+    font-size: .82rem;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    text-overflow: unset;
+  }
+  .game-col-score {
+    grid-area: score;
+    width: auto;
+    font-size: .95rem;
+  }
+  .game-col-vs {
+    grid-area: score;
+    width: auto;
+    font-size: .85rem;
+  }
+  .game-col-league {
+    grid-area: league;
+    width: auto;
+    text-align: right;
+    font-size: .68rem;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+  /* Hide time on mobile — date area has it if needed */
+  .game-col-time { display: none; }
+  .game-col-result { display: none; }
+
+  /* --- SCHEDULE compact rows: show opponent clearly --- */
+  .game-row--compact .game-col-team {
+    white-space: normal;
+    overflow: visible;
+    display: block;
+    font-size: .82rem;
+  }
+
+  /* --- STANDINGS TABLE: hide secondary columns on mobile --- */
+  /* Keep: #, Team, GP, W, L, PTS  |  Hide: OTW, OTL, GF, GA, GD */
+  .standings-col-hide-mobile { display: none; }
+
+  /* --- PLAYER STAT BADGES: 3 per row instead of wrapping randomly --- */
+  .stat-badges {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .5rem;
+  }
+  .stat-badge {
+    min-width: 0;
+    padding: .5rem .5rem;
+  }
+
+  /* --- HERO: reduce empty space --- */
+  .hero {
+    padding: 1.25rem 0 .75rem;
+  }
+  .hero h1 {
+    font-size: 1.75rem;
+    margin-bottom: .5rem;
+  }
+  .hero p {
+    font-size: .95rem;
+    margin-bottom: 1rem;
+  }
 }
 

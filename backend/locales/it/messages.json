@@ -47,7 +47,8 @@
     "view_all_players": "Vedi tutti i giocatori →",
     "all_leagues": "Tutti i campionati",
     "search_placeholder": "Cerca club, campionati, squadre...",
-    "no_recent_games": "Nessuna partita recente trovata."
+    "no_recent_games": "Nessuna partita recente trovata.",
+    "no_upcoming_games": "Nessuna partita in programma trovata."
   },
   "clubs": {
     "title": "Club",
@@ -267,7 +268,10 @@
     "no_series": "Nessun dato di serie disponibile.",
     "clear_all": "Deseleziona tutti",
     "select_all": "Seleziona tutti",
-    "search_player_roster": "Cerca nome o posizione…"
+    "search_player_roster": "Cerca nome o posizione…",
+    "all_phases": "Tutte le fasi",
+    "all_teams": "Tutte le squadre",
+    "teams_selected": "squadre selezionate"
   },
   "pwa": {
     "install_title": "📱 Installa Unihockey Stats",

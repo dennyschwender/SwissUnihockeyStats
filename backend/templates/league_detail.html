@@ -59,6 +59,9 @@
       playout: {{ t.league_detail.phase_playout | tojson }},
       promotion: {{ t.league_detail.phase_promotion | tojson }},
     };
+    const _T_ALL_PHASES   = {{ t.league_detail.all_phases   | tojson }};
+    const _T_ALL_TEAMS    = {{ t.league_detail.all_teams    | tojson }};
+    const _T_TEAMS_SEL    = {{ t.league_detail.teams_selected | tojson }};
     document.addEventListener('alpine:init', () => {
       // When the league has multiple groups, default to the first one.
       const defaultGroup = _leagueGroups.length > 1 ? _leagueGroups[0].name : 'all';
@@ -328,7 +331,7 @@
         <!-- Phase filter chips — only shown when per-game stats are available -->
         <template x-if="Object.keys(_scorersByPhase).length > 0">
           <div style="display:flex;gap:.375rem;flex-wrap:wrap;margin-bottom:.85rem;">
-            <button @click="phaseFilter = 'all'; teamFilter = []; visibleCount = 25;" :class="['filter-chip', phaseFilter === 'all' && 'active']">All phases</button>
+            <button @click="phaseFilter = 'all'; teamFilter = []; visibleCount = 25;" :class="['filter-chip', phaseFilter === 'all' && 'active']" x-text="_T_ALL_PHASES"></button>
             <template x-for="ph in availablePhases" :key="ph">
               <template x-if="ph in _scorersByPhase">
                 <button @click="phaseFilter = ph; teamFilter = []; visibleCount = 25;" :class="['filter-chip', phaseFilter === ph && 'active']" x-text="_PHASE_LABELS[ph] || ph"></button>
@@ -355,7 +358,7 @@
           <div style="position:relative;flex:1;min-width:160px;" x-data="{ open: false }" @click.outside="open=false">
             <button @click="open=!open" type="button"
               style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:.45rem .75rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;font-size:.875rem;background:var(--card-bg,white);color:inherit;cursor:pointer;text-align:left;">
-              <span x-text="teamFilter.length === 0 ? 'All teams' : teamFilter.length === 1 ? teamFilter[0] : teamFilter.length + ' teams selected'"></span>
+              <span x-text="teamFilter.length === 0 ? _T_ALL_TEAMS : teamFilter.length === 1 ? teamFilter[0] : teamFilter.length + ' ' + _T_TEAMS_SEL"></span>
               <span style="font-size:.7rem;margin-left:.4rem;" x-text="open ? '▲' : '▼'"></span>
             </button>
             <div x-show="open" x-transition
@@ -700,7 +703,7 @@
           <div style="position:relative;flex:1;min-width:160px;" x-data="{ open: false }" @click.outside="open=false">
             <button @click="open=!open" type="button"
               style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:.45rem .75rem;border:1px solid var(--gray-300,#d1d5db);border-radius:.375rem;font-size:.875rem;background:var(--card-bg,white);color:inherit;cursor:pointer;text-align:left;">
-              <span x-text="teamFilter.length === 0 ? 'All teams' : teamFilter.length === 1 ? teamFilter[0] : teamFilter.length + ' teams selected'"></span>
+              <span x-text="teamFilter.length === 0 ? _T_ALL_TEAMS : teamFilter.length === 1 ? teamFilter[0] : teamFilter.length + ' ' + _T_TEAMS_SEL"></span>
               <span style="font-size:.7rem;margin-left:.4rem;" x-text="open ? '▲' : '▼'"></span>
             </button>
             <div x-show="open" x-transition
