@@ -4123,9 +4123,10 @@ async def game_detail(request: Request, locale: str, game_id: int):
 @app.get("/{locale}/search", response_class=HTMLResponse)
 async def universal_search(request: Request, locale: str, q: str = "", offset: int = 0):
     """Universal search across players, teams, and leagues — DB-backed."""
+    t = get_translations(locale)
     if not q or len(q) < 2:
         return HTMLResponse(
-            '<div class="search-results"><p style="text-align:center;padding:2rem;color:var(--gray-500)">Enter at least 2 characters to search…</p></div>'
+            f'<div class="search-results"><p style="text-align:center;padding:2rem;color:var(--gray-500)">{t["search"]["min_chars"]}</p></div>'
         )
 
     from app.services.database import get_database_service
@@ -4140,7 +4141,7 @@ async def universal_search(request: Request, locale: str, q: str = "", offset: i
         players = session.query(Player).filter(Player.full_name.ilike(f"%{q}%")).limit(8).all()
         if players:
             html_parts.append(
-                '<div class="search-category"><h3>🏒 Players</h3><div class="search-items">'
+                f'<div class="search-category"><h3>🏒 {t["search"]["players"]}</h3><div class="search-items">'
             )
             for pl in players:
                 name = pl.full_name or f"Player {pl.person_id}"
@@ -4210,7 +4211,7 @@ async def universal_search(request: Request, locale: str, q: str = "", offset: i
                     f'<button class="search-load-more" '
                     f'hx-get="/{locale}/search?q={_up.quote(q)}&offset={next_off}" '
                     f'hx-target="this" hx-swap="outerHTML">'
-                    f'Load more…</button>'
+                    f'{t["search"]["load_more"]}</button>'
                 )
             return "".join(parts)
 
@@ -4220,7 +4221,7 @@ async def universal_search(request: Request, locale: str, q: str = "", offset: i
 
         if page_rows:
             html_parts.append(
-                '<div class="search-category"><h3>👥 Teams</h3><div class="search-items">'
+                f'<div class="search-category"><h3>👥 {t["search"]["teams"]}</h3><div class="search-items">'
             )
             html_parts.append(_team_items_html(page_rows, has_more, offset + _PAGE))
             html_parts.append("</div></div>")
@@ -4246,7 +4247,7 @@ async def universal_search(request: Request, locale: str, q: str = "", offset: i
         unique_leagues = unique_leagues[:5]
         if unique_leagues:
             html_parts.append(
-                '<div class="search-category"><h3>🏆 Leagues</h3><div class="search-items">'
+                f'<div class="search-category"><h3>🏆 {t["search"]["leagues"]}</h3><div class="search-items">'
             )
             for lg in unique_leagues:
                 lgname = lg.name or lg.text or f"League {lg.id}"
@@ -4271,7 +4272,7 @@ async def universal_search(request: Request, locale: str, q: str = "", offset: i
         referee_names = session.execute(_ref_stmt).fetchall()
         if referee_names:
             html_parts.append(
-                '<div class="search-category"><h3>🧑‍⚖️ Referees</h3><div class="search-items">'
+                f'<div class="search-category"><h3>🧑‍⚖️ {t["search"]["referees"]}</h3><div class="search-items">'
             )
             for (ref_name,) in referee_names:
                 from urllib.parse import quote
@@ -4309,7 +4310,7 @@ async def universal_search(request: Request, locale: str, q: str = "", offset: i
                 unique_coaches.append(cm)
         if unique_coaches:
             html_parts.append(
-                '<div class="search-category"><h3>🎯 Coaches</h3><div class="search-items">'
+                f'<div class="search-category"><h3>🎯 {t["search"]["coaches"]}</h3><div class="search-items">'
             )
             for cm in unique_coaches:
                 cname = " ".join(p for p in [cm.first_name, cm.last_name] if p).strip()

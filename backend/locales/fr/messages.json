@@ -325,5 +325,14 @@
     "view_clubs": "Voir tous les clubs",
     "view_leagues": "Voir toutes les ligues",
     "view_teams": "Voir toutes les équipes"
+  },
+  "search": {
+    "players": "Joueurs",
+    "teams": "Équipes",
+    "leagues": "Ligues",
+    "referees": "Arbitres",
+    "coaches": "Entraîneurs",
+    "load_more": "Charger plus…",
+    "min_chars": "Saisir au moins 2 caractères…"
   }
 }
