@@ -2349,7 +2349,7 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
 
         # Sort: most recent season first, then by tier (best league first) within season.
         # Rows with league_db_id resolved come first within the same key (higher quality).
-        career.sort(key=lambda r: (-r["season_id"], r["_tier"], 0 if r.get("_local") else 1, 0 if r.get("league_db_id") else 1))
+        career.sort(key=lambda r: (-r["season_id"], r["_tier"], 0 if r.get("league_db_id") else 1))
         for r in career:
             r.pop("_tier", None)
 
@@ -2370,8 +2370,7 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
             if (r.get("team_name") or "").strip() not in ("", "—"):
                 _keys_with_team.add((r["season_id"], _norm_league(r["league"])))
 
-        _career_seen: set[tuple] = set()
-        _career_deduped: list[dict] = []
+        _career_best: dict[tuple, dict] = {}  # dk → best row so far
         for r in career:
             _nl = _norm_league(r["league"])
             _tn = (r.get("team_name") or "").strip()
@@ -2379,10 +2378,26 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
             if _tn in ("", "—") and (r["season_id"], _nl) in _keys_with_team:
                 continue
             _dk = (r["season_id"], _nl, _tn.lower())
-            if _dk not in _career_seen:
-                _career_seen.add(_dk)
-                _career_deduped.append(r)
-        career = _career_deduped
+            if _dk not in _career_best:
+                _career_best[_dk] = r
+            else:
+                # Keep row with more points; tie-break: local row wins (includes playoffs)
+                cur = _career_best[_dk]
+                cur_pts = (cur.get("pts") or 0)
+                new_pts = (r.get("pts") or 0)
+                if new_pts > cur_pts or (new_pts == cur_pts and r.get("_local")):
+                    _career_best[_dk] = r
+        # Preserve original sort order
+        _seen_order = []
+        _seen_set: set[tuple] = set()
+        for r in career:
+            _nl = _norm_league(r["league"])
+            _tn = (r.get("team_name") or "").strip()
+            _dk = (r["season_id"], _nl, _tn.lower())
+            if _dk in _career_best and _career_best[_dk] is r and _dk not in _seen_set:
+                _seen_set.add(_dk)
+                _seen_order.append(r)
+        career = _seen_order
 
         # Build career_by_season: group career rows by season_id
         _season_groups: dict[int, list[dict]] = {}
