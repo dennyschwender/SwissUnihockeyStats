@@ -1418,7 +1418,7 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
                     "team_name": team_name or "Unknown",
                     "team_id": team_id,
                     "league": league_abbrev or "",
-                    "gender": team_gender.get(team_name or "", ""),
+                    "gender": _mw_from_league(None, league_abbrev or "") or team_gender.get(team_name or "", ""),
                     "gp": gp or 0,
                     "g": g or 0,
                     "a": a or 0,
