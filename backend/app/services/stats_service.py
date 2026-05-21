@@ -2343,12 +2343,13 @@ def get_player_detail(person_id: int, locale: str = "de") -> dict:
                     "pim": ps.penalty_minutes,
                     "ppg": _compute_ppg(ps.points, ps.games_played),
                     "_tier": abbrev_tier.get(_abbrev, _DEFAULT_TIER),
+                    "_local": bool(getattr(ps, "computed_from_local", False)),
                 }
             )
 
         # Sort: most recent season first, then by tier (best league first) within season.
         # Rows with league_db_id resolved come first within the same key (higher quality).
-        career.sort(key=lambda r: (-r["season_id"], r["_tier"], 0 if r.get("league_db_id") else 1))
+        career.sort(key=lambda r: (-r["season_id"], r["_tier"], 0 if r.get("_local") else 1, 0 if r.get("league_db_id") else 1))
         for r in career:
             r.pop("_tier", None)
 
