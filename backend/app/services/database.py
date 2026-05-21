@@ -101,6 +101,30 @@ def run_lifecycle_migration(engine) -> None:
                 session.commit()
 
         session.commit()
+    # Repair: reset games abandoned only because best_players was missing.
+    # best_players was removed from completeness requirements — these games
+    # now qualify as complete once re-checked by the lifecycle scheduler.
+    from datetime import timedelta as _td
+    now_repair = _utcnow().replace(tzinfo=None)
+    with Session(engine) as session:
+        abandoned_best_players = session.execute(
+            select(Game).where(
+                Game.completeness_status == "abandoned",
+                Game.status == "finished",
+                Game.incomplete_fields == '["best_players"]',
+            )
+        ).scalars().all()
+        for game in abandoned_best_players:
+            game.completeness_status = "post_game"
+            game.give_up_at = now_repair + _td(days=3)
+            game.incomplete_fields = None
+        session.commit()
+        if abandoned_best_players:
+            logger.info(
+                "Repair: reset %d abandoned games (best_players only) to post_game",
+                len(abandoned_best_players),
+            )
+
     logger.debug("Lifecycle migration applied")
 
 

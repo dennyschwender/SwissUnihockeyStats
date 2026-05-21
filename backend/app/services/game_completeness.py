@@ -9,8 +9,8 @@ from app.models.db_models import Game, GameEvent, GamePlayer, League, LeagueGrou
 from app.services.data_indexer import LEAGUE_TIERS
 
 TIER_COMPLETENESS_FIELDS: dict[int, set[str]] = {
-    1: {"score", "referees", "spectators", "events", "lineup", "best_players"},
-    2: {"score", "referees", "spectators", "events", "lineup", "best_players"},
+    1: {"score", "referees", "spectators", "events", "lineup"},
+    2: {"score", "referees", "spectators", "events", "lineup"},
     3: {"score"},
     4: {"score"},
     5: {"score"},
