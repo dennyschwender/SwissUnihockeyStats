@@ -292,6 +292,31 @@ POLICIES: list[dict] = [
     # current_only is NOT set: same rationale as player_stats above.
     # run_at_hour=4: runs after game_events (03:xx) so stats reflect last night's games.
     {
+        "name": "player_game_stats_t1",
+        "entity_type": "player_game_stats_t1",
+        "max_age": timedelta(hours=24),
+        "task": "player_game_stats",
+        "scope": "season",
+        "label": "Per-game G/A/PIM – T1 (L-UPL/NLA)",
+        "priority": 86,
+        "max_tier": 1,
+        "fixed_tier": True,
+        "run_at_hour": 4,
+    },
+    {
+        "name": "player_game_stats_t2",
+        "entity_type": "player_game_stats_t2",
+        "max_age": timedelta(hours=24),
+        "task": "player_game_stats",
+        "scope": "season",
+        "label": "Per-game G/A/PIM – T2 (NLB)",
+        "priority": 86,
+        "max_tier": 2,
+        "fixed_tier": True,
+        "requires": "player_game_stats_t1",
+        "run_at_hour": 4,
+    },
+    {
         "name": "player_game_stats_t4",
         "entity_type": "player_game_stats_t4",
         "max_age": timedelta(hours=24),
@@ -301,6 +326,7 @@ POLICIES: list[dict] = [
         "priority": 86,
         "max_tier": 4,
         "fixed_tier": True,
+        "requires": "player_game_stats_t2",
         "run_at_hour": 4,
     },
     {
