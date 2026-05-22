@@ -384,6 +384,22 @@ class TestPoliciesDefinition:
 
         assert leagues_p < games_p < game_events_p < upcoming_p
 
+    def test_player_game_stats_t3_policy_exists(self):
+        """T3 must appear between t2 and t4 so 1.Liga/U-B leagues get G/A/PIM updates."""
+        from app.services.scheduler import POLICIES
+
+        names = [p["name"] for p in POLICIES]
+        assert "player_game_stats_t3" in names, "Missing player_game_stats_t3 policy"
+        idx_t2 = names.index("player_game_stats_t2")
+        idx_t3 = names.index("player_game_stats_t3")
+        idx_t4 = names.index("player_game_stats_t4")
+        assert idx_t2 < idx_t3 < idx_t4, "player_game_stats_t3 must sit between t2 and t4"
+        p = POLICIES[idx_t3]
+        assert p["entity_type"] == "player_game_stats_t3"
+        assert p["task"] == "player_game_stats"
+        assert p["max_tier"] == 3
+        assert p.get("fixed_tier") is True
+        assert p.get("requires") == "player_game_stats_t2"
 
 class TestClearDone:
     """Unit tests for clear_done helper."""

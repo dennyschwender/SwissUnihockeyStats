@@ -317,6 +317,20 @@ POLICIES: list[dict] = [
         "run_at_hour": 4,
     },
     {
+        "name": "player_game_stats_t3",
+        "entity_type": "player_game_stats_t3",
+        "max_age": timedelta(hours=24),
+        "task": "player_game_stats",
+        "scope": "season",
+        "label": "Per-game G/A/PIM – T3 (1.Liga, U21B/U18B/U16B)",
+        "priority": 86,
+        "max_tier": 3,
+        "fixed_tier": True,
+        "requires": "player_game_stats_t2",
+        "run_at_hour": 4,
+    },
+
+    {
         "name": "player_game_stats_t4",
         "entity_type": "player_game_stats_t4",
         "max_age": timedelta(hours=24),
@@ -326,7 +340,7 @@ POLICIES: list[dict] = [
         "priority": 86,
         "max_tier": 4,
         "fixed_tier": True,
-        "requires": "player_game_stats_t2",
+        "requires": "player_game_stats_t3",
         "run_at_hour": 4,
     },
     {
