@@ -2654,15 +2654,6 @@ class DataIndexer:
             entity_type = "player_game_stats_season"
             entity_id = f"season_game_stats:{season_id}"
 
-        # T1–T3 per-game stats are derived locally; skip API calls for these tiers.
-        if exact_tier in {1, 2, 3}:
-            logger.info(
-                "Skipping API player game stats for tier %d (handled by local backfill)", exact_tier
-            )
-            with self.db_service.session_scope() as _s:
-                self._mark_sync_complete(_s, entity_type, entity_id, 0)
-            return 0
-
         if not force and not self._should_update(entity_type, entity_id, max_age_hours=4):
             # Bump last_sync so the scheduler's _snap_to_hour advances to the
             # *next* nightly window instead of replaying the same past window
