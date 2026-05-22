@@ -159,11 +159,11 @@ def test_index_player_game_stats_skips_tier_3(engine, indexer):
     assert result == 0
 
 
-def test_player_game_stats_t1_t2_t3_not_in_scheduler_policies():
+def test_player_game_stats_all_tiers_in_scheduler_policies():
     from app.services.scheduler import POLICIES
 
     policy_names = {p["name"] for p in POLICIES}
-    assert "player_game_stats_t1" not in policy_names
-    assert "player_game_stats_t2" not in policy_names
-    assert "player_game_stats_t3" not in policy_names
+    assert "player_game_stats_t1" in policy_names
+    assert "player_game_stats_t2" in policy_names
+    assert "player_game_stats_t3" in policy_names
     assert "player_game_stats_t4" in policy_names
