@@ -36,6 +36,8 @@ def test_run_nightly_returns_dict(repair):
     assert "missing_events" in result
     assert "null_period_fixed" in result
     assert "stale_failed" in result
+    assert "abandoned_games" in result
+    assert "null_phases" in result
 
 
 def test_run_nightly_on_empty_db_returns_zeros(repair):

@@ -317,6 +317,8 @@ class RepairService:
             "missing_events": self.fix_missing_events(),
             "null_period_fixed": self.fix_null_period_from_events(),
             "stale_failed": self.fix_stale_failed_rows(),
+            "abandoned_games": self.fix_abandoned_games(),
+            "null_phases": self.fix_null_phases(),
         }
         result["total_fixed"] = sum(result.values())
         logger.info("[repair] nightly run complete: %s", result)
