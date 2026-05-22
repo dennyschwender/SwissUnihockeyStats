@@ -22,6 +22,7 @@ from app.models.db_models import (
     _utcnow,
 )
 from app.services.local_stats_aggregator import (
+    _parse_goal_players,
     _pen_bucket,
     aggregate_player_stats_for_season,
     backfill_game_player_stats_from_events,
@@ -489,3 +490,42 @@ def test_backfill_reprocesses_game_with_unresolved_events(engine, mock_db):
         ).first()
         assert unresolved_evt is not None
         assert unresolved_evt.resolved_at is not None, "Expected unresolved event to be marked resolved"
+
+
+# ── _parse_goal_players tests ──────────────────────────────────────────────────
+
+
+class TestParseGoalPlayers:
+    def test_parens_format_scorer_and_assister(self):
+        """API format: 'S. Jelk (T. Maurer)' -> scorer, assister."""
+        scorer, assister = _parse_goal_players({"player": "S. Jelk (T. Maurer)"})
+        assert scorer == "S. Jelk"
+        assert assister == "T. Maurer"
+
+    def test_parens_format_scorer_only(self):
+        """No assister: 'S. Mauron' -> scorer, None."""
+        scorer, assister = _parse_goal_players({"player": "S. Mauron"})
+        assert scorer == "S. Mauron"
+        assert assister is None
+
+    def test_slash_format_still_works(self):
+        """Legacy slash format should still parse correctly."""
+        scorer, assister = _parse_goal_players({"player": "Anna Mueller / Bob Smith"})
+        assert scorer == "Anna Mueller"
+        assert assister == "Bob Smith"
+
+    def test_empty_player_returns_none_none(self):
+        scorer, assister = _parse_goal_players({"player": ""})
+        assert scorer is None
+        assert assister is None
+
+    def test_missing_key_returns_none_none(self):
+        scorer, assister = _parse_goal_players({})
+        assert scorer is None
+        assert assister is None
+
+    def test_parens_with_spaces(self):
+        """Leading/trailing spaces trimmed."""
+        scorer, assister = _parse_goal_players({"player": " O. Lucy ( R. Dorthe ) "})
+        assert scorer == "O. Lucy"
+        assert assister == "R. Dorthe"

@@ -340,14 +340,24 @@ def aggregate_player_stats_for_season(
 def _parse_goal_players(raw_data: dict) -> tuple[str | None, str | None]:
     """Parse scorer and optional assister from a goal event's raw_data.
 
-    The "player" field format is either "Scorer" or "Scorer / Assister".
+    API format: "Scorer (Assister)" — parentheses wrap the assister.
+    Legacy format: "Scorer / Assister" — also handled for safety.
     Returns (scorer_name, assister_name_or_None).
     """
-    raw = (raw_data or {}).get("player", "") or ""
+    raw = ((raw_data or {}).get("player", "") or "").strip()
+    if not raw:
+        return None, None
+    # Primary format: "Scorer (Assister)"
+    if "(" in raw and raw.endswith(")"):
+        idx = raw.index("(")
+        scorer = raw[:idx].strip() or None
+        assister = raw[idx + 1 : -1].strip() or None
+        return scorer, assister
+    # Legacy fallback: "Scorer / Assister"
     if "/" in raw:
         parts = raw.split("/", 1)
         return parts[0].strip() or None, parts[1].strip() or None
-    return raw.strip() or None, None
+    return raw or None, None
 
 
 def backfill_game_player_stats_from_events(
