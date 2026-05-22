@@ -177,7 +177,6 @@ def test_fix_stale_failed_rows_deletes_old_failures(db, repair):
         assert remaining == 1
 
 
-
 def test_fix_abandoned_games_resets_to_post_game(db, repair):
     """Abandoned games should be reset to post_game with a fresh give_up_at."""
     with db.session_scope() as session:
@@ -216,6 +215,59 @@ def test_fix_abandoned_games_resets_to_post_game(db, repair):
 
 def test_fix_abandoned_games_empty_db_returns_zero(repair):
     assert repair.fix_abandoned_games() == 0
+
+
+def test_fix_null_phases_deletes_sync_status(db, repair):
+    """sync_status rows for groups with null phase should be deleted."""
+    with db.session_scope() as session:
+        # Insert a leagues row (internal id=1, API league_id=99)
+        session.execute(text("""
+            INSERT INTO leagues (id, season_id, league_id, game_class, name, text)
+            VALUES (1, 2025, 99, 1, 'TestLeague', 'TestLeague')
+        """))
+        # League group with null phase (league_id=1 is the internal leagues.id)
+        session.execute(text("""
+            INSERT INTO league_groups (id, league_id, group_id, name)
+            VALUES (10, 1, 10, 'GroupA')
+        """))
+        # Matching sync_status row (entity_id uses internal leagues.id = 1)
+        session.execute(
+            text("""
+            INSERT INTO sync_status (entity_type, entity_id, sync_status, last_sync)
+            VALUES ('groups', 'league:1', 'completed', :now)
+        """),
+            {"now": datetime.utcnow()},
+        )
+        # A group with a valid phase — its sync_status must NOT be deleted
+        session.execute(text("""
+            INSERT INTO league_groups (id, league_id, group_id, name, phase)
+            VALUES (11, 1, 11, 'GroupB', 'Playoff')
+        """))
+        session.execute(
+            text("""
+            INSERT INTO sync_status (entity_type, entity_id, sync_status, last_sync)
+            VALUES ('groups', 'league:1:playoff', 'completed', :now)
+        """),
+            {"now": datetime.utcnow()},
+        )
+
+    n = repair.fix_null_phases()
+    assert n == 1  # only the null-phase one deleted
+
+    with db.session_scope() as session:
+        deleted = session.execute(
+            text("SELECT COUNT(*) FROM sync_status WHERE entity_type='groups' AND entity_id='league:1'")
+        ).scalar()
+        assert deleted == 0
+
+        kept = session.execute(
+            text("SELECT COUNT(*) FROM sync_status WHERE entity_type='groups' AND entity_id='league:1:playoff'")
+        ).scalar()
+        assert kept == 1
+
+
+def test_fix_null_phases_empty_db_returns_zero(repair):
+    assert repair.fix_null_phases() == 0
 
 
 def test_report_methods_return_lists(repair):

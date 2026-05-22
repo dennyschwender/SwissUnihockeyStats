@@ -186,6 +186,29 @@ class RepairService:
             logger.info("[repair] reset %d abandoned games to post_game", n)
         return n
 
+
+    def fix_null_phases(self) -> int:
+        """Delete sync_status rows for league groups with null phase.
+
+        Groups with phase IS NULL were indexed before the phase field was populated.
+        Deleting their sync_status rows (entity_type='groups') forces the scheduler
+        to re-run index_groups_for_league, which fetches the API and sets phase.
+        Returns number of sync_status rows deleted.
+        """
+        with self.db_service.session_scope() as session:
+            n = session.execute(text("""
+                DELETE FROM sync_status
+                WHERE entity_type = 'groups'
+                  AND entity_id IN (
+                      SELECT DISTINCT 'league:' || lg.league_id
+                      FROM league_groups lg
+                      WHERE lg.phase IS NULL
+                  )
+            """)).rowcount
+        if n:
+            logger.info("[repair] deleted %d sync_status rows for null-phase league groups", n)
+        return n
+
     # ── Report queries (read-only) ─────────────────────────────────────────
 
     def report_games_no_lineup(self) -> list[dict]:
