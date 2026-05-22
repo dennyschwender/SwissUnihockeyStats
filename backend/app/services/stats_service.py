@@ -1336,14 +1336,17 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
         # These coexist with API-fetched rows using different league_abbrev values
         # (e.g. "Herren NLB" vs "NLB"), causing double-counting. Prefer local rows
         # when they exist; fall back to API rows for players without any local rows.
+        # Use LEFT JOIN instead of NOT IN to avoid O(n^2) scan on large tables.
+        from sqlalchemy import select as sa_select
+
         local_players_subq = (
-            session.query(PlayerStatistics.player_id)
-            .filter(
+            sa_select(PlayerStatistics.player_id)
+            .where(
                 PlayerStatistics.season_id == season_id,
                 PlayerStatistics.computed_from_local == True,  # noqa: E712
             )
             .distinct()
-            .subquery()
+            .subquery("local_players")
         )
 
         # Aggregate stats per player across all teams
@@ -1358,11 +1361,12 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
                 func.sum(PlayerStatistics.penalty_minutes).label("pim"),
             )
             .join(Player, PlayerStatistics.player_id == Player.person_id)
+            .outerjoin(local_players_subq, PlayerStatistics.player_id == local_players_subq.c.player_id)
             .filter(
                 PlayerStatistics.season_id == season_id,
                 or_(
                     PlayerStatistics.computed_from_local == True,  # noqa: E712
-                    PlayerStatistics.player_id.not_in(local_players_subq),
+                    local_players_subq.c.player_id == None,  # noqa: E711 -- no local row exists
                 ),
             )
             .group_by(PlayerStatistics.player_id, Player.full_name)

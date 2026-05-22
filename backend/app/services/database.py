@@ -451,6 +451,10 @@ class DatabaseService:
                 "CREATE INDEX IF NOT EXISTS idx_stats_season_player "
                 "ON player_statistics (season_id, player_id)"
             ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_stats_season_local "
+                "ON player_statistics (season_id, computed_from_local, player_id)"
+            ))
 
             # ── Add is_frozen to seasons ─────────────────────────────────────
             season_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(seasons)"))}
