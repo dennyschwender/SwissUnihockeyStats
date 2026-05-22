@@ -529,3 +529,81 @@ class TestParseGoalPlayers:
         scorer, assister = _parse_goal_players({"player": " O. Lucy ( R. Dorthe ) "})
         assert scorer == "O. Lucy"
         assert assister == "R. Dorthe"
+
+
+import datetime as _dt
+
+
+def _seed_abbreviated_name_game(engine):
+    """Game where event uses abbreviated names; player record has full name."""
+    with Session(engine) as s:
+        season = Season(id=200, text="2025/26")
+        s.add(season)
+        s.flush()
+        league = League(id=200, season_id=200, league_id=3, game_class=11, name="1. Liga")
+        s.add(league)
+        s.flush()
+        group = LeagueGroup(id=200, league_id=200, group_id=200, name="1. Liga")
+        s.add(group)
+        s.flush()
+        home = Team(id=200, season_id=200, name="HomeTeam", club_id=None)
+        away = Team(id=201, season_id=200, name="AwayTeam", club_id=None)
+        s.add_all([home, away])
+        s.flush()
+        # Player with full name — event will use abbreviated form
+        scorer = Player(person_id=2001, first_name="Stefanie", last_name="Mauron")
+        assister = Player(person_id=2002, first_name="Oliver", last_name="Lucy")
+        s.add_all([scorer, assister])
+        s.flush()
+        game = Game(
+            id=200, season_id=200, group_id=200,
+            home_team_id=200, away_team_id=201,
+            home_score=1, away_score=0,
+            status="finished",
+            completeness_status="complete",
+            game_date=_dt.datetime(2025, 11, 1),
+        )
+        s.add(game)
+        s.flush()
+        gp1 = GamePlayer(
+            player_id=2001, game_id=200, team_id=200, season_id=200,
+            is_home_team=True, goals=0, assists=0, penalty_minutes=0,
+        )
+        gp2 = GamePlayer(
+            player_id=2002, game_id=200, team_id=200, season_id=200,
+            is_home_team=True, goals=0, assists=0, penalty_minutes=0,
+        )
+        s.add_all([gp1, gp2])
+        s.flush()
+        # Goal event: abbreviated scorer + assister in parens (real API format)
+        evt = GameEvent(
+            game_id=200, season_id=200, team_id=200,
+            event_type="Torschütze 1:0",
+            raw_data={
+                "event_type": "Torschütze 1:0",
+                "time": "15:00",
+                "team": "HomeTeam",
+                "player": "S. Mauron (O. Lucy)",
+            },
+        )
+        s.add(evt)
+        s.commit()
+
+
+class TestAbbreviatedNameBackfill:
+    def test_abbreviated_scorer_gets_goal(self, engine, mock_db):
+        """'S. Mauron' in event resolves to player with first_name='Stefanie', last_name='Mauron'."""
+        _seed_abbreviated_name_game(engine)
+        count = backfill_game_player_stats_from_events(mock_db, season_id=200, tiers=[3])
+        assert count > 0
+        with Session(engine) as s:
+            gp = s.query(GamePlayer).filter_by(player_id=2001, game_id=200).first()
+            assert gp.goals == 1, f"Scorer should have 1 goal, got {gp.goals}"
+
+    def test_abbreviated_assister_gets_assist(self, engine, mock_db):
+        """'O. Lucy' parsed from parens and resolved to player with first_name='Oliver'."""
+        _seed_abbreviated_name_game(engine)
+        backfill_game_player_stats_from_events(mock_db, season_id=200, tiers=[3])
+        with Session(engine) as s:
+            gp = s.query(GamePlayer).filter_by(player_id=2002, game_id=200).first()
+            assert gp.assists == 1, f"Assister should have 1 assist, got {gp.assists}"

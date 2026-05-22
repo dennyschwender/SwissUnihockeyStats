@@ -455,8 +455,17 @@ def backfill_game_player_stats_from_events(
         for gp in gp_all:
             key = (gp.game_id, gp.team_id)
             name = player_names.get(gp.player_id, "")
-            if name:
-                name_map.setdefault(key, {})[name] = gp.player_id
+            if not name:
+                continue
+            slot = name_map.setdefault(key, {})
+            slot[name] = gp.player_id
+            # Also register abbreviated form "F. Lastname" for API-style event names.
+            # Only add if unambiguous — skip when another player already occupies that slot.
+            parts = name.split(" ", 1)
+            if len(parts) == 2 and parts[0]:
+                abbrev = f"{parts[0][0]}. {parts[1]}"
+                if abbrev not in slot:
+                    slot[abbrev] = gp.player_id
 
         # Accumulate goals/assists/pim per (game_id, player_id)
         goals_acc: dict[tuple[int, int], int] = {}
