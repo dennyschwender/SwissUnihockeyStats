@@ -161,6 +161,31 @@ class RepairService:
             logger.info("[repair] cleared %d stale failed rows", n)
         return n
 
+    def fix_abandoned_games(self) -> int:
+        """Reset abandoned games to post_game for re-evaluation.
+
+        Games can become stuck in 'abandoned' when the completeness requirements
+        change after the give_up_at deadline was reached (e.g. best_players removed
+        from required fields). Resetting to post_game with a fresh give_up_at lets
+        index_post_game_completion re-evaluate them on the next scheduler run.
+        Returns number of games reset.
+        """
+        give_up_at = datetime.utcnow() + timedelta(days=7)
+        with self.db_service.session_scope() as session:
+            n = session.execute(
+                text("""
+                UPDATE games
+                SET completeness_status = 'post_game',
+                    give_up_at = :give_up_at,
+                    incomplete_fields = NULL
+                WHERE completeness_status = 'abandoned'
+                """),
+                {"give_up_at": give_up_at},
+            ).rowcount
+        if n:
+            logger.info("[repair] reset %d abandoned games to post_game", n)
+        return n
+
     # ── Report queries (read-only) ─────────────────────────────────────────
 
     def report_games_no_lineup(self) -> list[dict]:

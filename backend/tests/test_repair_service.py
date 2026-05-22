@@ -177,6 +177,47 @@ def test_fix_stale_failed_rows_deletes_old_failures(db, repair):
         assert remaining == 1
 
 
+
+def test_fix_abandoned_games_resets_to_post_game(db, repair):
+    """Abandoned games should be reset to post_game with a fresh give_up_at."""
+    with db.session_scope() as session:
+        session.execute(text("""
+            INSERT INTO games (id, season_id, status, home_score, away_score, game_date,
+                               completeness_status, give_up_at, incomplete_fields,
+                               home_team_id, away_team_id)
+            VALUES (2001, 2025, 'finished', 3, 2, '2025-11-01',
+                    'abandoned', '2025-11-10', '["spectators"]', 1, 2)
+        """))
+        # A non-abandoned game — should not be touched
+        session.execute(text("""
+            INSERT INTO games (id, season_id, status, home_score, away_score, game_date,
+                               completeness_status, home_team_id, away_team_id)
+            VALUES (2002, 2025, 'finished', 1, 0, '2025-11-02',
+                    'post_game', 1, 2)
+        """))
+
+    n = repair.fix_abandoned_games()
+    assert n == 1  # only the abandoned one
+
+    with db.session_scope() as session:
+        row = session.execute(
+            text("SELECT completeness_status, give_up_at, incomplete_fields FROM games WHERE id=2001")
+        ).fetchone()
+        assert row[0] == "post_game"
+        assert row[1] is not None   # give_up_at set to a future date
+        assert row[2] is None       # incomplete_fields cleared
+
+        # post_game game untouched
+        row2 = session.execute(
+            text("SELECT completeness_status FROM games WHERE id=2002")
+        ).fetchone()
+        assert row2[0] == "post_game"
+
+
+def test_fix_abandoned_games_empty_db_returns_zero(repair):
+    assert repair.fix_abandoned_games() == 0
+
+
 def test_report_methods_return_lists(repair):
     assert isinstance(repair.report_games_no_lineup(), list)
     assert isinstance(repair.report_roster_gaps(), list)
