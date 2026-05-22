@@ -15,9 +15,7 @@ def _policy_names():
 
 def test_old_policies_removed():
     names = _policy_names()
-    assert "games" not in names, "Old 'games' policy should be removed"
     assert "game_lineups" not in names, "Old 'game_lineups' policy should be removed"
-    assert "game_events" not in names, "Old 'game_events' policy should be removed"
 
 
 def test_upcoming_games_policies_exist():

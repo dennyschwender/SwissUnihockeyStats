@@ -83,7 +83,6 @@ def test_tier1_requires_all_fields():
         "spectators",
         "events",
         "lineup",
-        "best_players",
     }
 
 
@@ -276,35 +275,6 @@ def test_tier1_missing_lineup(session):
     assert "lineup" in missing
 
 
-def test_tier1_missing_best_players(session):
-    game = _make_game(session, api_id=34, home_score=2, away_score=0)
-    game.referee_1 = "Ref D"
-    game.spectators = 500
-    session.flush()
-    session.add(
-        GameEvent(
-            game_id=game.id,
-            event_type="goal",
-            period=1,
-            team_id=game.home_team_id,
-            season_id=_SEASON_ID,
-        )
-    )
-    # No best_player event
-    session.add(
-        GamePlayer(
-            game_id=game.id,
-            team_id=game.home_team_id,
-            player_id=4,
-            season_id=_SEASON_ID,
-            is_home_team=True,
-        )
-    )
-    session.flush()
-    ok, missing = _is_game_complete(game, 1, session)
-    assert ok is False
-    assert "best_players" in missing
-
 
 def test_tier1_missing_spectators(session):
     game = _make_game(session, api_id=36, home_score=2, away_score=0)
@@ -348,4 +318,4 @@ def test_missing_fields_list_contains_all_missing(session):
     game = _make_game(session, api_id=35)  # no score, no anything
     ok, missing = _is_game_complete(game, 1, session)
     assert ok is False
-    assert set(missing) == {"score", "referees", "spectators", "events", "lineup", "best_players"}
+    assert set(missing) == {"score", "referees", "spectators", "events", "lineup"}

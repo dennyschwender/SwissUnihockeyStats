@@ -104,7 +104,7 @@ def test_unresolved_events_route_registered():
     from app.main import app as fastapi_app
 
     routes = {r.path for r in fastapi_app.routes}
-    assert "/admin/unresolved-events" in routes
+    assert "/admin/api/unresolved-events" in routes
 
 
 def test_compute_player_stats_calls_backfill_first(engine, indexer):
