@@ -38,11 +38,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '3.0'
-          memory: 2G
-        reservations:
           cpus: '1.0'
-          memory: 512M
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
     healthcheck:
       test: ["CMD", "curl", "-fs", "http://127.0.0.1:8000/health"]
