@@ -1,6 +1,6 @@
 # Past Season Games Indexing Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add scheduler policies so that games, game events, and game lineups are automatically indexed for past seasons that don't have them yet.
 
@@ -16,7 +16,7 @@
 - Modify: `backend/app/services/scheduler.py` (around line 994)
 - Test: `backend/tests/test_scheduler.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add a new test class at the end of `backend/tests/test_scheduler.py` (before the final standalone functions):
 
@@ -118,7 +118,7 @@ class TestPastOnlyFlag:
         assert sched._queue[0].policy_name == "games"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_scheduler.py::TestPastOnlyFlag -v
@@ -126,7 +126,7 @@ cd backend && .venv/bin/pytest tests/test_scheduler.py::TestPastOnlyFlag -v
 
 Expected: both tests FAIL — `test_past_only_policy_skipped_for_current_season` fails because the current code has no `past_only` guard (the policy would run through to the `current_only` check and possibly enqueue), and `test_past_only_policy_runs_for_past_season` may also fail.
 
-- [ ] **Step 3: Add the `past_only` guard in `_maybe_schedule`**
+- [x] **Step 3: Add the `past_only` guard in `_maybe_schedule`**
 
 In `backend/app/services/scheduler.py`, find the block around line 992–995:
 
@@ -151,7 +151,7 @@ Add the `past_only` guard immediately after it:
             return
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_scheduler.py::TestPastOnlyFlag -v
@@ -159,7 +159,7 @@ cd backend && .venv/bin/pytest tests/test_scheduler.py::TestPastOnlyFlag -v
 
 Expected: both PASS.
 
-- [ ] **Step 5: Run full scheduler test suite to verify no regressions**
+- [x] **Step 5: Run full scheduler test suite to verify no regressions**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_scheduler.py -v
@@ -167,7 +167,7 @@ cd backend && .venv/bin/pytest tests/test_scheduler.py -v
 
 Expected: all existing tests PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/services/scheduler.py backend/tests/test_scheduler.py
@@ -182,7 +182,7 @@ git commit -m "feat: add past_only guard to scheduler _maybe_schedule"
 - Modify: `backend/app/services/scheduler.py` (around line 122)
 - Test: `backend/tests/test_scheduler.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `backend/tests/test_scheduler.py`, inside the existing `class TestPoliciesDefinition:` (which starts around line 322):
 
@@ -223,7 +223,7 @@ Add to `backend/tests/test_scheduler.py`, inside the existing `class TestPolicie
         assert leagues_p < games_p < game_events_p < upcoming_p
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_scheduler.py::TestPoliciesDefinition::test_games_policy_exists_and_is_past_only tests/test_scheduler.py::TestPoliciesDefinition::test_game_events_policy_exists_and_is_past_only tests/test_scheduler.py::TestPoliciesDefinition::test_games_policy_priority_between_leagues_and_upcoming -v
@@ -231,7 +231,7 @@ cd backend && .venv/bin/pytest tests/test_scheduler.py::TestPoliciesDefinition::
 
 Expected: all three FAIL with "games policy not found in POLICIES".
 
-- [ ] **Step 3: Add the two new policies to POLICIES**
+- [x] **Step 3: Add the two new policies to POLICIES**
 
 In `backend/app/services/scheduler.py`, find the block ending at line 122:
 
@@ -293,7 +293,7 @@ Replace with:
     # ── Upcoming games polling — schedule changes (noon / evening / night) ───
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_scheduler.py::TestPoliciesDefinition -v
@@ -301,7 +301,7 @@ cd backend && .venv/bin/pytest tests/test_scheduler.py::TestPoliciesDefinition -
 
 Expected: all tests in `TestPoliciesDefinition` PASS, including the three new ones.
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_scheduler.py -v
@@ -309,7 +309,7 @@ cd backend && .venv/bin/pytest tests/test_scheduler.py -v
 
 Expected: all tests PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/services/scheduler.py backend/tests/test_scheduler.py
@@ -322,7 +322,7 @@ git commit -m "feat: add games and game_events policies for past season indexing
 
 **Files:** none modified — this is a verification step only.
 
-- [ ] **Step 1: Check current scheduler diagnostic in the admin**
+- [x] **Step 1: Check current scheduler diagnostic in the admin**
 
 Hit the admin API to see the current scheduler state:
 
@@ -332,17 +332,17 @@ curl -s http://localhost:8000/admin/api/scheduler-diag | python3 -m json.tool | 
 
 Or open `https://swissunihockeystats.mennylenderr.ch/admin` → Scheduler tab → check that `games` and `game_events` policies appear in the policy list.
 
-- [ ] **Step 2: Confirm past seasons are queued for games**
+- [x] **Step 2: Confirm past seasons are queued for games**
 
 Check the scheduler queue in the admin jobs list. Seasons 2018/2019/2020 should have `games` jobs queued for the next 03:00 UTC window (since `leagues` was already indexed for them at the last nightly run).
 
 In the admin jobs panel, look for entries with `task=games, season=2018/2019/2020, run_at≈next 03:00 UTC`.
 
-- [ ] **Step 3: Verify `game_events` is NOT queued for current season (2025)**
+- [x] **Step 3: Verify `game_events` is NOT queued for current season (2025)**
 
 In the admin jobs list, confirm there is no `games` or `game_events` job for `season=2025`. The `past_only` guard must exclude the current season.
 
-- [ ] **Step 4: Deploy to production and monitor**
+- [x] **Step 4: Deploy to production and monitor**
 
 ```bash
 cd ~/dockerimages/SwissUnihockeyStats
@@ -357,7 +357,7 @@ docker logs -f $(docker ps -q --filter "name=swiss") 2>&1 | grep -E "(games|game
 
 Expected: `launching job ... task=games season=2018/2019/2020` at 03:00 UTC, followed later by `launching job ... task=events season=2018/2019/2020`.
 
-- [ ] **Step 5: Verify games appear in DB after run**
+- [x] **Step 5: Verify games appear in DB after run**
 
 ```bash
 docker exec $(docker ps -q --filter "name=swiss") python3 -c "

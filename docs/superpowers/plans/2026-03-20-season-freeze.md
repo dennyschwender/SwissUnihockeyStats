@@ -1,6 +1,6 @@
 # Season Freeze Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add `is_frozen` to `Season` so the scheduler skips past-season jobs once all games are finished, and expose freeze/unfreeze controls in the admin UI.
 
@@ -43,7 +43,7 @@ if "is_frozen" not in existing_cols:
 ```
 Add this block at the end of `_run_sqlite_migrations`, just before `conn.commit()` (line 431). The block for `player_statistics` ends around line 429 — add the seasons block after that.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/tests/test_season_freeze.py`:
 
@@ -68,7 +68,7 @@ class TestSeasonModel:
             session.delete(s)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -77,7 +77,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: FAIL — `Season` has no attribute `is_frozen`.
 
-- [ ] **Step 3: Add `is_frozen` to Season model**
+- [x] **Step 3: Add `is_frozen` to Season model**
 
 In `backend/app/models/db_models.py`, after the `last_full_sync` line (line 44):
 
@@ -85,7 +85,7 @@ In `backend/app/models/db_models.py`, after the `last_full_sync` line (line 44):
     is_frozen: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="0")
 ```
 
-- [ ] **Step 4: Add migration to `_run_sqlite_migrations`**
+- [x] **Step 4: Add migration to `_run_sqlite_migrations`**
 
 In `backend/app/services/database.py`, just before `conn.commit()` at the end of `_run_sqlite_migrations` (around line 430):
 
@@ -96,7 +96,7 @@ In `backend/app/services/database.py`, just before `conn.commit()` at the end of
                 conn.execute(text("ALTER TABLE seasons ADD COLUMN is_frozen INTEGER NOT NULL DEFAULT 0"))
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -105,7 +105,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: PASS.
 
-- [ ] **Step 6: Run full test suite to check for regressions**
+- [x] **Step 6: Run full test suite to check for regressions**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -114,7 +114,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: all tests pass (or the same tests that were failing before, no new failures).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats
@@ -212,7 +212,7 @@ Note: the local variable `season` in the auto-freeze loop shadows the outer `sea
                         )
 ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `backend/tests/test_season_freeze.py`:
 
@@ -304,7 +304,7 @@ class TestIsSeasonComplete:
             assert _is_season_complete(session, 4) is True
 ```
 
-- [ ] **Step 2: Run the new tests to verify they fail**
+- [x] **Step 2: Run the new tests to verify they fail**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -313,7 +313,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: FAIL — `cannot import name '_is_season_complete' from 'app.services.scheduler'`.
 
-- [ ] **Step 3: Add `_is_season_complete` to `scheduler.py`**
+- [x] **Step 3: Add `_is_season_complete` to `scheduler.py`**
 
 Add the following module-level function just above the `Scheduler` class definition (around line 388):
 
@@ -353,7 +353,7 @@ def _is_season_complete(session, season_id: int) -> bool:
     return in_progress == 0
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -362,7 +362,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: all 5 tests PASS.
 
-- [ ] **Step 5: Add skip-frozen check to `_maybe_schedule`**
+- [x] **Step 5: Add skip-frozen check to `_maybe_schedule`**
 
 In `backend/app/services/scheduler.py`, at the very top of `_maybe_schedule` (line ~838, before the double-queue guard at `key = ...`):
 
@@ -377,7 +377,7 @@ In `backend/app/services/scheduler.py`, at the very top of `_maybe_schedule` (li
         # ... rest of existing method unchanged (key = ...) ...
 ```
 
-- [ ] **Step 6: Add auto-freeze block at the end of `_refresh_queue`**
+- [x] **Step 6: Add auto-freeze block at the end of `_refresh_queue`**
 
 In `backend/app/services/scheduler.py`, at the end of `_refresh_queue` (after the existing `except Exception as exc:` block at line ~822), add the auto-freeze block. The structure of `_refresh_queue` is:
 
@@ -414,7 +414,7 @@ In `backend/app/services/scheduler.py`, at the end of `_refresh_queue` (after th
             logger.error("[scheduler] auto-freeze error: %s", exc, exc_info=True)
 ```
 
-- [ ] **Step 7: Write scheduler freeze/skip tests**
+- [x] **Step 7: Write scheduler freeze/skip tests**
 
 Add to `backend/tests/test_scheduler.py`:
 
@@ -469,7 +469,7 @@ class TestSeasonFreezeScheduler:
             session.query(Season).filter(Season.id == 7002).delete()
 ```
 
-- [ ] **Step 8: Run all new scheduler tests**
+- [x] **Step 8: Run all new scheduler tests**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -478,7 +478,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: both PASS.
 
-- [ ] **Step 9: Run full test suite**
+- [x] **Step 9: Run full test suite**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -487,7 +487,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: no new failures.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats
@@ -545,7 +545,7 @@ Add the three new endpoints after the `admin_delete_season_layer` endpoint (arou
 
 Both freeze/unfreeze return `{"ok": True, "season_id": season_id, "is_frozen": True/False}`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `backend/tests/test_season_freeze.py`:
 
@@ -627,7 +627,7 @@ class TestAdminFreezeEndpoints:
             session.query(Season).filter(Season.id == 6003).delete()
 ```
 
-- [ ] **Step 2: Run the failing tests**
+- [x] **Step 2: Run the failing tests**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -636,7 +636,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: FAIL — 404 or 405 (routes not defined yet).
 
-- [ ] **Step 3: Add the three endpoints to `main.py`**
+- [x] **Step 3: Add the three endpoints to `main.py`**
 
 Add after the `admin_delete_season_layer` function (around line 1589):
 
@@ -709,7 +709,7 @@ async def admin_unfreeze_season(season_id: int, _: None = Depends(require_admin)
     return {"ok": True, "season_id": season_id, "is_frozen": False}
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -718,7 +718,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: all 5 PASS.
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -727,7 +727,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: no new failures.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats
@@ -750,7 +750,7 @@ The seasons list is loaded dynamically. The simplest approach: after the existin
 
 **Important:** Read the full HTML file and any referenced JS before editing, so you don't break existing functionality. Look for `pullSeasons` or the `#seasons-container` rendering logic.
 
-- [ ] **Step 1: Read the full `_tab_seasons.html` to understand the JS structure**
+- [x] **Step 1: Read the full `_tab_seasons.html` to understand the JS structure**
 
 ```bash
 cat /home/denny/Development/SwissUnihockeyStats/backend/templates/admin/_tab_seasons.html
@@ -763,11 +763,11 @@ ls /home/denny/Development/SwissUnihockeyStats/backend/static/
 ls /home/denny/Development/SwissUnihockeyStats/backend/static/js/ 2>/dev/null || true
 ```
 
-- [ ] **Step 2: Find where seasons are rendered in the JS**
+- [x] **Step 2: Find where seasons are rendered in the JS**
 
 Look for `seasons-container`, `renderSeason`, or the function that builds the seasons list HTML. Understand the existing row structure before modifying it.
 
-- [ ] **Step 3: Add completeness column to the seasons table**
+- [x] **Step 3: Add completeness column to the seasons table**
 
 Modify the season row rendering to add:
 - **Games**: `{games_finished}/{games_total}` (with ✓ when 100%)
@@ -790,7 +790,7 @@ async function unfreezeSeason(seasonId) {
 }
 ```
 
-- [ ] **Step 4: Verify the admin UI renders correctly**
+- [x] **Step 4: Verify the admin UI renders correctly**
 
 Start the dev server and visit the admin page:
 
@@ -804,7 +804,7 @@ Navigate to the admin dashboard → Seasons tab. Verify:
 - Freeze/Unfreeze buttons appear and work (check Network tab for the POST calls)
 - No JS errors in the console
 
-- [ ] **Step 5: Run the full test suite one final time**
+- [x] **Step 5: Run the full test suite one final time**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -813,7 +813,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: all tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats

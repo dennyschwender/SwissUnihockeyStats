@@ -1,6 +1,6 @@
 # Remove Scheduler Cold-Start Queue Flooding
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Remove the `_cold_start` flag from the scheduler so that jobs with a fresh `SyncStatus` are not re-queued on server restart or scheduler re-enable.
 
@@ -46,7 +46,7 @@ The test needs a `Scheduler` instance and a seeded in-memory DB with `SyncStatus
 
 Look at the existing test fixtures in `test_scheduler.py` to understand how `scheduler` fixture and DB are constructed — follow the same pattern.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `backend/tests/test_scheduler.py`, add a new test class or method. Find the existing `@pytest.fixture` for `scheduler` and `engine`/`db` in the file to understand how to wire up a session. Then add:
 
@@ -82,7 +82,7 @@ async def test_fresh_sync_status_not_requeued_on_restart(scheduler, db_engine):
 
 Note: `db_engine` fixture may need to be added if it doesn't already exist. Check the existing fixtures — the scheduler fixture may already inject a DB. If `_utcnow` is not exported from scheduler, use `datetime.now(timezone.utc).replace(tzinfo=None)` instead.
 
-- [ ] **Step 2: Run to verify the test fails**
+- [x] **Step 2: Run to verify the test fails**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests/test_scheduler.py::test_fresh_sync_status_not_requeued_on_restart -v
@@ -90,7 +90,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests
 
 Expected: **FAIL** — the queue will have jobs because `_cold_start=True` causes them to be enqueued.
 
-- [ ] **Step 3: Make the four changes to `scheduler.py`**
+- [x] **Step 3: Make the four changes to `scheduler.py`**
 
 **Change 1** — remove `_cold_start` from `__init__` (line 443):
 ```python
@@ -125,7 +125,7 @@ Also delete the comment above it on line 851: `# Cold start complete – subsequ
             run_at = now + timedelta(seconds=policy["priority"])
 ```
 
-- [ ] **Step 4: Run the new test to verify it passes**
+- [x] **Step 4: Run the new test to verify it passes**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests/test_scheduler.py::test_fresh_sync_status_not_requeued_on_restart -v
@@ -133,7 +133,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests
 
 Expected: **PASS**
 
-- [ ] **Step 5: Run the full scheduler test suite**
+- [x] **Step 5: Run the full scheduler test suite**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests/test_scheduler.py -v
@@ -141,7 +141,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests
 
 Expected: All tests pass. If any fail, read the error — most likely a test was asserting `_cold_start` exists; remove or update that assertion.
 
-- [ ] **Step 6: Run the full test suite**
+- [x] **Step 6: Run the full test suite**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest --tb=short -q
@@ -149,7 +149,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest --tb=
 
 Expected: All tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats && git add backend/app/services/scheduler.py backend/tests/test_scheduler.py && git commit -m "fix(scheduler): remove cold_start flag — only queue jobs with stale or missing SyncStatus"

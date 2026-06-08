@@ -1,6 +1,6 @@
 # Local PlayerStatistics Computation (T1–T3) Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace per-player API calls for `PlayerStatistics` with SQL aggregation over local `GamePlayer`/`GameEvent` rows for tiers 1–3, eliminating hours-long API polling.
 
@@ -35,7 +35,7 @@
 
 **Context:** `PlayerStatistics` is at line 308. `GameSyncFailure` is at line 235 — follow that as a pattern for the new table. The `_utcnow` helper is at the top of the file. The `Base.metadata.create_all` + idempotent migration in `database.py` handles schema changes automatically — no Alembic needed.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/tests/test_local_stats_integration.py`:
 
@@ -69,14 +69,14 @@ def test_unresolved_player_event_table_exists(engine):
             "resolved_at", "resolved_by"}.issubset(cols)
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_local_stats_integration.py -v
 ```
 Expected: FAIL — columns/table don't exist yet.
 
-- [ ] **Step 3: Add `computed_from_local` and `local_computed_at` to `PlayerStatistics`**
+- [x] **Step 3: Add `computed_from_local` and `local_computed_at` to `PlayerStatistics`**
 
 In `backend/app/models/db_models.py`, after `last_updated` on `PlayerStatistics` (around line 329), add:
 
@@ -85,7 +85,7 @@ In `backend/app/models/db_models.py`, after `last_updated` on `PlayerStatistics`
     local_computed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 ```
 
-- [ ] **Step 4: Add `UnresolvedPlayerEvent` model**
+- [x] **Step 4: Add `UnresolvedPlayerEvent` model**
 
 After `GameSyncFailure` (around line 245), add:
 
@@ -112,21 +112,21 @@ class UnresolvedPlayerEvent(Base):
 
 Also add `UnresolvedPlayerEvent` to the imports at top of `data_indexer.py` and `main.py` once it's needed.
 
-- [ ] **Step 5: Run tests to verify pass**
+- [x] **Step 5: Run tests to verify pass**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_local_stats_integration.py -v
 ```
 Expected: PASS
 
-- [ ] **Step 6: Run full test suite to check for regressions**
+- [x] **Step 6: Run full test suite to check for regressions**
 
 ```bash
 cd backend && .venv/bin/pytest --tb=short -q
 ```
 Expected: All existing tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/app/models/db_models.py backend/tests/test_local_stats_integration.py
@@ -165,7 +165,7 @@ def _pen_bucket(event_type: str) -> str | None:
     return None  # unknown penalty type, ignore for breakdown
 ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `backend/tests/test_local_stats_aggregator.py`:
 
@@ -341,14 +341,14 @@ def test_unresolved_event_created_for_unknown_player(engine, mock_db):
         assert any(u.raw_name == "Unknown Player" for u in unresolved)
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_local_stats_aggregator.py -v
 ```
 Expected: FAIL — `local_stats_aggregator` module doesn't exist.
 
-- [ ] **Step 3: Create `backend/app/services/local_stats_aggregator.py`**
+- [x] **Step 3: Create `backend/app/services/local_stats_aggregator.py`**
 
 ```python
 """Local aggregation of PlayerStatistics from GamePlayer/GameEvent rows.
@@ -656,21 +656,21 @@ def aggregate_player_stats_for_season(
     return updated
 ```
 
-- [ ] **Step 4: Run tests to verify pass**
+- [x] **Step 4: Run tests to verify pass**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_local_stats_aggregator.py -v
 ```
 Expected: All tests PASS.
 
-- [ ] **Step 5: Run full suite**
+- [x] **Step 5: Run full suite**
 
 ```bash
 cd backend && .venv/bin/pytest --tb=short -q
 ```
 Expected: All tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/services/local_stats_aggregator.py backend/tests/test_local_stats_aggregator.py
@@ -692,7 +692,7 @@ git commit -m "feat(stats): add local_stats_aggregator — aggregate PlayerStati
 - Add `compute_player_stats_for_season` as a thin wrapper that calls `aggregate_player_stats_for_season` with SyncStatus tracking (same pattern as other `index_*` methods).
 - Import `aggregate_player_stats_for_season` from `app.services.local_stats_aggregator`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `backend/tests/test_local_stats_integration.py`:
 
@@ -749,14 +749,14 @@ def test_index_player_stats_skips_tier_3(engine, indexer):
     assert result == 0
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_local_stats_integration.py::test_compute_player_stats_for_season_returns_int -v
 ```
 Expected: FAIL — method doesn't exist yet.
 
-- [ ] **Step 3: Add guard to `index_player_stats_for_season`**
+- [x] **Step 3: Add guard to `index_player_stats_for_season`**
 
 At the very start of `index_player_stats_for_season`, after the `if exact_tier is not None:` block that sets `entity_type`, add:
 
@@ -769,7 +769,7 @@ At the very start of `index_player_stats_for_season`, after the `if exact_tier i
             return 0
 ```
 
-- [ ] **Step 4: Add `compute_player_stats_for_season` method**
+- [x] **Step 4: Add `compute_player_stats_for_season` method**
 
 After `index_player_stats_for_season` (around line 1100), add:
 
@@ -801,21 +801,21 @@ After `index_player_stats_for_season` (around line 1100), add:
             raise
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_local_stats_integration.py -v
 ```
 Expected: All PASS.
 
-- [ ] **Step 6: Run full suite**
+- [x] **Step 6: Run full suite**
 
 ```bash
 cd backend && .venv/bin/pytest --tb=short -q
 ```
 Expected: All pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/app/services/data_indexer.py backend/tests/test_local_stats_integration.py
@@ -839,7 +839,7 @@ git commit -m "feat(indexer): add compute_player_stats_for_season; skip API for 
 - Schedule: run `compute_player_stats` every 6 hours (same cadence as post_game_completion or use `max_age_hours=6`).
 - `current_only: True` — only run for the current/highlighted season (same as `upcoming_games` policies).
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Add to `backend/tests/test_local_stats_integration.py`:
 
@@ -850,14 +850,14 @@ def test_compute_player_stats_task_registered_in_main():
     assert "compute_player_stats" in _TASK_META
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_local_stats_integration.py::test_compute_player_stats_task_registered_in_main -v
 ```
 Expected: FAIL.
 
-- [ ] **Step 3: Add `compute_player_stats` policy to `scheduler.py`**
+- [x] **Step 3: Add `compute_player_stats` policy to `scheduler.py`**
 
 After the `post_game_completion` policy block (around line 165), add:
 
@@ -873,7 +873,7 @@ After the `post_game_completion` policy block (around line 165), add:
     },
 ```
 
-- [ ] **Step 4: Wire `compute_player_stats` in `main.py`**
+- [x] **Step 4: Wire `compute_player_stats` in `main.py`**
 
 In `_TASK_META` dict, add:
 ```python
@@ -899,21 +899,21 @@ Also in `_TASK_COOLDOWNS` (line ~1177):
     "compute_player_stats": 30,
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_local_stats_integration.py -v
 ```
 Expected: All PASS.
 
-- [ ] **Step 6: Run full suite**
+- [x] **Step 6: Run full suite**
 
 ```bash
 cd backend && .venv/bin/pytest --tb=short -q
 ```
 Expected: All pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/app/services/scheduler.py backend/app/main.py backend/tests/test_local_stats_integration.py
@@ -939,7 +939,7 @@ git commit -m "feat(scheduler): add compute_player_stats policy (T1-T3, every 6h
 - Link from `_tab_database.html` — already has the sync-failures button to model after (line 27).
 - Import `UnresolvedPlayerEvent` in `main.py`.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Add to `backend/tests/test_local_stats_integration.py`:
 
@@ -952,14 +952,14 @@ def test_unresolved_events_page_returns_200(engine):
     assert "/admin/unresolved-events" in routes
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_local_stats_integration.py::test_unresolved_events_page_returns_200 -v
 ```
 Expected: FAIL.
 
-- [ ] **Step 3: Add route in `main.py`**
+- [x] **Step 3: Add route in `main.py`**
 
 Model after the `/admin/sync-failures` route. Add after that route:
 
@@ -1014,7 +1014,7 @@ async def admin_dismiss_unresolved_event(
         raise HTTPException(status_code=500, detail=str(exc))
 ```
 
-- [ ] **Step 4: Create `admin_unresolved_events.html`**
+- [x] **Step 4: Create `admin_unresolved_events.html`**
 
 Create `backend/templates/admin_unresolved_events.html` — model after `admin_sync_failures.html`. Show: raw_name, event_type, game_id, team_id, created_at, and a Dismiss button (POST form to `/admin/unresolved-events/{id}/dismiss`).
 
@@ -1067,7 +1067,7 @@ Create `backend/templates/admin_unresolved_events.html` — model after `admin_s
 {% endblock %}
 ```
 
-- [ ] **Step 5: Add link in `_tab_database.html`**
+- [x] **Step 5: Add link in `_tab_database.html`**
 
 After the sync-failures link (line 27), add:
 
@@ -1075,21 +1075,21 @@ After the sync-failures link (line 27), add:
               <a href="/admin/unresolved-events" class="btn btn-sm" style="text-decoration:none">🔗 Unresolved Events</a>
 ```
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_local_stats_integration.py -v
 ```
 Expected: All PASS.
 
-- [ ] **Step 7: Run full suite**
+- [x] **Step 7: Run full suite**
 
 ```bash
 cd backend && .venv/bin/pytest --tb=short -q
 ```
 Expected: All pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add backend/app/main.py backend/templates/admin_unresolved_events.html backend/templates/admin/_tab_database.html
@@ -1102,21 +1102,21 @@ git commit -m "feat(admin): add /admin/unresolved-events page with dismiss actio
 
 ### Task 6: Final check — linting + full test run
 
-- [ ] **Step 1: Lint**
+- [x] **Step 1: Lint**
 
 ```bash
 cd backend && .venv/bin/black app/ tests/ && .venv/bin/flake8 app/ tests/ --max-line-length=120 --count --select=E9,F63,F7,F82 --show-source
 ```
 Expected: no errors.
 
-- [ ] **Step 2: Full test suite with coverage**
+- [x] **Step 2: Full test suite with coverage**
 
 ```bash
 cd backend && .venv/bin/pytest --tb=short -q --cov=app --cov-report=term-missing
 ```
 Expected: All tests pass, no regressions.
 
-- [ ] **Step 3: Commit (if any lint fixes needed)**
+- [x] **Step 3: Commit (if any lint fixes needed)**
 
 ```bash
 git add -u && git commit -m "chore: lint fixes for local player stats feature"

@@ -1,6 +1,6 @@
 # Enhancements Plan A — Quick Wins Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add PPG column to team roster and group playoff/playout series by round in league standings.
 
@@ -28,7 +28,7 @@
 - Modify: `backend/app/services/stats_service.py` (lines ~1750–1837)
 - Test: `backend/tests/test_stats_service.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `backend/tests/test_stats_service.py` inside a new `class TestTeamRosterPPG`:
 
@@ -68,7 +68,7 @@ class TestTeamRosterPPG:
         assert result == 3.33
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_stats_service.py::TestTeamRosterPPG -v
@@ -76,7 +76,7 @@ cd backend && .venv/bin/pytest tests/test_stats_service.py::TestTeamRosterPPG -v
 
 Expected: FAIL — `ppg key missing from player dict` or `KeyError`.
 
-- [ ] **Step 3: Add ppg to the three roster.append() blocks in stats_service.py**
+- [x] **Step 3: Add ppg to the three roster.append() blocks in stats_service.py**
 
 There are three `roster.append({...})` calls in `get_team_detail` (around lines 1750, 1800, 1823). Add `"ppg"` to each one. The pattern is: `round(pts_val / gp_val, 2) if gp_val else None`.
 
@@ -139,7 +139,7 @@ roster.append(
 )
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_stats_service.py::TestTeamRosterPPG -v
@@ -147,7 +147,7 @@ cd backend && .venv/bin/pytest tests/test_stats_service.py::TestTeamRosterPPG -v
 
 Expected: 3 PASSED.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd backend && git add app/services/stats_service.py tests/test_stats_service.py
@@ -161,7 +161,7 @@ git commit -m "feat: add ppg field to team roster player dicts"
 **Files:**
 - Modify: `backend/templates/team_detail.html` (lines ~197–214)
 
-- [ ] **Step 1: Add PPG column header after PTS header**
+- [x] **Step 1: Add PPG column header after PTS header**
 
 Find the `PIM` header line (~line 198):
 ```html
@@ -173,7 +173,7 @@ Insert before it (after the PTS `</th>`):
 <th style="{{ th_ctr }}"><button @click="sort('ppg')" style="{{ btn }}">PPG<span style="font-size:.7rem;opacity:.55;" x-text="icon('ppg')"></span></button></th>
 ```
 
-- [ ] **Step 2: Add PPG cell after PTS cell**
+- [x] **Step 2: Add PPG cell after PTS cell**
 
 Find the PIM cell (~line 214):
 ```html
@@ -185,7 +185,7 @@ Insert before it (after the PTS `</td>`):
 <td style="padding:.6rem .5rem;text-align:center;color:var(--gray-500);" x-text="p.ppg != null ? p.ppg : '—'"></td>
 ```
 
-- [ ] **Step 3: Verify in browser (or run template test)**
+- [x] **Step 3: Verify in browser (or run template test)**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ -k "team" -v
@@ -193,7 +193,7 @@ cd backend && .venv/bin/pytest tests/ -k "team" -v
 
 Expected: all existing team tests PASS, no new failures.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd backend && git add templates/team_detail.html
@@ -208,7 +208,7 @@ git commit -m "feat: add PPG column to team roster table"
 - Modify: `backend/app/services/stats_service.py` (add helper before `get_playoff_series_for_game`)
 - Test: `backend/tests/test_stats_service.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `backend/tests/test_stats_service.py`:
 
@@ -266,7 +266,7 @@ class TestBuildSeriesRounds:
             assert key in s, f"Missing key {key} in series dict"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_stats_service.py::TestBuildSeriesRounds -v
@@ -274,7 +274,7 @@ cd backend && .venv/bin/pytest tests/test_stats_service.py::TestBuildSeriesRound
 
 Expected: FAIL — `ImportError: cannot import name '_build_series_rounds'`.
 
-- [ ] **Step 3: Add _build_series_rounds to stats_service.py**
+- [x] **Step 3: Add _build_series_rounds to stats_service.py**
 
 Insert this function immediately before `get_playoff_series_for_game` (around line 3669):
 
@@ -421,7 +421,7 @@ def _build_series_rounds(
 
 Note: `LeagueGroup`, `Game`, `Team` are already imported at the top of `stats_service.py`. `Optional` and `datetime` are also already imported.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_stats_service.py::TestBuildSeriesRounds -v
@@ -429,7 +429,7 @@ cd backend && .venv/bin/pytest tests/test_stats_service.py::TestBuildSeriesRound
 
 Expected: 3 PASSED.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd backend && git add app/services/stats_service.py tests/test_stats_service.py
@@ -445,7 +445,7 @@ git commit -m "feat: add _build_series_rounds helper to stats_service"
 
 The current block opens a new `db.session_scope()` per phase and builds the flat `_series_list`. Replace it entirely.
 
-- [ ] **Step 1: Replace the series-building loop in main.py**
+- [x] **Step 1: Replace the series-building loop in main.py**
 
 Find the block (around line 3346):
 ```python
@@ -491,7 +491,7 @@ Replace the entire block from `# --- Series data per phase` to `series_by_phase[
             )
 ```
 
-- [ ] **Step 2: Run existing tests to verify nothing broke**
+- [x] **Step 2: Run existing tests to verify nothing broke**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
@@ -499,7 +499,7 @@ cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
 
 Expected: all previously passing tests still PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd backend && git add app/main.py
@@ -515,7 +515,7 @@ git commit -m "refactor: use _build_series_rounds helper in league detail route"
 
 The `shownSeries` getter now returns `[{phase_name, series_list}, ...]` instead of `[{team_a_id, ...}]`. Update the Alpine data and template accordingly.
 
-- [ ] **Step 1: Add hasAnySeries computed getter to Alpine data block**
+- [x] **Step 1: Add hasAnySeries computed getter to Alpine data block**
 
 Find the `get shownSeries()` getter (~line 83):
 ```javascript
@@ -534,7 +534,7 @@ Leave `shownSeries` unchanged (still returns the phases array from `_seriesByPha
     },
 ```
 
-- [ ] **Step 2: Replace the bracket template in league_detail.html**
+- [x] **Step 2: Replace the bracket template in league_detail.html**
 
 Find the bracket section (around line 241):
 ```html
@@ -633,7 +633,7 @@ Replace the entire `<template x-if="isSeriesPhase">` block with:
       </template>
 ```
 
-- [ ] **Step 3: Run all tests**
+- [x] **Step 3: Run all tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -30
@@ -641,7 +641,7 @@ cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -30
 
 Expected: all tests PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd backend && git add templates/league_detail.html

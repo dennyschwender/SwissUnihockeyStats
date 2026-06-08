@@ -1215,12 +1215,12 @@ Should show clear per-file distribution.
 **Step 3: Smoke test checklist**
 
 Go through every tab manually:
-- [ ] Seasons: accordion opens, Index button starts job, job log streams, Set Current works
-- [ ] Scheduling: queue renders, Enable/Disable toggles, Diagnostics expand
-- [ ] Settings: save tier limits, save rendering filters, round-trip correctly
-- [ ] Database: VACUUM button logs output, DB file sizes show
-- [ ] System: gauges render, refresh updates values
-- [ ] Trends: tab loads, range buttons switch, charts render data
+- [x] Seasons: accordion opens, Index button starts job, job log streams, Set Current works
+- [x] Scheduling: queue renders, Enable/Disable toggles, Diagnostics expand
+- [x] Settings: save tier limits, save rendering filters, round-trip correctly
+- [x] Database: VACUUM button logs output, DB file sizes show
+- [x] System: gauges render, refresh updates values
+- [x] Trends: tab loads, range buttons switch, charts render data
 
 **Step 4: Final commit**
 

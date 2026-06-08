@@ -1,6 +1,6 @@
 # Enhancements Plan B — Player & Game UX Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Collapsible per-season career history for players, and a richer game timeline with score/penalty labels, structured tooltip, and horizontal-scrollable mobile view.
 
@@ -27,7 +27,7 @@
 - Modify: `backend/app/services/stats_service.py` (around line 2278–2310)
 - Test: `backend/tests/test_stats_service.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `backend/tests/test_stats_service.py`:
 
@@ -91,7 +91,7 @@ class TestCareerBySeason:
         assert len(season_2024["rows"]) == 1
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_stats_service.py::TestCareerBySeason -v
@@ -99,7 +99,7 @@ cd backend && .venv/bin/pytest tests/test_stats_service.py::TestCareerBySeason -
 
 Expected: FAIL — `AssertionError: 'career_by_season' not in result`.
 
-- [ ] **Step 3: Add career_by_season to get_player_detail**
+- [x] **Step 3: Add career_by_season to get_player_detail**
 
 In `stats_service.py`, find the block after `career.sort(...)` and the `for r in career: r.pop("_tier", None)` loop (around line 2278). After these lines and before the career totals computation, insert:
 
@@ -150,7 +150,7 @@ Then find the `result = { ... }` dict (around line 2302) and add `"career_by_sea
         }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_stats_service.py::TestCareerBySeason -v
@@ -158,7 +158,7 @@ cd backend && .venv/bin/pytest tests/test_stats_service.py::TestCareerBySeason -
 
 Expected: 4 PASSED.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd backend && git add app/services/stats_service.py tests/test_stats_service.py
@@ -172,7 +172,7 @@ git commit -m "feat: add career_by_season grouping to get_player_detail"
 **Files:**
 - Modify: `backend/templates/player_detail.html` (lines 59–118)
 
-- [ ] **Step 1: Replace the career section with collapsible Alpine rows**
+- [x] **Step 1: Replace the career section with collapsible Alpine rows**
 
 Find the entire `<!-- Season History (collapsible) -->` section (lines 59–124) and replace it with:
 
@@ -350,7 +350,7 @@ Replace with this cleaner approach:
   {% endif %}
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
@@ -358,7 +358,7 @@ cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
 
 Expected: all tests PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd backend && git add templates/player_detail.html
@@ -373,7 +373,7 @@ git commit -m "feat: collapsible per-season career history in player detail"
 - Modify: `backend/app/services/stats_service.py` (lines 2915–2947)
 - Test: `backend/tests/test_stats_service.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `backend/tests/test_stats_service.py`:
 
@@ -421,7 +421,7 @@ class TestBuildTimelineEvents:
         assert goal_ev["score"] == ""
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_stats_service.py::TestBuildTimelineEvents -v
@@ -429,7 +429,7 @@ cd backend && .venv/bin/pytest tests/test_stats_service.py::TestBuildTimelineEve
 
 Expected: FAIL — `KeyError: 'score'` or `AssertionError`.
 
-- [ ] **Step 3: Add score to goal events and minutes/infraction to penalty events**
+- [x] **Step 3: Add score to goal events and minutes/infraction to penalty events**
 
 In `build_timeline_events` (around line 2915), find the goal `events.append({...})` block and add `"score"`:
 
@@ -462,7 +462,7 @@ Find the penalty `events.append({...})` block and add `"minutes"` and `"infracti
         )
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_stats_service.py::TestBuildTimelineEvents -v
@@ -470,7 +470,7 @@ cd backend && .venv/bin/pytest tests/test_stats_service.py::TestBuildTimelineEve
 
 Expected: 4 PASSED.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd backend && git add app/services/stats_service.py tests/test_stats_service.py
@@ -484,7 +484,7 @@ git commit -m "feat: add score/minutes/infraction to build_timeline_events"
 **Files:**
 - Modify: `backend/templates/game_detail.html`
 
-- [ ] **Step 1: Update .tl-marker CSS to accommodate label text**
+- [x] **Step 1: Update .tl-marker CSS to accommodate label text**
 
 Find the `.tl-marker` CSS block (~line 310):
 ```css
@@ -542,7 +542,7 @@ Replace with:
   }
 ```
 
-- [ ] **Step 2: Add label span inside each tl-marker**
+- [x] **Step 2: Add label span inside each tl-marker**
 
 Find the event markers template block (~line 554):
 ```html
@@ -574,7 +574,7 @@ Replace with:
       </template>
 ```
 
-- [ ] **Step 3: Replace single-string tooltip with structured multi-field tooltip**
+- [x] **Step 3: Replace single-string tooltip with structured multi-field tooltip**
 
 Find the tooltip div (~line 565):
 ```html
@@ -611,7 +611,7 @@ Replace with:
       </div>
 ```
 
-- [ ] **Step 4: Update mobile CSS — show scrollable bar instead of hiding it**
+- [x] **Step 4: Update mobile CSS — show scrollable bar instead of hiding it**
 
 Find the mobile media query (~line 344):
 ```css
@@ -687,7 +687,7 @@ In the mobile media query, use:
 
 And remove `display: none` from `.tl-bar` in the mobile query (it was the line being replaced).
 
-- [ ] **Step 5: Run all tests**
+- [x] **Step 5: Run all tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
@@ -695,7 +695,7 @@ cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
 
 Expected: all tests PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd backend && git add templates/game_detail.html

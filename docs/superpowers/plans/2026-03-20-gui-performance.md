@@ -1,6 +1,6 @@
 # GUI Performance Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Cut home page and league detail page load times from 3–5s to <200ms on warm cache and ~1s on cold load.
 
@@ -31,7 +31,7 @@
 - Create: `backend/app/services/cache.py`
 - Create: `backend/tests/test_cache.py`
 
-- [ ] **Step 1: Write failing tests for the cache module**
+- [x] **Step 1: Write failing tests for the cache module**
 
 Create `backend/tests/test_cache.py`:
 
@@ -135,7 +135,7 @@ def test_thread_safety_concurrent_set_and_invalidate():
     assert errors == [], f"Thread safety errors: {errors}"
 ```
 
-- [ ] **Step 2: Run tests — verify they all fail (module does not exist)**
+- [x] **Step 2: Run tests — verify they all fail (module does not exist)**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -144,7 +144,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: `ModuleNotFoundError: No module named 'app.services.cache'`
 
-- [ ] **Step 3: Create `backend/app/services/cache.py`**
+- [x] **Step 3: Create `backend/app/services/cache.py`**
 
 ```python
 """
@@ -193,7 +193,7 @@ def invalidate_prefix(prefix: str) -> None:
             del _cache[k]
 ```
 
-- [ ] **Step 4: Run tests — all should pass**
+- [x] **Step 4: Run tests — all should pass**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -202,7 +202,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: All 8 tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats
@@ -217,11 +217,11 @@ git commit -m "feat(perf): add in-memory TTL cache module with thread safety"
 **Files:**
 - Modify: `backend/app/services/stats_service.py:1131-1231`
 
-- [ ] **Step 1: Read the current function**
+- [x] **Step 1: Read the current function**
 
 Read lines 1131–1231 of `backend/app/services/stats_service.py` to understand the exact structure before editing.
 
-- [ ] **Step 2: Replace the N+1 inner loop with a batch query**
+- [x] **Step 2: Replace the N+1 inner loop with a batch query**
 
 The existing loop (lines 1193–1231) fires one `session.query(PlayerStatistics)` per player. Replace it with a batch fetch.
 
@@ -282,7 +282,7 @@ Replace lines 1192–1231 (the `result = []` + loop + `return result`) with:
         return result
 ```
 
-- [ ] **Step 3: Run the existing test suite to verify no regressions**
+- [x] **Step 3: Run the existing test suite to verify no regressions**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -291,7 +291,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: all previously-passing tests still pass. If any test references `get_overall_top_scorers`, check it passes.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats
@@ -308,7 +308,7 @@ git commit -m "fix(perf): batch primary-team lookup in get_overall_top_scorers (
 
 `joinedload` is already imported from `sqlalchemy.orm` (check imports at top; if not present, add it).
 
-- [ ] **Step 1: Check joinedload import**
+- [x] **Step 1: Check joinedload import**
 
 Search the top of `stats_service.py` for `joinedload`. If it's not imported, add it:
 
@@ -318,7 +318,7 @@ from sqlalchemy.orm import joinedload
 
 Add after the existing `from sqlalchemy import ...` line.
 
-- [ ] **Step 2: Fix `get_league_standings` (~line 430)**
+- [x] **Step 2: Fix `get_league_standings` (~line 430)**
 
 Find where `league` is queried in this function. It will look something like:
 
@@ -337,15 +337,15 @@ league = (
 )
 ```
 
-- [ ] **Step 3: Fix `get_league_top_scorers` (~line 625)**
+- [x] **Step 3: Fix `get_league_top_scorers` (~line 625)**
 
 Same pattern — find the `session.query(League)` call and add `.options(joinedload(League.groups))`.
 
-- [ ] **Step 4: Fix `get_league_top_penalties` (~line 965)**
+- [x] **Step 4: Fix `get_league_top_penalties` (~line 965)**
 
 Same pattern.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -354,7 +354,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: all tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats
@@ -370,7 +370,7 @@ git commit -m "fix(perf): eager-load League.groups in standings and top-scorer q
 - Modify: `backend/app/models/db_models.py` (PlayerStatistics `__table_args__`)
 - Modify: `backend/app/services/database.py` (idempotent migrations)
 
-- [ ] **Step 1: Add indexes to the model**
+- [x] **Step 1: Add indexes to the model**
 
 In `backend/app/models/db_models.py`, find `PlayerStatistics.__table_args__` (currently ends around line 474). Add two new indexes:
 
@@ -387,7 +387,7 @@ In `backend/app/models/db_models.py`, find `PlayerStatistics.__table_args__` (cu
     )
 ```
 
-- [ ] **Step 2: Add idempotent migrations in `database.py`**
+- [x] **Step 2: Add idempotent migrations in `database.py`**
 
 In `backend/app/services/database.py`, find where existing index migrations are done (look for `CREATE INDEX IF NOT EXISTS` or similar). If none exist for indexes (only column migrations exist), add a new block. The pattern uses `CREATE INDEX IF NOT EXISTS` which is natively idempotent in SQLite:
 
@@ -405,7 +405,7 @@ Find the `_run_migrations` method (or equivalent) and add after the existing mig
         ))
 ```
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -414,7 +414,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: all tests pass. The `:memory:` SQLite in tests will also create these indexes on startup.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats
@@ -431,7 +431,7 @@ git commit -m "feat(perf): add composite indexes on player_statistics for scorer
 
 All four functions are in `stats_service.py`. The cache import goes at the top; each function gets a cache check at the start and a `set_cached` call before returning.
 
-- [ ] **Step 1: Add cache import to `stats_service.py`**
+- [x] **Step 1: Add cache import to `stats_service.py`**
 
 At the top of `stats_service.py`, after the existing imports, add:
 
@@ -439,7 +439,7 @@ At the top of `stats_service.py`, after the existing imports, add:
 from app.services.cache import get_cached, set_cached
 ```
 
-- [ ] **Step 2: Wrap `get_overall_top_scorers` (lines ~1131)**
+- [x] **Step 2: Wrap `get_overall_top_scorers` (lines ~1131)**
 
 Find the function. After the `def` line and any docstring, insert cache get/set:
 
@@ -455,7 +455,7 @@ def get_overall_top_scorers(season_id: Optional[int] = None, limit: int = 20) ->
     return results
 ```
 
-- [ ] **Step 3: Wrap `get_league_standings` (lines ~421)**
+- [x] **Step 3: Wrap `get_league_standings` (lines ~421)**
 
 ```python
 def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = None) -> list[dict]:
@@ -471,7 +471,7 @@ def get_league_standings(db_league_id: int, only_group_ids: list[int] | None = N
 
 Note: `get_league_standings` has no `season_id` parameter — the `db_league_id` is the League table primary key which already scopes to one season (each season has its own League rows). The `only_group_ids` list is normalised to `tuple(sorted(...))` so call order doesn't matter.
 
-- [ ] **Step 4: Wrap `get_league_top_scorers` (lines ~612)**
+- [x] **Step 4: Wrap `get_league_top_scorers` (lines ~612)**
 
 Note: the spec's cache key table incorrectly lists `season_id` as a parameter for this function — it does not exist in the actual signature. The correct cache key uses only `db_league_id` and `limit`. The league's DB primary key already encodes the season.
 
@@ -486,7 +486,7 @@ def get_league_top_scorers(db_league_id: int, limit: int = 20) -> list[dict]:
     return results
 ```
 
-- [ ] **Step 5: Wrap `get_league_top_penalties` (lines ~960)**
+- [x] **Step 5: Wrap `get_league_top_penalties` (lines ~960)**
 
 Note: same situation as `get_league_top_scorers` — no `season_id` param; cache key uses only `db_league_id` and `limit`.
 
@@ -501,7 +501,7 @@ def get_league_top_penalties(db_league_id: int, limit: int = 100) -> list[dict]:
     return results
 ```
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -510,7 +510,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: all tests pass. The cache will be populated during test runs but TTL is irrelevant since tests complete fast.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats
@@ -527,7 +527,7 @@ git commit -m "feat(perf): wrap expensive stats queries with 1h TTL in-memory ca
 
 When sync jobs complete, the TTL cache should be invalidated so stale data is not served for the full hour. Two insertion points.
 
-- [ ] **Step 1: Add cache import to `data_indexer.py`**
+- [x] **Step 1: Add cache import to `data_indexer.py`**
 
 At the top of `data_indexer.py`, after the existing imports, add:
 
@@ -535,7 +535,7 @@ At the top of `data_indexer.py`, after the existing imports, add:
 from app.services.cache import invalidate_prefix
 ```
 
-- [ ] **Step 2: Invalidate after `index_games_for_league` completes**
+- [x] **Step 2: Invalidate after `index_games_for_league` completes**
 
 Find the end of `index_games_for_league` in `data_indexer.py` (around line 1684). Before `return count`, add:
 
@@ -549,7 +549,7 @@ Find the end of `index_games_for_league` in `data_indexer.py` (around line 1684)
 
 Note: we invalidate all standings/scorers (not just this league_id) since the cache is small and this is simpler and safer.
 
-- [ ] **Step 3: Invalidate after `index_player_stats_for_season` completes**
+- [x] **Step 3: Invalidate after `index_player_stats_for_season` completes**
 
 Find the end of `index_player_stats_for_season` (around line 1238). Before the final `return`, add:
 
@@ -558,7 +558,7 @@ Find the end of `index_player_stats_for_season` (around line 1238). Before the f
         invalidate_prefix("top_scorers")
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -567,7 +567,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: all tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats
@@ -579,7 +579,7 @@ git commit -m "feat(perf): invalidate query cache after game and player stats sy
 
 ## Task 7: Verify end-to-end and run full test suite
 
-- [ ] **Step 1: Run full test suite with coverage**
+- [x] **Step 1: Run full test suite with coverage**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -588,7 +588,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: all tests pass, no regressions.
 
-- [ ] **Step 2: Lint**
+- [x] **Step 2: Lint**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -597,7 +597,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: no errors.
 
-- [ ] **Step 3: Final commit if any lint fixes were needed**
+- [x] **Step 3: Final commit if any lint fixes were needed**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats

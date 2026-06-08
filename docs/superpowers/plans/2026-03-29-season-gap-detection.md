@@ -1,6 +1,6 @@
 # Season Gap Detection Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** When `min_season` is configured, automatically force `index_seasons` whenever seasons in the range `[min_season, current_season]` are missing from the DB.
 
@@ -17,7 +17,7 @@
 
 Currently `_launch_and_return_id` always passes `force=False` to `self._submit`. We need it to accept a `force` argument so the gap-fill path can bypass the 30-day cache.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `backend/tests/test_scheduler.py` inside the existing test file (after the last test class):
 
@@ -48,7 +48,7 @@ class TestLaunchAndReturnIdForce:
         assert captured["force"] is True
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_scheduler.py::TestLaunchAndReturnIdForce -v
@@ -56,7 +56,7 @@ cd backend && .venv/bin/pytest tests/test_scheduler.py::TestLaunchAndReturnIdFor
 
 Expected: `FAILED` — `TypeError: _launch_and_return_id() got an unexpected keyword argument 'force'`
 
-- [ ] **Step 3: Add `force` parameter to `_launch_and_return_id`**
+- [x] **Step 3: Add `force` parameter to `_launch_and_return_id`**
 
 In `backend/app/services/scheduler.py`, find:
 
@@ -86,7 +86,7 @@ Replace with:
             await self._submit(job_id, job.season, job.task, force, job.max_tier)
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_scheduler.py::TestLaunchAndReturnIdForce -v
@@ -94,7 +94,7 @@ cd backend && .venv/bin/pytest tests/test_scheduler.py::TestLaunchAndReturnIdFor
 
 Expected: `PASSED`
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_scheduler.py -v
@@ -102,7 +102,7 @@ cd backend && .venv/bin/pytest tests/test_scheduler.py -v
 
 Expected: all pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd backend && git add app/services/scheduler.py tests/test_scheduler.py
@@ -116,7 +116,7 @@ git commit -m "feat: thread force flag through _launch_and_return_id"
 **Files:**
 - Modify: `backend/app/services/scheduler.py` (method `_refresh_queue`)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `backend/tests/test_scheduler.py`:
 
@@ -218,7 +218,7 @@ class TestSeasonGapDetection:
         assert len(forced_seasons) == 0
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_scheduler.py::TestSeasonGapDetection -v
@@ -226,7 +226,7 @@ cd backend && .venv/bin/pytest tests/test_scheduler.py::TestSeasonGapDetection -
 
 Expected: all 3 `FAILED` (gap detection logic doesn't exist yet).
 
-- [ ] **Step 3: Add gap detection to `_refresh_queue`**
+- [x] **Step 3: Add gap detection to `_refresh_queue`**
 
 In `backend/app/services/scheduler.py`, find the end of the `with db_service.session_scope() as session:` block inside `_refresh_queue` — just before the closing `except Exception` line of the first try block. The block ends after the async yield loop:
 
@@ -278,7 +278,7 @@ Insert the gap detection block **inside** the `with session_scope()` block, imme
             logger.error("[scheduler] refresh_queue error: %s", exc, exc_info=True)
 ```
 
-- [ ] **Step 4: Run gap detection tests**
+- [x] **Step 4: Run gap detection tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_scheduler.py::TestSeasonGapDetection -v
@@ -286,7 +286,7 @@ cd backend && .venv/bin/pytest tests/test_scheduler.py::TestSeasonGapDetection -
 
 Expected: all 3 `PASSED`.
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_scheduler.py -v
@@ -294,7 +294,7 @@ cd backend && .venv/bin/pytest tests/test_scheduler.py -v
 
 Expected: all pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd backend && git add app/services/scheduler.py tests/test_scheduler.py
@@ -305,7 +305,7 @@ git commit -m "feat: force index_seasons when configured seasons are missing fro
 
 ### Task 3: Verify on the running instance
 
-- [ ] **Step 1: Deploy**
+- [x] **Step 1: Deploy**
 
 On `pi4desk`:
 
@@ -314,7 +314,7 @@ cd ~/dockerimages/SwissUnihockeyStats
 docker compose build --no-cache && docker compose up -d --force-recreate
 ```
 
-- [ ] **Step 2: Confirm gap detection fires**
+- [x] **Step 2: Confirm gap detection fires**
 
 ```bash
 docker compose logs -f | grep "season gap detected"
@@ -325,6 +325,6 @@ Expected within one scheduler tick (~60 s): a log line like:
 [scheduler] season gap detected (missing {2019, 2020, ...}), forcing index_seasons
 ```
 
-- [ ] **Step 3: Confirm seasons appear in DB**
+- [x] **Step 3: Confirm seasons appear in DB**
 
 Open the admin Seasons view at `https://swissunihockeystats.mennylenderr.ch/admin` and confirm the previously-missing seasons now appear after the `index_seasons (gap fill)` job completes.

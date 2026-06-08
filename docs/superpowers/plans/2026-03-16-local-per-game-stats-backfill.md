@@ -1,6 +1,6 @@
 # Local Per-Game Stats Backfill (T1–T3) Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace `player_game_stats_t1/t2/t3` API jobs with local derivation of `GamePlayer.goals/assists/penalty_minutes` from `GameEvent` rows, run as Phase 0 inside `compute_player_stats_for_season`.
 
@@ -53,7 +53,7 @@ _BUCKET_MINUTES = {"2min": 2, "5min": 5, "10min": 10, "match": 5}
 
 The function returns the count of `GamePlayer` rows updated.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `backend/tests/test_local_stats_aggregator.py` (append after existing tests):
 
@@ -204,7 +204,7 @@ def test_backfill_no_complete_games_returns_zero(engine, mock_db):
     assert count == 0
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests/test_local_stats_aggregator.py -k "backfill" -v
@@ -212,7 +212,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests
 
 Expected: FAIL — `backfill_game_player_stats_from_events` not imported.
 
-- [ ] **Step 3: Implement `backfill_game_player_stats_from_events`**
+- [x] **Step 3: Implement `backfill_game_player_stats_from_events`**
 
 Add to `backend/app/services/local_stats_aggregator.py` after the existing `_pen_bucket` function:
 
@@ -412,7 +412,7 @@ def backfill_game_player_stats_from_events(
     return updated
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests/test_local_stats_aggregator.py -k "backfill" -v
@@ -422,7 +422,7 @@ Expected: All backfill tests PASS.
 
 If `test_backfill_sets_goals_and_assists` fails with a player_id mismatch, verify the seed uses `api_id=10` → `player_id=1000` and `1001`. Adjust the `filter_by(player_id=...)` calls in the test if needed.
 
-- [ ] **Step 5: Run full aggregator test suite**
+- [x] **Step 5: Run full aggregator test suite**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests/test_local_stats_aggregator.py -v
@@ -430,7 +430,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests
 
 Expected: All 11 existing tests + new backfill tests pass.
 
-- [ ] **Step 6: Run full suite**
+- [x] **Step 6: Run full suite**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest --tb=short -q
@@ -438,7 +438,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest --tb=
 
 Expected: All tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats && git add backend/app/services/local_stats_aggregator.py backend/tests/test_local_stats_aggregator.py && git commit -m "feat(stats): add backfill_game_player_stats_from_events — derive per-game G/A/PIM from events for T1-T3"
@@ -463,7 +463,7 @@ cd /home/denny/Development/SwissUnihockeyStats && git add backend/app/services/l
 
 In `scheduler.py`, remove the three policy dicts for `player_game_stats_t1`, `player_game_stats_t2`, `player_game_stats_t3` (lines ~263-300). Also update `player_game_stats_t4` to remove `"requires": "player_game_stats_t3"` since that policy no longer exists.
 
-- [ ] **Step 1: Write tests**
+- [x] **Step 1: Write tests**
 
 Append to `backend/tests/test_local_stats_integration.py`:
 
@@ -520,7 +520,7 @@ def test_player_game_stats_t1_t2_t3_not_in_scheduler_policies():
     assert "player_game_stats_t4" in policy_names
 ```
 
-- [ ] **Step 2: Run to verify failures**
+- [x] **Step 2: Run to verify failures**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests/test_local_stats_integration.py -k "backfill_first or game_stats_skip or t1_t2_t3_not" -v
@@ -528,7 +528,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests
 
 Expected: FAIL.
 
-- [ ] **Step 3: Update `compute_player_stats_for_season` in `data_indexer.py`**
+- [x] **Step 3: Update `compute_player_stats_for_season` in `data_indexer.py`**
 
 Find the method and update the `try` block to call backfill first:
 
@@ -556,7 +556,7 @@ Find the method and update the `try` block to call backfill first:
             raise
 ```
 
-- [ ] **Step 4: Add guard to `index_player_game_stats_for_season` in `data_indexer.py`**
+- [x] **Step 4: Add guard to `index_player_game_stats_for_season` in `data_indexer.py`**
 
 After the block that sets `entity_type` and `entity_id` (and before the `_should_update` check), add:
 
@@ -571,7 +571,7 @@ After the block that sets `entity_type` and `entity_id` (and before the `_should
             return 0
 ```
 
-- [ ] **Step 5: Remove T1/T2/T3 policies from `scheduler.py`**
+- [x] **Step 5: Remove T1/T2/T3 policies from `scheduler.py`**
 
 Read the file, then delete the three policy dicts for `player_game_stats_t1`, `player_game_stats_t2`, `player_game_stats_t3` (the blocks with `"name": "player_game_stats_t1"`, `"player_game_stats_t2"`, `"player_game_stats_t3"`).
 
@@ -579,7 +579,7 @@ Also update `player_game_stats_t4` — remove `"requires": "player_game_stats_t3
 
 Also remove the comment above the removed block if it only refers to the removed policies (check context).
 
-- [ ] **Step 6: Run the new tests**
+- [x] **Step 6: Run the new tests**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests/test_local_stats_integration.py -v
@@ -587,7 +587,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest tests
 
 Expected: All pass.
 
-- [ ] **Step 7: Run full suite**
+- [x] **Step 7: Run full suite**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest --tb=short -q
@@ -595,7 +595,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest --tb=
 
 Expected: All tests pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats && git add backend/app/services/data_indexer.py backend/app/services/scheduler.py backend/tests/test_local_stats_integration.py && git commit -m "feat(indexer): wire per-game backfill into compute_player_stats; remove T1-T3 player_game_stats API jobs"
@@ -607,7 +607,7 @@ cd /home/denny/Development/SwissUnihockeyStats && git add backend/app/services/d
 
 ### Task 3: Lint + full test run
 
-- [ ] **Step 1: Lint**
+- [x] **Step 1: Lint**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/black app/ tests/ && .venv/bin/flake8 app/ tests/ --max-line-length=120 --count --select=E9,F63,F7,F82 --show-source --statistics
@@ -615,7 +615,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/black app/ t
 
 Fix any errors.
 
-- [ ] **Step 2: Full test suite**
+- [x] **Step 2: Full test suite**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest --tb=short -q
@@ -623,7 +623,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend && .venv/bin/pytest --tb=
 
 Expected: All tests pass.
 
-- [ ] **Step 3: Commit lint fixes (if needed)**
+- [x] **Step 3: Commit lint fixes (if needed)**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats && git add -u && git commit -m "chore: lint fixes for per-game stats backfill"

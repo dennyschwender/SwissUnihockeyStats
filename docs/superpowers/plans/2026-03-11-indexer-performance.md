@@ -1,6 +1,6 @@
 # Indexer Performance Improvements Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Reduce indexing job runtimes by fixing two structural bottlenecks and exposing a tunable concurrency setting in the admin panel.
 
@@ -21,7 +21,7 @@
 
 ---
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 ```python
 # tests/test_scheduler.py  — add these tests
@@ -61,7 +61,7 @@ def test_player_game_stats_workers_reload_config(tmp_path, monkeypatch):
     assert sched._player_game_stats_workers == 15
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_scheduler.py::test_player_game_stats_workers_persists -v
@@ -69,7 +69,7 @@ cd backend && .venv/bin/pytest tests/test_scheduler.py::test_player_game_stats_w
 
 Expected: `AttributeError: 'Scheduler' object has no attribute 'set_player_game_stats_workers'`
 
-- [ ] **Step 3: Implement in `scheduler.py`**
+- [x] **Step 3: Implement in `scheduler.py`**
 
 All config attributes are initialised inside `_load_state()` / its `except` branch, not in `__init__`. Follow the same pattern — do NOT add a separate init in `__init__`.
 
@@ -102,7 +102,7 @@ def set_player_game_stats_workers(self, n: int):
     logger.info("[scheduler] player_game_stats_workers set to %d", self._player_game_stats_workers)
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 .venv/bin/pytest tests/test_scheduler.py::test_player_game_stats_workers_persists -v
@@ -110,7 +110,7 @@ def set_player_game_stats_workers(self, n: int):
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/services/scheduler.py backend/tests/test_scheduler.py
@@ -126,7 +126,7 @@ git commit -m "feat(scheduler): add player_game_stats_workers config field"
 
 ---
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 ```python
 # tests/test_admin_indexing.py — add this test
@@ -141,7 +141,7 @@ def test_player_game_stats_workers_endpoint(admin_client):
     assert data["player_game_stats_workers"] == 8
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 .venv/bin/pytest tests/test_admin_indexing.py::test_player_game_stats_workers_endpoint -v
@@ -149,7 +149,7 @@ def test_player_game_stats_workers_endpoint(admin_client):
 
 Expected: FAIL (404 or 400 — action not recognised)
 
-- [ ] **Step 3: Add endpoint branch and wire `_run()`**
+- [x] **Step 3: Add endpoint branch and wire `_run()`**
 
 In `main.py` after the `max_concurrent` block (line 1485), add:
 ```python
@@ -171,7 +171,7 @@ pgstats_n = await asyncio.to_thread(
 )
 ```
 
-- [ ] **Step 4: Run test**
+- [x] **Step 4: Run test**
 
 ```bash
 .venv/bin/pytest tests/test_admin_indexing.py::test_player_game_stats_workers_endpoint -v
@@ -179,7 +179,7 @@ pgstats_n = await asyncio.to_thread(
 
 Expected: PASS
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 ```bash
 .venv/bin/pytest -q --ignore=tests/test_api_endpoints.py
@@ -187,7 +187,7 @@ Expected: PASS
 
 Expected: same pass/fail count as before (12 pre-existing failures, all others pass)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/main.py
@@ -203,19 +203,19 @@ git commit -m "feat: wire player_game_stats_workers through _run() and admin end
 
 ---
 
-- [ ] **Step 1: Find the template**
+- [x] **Step 1: Find the template**
 
 ```bash
 grep -r "max_concurrent" backend/templates/ -l
 ```
 
-- [ ] **Step 2: Add the input**
+- [x] **Step 2: Add the input**
 
 Locate the `max_concurrent` input element. Directly below it, add an analogous input for `player_game_stats_workers`. Follow the exact same HTML pattern and JavaScript wiring used for `max_concurrent`. The endpoint call should POST `{"action": "player_game_stats_workers", "value": <int>}` to `/admin/api/scheduler`.
 
 Label: `"API workers (player stats)"`. Add a short help text: `"Thread pool size for player_game_stats Phase 1 API fetches (default 10, max ≈ 20)"`.
 
-- [ ] **Step 3: Verify visually**
+- [x] **Step 3: Verify visually**
 
 Start the dev server and open the admin scheduler settings. Confirm the new input appears, can be edited, and the value persists after page reload.
 
@@ -223,7 +223,7 @@ Start the dev server and open the admin scheduler settings. Confirm the new inpu
 cd backend && .venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add backend/templates/
@@ -241,7 +241,7 @@ git commit -m "feat(admin): add player_game_stats workers input to scheduler set
 
 ---
 
-- [ ] **Step 1: Change constants**
+- [x] **Step 1: Change constants**
 
 In `main.py` line 1984:
 ```python
@@ -253,7 +253,7 @@ In `main.py` line 2084:
 _EV_BATCH = 6   # was 2
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 ```bash
 .venv/bin/pytest -q --ignore=tests/test_api_endpoints.py
@@ -261,7 +261,7 @@ _EV_BATCH = 6   # was 2
 
 Expected: same pass/fail as baseline
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add backend/app/main.py
@@ -281,7 +281,7 @@ The goal is to separate the API call from the DB write so Phase 1 can run the AP
 
 ---
 
-- [ ] **Step 1: Write test for the new helper**
+- [x] **Step 1: Write test for the new helper**
 
 ```python
 # tests/test_player_stats_phase2.py (new file)
@@ -332,7 +332,7 @@ def test_apply_player_stats_result_upserts_rows():
     session.add.assert_called_once()
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 .venv/bin/pytest tests/test_player_stats_phase2.py -v
@@ -340,7 +340,7 @@ def test_apply_player_stats_result_upserts_rows():
 
 Expected: `AttributeError: _apply_player_stats_result`
 
-- [ ] **Step 3: Extract `_apply_player_stats_result`**
+- [x] **Step 3: Extract `_apply_player_stats_result`**
 
 Cut lines 802–921 from `_upsert_player_stats_from_api` (everything after the API call, starting from `regions = stats_data.get(...)`) and move them into a new method:
 
@@ -381,7 +381,7 @@ def _upsert_player_stats_from_api(self, person_id, season_id, season_label, sess
     return self._apply_player_stats_result(session, person_id, stats_data, season_id, season_label, staged), False
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 .venv/bin/pytest tests/test_player_stats_phase2.py tests/test_player_stats_skip_logic.py -v
@@ -389,7 +389,7 @@ def _upsert_player_stats_from_api(self, person_id, season_id, season_label, sess
 
 Expected: all pass
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/services/data_indexer.py backend/tests/test_player_stats_phase2.py
@@ -405,7 +405,7 @@ git commit -m "refactor: extract _apply_player_stats_result for Phase 1/2 split"
 
 ---
 
-- [ ] **Step 1: Write test**
+- [x] **Step 1: Write test**
 
 ```python
 # tests/test_player_stats_phase2.py — add:
@@ -443,7 +443,7 @@ def test_fetch_player_stats_raw_marks_5xx_as_api_error():
     assert result.api_error is True
 ```
 
-- [ ] **Step 2: Run to verify fails**
+- [x] **Step 2: Run to verify fails**
 
 ```bash
 .venv/bin/pytest tests/test_player_stats_phase2.py::test_fetch_player_stats_raw_returns_result -v
@@ -451,7 +451,7 @@ def test_fetch_player_stats_raw_marks_5xx_as_api_error():
 
 Expected: `AttributeError`
 
-- [ ] **Step 3: Add dataclass and method**
+- [x] **Step 3: Add dataclass and method**
 
 Near line 28 (after `_PlayerGameStatsFetchResult`), add:
 ```python
@@ -480,7 +480,7 @@ def _fetch_player_stats_raw(self, person_id: int) -> "_PlayerStatsFetchResult":
         return _PlayerStatsFetchResult(player_id=person_id, api_error=is_5xx)
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 .venv/bin/pytest tests/test_player_stats_phase2.py -v
@@ -488,7 +488,7 @@ def _fetch_player_stats_raw(self, person_id: int) -> "_PlayerStatsFetchResult":
 
 Expected: all pass
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/services/data_indexer.py backend/tests/test_player_stats_phase2.py
@@ -504,7 +504,7 @@ git commit -m "feat: add _PlayerStatsFetchResult and _fetch_player_stats_raw"
 
 ---
 
-- [ ] **Step 1: Write integration test**
+- [x] **Step 1: Write integration test**
 
 ```python
 # tests/test_player_stats_phase2.py — add:
@@ -559,7 +559,7 @@ def test_player_stats_phase2_uses_batch_sessions():
     assert call_count == expected
 ```
 
-- [ ] **Step 2: Run to verify fails**
+- [x] **Step 2: Run to verify fails**
 
 ```bash
 .venv/bin/pytest tests/test_player_stats_phase2.py::test_player_stats_phase2_uses_batch_sessions -v
@@ -567,7 +567,7 @@ def test_player_stats_phase2_uses_batch_sessions():
 
 Expected: `AttributeError: _run_player_stats_phase2`
 
-- [ ] **Step 3: Add `_run_player_stats_phase2` and `_PLAYER_STATS_PHASE2_BATCH_SIZE`**
+- [x] **Step 3: Add `_run_player_stats_phase2` and `_PLAYER_STATS_PHASE2_BATCH_SIZE`**
 
 Add constant near `_PHASE2_BATCH_SIZE`:
 ```python
@@ -639,7 +639,7 @@ def _run_player_stats_phase2(
     return total
 ```
 
-- [ ] **Step 4: Run test**
+- [x] **Step 4: Run test**
 
 ```bash
 .venv/bin/pytest tests/test_player_stats_phase2.py -v
@@ -647,7 +647,7 @@ def _run_player_stats_phase2(
 
 Expected: all pass
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/services/data_indexer.py backend/tests/test_player_stats_phase2.py
@@ -663,7 +663,7 @@ git commit -m "feat: add _run_player_stats_phase2 with batched session writes"
 
 ---
 
-- [ ] **Step 1: Write integration test for the full function**
+- [x] **Step 1: Write integration test for the full function**
 
 ```python
 # tests/test_player_stats_phase2.py — add:
@@ -706,7 +706,7 @@ def test_index_player_stats_for_season_uses_parallel_phase1():
     assert result == 3
 ```
 
-- [ ] **Step 2: Run to verify fails**
+- [x] **Step 2: Run to verify fails**
 
 ```bash
 .venv/bin/pytest tests/test_player_stats_phase2.py::test_index_player_stats_for_season_uses_parallel_phase1 -v
@@ -714,7 +714,7 @@ def test_index_player_stats_for_season_uses_parallel_phase1():
 
 Expected: FAIL (still uses old serial loop)
 
-- [ ] **Step 3: Replace body of `index_player_stats_for_season`**
+- [x] **Step 3: Replace body of `index_player_stats_for_season`**
 
 Replace lines 975–1081 (the `try/except` block that holds the big session) with:
 
@@ -856,7 +856,7 @@ Replace lines 975–1081 (the `try/except` block that holds the big session) wit
 
 Note: the outer `try/except Exception` block wrapping the old session is now gone. Errors propagate naturally (matching the player_game_stats pattern).
 
-- [ ] **Step 4: Run all targeted tests**
+- [x] **Step 4: Run all targeted tests**
 
 ```bash
 .venv/bin/pytest tests/test_player_stats_phase2.py tests/test_player_stats_skip_logic.py tests/test_data_indexer_comprehensive.py -v
@@ -864,7 +864,7 @@ Note: the outer `try/except Exception` block wrapping the old session is now gon
 
 Expected: all pass
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 ```bash
 .venv/bin/pytest -q --ignore=tests/test_api_endpoints.py
@@ -872,7 +872,7 @@ Expected: all pass
 
 Expected: same pass/fail baseline (12 pre-existing failures, all others pass + new tests green)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/services/data_indexer.py backend/tests/test_player_stats_phase2.py
@@ -889,17 +889,17 @@ means restarts skip already-written players."
 
 ## Final: Deploy and verify
 
-- [ ] Push to remote and deploy to pi4desk
+- [x] Push to remote and deploy to pi4desk
 
 ```bash
 git push origin main
 ssh pi4desk "cd /home/denny/dockerimages/SwissUnihockeyStats && git pull && docker build --no-cache -t swissunihockey:latest . && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate"
 ```
 
-- [ ] Enable scheduler in admin panel, trigger a player_game_stats run, confirm logs show new worker count
+- [x] Enable scheduler in admin panel, trigger a player_game_stats run, confirm logs show new worker count
 
 ```bash
 ssh pi4desk "docker logs swissunihockey-prod --follow 2>&1 | grep -E '(workers|player_stats|player_game_stats)'"
 ```
 
-- [ ] Confirm no `database is locked` errors appear when multiple jobs run concurrently
+- [x] Confirm no `database is locked` errors appear when multiple jobs run concurrently

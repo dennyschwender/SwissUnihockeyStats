@@ -1,6 +1,6 @@
 # Game Lifecycle Jobs Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace blind repeated polling of all game data with a lifecycle-aware system: upcoming games polled 3×/day for schedule changes, finished games polled until fully complete then frozen forever.
 
@@ -20,7 +20,7 @@
 - Modify: `backend/app/models/db_models.py`
 - Test: `backend/tests/test_game_lifecycle_model.py`
 
-- [ ] **Step 1: Write a failing test asserting the new columns exist**
+- [x] **Step 1: Write a failing test asserting the new columns exist**
 
 ```python
 # backend/tests/test_game_lifecycle_model.py
@@ -73,14 +73,14 @@ def test_game_completeness_status_defaults_to_upcoming(app):
         assert g.give_up_at is None
 ```
 
-- [ ] **Step 2: Run test to confirm it fails**
+- [x] **Step 2: Run test to confirm it fails**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_game_lifecycle_model.py -v
 ```
 Expected: `FAILED` — columns don't exist yet.
 
-- [ ] **Step 3: Add new columns to `Game` and `GameSyncFailure` table to `db_models.py`**
+- [x] **Step 3: Add new columns to `Game` and `GameSyncFailure` table to `db_models.py`**
 
 In `backend/app/models/db_models.py`, after `last_events_update` (line 208), add to the `Game` class:
 
@@ -130,14 +130,14 @@ class GameSyncFailure(Base):
 
 Make sure `GameSyncFailure` is imported wherever `Game` is imported from `db_models`.
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_game_lifecycle_model.py -v
 ```
 Expected: `PASSED` (3 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/models/db_models.py backend/tests/test_game_lifecycle_model.py
@@ -158,7 +158,7 @@ The migration runs in `_run_sqlite_migrations()`. It must:
 3. CREATE INDEX `idx_game_completeness_status` (if absent)
 4. Backfill `completeness_status` for existing finished games (one-time)
 
-- [ ] **Step 1: Write failing tests for migration backfill logic**
+- [x] **Step 1: Write failing tests for migration backfill logic**
 
 Add to `backend/tests/test_game_lifecycle_model.py`:
 
@@ -261,14 +261,14 @@ def test_migration_sets_abandoned_for_old_finished_games_without_events(app):
         assert g.completeness_status == "abandoned"
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_game_lifecycle_model.py::test_migration_sets_upcoming_for_scheduled_games -v
 ```
 Expected: `FAILED` — `_backfill_completeness_status` doesn't exist.
 
-- [ ] **Step 3: Add migration SQL + `_backfill_completeness_status()` to `database.py`**
+- [x] **Step 3: Add migration SQL + `_backfill_completeness_status()` to `database.py`**
 
 Inside `_run_sqlite_migrations()` (after the existing migrations block), add:
 
@@ -391,21 +391,21 @@ def _backfill_completeness_status(self):
 
 Call `self._backfill_completeness_status()` at the very end of `_run_sqlite_migrations()`.
 
-- [ ] **Step 4: Run all migration tests**
+- [x] **Step 4: Run all migration tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_game_lifecycle_model.py -v
 ```
 Expected: all `PASSED`.
 
-- [ ] **Step 5: Run full test suite to check no regressions**
+- [x] **Step 5: Run full test suite to check no regressions**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -30
 ```
 Expected: all existing tests still pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/services/database.py backend/tests/test_game_lifecycle_model.py
@@ -422,7 +422,7 @@ git commit -m "feat(db): add idempotent migration for game lifecycle columns and
 - Create: `backend/app/services/game_completeness.py`
 - Test: `backend/tests/test_game_completeness.py`
 
-- [ ] **Step 1: Write failing tests for `_is_game_complete` and `_resolve_game_tier`**
+- [x] **Step 1: Write failing tests for `_is_game_complete` and `_resolve_game_tier`**
 
 ```python
 # backend/tests/test_game_completeness.py
@@ -616,14 +616,14 @@ def test_events_and_best_players_are_checked_independently():
     assert "best_players" not in missing
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_game_completeness.py -v 2>&1 | head -20
 ```
 Expected: `ImportError` — module doesn't exist yet.
 
-- [ ] **Step 3: Create `backend/app/services/game_completeness.py`**
+- [x] **Step 3: Create `backend/app/services/game_completeness.py`**
 
 ```python
 """Game completeness: tier-aware rules for when a finished game is fully indexed."""
@@ -734,14 +734,14 @@ def _is_game_complete(
     return (len(missing) == 0, missing)
 ```
 
-- [ ] **Step 4: Run completeness tests**
+- [x] **Step 4: Run completeness tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_game_completeness.py -v
 ```
 Expected: all `PASSED`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/services/game_completeness.py backend/tests/test_game_completeness.py
@@ -760,7 +760,7 @@ git commit -m "feat(completeness): add tier-aware game completeness service"
 
 This method reuses the existing `index_games_for_league` (which already updates game metadata) and afterwards flips any games that have become `finished` from `upcoming` → `post_game`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```python
 # backend/tests/test_game_lifecycle_indexer.py
@@ -882,14 +882,14 @@ def test_index_upcoming_games_does_not_flip_complete_games(app):
         )
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_game_lifecycle_indexer.py -v 2>&1 | head -20
 ```
 Expected: `AttributeError` — `index_upcoming_games` doesn't exist.
 
-- [ ] **Step 3: Add `index_upcoming_games` to `DataIndexer` (append near existing `index_games_for_league`)**
+- [x] **Step 3: Add `index_upcoming_games` to `DataIndexer` (append near existing `index_games_for_league`)**
 
 In `data_indexer.py`, add after `index_games_for_league`:
 
@@ -1009,14 +1009,14 @@ def _get_league_groups_for_season(self, season_id: int) -> list[dict]:
     return result
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_game_lifecycle_indexer.py::test_index_upcoming_games_flips_finished_game_to_post_game tests/test_game_lifecycle_indexer.py::test_index_upcoming_games_skips_complete_games -v
 ```
 Expected: both `PASSED`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/services/data_indexer.py backend/tests/test_game_lifecycle_indexer.py
@@ -1031,7 +1031,7 @@ git commit -m "feat(indexer): add index_upcoming_games method"
 - Modify: `backend/app/services/data_indexer.py`
 - Modify: `backend/tests/test_game_lifecycle_indexer.py`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `backend/tests/test_game_lifecycle_indexer.py`:
 
@@ -1159,14 +1159,14 @@ def test_manual_retry_resets_game_to_post_game(app):
         assert failure.retried_at is not None
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_game_lifecycle_indexer.py -k "post_game" -v 2>&1 | head -20
 ```
 Expected: `AttributeError` — `index_post_game_completion` doesn't exist.
 
-- [ ] **Step 3: Add `index_post_game_completion` to `DataIndexer`**
+- [x] **Step 3: Add `index_post_game_completion` to `DataIndexer`**
 
 In `data_indexer.py`, add after `index_upcoming_games`:
 
@@ -1295,21 +1295,21 @@ def index_post_game_completion(self, season_id: int) -> int:
     return transitioned
 ```
 
-- [ ] **Step 4: Run indexer tests**
+- [x] **Step 4: Run indexer tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_game_lifecycle_indexer.py -v
 ```
 Expected: all `PASSED`.
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ --tb=short 2>&1 | tail -20
 ```
 Expected: no regressions.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/services/data_indexer.py backend/tests/test_game_lifecycle_indexer.py
@@ -1328,7 +1328,7 @@ git commit -m "feat(indexer): add index_post_game_completion with abandon + manu
 
 Replace the `games`, `game_lineups`, and `game_events` policies with three `upcoming_games_*` policies and one `post_game_completion` policy.
 
-- [ ] **Step 1: Write failing tests for new policies**
+- [x] **Step 1: Write failing tests for new policies**
 
 ```python
 # backend/tests/test_game_lifecycle_scheduler.py
@@ -1372,14 +1372,14 @@ def test_post_game_completion_has_no_run_at_hour():
     assert p["max_age"] == timedelta(hours=2)
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_game_lifecycle_scheduler.py -v
 ```
 Expected: `FAILED` — old policies still exist, new ones absent.
 
-- [ ] **Step 3: Edit `POLICIES` in `scheduler.py`**
+- [x] **Step 3: Edit `POLICIES` in `scheduler.py`**
 
 Find and **remove** the policy dicts with `"name": "games"`, `"name": "game_lineups"`, and `"name": "game_events"` from the `POLICIES` list.
 
@@ -1431,14 +1431,14 @@ Find and **remove** the policy dicts with `"name": "games"`, `"name": "game_line
 },
 ```
 
-- [ ] **Step 4: Run scheduler policy tests**
+- [x] **Step 4: Run scheduler policy tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_game_lifecycle_scheduler.py -v
 ```
 Expected: all `PASSED`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/services/scheduler.py backend/tests/test_game_lifecycle_scheduler.py
@@ -1455,7 +1455,7 @@ git commit -m "feat(scheduler): replace game/game_lineups/game_events with lifec
 
 The scheduler calls `_submit(job_id, season_id, task_name, force, max_tier)` which routes `task_name` to a handler. Find where `"events"`, `"games"`, and `"game_lineups"` are handled and add `"upcoming_games"` and `"post_game_completion"`.
 
-- [ ] **Step 1: Find the dispatch table**
+- [x] **Step 1: Find the dispatch table**
 
 ```bash
 cd backend && grep -n '"events"\|"games"\|"game_lineups"\|task.*index' app/main.py | head -30
@@ -1463,7 +1463,7 @@ cd backend && grep -n '"events"\|"games"\|"game_lineups"\|task.*index' app/main.
 
 Identify the dict/if-elif that maps task names to indexer calls.
 
-- [ ] **Step 2: Write a failing test**
+- [x] **Step 2: Write a failing test**
 
 ```python
 # In backend/tests/test_admin_indexing.py (or new file)
@@ -1484,14 +1484,14 @@ def test_post_game_completion_task_is_registered(admin_client):
     assert resp.status_code in (200, 202, 303)
 ```
 
-- [ ] **Step 3: Run to confirm failure**
+- [x] **Step 3: Run to confirm failure**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_admin_indexing.py -k "upcoming_games or post_game_completion" -v
 ```
 Expected: task not recognised → non-200 response.
 
-- [ ] **Step 4: Register the new task handlers in the dispatch table**
+- [x] **Step 4: Register the new task handlers in the dispatch table**
 
 All admin indexer calls use `await asyncio.to_thread(...)` to avoid blocking the event loop (see existing pattern at lines ~1833, ~1970, ~2107). Follow the same pattern and call `record_season_sync` at the end (matching adjacent handlers):
 
@@ -1517,21 +1517,21 @@ if task == "post_game_completion":
 
 Also **remove** (or comment out) the handlers for `"games"`, `"game_lineups"`, and `"events"` if they are no longer reachable from the scheduler. Keep them if any admin UI buttons still reference them directly.
 
-- [ ] **Step 5: Run wiring tests**
+- [x] **Step 5: Run wiring tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_admin_indexing.py -v
 ```
 Expected: all `PASSED`.
 
-- [ ] **Step 6: Run full test suite**
+- [x] **Step 6: Run full test suite**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ --tb=short 2>&1 | tail -30
 ```
 Expected: all passing.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/app/main.py backend/tests/test_admin_indexing.py
@@ -1547,7 +1547,7 @@ git commit -m "feat(admin): wire upcoming_games and post_game_completion job tas
 - Modify: `backend/templates/admin.html` (or create partial) — add failures section
 - Modify: `backend/locales/*/messages.json` (add i18n keys)
 
-- [ ] **Step 1: Add a route to list and retry GameSyncFailure rows**
+- [x] **Step 1: Add a route to list and retry GameSyncFailure rows**
 
 Find an existing admin-only route in `main.py` (e.g. the admin dashboard route) and copy its `Depends(...)` auth guard exactly — do not invent a new auth pattern. The route must be behind the same session-based PIN auth as all other `/{locale}/admin/` routes.
 
@@ -1598,11 +1598,11 @@ async def admin_retry_game_failure(
 (`require_admin` is a placeholder name — use whatever dependency the existing admin routes use.)
 ```
 
-- [ ] **Step 2: Create `backend/templates/admin_game_failures.html`**
+- [x] **Step 2: Create `backend/templates/admin_game_failures.html`**
 
 Extend `base.html`. Show a table: game_id, season, abandoned_at, missing_fields (formatted as comma-separated), can_retry status, "Retry" button (POST form).
 
-- [ ] **Step 3: Add i18n keys**
+- [x] **Step 3: Add i18n keys**
 
 In each of `backend/locales/{de,en,fr,it}/messages.json`, add under an `"admin"` section. Use English as placeholder for non-English locales (to be translated later):
 
@@ -1613,18 +1613,18 @@ In each of `backend/locales/{de,en,fr,it}/messages.json`, add under an `"admin"`
 "abandoned_at": "Abandoned At"
 ```
 
-- [ ] **Step 4: Add a link to the new page from the admin nav**
+- [x] **Step 4: Add a link to the new page from the admin nav**
 
 In `backend/templates/admin.html` (or `base.html` admin section), add a link to `/{locale}/admin/game-failures`.
 
-- [ ] **Step 5: Run smoke test**
+- [x] **Step 5: Run smoke test**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_routes.py -v -k "admin" --tb=short
 ```
 Expected: existing admin tests still pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/main.py backend/templates/admin_game_failures.html \
@@ -1637,14 +1637,14 @@ git commit -m "feat(admin): add game sync failures page with manual retry"
 
 ## Final Verification
 
-- [ ] **Run full test suite**
+- [x] **Run full test suite**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -40
 ```
 Expected: all passing, no regressions.
 
-- [ ] **Smoke test the lifecycle end-to-end**
+- [x] **Smoke test the lifecycle end-to-end**
 
 Start dev server, navigate to `/admin`, trigger `upcoming_games` for a recent season, verify:
 1. Games with `status=scheduled` stay `upcoming`
@@ -1652,11 +1652,11 @@ Start dev server, navigate to `/admin`, trigger `upcoming_games` for a recent se
 3. Trigger `post_game_completion` — games with full data flip to `complete`
 4. Check `/admin/game-failures` page loads
 
-- [ ] **Verify old jobs are gone from scheduler queue**
+- [x] **Verify old jobs are gone from scheduler queue**
 
 In the admin scheduler panel, confirm `game_events`, `games`, `game_lineups` no longer appear. Confirm `upcoming_games_midday`, `upcoming_games_evening`, `upcoming_games_night`, and `post_game_completion` appear.
 
-- [ ] **Final commit tag**
+- [x] **Final commit tag**
 
 ```bash
 git tag game-lifecycle-jobs-complete

@@ -1,6 +1,6 @@
 # Home Page Cache Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Cache `get_upcoming_games` and `get_latest_results` in `stats_service.py` so the home page warm-hits drop from 3–4s to <200ms.
 
@@ -87,7 +87,7 @@ Both functions currently do `season_id` resolution **inside** the single `sessio
 
 ### Step-by-step for `get_upcoming_games`
 
-- [ ] **Step 1: Write the failing cache test**
+- [x] **Step 1: Write the failing cache test**
 
 Add to `backend/tests/test_ttl_cache.py`:
 
@@ -126,7 +126,7 @@ class TestStatsCacheFunctions:
         _cache.invalidate_prefix("latest_results")
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -135,7 +135,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: FAIL — functions don't check the cache yet so `fake` entries are ignored.
 
-- [ ] **Step 3: Wrap `get_upcoming_games` with cache**
+- [x] **Step 3: Wrap `get_upcoming_games` with cache**
 
 In `backend/app/services/stats_service.py`, modify `get_upcoming_games` (line 2139).
 
@@ -242,7 +242,7 @@ Also wrap the `if not games_raw: return []` early-return around line 2192. The e
             return []
 ```
 
-- [ ] **Step 4: Wrap `get_latest_results` with cache**
+- [x] **Step 4: Wrap `get_latest_results` with cache**
 
 Same pattern. In `backend/app/services/stats_service.py`, modify `get_latest_results` (line 2372):
 
@@ -291,7 +291,7 @@ Also wrap the empty early-return:
             return []
 ```
 
-- [ ] **Step 5: Run the cache tests to verify they pass**
+- [x] **Step 5: Run the cache tests to verify they pass**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -300,7 +300,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: both PASS.
 
-- [ ] **Step 6: Add invalidation to `data_indexer.py`**
+- [x] **Step 6: Add invalidation to `data_indexer.py`**
 
 **Location 1:** End of `index_games_for_league`, after existing invalidations at line ~1688:
 
@@ -327,7 +327,7 @@ Expected: both PASS.
         return transitioned
 ```
 
-- [ ] **Step 7: Run full test suite**
+- [x] **Step 7: Run full test suite**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats/backend
@@ -336,7 +336,7 @@ cd /home/denny/Development/SwissUnihockeyStats/backend
 
 Expected: all tests pass (same count as before, no new failures).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats

@@ -1,6 +1,6 @@
 # Player Detail Enrichment Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Enrich the player detail page with cached biographical data (photo, height, weight, position, license), add PPG as a derived stat, and improve recent games with "show more" pagination.
 
@@ -30,7 +30,7 @@
 **Files:**
 - Modify: `backend/app/models/db_models.py` (class Player, ~line 172)
 
-- [ ] **Step 1: Add columns to the Player class**
+- [x] **Step 1: Add columns to the Player class**
 
 In `db_models.py`, add the following 6 mapped columns to the `Player` class, after the `api_skip_until` line (~line 190):
 
@@ -43,7 +43,7 @@ In `db_models.py`, add the following 6 mapped columns to the `Player` class, aft
     player_details_fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add backend/app/models/db_models.py
@@ -57,7 +57,7 @@ git commit -m "feat: add biographical cache columns to Player model"
 **Files:**
 - Modify: `backend/app/services/database.py` (`_run_sqlite_migrations`, ~line 210)
 
-- [ ] **Step 1: Write a failing test**
+- [x] **Step 1: Write a failing test**
 
 Create `backend/tests/test_player_detail_enrichment.py`:
 
@@ -83,14 +83,14 @@ def test_migration_adds_player_columns(client):
     assert "player_details_fetched_at" in cols
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_player_detail_enrichment.py::test_migration_adds_player_columns -v
 ```
 Expected: FAIL — columns not yet in migration.
 
-- [ ] **Step 3: Add the migration stanza**
+- [x] **Step 3: Add the migration stanza**
 
 In `_run_sqlite_migrations`, add a new block after the existing `player_statistics` migration block:
 
@@ -113,14 +113,14 @@ In `_run_sqlite_migrations`, add a new block after the existing `player_statisti
 
 Place this block inside the `with self.engine.connect() as conn:` block, before the `conn.commit()` at the end of the existing migrations.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_player_detail_enrichment.py::test_migration_adds_player_columns -v
 ```
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/services/database.py backend/tests/test_player_detail_enrichment.py
@@ -134,7 +134,7 @@ git commit -m "feat: migrate Player table with biographical cache columns"
 **Files:**
 - Create: `backend/app/lib/player_translations.py`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `backend/tests/test_player_detail_enrichment.py`:
 
@@ -177,14 +177,14 @@ def test_translate_license_none_returns_none():
     assert translate_license(None, "en") is None
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_player_detail_enrichment.py -k "translate" -v
 ```
 Expected: FAIL — module doesn't exist.
 
-- [ ] **Step 3: Create the module**
+- [x] **Step 3: Create the module**
 
 Create `backend/app/lib/player_translations.py`:
 
@@ -263,14 +263,14 @@ def translate_license(raw: Optional[str], locale: str) -> Optional[str]:
     return raw
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_player_detail_enrichment.py -k "translate" -v
 ```
 Expected: all PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/lib/player_translations.py backend/tests/test_player_detail_enrichment.py
@@ -294,7 +294,7 @@ The API cells structure for `get_player_details(person_id)`:
 - `cells[6]` → weight e.g. "70 kg"
 - `cells[7]` → license e.g. "Herren Aktive GF L-UPL"
 
-- [ ] **Step 1: Write failing tests for the TTL helper**
+- [x] **Step 1: Write failing tests for the TTL helper**
 
 Add to `backend/tests/test_player_detail_enrichment.py`:
 
@@ -333,14 +333,14 @@ def test_player_details_fresh_when_fetched_same_day_as_aug31():
     assert _player_details_stale(fetched, _today=datetime(2026, 3, 1, tzinfo=timezone.utc)) is False
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_player_detail_enrichment.py -k "stale" -v
 ```
 Expected: FAIL — function doesn't exist.
 
-- [ ] **Step 3: Add the TTL helper to stats_service.py**
+- [x] **Step 3: Add the TTL helper to stats_service.py**
 
 Add this function near the top of `stats_service.py`, before `get_player_detail` (around line 1882):
 
@@ -370,14 +370,14 @@ def _player_details_stale(
     return fetched_at < cutoff
 ```
 
-- [ ] **Step 4: Run TTL tests to verify they pass**
+- [x] **Step 4: Run TTL tests to verify they pass**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_player_detail_enrichment.py -k "stale" -v
 ```
 Expected: all PASS
 
-- [ ] **Step 5: Update get_player_detail to populate new fields**
+- [x] **Step 5: Update get_player_detail to populate new fields**
 
 In `get_player_detail`, replace the existing API call block (currently ~lines 2133–2163) with:
 
@@ -498,7 +498,7 @@ Also update the `get_player_detail` function signature to accept a `locale` para
 def get_player_detail(person_id: int, locale: str = "de") -> dict:
 ```
 
-- [ ] **Step 6: Update the caller in main.py to pass locale**
+- [x] **Step 6: Update the caller in main.py to pass locale**
 
 Find the `get_player_detail` call in `main.py` and update it:
 
@@ -506,7 +506,7 @@ Find the `get_player_detail` call in `main.py` and update it:
 player = get_player_detail(person_id, locale=locale)
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/app/services/stats_service.py backend/app/main.py backend/tests/test_player_detail_enrichment.py
@@ -520,7 +520,7 @@ git commit -m "feat: cache player biographical data with end-of-August TTL"
 **Files:**
 - Modify: `backend/app/services/stats_service.py`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `backend/tests/test_player_detail_enrichment.py`:
 
@@ -543,14 +543,14 @@ def test_ppg_none_when_games_none():
     assert _compute_ppg(points=5, games_played=None) is None
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_player_detail_enrichment.py -k "ppg" -v
 ```
 Expected: FAIL
 
-- [ ] **Step 3: Add _compute_ppg helper to stats_service.py**
+- [x] **Step 3: Add _compute_ppg helper to stats_service.py**
 
 Add near `_player_details_stale` (around line 1882):
 
@@ -562,7 +562,7 @@ def _compute_ppg(points: Optional[int], games_played: Optional[int]) -> Optional
     return round((points or 0) / games_played, 2)
 ```
 
-- [ ] **Step 4: Apply PPG to career rows and totals**
+- [x] **Step 4: Apply PPG to career rows and totals**
 
 In `get_player_detail`, find where each `career` row dict is built (around line 2000–2030). Add `ppg` to each row:
 
@@ -584,14 +584,14 @@ And in the `totals` dict (find where totals are computed):
 
 Where `totals_points` and `totals_gp` are the summed values already computed. Check the exact variable names in the existing totals block — they will be something like `sum(...)` expressions assigned to local variables.
 
-- [ ] **Step 5: Run PPG tests to verify they pass**
+- [x] **Step 5: Run PPG tests to verify they pass**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_player_detail_enrichment.py -k "ppg" -v
 ```
 Expected: all PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/services/stats_service.py backend/tests/test_player_detail_enrichment.py
@@ -606,7 +606,7 @@ git commit -m "feat: add PPG (points-per-game) to player career stats"
 - Modify: `backend/app/services/stats_service.py`
 - Modify: `backend/app/api/v1/endpoints/players.py`
 
-- [ ] **Step 1: Write failing test for the new function**
+- [x] **Step 1: Write failing test for the new function**
 
 Add to `backend/tests/test_player_detail_enrichment.py`:
 
@@ -622,14 +622,14 @@ def test_get_player_recent_games_returns_limited_rows(client):
     assert isinstance(result["rows"], list)
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_player_detail_enrichment.py::test_get_player_recent_games_returns_limited_rows -v
 ```
 Expected: FAIL
 
-- [ ] **Step 3: Extract recent games logic into a standalone function**
+- [x] **Step 3: Extract recent games logic into a standalone function**
 
 In `stats_service.py`, add a new function `get_player_recent_games` that reuses the existing query logic from `get_player_detail`. The function should:
 
@@ -673,14 +673,14 @@ Update `get_player_detail` to use the first 10 rows and include `has_more`:
 
 And add `"recent_has_more": recent_has_more` to the result dict.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_player_detail_enrichment.py::test_get_player_recent_games_returns_limited_rows -v
 ```
 Expected: PASS
 
-- [ ] **Step 5: Add the API endpoint**
+- [x] **Step 5: Add the API endpoint**
 
 In `backend/app/api/v1/endpoints/players.py`, add:
 
@@ -706,7 +706,7 @@ async def get_player_games(
         raise HTTPException(status_code=500, detail="Internal server error")
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/services/stats_service.py backend/app/api/v1/endpoints/players.py backend/tests/test_player_detail_enrichment.py
@@ -723,7 +723,7 @@ git commit -m "feat: add recent games pagination for player detail"
 - Modify: `backend/locales/fr/messages.json`
 - Modify: `backend/locales/it/messages.json`
 
-- [ ] **Step 1: Add keys to all four locale files**
+- [x] **Step 1: Add keys to all four locale files**
 
 In each file, find the `"player"` section and add the following keys:
 
@@ -759,7 +759,7 @@ In each file, find the `"player"` section and add the following keys:
 "show_more_games": "Carica altro"
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add backend/locales/
@@ -773,7 +773,7 @@ git commit -m "i18n: add player height/weight/ppg/show_more translation keys"
 **Files:**
 - Modify: `backend/templates/player_detail.html`
 
-- [ ] **Step 1: Add bio info row under the player name**
+- [x] **Step 1: Add bio info row under the player name**
 
 Replace the current header body block (lines 13–19):
 
@@ -809,7 +809,7 @@ With:
     </div>
 ```
 
-- [ ] **Step 2: Add PPG to header stat badges**
+- [x] **Step 2: Add PPG to header stat badges**
 
 Find the `stats` variable in the header badges block (around line 32) and add PPG:
 
@@ -824,7 +824,7 @@ Find the `stats` variable in the header badges block (around line 32) and add PP
     ] %}
 ```
 
-- [ ] **Step 3: Add PPG column to career table**
+- [x] **Step 3: Add PPG column to career table**
 
 In the `<thead>` row, add after the PTS column:
 
@@ -844,7 +844,7 @@ In the totals row, add after the PTS cell:
             <td class="col-narrow" style="color:var(--gray-500);">{{ player.totals.ppg if player.totals.ppg is not none else '–' }}</td>
 ```
 
-- [ ] **Step 4: Replace recent games section with paginated version**
+- [x] **Step 4: Replace recent games section with paginated version**
 
 Replace the current recent games section (lines 112–168) with:
 
@@ -906,7 +906,7 @@ Replace the current recent games section (lines 112–168) with:
   {% endif %}
 ```
 
-- [ ] **Step 5: Create the partial template for game rows**
+- [x] **Step 5: Create the partial template for game rows**
 
 Create `backend/templates/partials/player_game_row.html`:
 
@@ -1018,14 +1018,14 @@ Update the initial "show more" button in `player_detail.html` to match this patt
 
 Place this `<tbody>` after the first `</tbody>` closing tag of the recent games table.
 
-- [ ] **Step 6: Run the full test suite**
+- [x] **Step 6: Run the full test suite**
 
 ```bash
 cd backend && .venv/bin/pytest --tb=short -q
 ```
 Expected: all tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/templates/ backend/locales/ backend/app/api/v1/endpoints/players.py
@@ -1036,13 +1036,13 @@ git commit -m "feat: update player detail template with bio row, PPG, show-more 
 
 ## Task 9: Smoke test on production DB
 
-- [ ] **Step 1: Start the dev server**
+- [x] **Step 1: Start the dev server**
 
 ```bash
 cd backend && .venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
-- [ ] **Step 2: Open Pablo Mariotti's player page**
+- [x] **Step 2: Open Pablo Mariotti's player page**
 
 Navigate to `http://localhost:8000/de/player/471982`
 
@@ -1053,10 +1053,10 @@ Expected:
 - Recent games shows 10 rows with "Load more" button if player has >10 game appearances
 - Clicking "Load more" appends the next 10 rows
 
-- [ ] **Step 3: Check English locale**
+- [x] **Step 3: Check English locale**
 
 Navigate to `http://localhost:8000/en/player/471982`
 
 Expected: Bio row shows `Forward · 179 cm · 70 kg · Men Active GF L-UPL · Born 2003`
 
-- [ ] **Step 4: Commit if any template fixes needed, then done**
+- [x] **Step 4: Commit if any template fixes needed, then done**

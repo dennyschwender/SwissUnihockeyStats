@@ -1,6 +1,6 @@
 # Docker Compose Cleanup & Resource Tuning Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Consolidate three Docker Compose files into one clean `docker-compose.yml` with prod settings (gunicorn, 3 CPU / 2 GB limits, DEBUG=false) and update CLAUDE.md and memory to match.
 
@@ -27,7 +27,7 @@
 **Files:**
 - Modify: `docker-compose.yml`
 
-- [ ] **Step 1: Replace the entire content of `docker-compose.yml`**
+- [x] **Step 1: Replace the entire content of `docker-compose.yml`**
 
 Write this exact content to `/home/denny/Development/SwissUnihockeyStats/docker-compose.yml`:
 
@@ -94,7 +94,7 @@ networks:
     driver: bridge
 ```
 
-- [ ] **Step 2: Verify the file is valid YAML**
+- [x] **Step 2: Verify the file is valid YAML**
 
 ```bash
 docker compose -f /home/denny/Development/SwissUnihockeyStats/docker-compose.yml config --quiet
@@ -102,7 +102,7 @@ docker compose -f /home/denny/Development/SwissUnihockeyStats/docker-compose.yml
 
 Expected: no output, exit code 0. If it prints errors, fix the YAML.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats
@@ -118,14 +118,14 @@ git commit -m "chore(docker): consolidate compose files — prod settings, 3CPU/
 - Delete: `docker-compose.prod.yml`
 - Delete: `docker-compose.dev.yml`
 
-- [ ] **Step 1: Delete both files**
+- [x] **Step 1: Delete both files**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats
 rm docker-compose.prod.yml docker-compose.dev.yml
 ```
 
-- [ ] **Step 2: Verify only one compose file remains**
+- [x] **Step 2: Verify only one compose file remains**
 
 ```bash
 ls /home/denny/Development/SwissUnihockeyStats/docker-compose*.yml
@@ -133,7 +133,7 @@ ls /home/denny/Development/SwissUnihockeyStats/docker-compose*.yml
 
 Expected: only `docker-compose.yml` listed.
 
-- [ ] **Step 3: Verify compose still validates**
+- [x] **Step 3: Verify compose still validates**
 
 ```bash
 docker compose -f /home/denny/Development/SwissUnihockeyStats/docker-compose.yml config --quiet
@@ -141,7 +141,7 @@ docker compose -f /home/denny/Development/SwissUnihockeyStats/docker-compose.yml
 
 Expected: no output, exit code 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats
@@ -156,7 +156,7 @@ git commit -m "chore(docker): delete docker-compose.prod.yml and docker-compose.
 **Files:**
 - Modify: `CLAUDE.md`
 
-- [ ] **Step 1: Find and update the deploy command in CLAUDE.md**
+- [x] **Step 1: Find and update the deploy command in CLAUDE.md**
 
 Find this block in `/home/denny/Development/SwissUnihockeyStats/CLAUDE.md`:
 
@@ -179,7 +179,7 @@ Production container name: `swissunihockey-prod`
 ```
 and any reference to `swissunihockey-prod` in CLAUDE.md. Change to `swissunihockeystats`.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats
@@ -194,7 +194,7 @@ git commit -m "docs: update deploy command and container name in CLAUDE.md"
 **Files:**
 - Modify: `/home/denny/.claude/projects/-home-denny-Development-SwissUnihockeyStats/memory/MEMORY.md`
 
-- [ ] **Step 1: Update container name and deploy command in MEMORY.md**
+- [x] **Step 1: Update container name and deploy command in MEMORY.md**
 
 Find the deploy section. Update:
 - Container name: `swissunihockey-prod` → `swissunihockeystats`
@@ -210,7 +210,7 @@ And the container name line:
 Production container name: `swissunihockeystats`
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 cd /home/denny/Development/SwissUnihockeyStats

@@ -1,6 +1,6 @@
 # Enhancements Plan C — People Pages Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add referee detail pages (query-based, no new model) and coach detail pages (new `Staff` DB model + API client method + indexer).
 
@@ -34,7 +34,7 @@
 **Files:**
 - Modify: `backend/locales/de/messages.json`, `en/`, `fr/`, `it/`
 
-- [ ] **Step 1: Add referee and coach keys to all four locale files**
+- [x] **Step 1: Add referee and coach keys to all four locale files**
 
 In each `messages.json`, add a top-level `"referee"` section and a `"coach"` section:
 
@@ -102,7 +102,7 @@ In each `messages.json`, add a top-level `"referee"` section and a `"coach"` sec
   }
 ```
 
-- [ ] **Step 2: Verify JSON is valid**
+- [x] **Step 2: Verify JSON is valid**
 
 ```bash
 cd backend && python3 -c "
@@ -119,7 +119,7 @@ print('All locale files valid')
 
 Expected: `All locale files valid`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd backend && git add locales/
@@ -134,7 +134,7 @@ git commit -m "i18n: add referee and coach translation keys"
 - Modify: `backend/app/services/stats_service.py`
 - Test: `backend/tests/test_stats_service.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `backend/tests/test_stats_service.py`:
 
@@ -200,7 +200,7 @@ class TestGetRefereeGames:
         assert result["games"] == []
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_stats_service.py::TestGetRefereeGames -v
@@ -208,7 +208,7 @@ cd backend && .venv/bin/pytest tests/test_stats_service.py::TestGetRefereeGames 
 
 Expected: FAIL — `ImportError: cannot import name 'get_referee_games'`.
 
-- [ ] **Step 3: Add get_referee_games to stats_service.py**
+- [x] **Step 3: Add get_referee_games to stats_service.py**
 
 Add after the global search helpers (around the end of the file, before the final closing):
 
@@ -247,7 +247,7 @@ def get_referee_games(name: str, session) -> dict:
 
 Note: `or_` is already imported at the top of `stats_service.py`. `Game` is also already imported.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_stats_service.py::TestGetRefereeGames -v
@@ -255,7 +255,7 @@ cd backend && .venv/bin/pytest tests/test_stats_service.py::TestGetRefereeGames 
 
 Expected: 3 PASSED.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd backend && git add app/services/stats_service.py tests/test_stats_service.py
@@ -270,7 +270,7 @@ git commit -m "feat: add get_referee_games to stats_service"
 - Modify: `backend/app/main.py`
 - Create: `backend/templates/referee_detail.html`
 
-- [ ] **Step 1: Add referee_detail route to main.py**
+- [x] **Step 1: Add referee_detail route to main.py**
 
 Add after the `coach_detail` or any nearby detail route (place after the `player_detail` route for consistency — find it around line 3907 area). Insert:
 
@@ -292,7 +292,7 @@ async def referee_detail(locale: str, name: str, request: Request):
     )
 ```
 
-- [ ] **Step 2: Create referee_detail.html**
+- [x] **Step 2: Create referee_detail.html**
 
 Create `backend/templates/referee_detail.html`:
 
@@ -348,7 +348,7 @@ Create `backend/templates/referee_detail.html`:
 {% endblock %}
 ```
 
-- [ ] **Step 3: Run all tests**
+- [x] **Step 3: Run all tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
@@ -356,7 +356,7 @@ cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
 
 Expected: all tests PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd backend && git add app/main.py templates/referee_detail.html
@@ -371,7 +371,7 @@ git commit -m "feat: add referee detail page and route"
 - Modify: `backend/templates/game_detail.html`
 - Modify: `backend/app/main.py` (global search endpoint)
 
-- [ ] **Step 1: Make referee names clickable in game_detail.html**
+- [x] **Step 1: Make referee names clickable in game_detail.html**
 
 Find the referee display line (~line 455):
 ```html
@@ -389,7 +389,7 @@ Replace with:
 
 Note: Jinja2 has a built-in `urlencode` filter that percent-encodes strings.
 
-- [ ] **Step 2: Add referee results to global search in main.py**
+- [x] **Step 2: Add referee results to global search in main.py**
 
 Find the `universal_search` endpoint (~line 4089). Inside the `with db.session_scope() as session:` block, after the Leagues section (after `html_parts.append("</div></div>")` for leagues), add:
 
@@ -424,7 +424,7 @@ Find the `universal_search` endpoint (~line 4089). Inside the `with db.session_s
             html_parts.append("</div></div>")
 ```
 
-- [ ] **Step 3: Run all tests**
+- [x] **Step 3: Run all tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
@@ -432,7 +432,7 @@ cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
 
 Expected: all tests PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd backend && git add templates/game_detail.html app/main.py
@@ -446,7 +446,7 @@ git commit -m "feat: clickable referee names + referee global search results"
 **Files:**
 - Modify: `backend/app/models/db_models.py`
 
-- [ ] **Step 1: Add Staff model to db_models.py**
+- [x] **Step 1: Add Staff model to db_models.py**
 
 Add after the `PlayerStatistics` class (around line 460), before `SyncStatus`:
 
@@ -471,7 +471,7 @@ class Staff(Base):
 
 The composite primary key `(id, season_id)` allows the same person to appear across seasons. `session.merge()` will upsert correctly.
 
-- [ ] **Step 2: Verify the model creates its table**
+- [x] **Step 2: Verify the model creates its table**
 
 ```bash
 cd backend && DATABASE_PATH=:memory: .venv/bin/python3 -c "
@@ -485,7 +485,7 @@ print('Staff table created OK')
 
 Expected: `Staff table created OK`
 
-- [ ] **Step 3: Run all tests (migrations are auto-applied)**
+- [x] **Step 3: Run all tests (migrations are auto-applied)**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
@@ -493,7 +493,7 @@ cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
 
 Expected: all tests PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd backend && git add app/models/db_models.py
@@ -507,7 +507,7 @@ git commit -m "feat: add Staff DB model for coaching staff"
 **Files:**
 - Modify: `backend/app/services/api_client.py`
 
-- [ ] **Step 1: Add get_team_staff after get_team_stats**
+- [x] **Step 1: Add get_team_staff after get_team_stats**
 
 Find `get_team_stats` (~line 340):
 ```python
@@ -522,7 +522,7 @@ Add immediately after:
         return self._make_request(f"/api/teams/{team_id}/staff", {})
 ```
 
-- [ ] **Step 2: Verify no import or syntax errors**
+- [x] **Step 2: Verify no import or syntax errors**
 
 ```bash
 cd backend && .venv/bin/python3 -c "from app.services.api_client import SwissUnihockeyClient; print('OK')"
@@ -530,7 +530,7 @@ cd backend && .venv/bin/python3 -c "from app.services.api_client import SwissUni
 
 Expected: `OK`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd backend && git add app/services/api_client.py
@@ -545,7 +545,7 @@ git commit -m "feat: add get_team_staff to SwissUnihockeyClient"
 - Modify: `backend/app/services/data_indexer.py`
 - Test: `backend/tests/test_data_indexer.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `backend/tests/test_data_indexer.py` (find the existing test class structure and add a new class):
 
@@ -614,7 +614,7 @@ class TestIndexTeamStaff:
         assert s.first_name == "New"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_data_indexer.py::TestIndexTeamStaff -v
@@ -622,7 +622,7 @@ cd backend && .venv/bin/pytest tests/test_data_indexer.py::TestIndexTeamStaff -v
 
 Expected: FAIL — `AttributeError: 'DataIndexer' has no attribute 'index_team_staff'`.
 
-- [ ] **Step 3: Add index_team_staff to data_indexer.py**
+- [x] **Step 3: Add index_team_staff to data_indexer.py**
 
 Find `index_teams_for_club` method (around line 656) and add `index_team_staff` as a new method of the `DataIndexer` class. Place it near the other per-team indexing methods:
 
@@ -664,7 +664,7 @@ Find `index_teams_for_club` method (around line 656) and add `index_team_staff` 
             session.merge(staff_row)
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_data_indexer.py::TestIndexTeamStaff -v
@@ -672,7 +672,7 @@ cd backend && .venv/bin/pytest tests/test_data_indexer.py::TestIndexTeamStaff -v
 
 Expected: 2 PASSED.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd backend && git add app/services/data_indexer.py tests/test_data_indexer.py
@@ -687,7 +687,7 @@ git commit -m "feat: add index_team_staff to DataIndexer"
 - Modify: `backend/app/services/stats_service.py`
 - Test: `backend/tests/test_stats_service.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `backend/tests/test_stats_service.py`:
 
@@ -740,7 +740,7 @@ class TestGetCoachDetail:
         assert result is None
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_stats_service.py::TestGetCoachDetail -v
@@ -748,7 +748,7 @@ cd backend && .venv/bin/pytest tests/test_stats_service.py::TestGetCoachDetail -
 
 Expected: FAIL — `ImportError: cannot import name 'get_coach_detail'`.
 
-- [ ] **Step 3: Add get_coach_detail to stats_service.py**
+- [x] **Step 3: Add get_coach_detail to stats_service.py**
 
 Add after `get_referee_games`:
 
@@ -804,7 +804,7 @@ def get_coach_detail(person_id: int, session) -> dict | None:
 
 Also add `Season` to the imports at the top of `stats_service.py` if not already present (it is — used in `get_player_detail`).
 
-- [ ] **Step 4: Extend get_team_detail to include head_coach**
+- [x] **Step 4: Extend get_team_detail to include head_coach**
 
 In `get_team_detail`, after the roster is built and before the `return {}` / result dict is assembled, add a coach lookup:
 
@@ -830,7 +830,7 @@ In `get_team_detail`, after the roster is built and before the `return {}` / res
 
 Then add `"head_coach": head_coach,` to the returned dict.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/test_stats_service.py::TestGetCoachDetail -v
@@ -838,7 +838,7 @@ cd backend && .venv/bin/pytest tests/test_stats_service.py::TestGetCoachDetail -
 
 Expected: 3 PASSED.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd backend && git add app/services/stats_service.py tests/test_stats_service.py
@@ -853,7 +853,7 @@ git commit -m "feat: add get_coach_detail and head_coach to get_team_detail"
 - Modify: `backend/app/main.py`
 - Create: `backend/templates/coach_detail.html`
 
-- [ ] **Step 1: Add coach_detail route to main.py**
+- [x] **Step 1: Add coach_detail route to main.py**
 
 Add alongside the referee_detail route:
 
@@ -875,7 +875,7 @@ async def coach_detail(locale: str, person_id: int, request: Request):
     )
 ```
 
-- [ ] **Step 2: Create coach_detail.html**
+- [x] **Step 2: Create coach_detail.html**
 
 Create `backend/templates/coach_detail.html`:
 
@@ -936,7 +936,7 @@ Create `backend/templates/coach_detail.html`:
 {% endblock %}
 ```
 
-- [ ] **Step 3: Run all tests**
+- [x] **Step 3: Run all tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
@@ -944,7 +944,7 @@ cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -20
 
 Expected: all tests PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd backend && git add app/main.py templates/coach_detail.html
@@ -960,7 +960,7 @@ git commit -m "feat: add coach detail page and route"
 - Modify: `backend/templates/game_detail.html`
 - Modify: `backend/app/main.py` (global search)
 
-- [ ] **Step 1: Add head coach line in team_detail.html**
+- [x] **Step 1: Add head coach line in team_detail.html**
 
 Find the team info header section (around the league name / season display area). Look for the venue or league line in the team header — search for `team.league_name` or `team.season_name` in `team_detail.html`. Add after the league/season display:
 
@@ -975,7 +975,7 @@ Find the team info header section (around the league name / season display area)
 
 To find the exact insertion point, search for the line with `team.league_name` or `team.name` in the header `<div>` near the top of the team detail content (not inside the roster table).
 
-- [ ] **Step 2: Add coach names in game_detail.html**
+- [x] **Step 2: Add coach names in game_detail.html**
 
 Find the referee display area (around line 455). After the referee line, add:
 
@@ -1017,7 +1017,7 @@ Add `"home_coach": home_coach, "away_coach": away_coach,` to the returned box sc
 
 Find the returned dict in `get_game_box_score` — search for `"referee_1"` in the returned dict and add the coach fields near it.
 
-- [ ] **Step 3: Add coach results to global search in main.py**
+- [x] **Step 3: Add coach results to global search in main.py**
 
 In `universal_search`, after the referee section, add:
 
@@ -1061,7 +1061,7 @@ In `universal_search`, after the referee section, add:
             html_parts.append("</div></div>")
 ```
 
-- [ ] **Step 4: Run all tests**
+- [x] **Step 4: Run all tests**
 
 ```bash
 cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -30
@@ -1069,7 +1069,7 @@ cd backend && .venv/bin/pytest tests/ -v --tb=short 2>&1 | tail -30
 
 Expected: all tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd backend && git add templates/team_detail.html templates/game_detail.html app/main.py app/services/stats_service.py
