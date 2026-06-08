@@ -1019,26 +1019,6 @@ class Scheduler:
         except Exception as exc:
             logger.error("[scheduler] auto-freeze error: %s", exc, exc_info=True)
 
-    def _maybe_schedule(
-        self,
-        session,
-        policy: dict,
-        season: int | None,
-        is_current_season: bool = True,
-    ):
-        """Schedule a job if none is already queued for this policy+season.
-
-        Past seasons (is_current_season=False) are indexed once and then frozen:
-        once a completed sync exists their data never changes, so we skip
-        rescheduling to avoid thousands of redundant API calls per day.
-        """
-        # Skip frozen seasons entirely — no jobs, no DB queries
-        if season is not None:
-            from app.models.db_models import Season as _Season
-            frozen = session.query(_Season.is_frozen).filter(_Season.id == season).scalar()
-            if frozen:
-                return
-
         key = (policy["name"], season)
 
         # Don't double-queue
@@ -1077,35 +1057,6 @@ class Scheduler:
             if req_last is None:
                 return  # prerequisite has never completed for this season yet
 
-        # Past seasons are frozen once indexed — their data never changes after
-        # the season ends, so we index once and never reschedule again.
-        if not is_current_season and last_sync is not None:
-            return
-
-        # For past seasons: if the last attempt (even a failed one) was recent,
-        # don't keep retrying.  This prevents infinite re-queuing when the API
-        # no longer serves historical data (returns error → status='failed' →
-        # _last_sync_for finds nothing → schedules again → repeat).
-        if not is_current_season and last_sync is None:
-            last_attempt = _last_attempt_for(session, policy["entity_type"], season)
-            if last_attempt is not None:
-                # Normalize to naive UTC to match _utcnow() (which is naive).
-                # DB rows written with datetime.now(timezone.utc) may be
-                # returned as offset-aware by SQLAlchemy on some backends.
-                if last_attempt.tzinfo is not None:
-                    last_attempt = last_attempt.replace(tzinfo=None)
-                if (now - last_attempt) < policy["max_age"]:
-                    return  # back off until max_age expires
-
-        if last_sync is None:
-            if "run_at_hour" in policy:
-                # Fixed-time policies: even on first run, snap to the next scheduled
-                # window instead of running immediately. Running at startup would fire
-                # all instances of e.g. upcoming_games (noon/evening/night) in parallel.
-                run_at = _snap_to_hour(now, policy["run_at_hour"])
-            else:
-                # Other policies: run soon, staggered by priority to avoid thundering herd.
-                run_at = now + timedelta(seconds=policy["priority"])
         else:
             if "run_at_hour" in policy:
                 # Snap to the next nightly window that satisfies max_age.
