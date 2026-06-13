@@ -21,7 +21,7 @@ services:
       - ./backend/.env:/app/.env:ro
 
     ports:
-      - "8000:8000"
+      - "8001:8000"
 
     # Single gunicorn/uvicorn worker — SQLite does not support concurrent multi-process writes.
     # Async uvicorn handles all request concurrency within one process via asyncio.
